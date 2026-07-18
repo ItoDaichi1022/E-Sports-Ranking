@@ -22,15 +22,25 @@ export function renderRanking(containerEl) {
 
   rankings.forEach((r) => {
     const tr = document.createElement('tr');
+    tr.className = 'clickable-row' + (r.rank <= 3 ? ` rank-${r.rank}` : '');
     tr.innerHTML = `
-      <td>${r.rank}</td>
-      <td>${escapeHtml(r.name)}</td>
+      <td class="rank-cell">${r.rank}</td>
+      <td><a href="#player/${encodeURIComponent(r.id)}">${escapeHtml(r.name)}</a></td>
       <td>${r.score.toFixed(1)}</td>
       <td>${r.tournamentsPlayed}</td>
     `;
+    tr.addEventListener('click', (e) => {
+      if (e.target.closest('a')) return;
+      location.hash = `#player/${encodeURIComponent(r.id)}`;
+    });
     tbody.appendChild(tr);
   });
 
   table.appendChild(tbody);
   containerEl.appendChild(table);
+
+  const note = document.createElement('p');
+  note.className = 'note';
+  note.textContent = '行をクリックすると選手の個人戦績ページが開きます。';
+  containerEl.appendChild(note);
 }

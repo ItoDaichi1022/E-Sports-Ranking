@@ -1,17 +1,19 @@
-import { state, generateId } from './state.js';
-import { addPlayer, renderPlayerTable } from './players.js';
-import { createBracket } from './bracket.js';
+import { state, generateId, getPlayerName } from './state.js';
+import { addPlayer, renderPlayerTable, escapeHtml } from './players.js';
+import { createBracket, updateTournament, deleteTournamentData, getChampionId } from './bracket.js';
 import { renderBracket } from './bracketView.js';
-import { renderMatchesLog } from './matchesLog.js';
+import { renderMatchesTable } from './matchesLog.js';
 import { computeRankings } from './ranking.js';
 import { renderRanking } from './rankingView.js';
+import { getPlayerStats } from './playerStats.js';
 import { githubConfig, loadConfigFromStorage, saveConfigToStorage, isConfigured } from './github.js';
-import { loadAllFromGitHub, saveAllToGitHub } from './githubSync.js';
+import { loadAllFromGitHub, saveAllToGitHub, markBracketDeleted } from './githubSync.js';
 
-// 選手選択画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
+// 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
 let selectedParticipantIds = [];
-let currentTournamentId = null;
 let participantSearchQuery = '';
+let currentBracketTournamentId = null;
+let dirty = false;
 
 const playerForm = document.getElementById('player-form');
 const playerIdInput = document.getElementById('player-id-input');
@@ -21,6 +23,7 @@ const playerListEl = document.getElementById('player-list');
 const participantSearchInput = document.getElementById('participant-search-input');
 const participantCheckboxesEl = document.getElementById('participant-checkboxes');
 const selectedListEl = document.getElementById('selected-participant-list');
+const selectedCountEl = document.getElementById('selected-count');
 const shuffleBtn = document.getElementById('shuffle-btn');
 const seedByRankingBtn = document.getElementById('seed-by-ranking-btn');
 
@@ -28,9 +31,22 @@ const tournamentForm = document.getElementById('tournament-form');
 const tournamentNameInput = document.getElementById('tournament-name-input');
 const tournamentDateInput = document.getElementById('tournament-date-input');
 
-const tournamentSelect = document.getElementById('tournament-select');
+const historyListEl = document.getElementById('history-list');
+
+const bracketTitleEl = document.getElementById('bracket-title');
+const bracketMetaEl = document.getElementById('bracket-meta');
 const bracketContainer = document.getElementById('bracket-container');
-const matchesLogContainer = document.getElementById('matches-log-container');
+const bracketMatchesContainer = document.getElementById('bracket-matches-container');
+const tournamentEditBtn = document.getElementById('tournament-edit-btn');
+const tournamentDeleteBtn = document.getElementById('tournament-delete-btn');
+const tournamentEditForm = document.getElementById('tournament-edit-form');
+const tournamentEditNameInput = document.getElementById('tournament-edit-name-input');
+const tournamentEditDateInput = document.getElementById('tournament-edit-date-input');
+const tournamentEditCancelBtn = document.getElementById('tournament-edit-cancel-btn');
+
+const playerDetailEl = document.getElementById('player-detail');
+const playerBackBtn = document.getElementById('player-back-btn');
+
 const rankingContainer = document.getElementById('ranking-container');
 
 const githubConfigForm = document.getElementById('github-config-form');
@@ -39,22 +55,84 @@ const githubRepoInput = document.getElementById('github-repo-input');
 const githubBranchInput = document.getElementById('github-branch-input');
 const githubPathInput = document.getElementById('github-path-input');
 const githubTokenInput = document.getElementById('github-token-input');
+const githubRememberInput = document.getElementById('github-remember-input');
 const githubLoadBtn = document.getElementById('github-load-btn');
 const githubSaveBtn = document.getElementById('github-save-btn');
 const githubStatusEl = document.getElementById('github-status');
+const dirtyBadgeEl = document.getElementById('dirty-badge');
 
-const VIEWS = ['home', 'tournament', 'players', 'ranking', 'settings'];
-const viewElements = Object.fromEntries(VIEWS.map((v) => [v, document.getElementById(`view-${v}`)]));
+const mainNav = document.getElementById('main-nav');
 
-function showView(view) {
-  const target = VIEWS.includes(view) ? view : 'home';
-  VIEWS.forEach((v) => { viewElements[v].hidden = v !== target; });
+// ---- 未保存変更の管理 ----
+
+function updateSyncBar() {
+  dirtyBadgeEl.hidden = !dirty;
+  githubSaveBtn.classList.toggle('attention', dirty);
+}
+
+function markDirty() {
+  dirty = true;
+  updateSyncBar();
+}
+
+function clearDirty() {
+  dirty = false;
+  updateSyncBar();
+}
+
+window.addEventListener('beforeunload', (e) => {
+  if (dirty) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+// ---- ルーティング ----
+
+const VIEW_IDS = {
+  home: 'view-home',
+  tournament: 'view-tournament',
+  history: 'view-history',
+  bracket: 'view-bracket',
+  players: 'view-players',
+  player: 'view-player-detail',
+  ranking: 'view-ranking',
+  settings: 'view-settings',
+};
+
+// ナビのハイライト用：詳細ページは親メニューに対応付ける
+const NAV_PAGE_OF = { bracket: 'history', player: 'players' };
+
+function parseHash() {
+  const h = location.hash.replace(/^#/, '');
+  const [page, param] = h.split('/');
+  return { page: page || 'home', param: param ? decodeURIComponent(param) : null };
+}
+
+function routeFromHash() {
+  const { page, param } = parseHash();
+  const target = VIEW_IDS[page] ? page : 'home';
+
+  Object.entries(VIEW_IDS).forEach(([name, id]) => {
+    document.getElementById(id).hidden = name !== target;
+  });
+
+  const navPage = NAV_PAGE_OF[target] || target;
+  mainNav.querySelectorAll('a').forEach((a) => {
+    a.classList.toggle('active', a.dataset.page === navPage);
+  });
 
   if (target === 'tournament') {
-    refreshTournamentSelect();
-    renderBracketAndLog();
+    renderParticipantCheckboxes();
+    renderSelectedList();
+  } else if (target === 'history') {
+    renderHistoryList();
+  } else if (target === 'bracket') {
+    renderBracketPage(param);
   } else if (target === 'players') {
     refreshPlayerUI();
+  } else if (target === 'player') {
+    renderPlayerDetail(param);
   } else if (target === 'ranking') {
     renderRanking(rankingContainer);
   } else if (target === 'settings') {
@@ -62,12 +140,17 @@ function showView(view) {
   }
 }
 
-function routeFromHash() {
-  showView(location.hash.replace('#', ''));
-}
+// ---- 選手まわり ----
 
 function refreshPlayerUI() {
-  renderPlayerTable(playerListEl);
+  renderPlayerTable(playerListEl, () => {
+    markDirty();
+    // 削除された選手が選択中リストに残らないようにする
+    selectedParticipantIds = selectedParticipantIds.filter((id) =>
+      state.players.some((p) => p.id === id),
+    );
+    refreshPlayerUI();
+  });
   renderParticipantCheckboxes();
 }
 
@@ -115,6 +198,9 @@ function renderParticipantCheckboxes() {
 
 function renderSelectedList() {
   selectedListEl.innerHTML = '';
+  selectedCountEl.textContent = selectedParticipantIds.length
+    ? `（選択中: ${selectedParticipantIds.length}人）`
+    : '';
 
   if (selectedParticipantIds.length === 0) {
     selectedListEl.innerHTML = '<p class="empty-hint">参加者が選択されていません。</p>';
@@ -136,6 +222,7 @@ function renderSelectedList() {
 
     const upBtn = document.createElement('button');
     upBtn.type = 'button';
+    upBtn.className = 'btn-secondary';
     upBtn.textContent = '↑';
     upBtn.disabled = index === 0;
     upBtn.addEventListener('click', () => {
@@ -146,6 +233,7 @@ function renderSelectedList() {
 
     const downBtn = document.createElement('button');
     downBtn.type = 'button';
+    downBtn.className = 'btn-secondary';
     downBtn.textContent = '↓';
     downBtn.disabled = index === selectedParticipantIds.length - 1;
     downBtn.addEventListener('click', () => {
@@ -156,6 +244,7 @@ function renderSelectedList() {
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
+    removeBtn.className = 'btn-secondary';
     removeBtn.textContent = '✕';
     removeBtn.addEventListener('click', () => {
       selectedParticipantIds = selectedParticipantIds.filter((pid) => pid !== id);
@@ -196,33 +285,150 @@ function seedBySelectedRanking() {
   renderSelectedList();
 }
 
-function refreshTournamentSelect() {
-  tournamentSelect.innerHTML = '';
+// ---- 大会履歴 ----
+
+function tournamentStatusLabel(t) {
+  const bracket = state.brackets[t.id];
+  if (!bracket) return '—';
+  const championId = getChampionId(bracket);
+  return championId ? `優勝: ${getPlayerName(championId)}` : '進行中';
+}
+
+function renderHistoryList() {
+  historyListEl.innerHTML = '';
 
   if (state.tournaments.length === 0) {
-    tournamentSelect.innerHTML = '<option value="">(大会未作成)</option>';
+    historyListEl.innerHTML = '<p class="empty-hint">まだ大会がありません。「大会作成」から始めてください。</p>';
     return;
   }
 
-  state.tournaments.forEach((t) => {
-    const option = document.createElement('option');
-    option.value = t.id;
-    option.textContent = `${t.name} (${t.date || '日付未設定'})`;
-    tournamentSelect.appendChild(option);
+  [...state.tournaments].reverse().forEach((t) => {
+    const item = document.createElement('a');
+    item.className = 'history-item';
+    item.href = `#bracket/${encodeURIComponent(t.id)}`;
+
+    const info = document.createElement('div');
+    info.className = 'history-info';
+    info.innerHTML = `
+      <span class="history-name">${escapeHtml(t.name)}</span>
+      <span class="history-meta">${escapeHtml(t.date || '日付未設定')} ・ ${t.participantIds.length}人参加</span>
+    `;
+
+    const status = document.createElement('span');
+    status.className = 'history-status';
+    status.textContent = tournamentStatusLabel(t);
+
+    item.appendChild(info);
+    item.appendChild(status);
+    historyListEl.appendChild(item);
   });
-
-  tournamentSelect.value = currentTournamentId;
 }
 
-function renderBracketAndLog() {
-  if (currentTournamentId) {
-    renderBracket(currentTournamentId, bracketContainer, renderBracketAndLog);
-  } else {
-    bracketContainer.innerHTML = '<p class="empty-hint">まだブラケットが生成されていません。</p>';
+// ---- ブラケットページ ----
+
+function renderBracketPage(tournamentId) {
+  currentBracketTournamentId = tournamentId;
+  tournamentEditForm.hidden = true;
+
+  const tournament = state.tournaments.find((t) => t.id === tournamentId);
+  if (!tournament) {
+    bracketTitleEl.textContent = '大会が見つかりません';
+    bracketMetaEl.textContent = '';
+    bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
+    bracketMatchesContainer.innerHTML = '';
+    return;
   }
-  renderMatchesLog(matchesLogContainer);
-  renderRanking(rankingContainer);
+
+  bracketTitleEl.textContent = tournament.name;
+  bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${tournament.participantIds.length}人参加 ・ ${tournamentStatusLabel(tournament)}`;
+
+  renderBracket(tournamentId, bracketContainer, () => {
+    markDirty();
+    renderBracketPage(tournamentId);
+  });
+  renderMatchesTable(bracketMatchesContainer, tournamentId);
 }
+
+// ---- 選手個人ページ ----
+
+function renderPlayerDetail(playerId) {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) {
+    playerDetailEl.innerHTML = '<p class="empty-hint">選手が見つかりません。</p>';
+    return;
+  }
+
+  const stats = getPlayerStats(playerId);
+  const rankings = computeRankings(state);
+  const rankEntry = rankings.find((r) => r.id === playerId);
+  const total = stats.wins + stats.losses;
+  const winRate = total > 0 ? Math.round((stats.wins / total) * 100) : null;
+
+  let html = `
+    <div class="player-detail-header">
+      <h2>${escapeHtml(player.currentName)}</h2>
+      <p class="meta-line"><code>${escapeHtml(player.id)}</code></p>
+      ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.join(', '))}</p>` : ''}
+      ${player.mainCharacters.length ? `<p class="meta-line">使用キャラ: ${escapeHtml(player.mainCharacters.join(', '))}</p>` : ''}
+    </div>
+    <div class="stat-cards">
+      <div class="stat-card"><span class="stat-value">${rankEntry ? `${rankEntry.rank}位` : '対象外'}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>
+      <div class="stat-card"><span class="stat-value">${stats.tournaments.length}</span><span class="stat-label">出場大会数</span></div>
+      <div class="stat-card"><span class="stat-value">${stats.wins}勝${stats.losses}敗</span><span class="stat-label">通算成績</span></div>
+      <div class="stat-card"><span class="stat-value">${winRate === null ? '—' : `${winRate}%`}</span><span class="stat-label">勝率</span></div>
+    </div>
+  `;
+
+  if (stats.tournaments.length > 0) {
+    html += `
+      <h3>大会別成績</h3>
+      <table>
+        <thead><tr><th>大会</th><th>日付</th><th>結果</th><th>勝敗</th></tr></thead>
+        <tbody>
+          ${[...stats.tournaments].reverse().map((entry) => `
+            <tr>
+              <td><a href="#bracket/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a></td>
+              <td>${escapeHtml(entry.tournament.date || '—')}</td>
+              <td>${escapeHtml(entry.placement || '—')}</td>
+              <td>${entry.wins}勝${entry.losses}敗</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  if (stats.matches.length > 0) {
+    html += `
+      <h3>対戦履歴</h3>
+      <table>
+        <thead><tr><th>大会</th><th>ラウンド</th><th>対戦相手</th><th>勝敗</th><th>スコア</th></tr></thead>
+        <tbody>
+          ${[...stats.matches].reverse().map((m) => {
+            const won = m.winnerId === playerId;
+            const opponentId = won ? m.loserId : m.winnerId;
+            const tournament = state.tournaments.find((t) => t.id === m.tournamentId);
+            return `
+              <tr>
+                <td>${escapeHtml(tournament ? tournament.name : m.tournamentId)}</td>
+                <td>${escapeHtml(m.round)}</td>
+                <td><a href="#player/${encodeURIComponent(opponentId)}">${escapeHtml(getPlayerName(opponentId))}</a></td>
+                <td class="${won ? 'result-win' : 'result-loss'}">${won ? '勝ち' : '負け'}</td>
+                <td>${m.score ? escapeHtml(m.score) : '不戦勝'}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  } else {
+    html += '<p class="empty-hint">まだ対戦記録がありません。</p>';
+  }
+
+  playerDetailEl.innerHTML = html;
+}
+
+// ---- GitHub連携 ----
 
 function setGithubStatus(text, type) {
   githubStatusEl.textContent = text;
@@ -235,6 +441,7 @@ function populateGithubConfigForm() {
   githubBranchInput.value = githubConfig.branch;
   githubPathInput.value = githubConfig.pathPrefix;
   githubTokenInput.value = githubConfig.token;
+  githubRememberInput.checked = githubConfig.rememberToken;
 }
 
 function applyGithubConfigFromForm() {
@@ -243,26 +450,23 @@ function applyGithubConfigFromForm() {
   githubConfig.branch = githubBranchInput.value.trim() || 'main';
   githubConfig.pathPrefix = githubPathInput.value.trim() || 'data';
   githubConfig.token = githubTokenInput.value;
+  githubConfig.rememberToken = githubRememberInput.checked;
   saveConfigToStorage();
 }
 
 async function handleGithubLoad() {
   if (!isConfigured()) {
-    setGithubStatus('リポジトリ所有者とリポジトリ名を入力してください。', 'error');
+    setGithubStatus('設定ページでリポジトリ情報を入力してください。', 'error');
     return;
   }
+  if (dirty && !confirm('未保存の変更があります。読み込むと破棄されますが、続けますか？')) return;
   githubLoadBtn.disabled = true;
   setGithubStatus('GitHubから読み込み中...', 'loading');
   try {
     await loadAllFromGitHub();
     selectedParticipantIds = [];
-    currentTournamentId = state.tournaments.length
-      ? state.tournaments[state.tournaments.length - 1].id
-      : null;
-    refreshPlayerUI();
-    renderSelectedList();
-    refreshTournamentSelect();
-    renderBracketAndLog();
+    clearDirty();
+    routeFromHash();
     setGithubStatus('GitHubから読み込みました。', 'success');
   } catch (err) {
     setGithubStatus(err.message, 'error');
@@ -273,13 +477,18 @@ async function handleGithubLoad() {
 
 async function handleGithubSave() {
   if (!isConfigured()) {
-    setGithubStatus('リポジトリ所有者とリポジトリ名を入力してください。', 'error');
+    setGithubStatus('設定ページでリポジトリ情報を入力してください。', 'error');
+    return;
+  }
+  if (!githubConfig.token) {
+    setGithubStatus('保存には書き込みトークンが必要です。設定ページで入力してください。', 'error');
     return;
   }
   githubSaveBtn.disabled = true;
   setGithubStatus('GitHubに保存中...', 'loading');
   try {
     await saveAllToGitHub();
+    clearDirty();
     setGithubStatus('GitHubに保存しました。', 'success');
   } catch (err) {
     setGithubStatus(err.message, 'error');
@@ -287,6 +496,8 @@ async function handleGithubSave() {
     githubSaveBtn.disabled = false;
   }
 }
+
+// ---- イベント配線 ----
 
 playerForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -297,6 +508,7 @@ playerForm.addEventListener('submit', (e) => {
   }
   playerIdInput.value = '';
   playerNameInput.value = '';
+  markDirty();
   refreshPlayerUI();
 });
 
@@ -331,15 +543,56 @@ tournamentForm.addEventListener('submit', (e) => {
   };
   state.tournaments.push(tournament);
   state.brackets[tournament.id] = createBracket(tournament.id, selectedParticipantIds);
-  currentTournamentId = tournament.id;
 
-  refreshTournamentSelect();
-  renderBracketAndLog();
+  tournamentNameInput.value = '';
+  tournamentDateInput.value = '';
+  selectedParticipantIds = [];
+  markDirty();
+  location.hash = `#bracket/${encodeURIComponent(tournament.id)}`;
 });
 
-tournamentSelect.addEventListener('change', () => {
-  currentTournamentId = tournamentSelect.value || null;
-  renderBracketAndLog();
+tournamentEditBtn.addEventListener('click', () => {
+  const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
+  if (!tournament) return;
+  tournamentEditNameInput.value = tournament.name;
+  tournamentEditDateInput.value = tournament.date || '';
+  tournamentEditForm.hidden = !tournamentEditForm.hidden;
+});
+
+tournamentEditCancelBtn.addEventListener('click', () => {
+  tournamentEditForm.hidden = true;
+});
+
+tournamentEditForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const result = updateTournament(currentBracketTournamentId, {
+    name: tournamentEditNameInput.value,
+    date: tournamentEditDateInput.value,
+  });
+  if (!result.ok) {
+    alert(result.error);
+    return;
+  }
+  markDirty();
+  renderBracketPage(currentBracketTournamentId);
+});
+
+tournamentDeleteBtn.addEventListener('click', () => {
+  const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
+  if (!tournament) return;
+  if (!confirm(`大会「${tournament.name}」と、その試合結果をすべて削除します。よろしいですか？`)) return;
+  const result = deleteTournamentData(currentBracketTournamentId);
+  if (!result.ok) {
+    alert(result.error);
+    return;
+  }
+  markBracketDeleted(currentBracketTournamentId);
+  markDirty();
+  location.hash = '#history';
+});
+
+playerBackBtn.addEventListener('click', () => {
+  history.back();
 });
 
 githubConfigForm.addEventListener('submit', (e) => {
@@ -353,14 +606,11 @@ githubSaveBtn.addEventListener('click', handleGithubSave);
 
 window.addEventListener('hashchange', routeFromHash);
 
-refreshPlayerUI();
-renderSelectedList();
-refreshTournamentSelect();
-renderBracketAndLog();
-routeFromHash();
+// ---- 起動 ----
 
 loadConfigFromStorage();
 populateGithubConfigForm();
+routeFromHash();
 if (isConfigured()) {
   handleGithubLoad();
 }

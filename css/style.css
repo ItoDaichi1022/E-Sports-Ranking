@@ -8,6 +8,9 @@
 
 * { box-sizing: border-box; }
 
+/* display:flex 等の指定があっても hidden 属性を必ず優先させる */
+[hidden] { display: none !important; }
+
 body {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   margin: 0;
@@ -16,17 +19,81 @@ body {
 }
 
 header {
-  padding: 1.5rem 0 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 -1.5rem 0.5rem;
+  padding: 0.75rem 1.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  background: #ffffff;
 }
 
-header .note {
-  color: #b45309;
-  font-size: 0.9rem;
+@media (prefers-color-scheme: dark) {
+  header { background: #202124; }
+}
+
+.header-row {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.25rem;
 }
 
 header h1 a {
   color: inherit;
   text-decoration: none;
+}
+
+#main-nav {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+#main-nav a {
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+#main-nav a:hover {
+  background: var(--bg-panel);
+}
+
+#main-nav a.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sync-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sync-bar button {
+  padding: 0.25rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.dirty-badge {
+  font-size: 0.8rem;
+  color: #b45309;
+  font-weight: bold;
+}
+
+#github-save-btn.attention {
+  background: #b45309;
+  border-color: #b45309;
 }
 
 section {
@@ -101,10 +168,12 @@ h2 { margin-top: 0; }
   text-decoration: underline;
 }
 
-.github-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
+.back-link.as-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.9rem;
 }
 
 .status-line {
@@ -155,6 +224,12 @@ button:disabled {
   background: #b91c1c;
 }
 
+.btn-secondary {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .empty-hint {
   color: #777;
   font-style: italic;
@@ -173,6 +248,42 @@ th, td {
   font-size: 0.9rem;
 }
 
+tbody tr:hover {
+  background: var(--bg-panel);
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.row-actions button {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+td code {
+  font-size: 0.85em;
+}
+
+.meta-line {
+  margin: 0.2rem 0;
+  color: #777;
+  font-size: 0.9rem;
+}
+
+.note {
+  color: #b45309;
+  font-size: 0.9rem;
+}
+
+.checkbox-inline {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.4rem !important;
+}
+
 .setup-columns {
   display: flex;
   gap: 2rem;
@@ -182,6 +293,35 @@ th, td {
 
 .setup-column { flex: 1; min-width: 260px; }
 
+#participant-search-input {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* 選手が増えても画面が縦に伸びないよう、固定高さでスクロールさせる */
+.scroll-box {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  background: rgba(128, 128, 128, 0.04);
+}
+
+.selected-count {
+  font-weight: normal;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
+.seed-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .checkbox-item {
   display: block;
   padding: 0.15rem 0;
@@ -189,7 +329,7 @@ th, td {
 
 #selected-participant-list {
   list-style: none;
-  padding: 0;
+  margin: 0;
 }
 
 .selected-item {
@@ -346,15 +486,102 @@ th, td {
   border-radius: 6px;
 }
 
-.raw-json {
-  margin-top: 1rem;
-  font-size: 0.85rem;
+/* --- 大会履歴 --- */
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  background: rgba(128, 128, 128, 0.04);
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.raw-json pre {
-  background: rgba(128, 128, 128, 0.1);
-  padding: 0.75rem;
-  border-radius: 6px;
-  overflow-x: auto;
-  max-height: 300px;
+.history-item:hover {
+  border-color: var(--accent);
+  background: var(--bg-panel);
 }
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-name {
+  font-weight: bold;
+  font-size: 1.05rem;
+}
+
+.history-meta {
+  font-size: 0.85rem;
+  color: #777;
+}
+
+.history-status {
+  font-size: 0.9rem;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* --- ブラケットページ --- */
+.bracket-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+/* --- 選手個人ページ --- */
+.player-detail-header h2 {
+  margin-bottom: 0.25rem;
+}
+
+.stat-cards {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1rem 0 1.5rem;
+}
+
+.stat-card {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(128, 128, 128, 0.04);
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #777;
+  margin-top: 0.25rem;
+}
+
+.result-win { color: #15803d; font-weight: bold; }
+.result-loss { color: #b91c1c; }
+
+/* --- ランキング --- */
+.clickable-row { cursor: pointer; }
+
+.rank-cell { font-weight: bold; text-align: center; }
+
+.rank-1 .rank-cell { color: #b8860b; }
+.rank-2 .rank-cell { color: #708090; }
+.rank-3 .rank-cell { color: #a0522d; }

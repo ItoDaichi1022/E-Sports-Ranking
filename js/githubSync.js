@@ -1,8 +1,15 @@
 import { state } from './state.js';
-import { githubConfig, getFile, putFile, listDirectory } from './github.js';
+import { githubConfig, getFile, putFile, deleteFile, listDirectory } from './github.js';
 
 // 各ファイルの現在のsha（楽観ロック用）。読み込み時に記録し、書き込み成功時に更新する。
 const shaCache = new Map();
+
+// ローカルで削除された大会のブラケットファイル。次回保存時にGitHub側からも削除する。
+const deletedBracketIds = new Set();
+
+export function markBracketDeleted(tournamentId) {
+  deletedBracketIds.add(tournamentId);
+}
 
 function dataPath(name) {
   return `${githubConfig.pathPrefix}/${name}`;
@@ -28,6 +35,7 @@ export async function loadAllFromGitHub() {
   shaCache.set('tournaments', tournamentsFile.sha);
   shaCache.set('matches', matchesFile.sha);
 
+  deletedBracketIds.clear();
   state.brackets = {};
   const entries = await listDirectory(`${githubConfig.pathPrefix}/brackets`);
   const bracketFiles = await Promise.all(
@@ -78,5 +86,15 @@ export async function saveAllToGitHub() {
       `bracket ${tournamentId} を更新`,
     );
     shaCache.set(`bracket:${tournamentId}`, sha);
+  }
+
+  // ローカルで削除された大会のブラケットファイルをGitHub側からも消す。
+  for (const tournamentId of [...deletedBracketIds]) {
+    const path = bracketPath(tournamentId);
+    let sha = shaCache.get(`bracket:${tournamentId}`);
+    if (!sha) sha = (await getFile(path)).sha;
+    if (sha) await deleteFile(path, sha, `bracket ${tournamentId} を削除`);
+    shaCache.delete(`bracket:${tournamentId}`);
+    deletedBracketIds.delete(tournamentId);
   }
 }

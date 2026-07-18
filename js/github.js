@@ -3,16 +3,19 @@
 const CONFIG_STORAGE_KEY = 'esr-github-config';
 
 // このサイト自体が同居しているリポジトリを既定値にしておく。
-// トークンだけは秘密情報のため既定値を持たせず、書き込み時に毎回本人が入力する。
+// トークンだけは秘密情報のため既定値を持たせず、本人に入力してもらう。
+// rememberToken を有効にした場合のみ localStorage に保存する（本人の明示的な選択）。
 export const githubConfig = {
   owner: 'ItoDaichi1022',
   repo: 'E-Sports-Ranking',
   branch: 'main',
   pathPrefix: 'data',
-  token: '', // 秘密情報のため localStorage には保存しない（sessionStorageのみ）
+  token: '',
+  rememberToken: false,
 };
 
 const TOKEN_SESSION_KEY = 'esr-github-token';
+const TOKEN_LOCAL_KEY = 'esr-github-token-local';
 
 export function loadConfigFromStorage() {
   try {
@@ -22,21 +25,34 @@ export function loadConfigFromStorage() {
     // 破損データは無視して既定値を使う
   }
   try {
-    const token = sessionStorage.getItem(TOKEN_SESSION_KEY);
+    const token = githubConfig.rememberToken
+      ? localStorage.getItem(TOKEN_LOCAL_KEY)
+      : sessionStorage.getItem(TOKEN_SESSION_KEY);
     if (token) githubConfig.token = token;
   } catch {
-    // sessionStorage不可な環境では毎回入力してもらう
+    // ストレージ不可な環境では毎回入力してもらう
   }
 }
 
 export function saveConfigToStorage() {
-  const { owner, repo, branch, pathPrefix } = githubConfig;
-  localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify({ owner, repo, branch, pathPrefix }));
+  const { owner, repo, branch, pathPrefix, rememberToken } = githubConfig;
+  localStorage.setItem(
+    CONFIG_STORAGE_KEY,
+    JSON.stringify({ owner, repo, branch, pathPrefix, rememberToken }),
+  );
   try {
-    if (githubConfig.token) sessionStorage.setItem(TOKEN_SESSION_KEY, githubConfig.token);
-    else sessionStorage.removeItem(TOKEN_SESSION_KEY);
+    if (githubConfig.token && rememberToken) {
+      localStorage.setItem(TOKEN_LOCAL_KEY, githubConfig.token);
+      sessionStorage.removeItem(TOKEN_SESSION_KEY);
+    } else if (githubConfig.token) {
+      sessionStorage.setItem(TOKEN_SESSION_KEY, githubConfig.token);
+      localStorage.removeItem(TOKEN_LOCAL_KEY);
+    } else {
+      sessionStorage.removeItem(TOKEN_SESSION_KEY);
+      localStorage.removeItem(TOKEN_LOCAL_KEY);
+    }
   } catch {
-    // sessionStorage不可な環境ではメモリ上の値のみ有効
+    // ストレージ不可な環境ではメモリ上の値のみ有効
   }
 }
 
@@ -121,4 +137,17 @@ export async function putFile(path, jsonValue, sha, message) {
   }
   const data = await res.json();
   return data.content.sha;
+}
+
+// ファイルを削除する（大会削除時のブラケットファイル用）。
+export async function deleteFile(path, sha, message) {
+  if (!githubConfig.token) throw new Error('書き込みトークンが設定されていません。');
+  const res = await fetch(`${apiBase()}/contents/${path}`, {
+    method: 'DELETE',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ message, sha, branch: githubConfig.branch }),
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub削除失敗 (${path}): ${res.status} ${await safeText(res)}`);
+  }
 }

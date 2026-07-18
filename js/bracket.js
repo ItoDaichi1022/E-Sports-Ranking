@@ -200,6 +200,27 @@ export function editMatch(tournamentId, matchId) {
   return { ok: true };
 }
 
+// 大会の基本情報（名前・日付）を修正する。
+export function updateTournament(tournamentId, { name, date }) {
+  const tournament = state.tournaments.find((t) => t.id === tournamentId);
+  if (!tournament) return { ok: false, error: '対象の大会が見つかりません。' };
+  const newName = name.trim();
+  if (!newName) return { ok: false, error: '大会名を入力してください。' };
+  tournament.name = newName;
+  tournament.date = date || null;
+  return { ok: true };
+}
+
+// 大会そのものを削除し、関連する試合記録とブラケットも取り除く。
+export function deleteTournamentData(tournamentId) {
+  const idx = state.tournaments.findIndex((t) => t.id === tournamentId);
+  if (idx === -1) return { ok: false, error: '対象の大会が見つかりません。' };
+  state.tournaments.splice(idx, 1);
+  delete state.brackets[tournamentId];
+  state.matches = state.matches.filter((m) => m.tournamentId !== tournamentId);
+  return { ok: true };
+}
+
 // ブラケット全体の勝者（決勝が確定していればそのwinnerId）を返す。
 export function getChampionId(bracket) {
   const finalRound = bracket.rounds[bracket.rounds.length - 1];

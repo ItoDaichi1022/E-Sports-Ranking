@@ -3,25 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>トーナメント運営 - ブラケット生成</title>
+<title>トーナメント運営ツール</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <header>
-  <h1><a href="#home">トーナメント運営ツール</a></h1>
-  <p class="note">閲覧はそのまま可能。保存にはGitHubの書き込みトークンが必要です。</p>
+  <div class="header-row">
+    <h1><a href="#home">トーナメント運営ツール</a></h1>
+    <nav id="main-nav">
+      <a href="#home" data-page="home">ホーム</a>
+      <a href="#tournament" data-page="tournament">大会作成</a>
+      <a href="#history" data-page="history">大会履歴</a>
+      <a href="#players" data-page="players">選手</a>
+      <a href="#ranking" data-page="ranking">ランキング</a>
+      <a href="#settings" data-page="settings">設定</a>
+    </nav>
+  </div>
+  <div class="sync-bar">
+    <span id="dirty-badge" class="dirty-badge" hidden>未保存の変更があります</span>
+    <button type="button" id="github-load-btn" class="btn-secondary">読み込み</button>
+    <button type="button" id="github-save-btn">保存</button>
+    <span id="github-status" class="status-line"></span>
+  </div>
 </header>
 
 <main>
   <section id="view-home" class="view">
     <div class="home-cards">
       <a class="home-card" href="#tournament">
-        <h2>トーナメント作成</h2>
-        <p>選手からブラケットを生成し、勝敗を入力します。</p>
+        <h2>大会作成</h2>
+        <p>参加者とシードを決めてブラケットを生成します。</p>
+      </a>
+      <a class="home-card" href="#history">
+        <h2>大会履歴</h2>
+        <p>過去・進行中の大会のブラケットと結果を見ます。</p>
       </a>
       <a class="home-card" href="#players">
-        <h2>選手登録</h2>
-        <p>ゲームアカウントIDと表示名を登録します。</p>
+        <h2>選手</h2>
+        <p>選手の登録・編集と個人戦績の確認をします。</p>
       </a>
       <a class="home-card" href="#ranking">
         <h2>ランキング</h2>
@@ -32,20 +51,20 @@
   </section>
 
   <section id="view-tournament" class="view" hidden>
-    <a class="back-link" href="#home">← ホームへ戻る</a>
-    <h2>トーナメント作成 &amp; ブラケット</h2>
-
+    <h2>大会作成</h2>
     <div class="setup-columns">
       <div class="setup-column">
         <h3>参加者を選択</h3>
         <input type="text" id="participant-search-input" placeholder="選手を検索（ID・表示名）">
-        <div id="participant-checkboxes"></div>
+        <div id="participant-checkboxes" class="scroll-box"></div>
       </div>
       <div class="setup-column">
-        <h3>シード順（上が1位シード）</h3>
-        <button type="button" id="shuffle-btn">ランダムに並び替え</button>
-        <button type="button" id="seed-by-ranking-btn">ランキング順に並び替え</button>
-        <ol id="selected-participant-list"></ol>
+        <h3>シード順（上が1位シード）<span id="selected-count" class="selected-count"></span></h3>
+        <div class="seed-actions">
+          <button type="button" id="shuffle-btn" class="btn-secondary">ランダムに並び替え</button>
+          <button type="button" id="seed-by-ranking-btn" class="btn-secondary">ランキング順に並び替え</button>
+        </div>
+        <ol id="selected-participant-list" class="scroll-box"></ol>
       </div>
     </div>
 
@@ -60,21 +79,46 @@
       </label>
       <button type="submit">ブラケット生成</button>
     </form>
+    <p class="note">生成すると、その大会のブラケット画面に移動します。</p>
+  </section>
 
-    <h3>ブラケット</h3>
-    <label>
-      表示中の大会
-      <select id="tournament-select"></select>
-    </label>
+  <section id="view-history" class="view" hidden>
+    <h2>大会履歴</h2>
+    <p class="note">大会を選ぶとブラケットの表示・勝敗の入力・大会情報の編集ができます。</p>
+    <div id="history-list"></div>
+  </section>
+
+  <section id="view-bracket" class="view" hidden>
+    <a class="back-link" href="#history">← 大会履歴へ</a>
+    <div class="bracket-page-header">
+      <div>
+        <h2 id="bracket-title"></h2>
+        <p id="bracket-meta" class="meta-line"></p>
+      </div>
+      <div class="row-actions">
+        <button type="button" id="tournament-edit-btn" class="btn-secondary">大会情報を編集</button>
+        <button type="button" id="tournament-delete-btn" class="btn-remove">大会を削除</button>
+      </div>
+    </div>
+    <form id="tournament-edit-form" class="inline-form" hidden>
+      <label>
+        大会名
+        <input type="text" id="tournament-edit-name-input" required>
+      </label>
+      <label>
+        開催日
+        <input type="date" id="tournament-edit-date-input">
+      </label>
+      <button type="submit">保存</button>
+      <button type="button" id="tournament-edit-cancel-btn" class="btn-secondary">キャンセル</button>
+    </form>
     <div id="bracket-container"></div>
-
-    <h3>確定済み試合ログ（matches スキーマ確認用）</h3>
-    <div id="matches-log-container"></div>
+    <h3>試合結果</h3>
+    <div id="bracket-matches-container"></div>
   </section>
 
   <section id="view-players" class="view" hidden>
-    <a class="back-link" href="#home">← ホームへ戻る</a>
-    <h2>選手登録</h2>
+    <h2>選手</h2>
     <form id="player-form" class="inline-form">
       <label>
         ゲームアカウントID
@@ -86,18 +130,22 @@
       </label>
       <button type="submit">登録</button>
     </form>
+    <p class="note">表示名をクリックすると個人戦績が見られます。名前を変更しても過去名が自動で記録され、戦績は引き継がれます。</p>
     <div id="player-list"></div>
   </section>
 
+  <section id="view-player-detail" class="view" hidden>
+    <button type="button" id="player-back-btn" class="back-link as-button">← 戻る</button>
+    <div id="player-detail"></div>
+  </section>
+
   <section id="view-ranking" class="view" hidden>
-    <a class="back-link" href="#home">← ホームへ戻る</a>
     <h2>ランキング（LumiRank軽量版）</h2>
-    <p class="note">全大会の matches から都度再計算する。ランキングスコアはどこにも保存しない。</p>
+    <p class="note">全大会の試合結果から都度再計算します。</p>
     <div id="ranking-container"></div>
   </section>
 
   <section id="view-settings" class="view" hidden>
-    <a class="back-link" href="#home">← ホームへ戻る</a>
     <h2>設定（GitHub連携）</h2>
     <form id="github-config-form" class="inline-form">
       <label>
@@ -120,14 +168,16 @@
         書き込みトークン（共有トークン）
         <input type="password" id="github-token-input" placeholder="ghp_...">
       </label>
+      <label class="checkbox-inline">
+        <input type="checkbox" id="github-remember-input">
+        トークンをこの端末に保存する
+      </label>
       <button type="submit">設定を反映</button>
     </form>
-    <p class="note">トークンはこのタブのセッション中のみ保持され、ファイルには保存されません。共有PCでは入力を避けてください。閲覧のみならトークンは不要です。</p>
-    <div class="github-actions">
-      <button type="button" id="github-load-btn">GitHubから読み込み</button>
-      <button type="button" id="github-save-btn">GitHubに保存</button>
-    </div>
-    <p id="github-status" class="status-line"></p>
+    <p class="note">
+      「トークンをこの端末に保存する」を有効にすると、ブラウザを閉じても再入力が不要になります（この端末のブラウザ内にのみ保存）。
+      共有PCでは有効にしないでください。無効の場合はタブのセッション中のみ保持されます。閲覧だけならトークンは不要です。
+    </p>
   </section>
 </main>
 
