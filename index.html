@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>トーナメント運営 - ブラケット生成</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <h1>トーナメント運営ツール</h1>
+  <p class="note">閲覧はそのまま可能。保存にはGitHubの書き込みトークンが必要です。</p>
+</header>
+
+<main>
+  <section id="github-section">
+    <h2>0. GitHub連携（保存・読込）</h2>
+    <form id="github-config-form" class="inline-form">
+      <label>
+        リポジトリ所有者
+        <input type="text" id="github-owner-input" placeholder="例: your-org">
+      </label>
+      <label>
+        リポジトリ名
+        <input type="text" id="github-repo-input" placeholder="例: E-sportsRanking">
+      </label>
+      <label>
+        ブランチ
+        <input type="text" id="github-branch-input" placeholder="main">
+      </label>
+      <label>
+        データ格納先パス
+        <input type="text" id="github-path-input" placeholder="data">
+      </label>
+      <label>
+        書き込みトークン（共有トークン）
+        <input type="password" id="github-token-input" placeholder="ghp_...">
+      </label>
+      <button type="submit">設定を反映</button>
+    </form>
+    <p class="note">トークンはこのタブのセッション中のみ保持され、ファイルには保存されません。共有PCでは入力を避けてください。閲覧のみならトークンは不要です。</p>
+    <div class="github-actions">
+      <button type="button" id="github-load-btn">GitHubから読み込み</button>
+      <button type="button" id="github-save-btn">GitHubに保存</button>
+    </div>
+    <p id="github-status" class="status-line"></p>
+  </section>
+
+  <section id="player-section">
+    <h2>1. 選手登録</h2>
+    <form id="player-form" class="inline-form">
+      <label>
+        ゲームアカウントID
+        <input type="text" id="player-id-input" placeholder="例: SW-1234-5678-9012" required>
+      </label>
+      <label>
+        表示名
+        <input type="text" id="player-name-input" placeholder="例: Gyu" required>
+      </label>
+      <button type="submit">登録</button>
+    </form>
+    <div id="player-list"></div>
+  </section>
+
+  <section id="tournament-setup-section">
+    <h2>2. 大会作成 &amp; シード設定</h2>
+    <div class="setup-columns">
+      <div class="setup-column">
+        <h3>参加者を選択</h3>
+        <input type="text" id="participant-search-input" placeholder="選手を検索（ID・表示名）">
+        <div id="participant-checkboxes"></div>
+      </div>
+      <div class="setup-column">
+        <h3>シード順（上が1位シード）</h3>
+        <button type="button" id="shuffle-btn">ランダムに並び替え</button>
+        <button type="button" id="seed-by-ranking-btn">ランキング順に並び替え</button>
+        <ol id="selected-participant-list"></ol>
+      </div>
+    </div>
+
+    <form id="tournament-form" class="inline-form">
+      <label>
+        大会名
+        <input type="text" id="tournament-name-input" placeholder="例: 第1回大会" required>
+      </label>
+      <label>
+        開催日
+        <input type="date" id="tournament-date-input">
+      </label>
+      <button type="submit">ブラケット生成</button>
+    </form>
+  </section>
+
+  <section id="bracket-section">
+    <h2>3. ブラケット</h2>
+    <label>
+      表示中の大会
+      <select id="tournament-select"></select>
+    </label>
+    <div id="bracket-container"></div>
+  </section>
+
+  <section id="matches-log-section">
+    <h2>4. 確定済み試合ログ（matches スキーマ確認用）</h2>
+    <div id="matches-log-container"></div>
+  </section>
+
+  <section id="ranking-section">
+    <h2>5. ランキング（LumiRank軽量版）</h2>
+    <p class="note">全大会の matches から都度再計算する。ランキングスコアはどこにも保存しない。</p>
+    <div id="ranking-container"></div>
+  </section>
+</main>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
