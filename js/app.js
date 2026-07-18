@@ -43,6 +43,29 @@ const githubLoadBtn = document.getElementById('github-load-btn');
 const githubSaveBtn = document.getElementById('github-save-btn');
 const githubStatusEl = document.getElementById('github-status');
 
+const VIEWS = ['home', 'tournament', 'players', 'ranking', 'settings'];
+const viewElements = Object.fromEntries(VIEWS.map((v) => [v, document.getElementById(`view-${v}`)]));
+
+function showView(view) {
+  const target = VIEWS.includes(view) ? view : 'home';
+  VIEWS.forEach((v) => { viewElements[v].hidden = v !== target; });
+
+  if (target === 'tournament') {
+    refreshTournamentSelect();
+    renderBracketAndLog();
+  } else if (target === 'players') {
+    refreshPlayerUI();
+  } else if (target === 'ranking') {
+    renderRanking(rankingContainer);
+  } else if (target === 'settings') {
+    populateGithubConfigForm();
+  }
+}
+
+function routeFromHash() {
+  showView(location.hash.replace('#', ''));
+}
+
 function refreshPlayerUI() {
   renderPlayerTable(playerListEl);
   renderParticipantCheckboxes();
@@ -328,10 +351,13 @@ githubConfigForm.addEventListener('submit', (e) => {
 githubLoadBtn.addEventListener('click', handleGithubLoad);
 githubSaveBtn.addEventListener('click', handleGithubSave);
 
+window.addEventListener('hashchange', routeFromHash);
+
 refreshPlayerUI();
 renderSelectedList();
 refreshTournamentSelect();
 renderBracketAndLog();
+routeFromHash();
 
 loadConfigFromStorage();
 populateGithubConfigForm();

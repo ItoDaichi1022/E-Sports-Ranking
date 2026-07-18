@@ -8,13 +8,97 @@
 </head>
 <body>
 <header>
-  <h1>トーナメント運営ツール</h1>
+  <h1><a href="#home">トーナメント運営ツール</a></h1>
   <p class="note">閲覧はそのまま可能。保存にはGitHubの書き込みトークンが必要です。</p>
 </header>
 
 <main>
-  <section id="github-section">
-    <h2>0. GitHub連携（保存・読込）</h2>
+  <section id="view-home" class="view">
+    <div class="home-cards">
+      <a class="home-card" href="#tournament">
+        <h2>トーナメント作成</h2>
+        <p>選手からブラケットを生成し、勝敗を入力します。</p>
+      </a>
+      <a class="home-card" href="#players">
+        <h2>選手登録</h2>
+        <p>ゲームアカウントIDと表示名を登録します。</p>
+      </a>
+      <a class="home-card" href="#ranking">
+        <h2>ランキング</h2>
+        <p>LumiRank軽量版で算出した順位を表示します。</p>
+      </a>
+    </div>
+    <a class="settings-link" href="#settings">GitHub連携の設定</a>
+  </section>
+
+  <section id="view-tournament" class="view" hidden>
+    <a class="back-link" href="#home">← ホームへ戻る</a>
+    <h2>トーナメント作成 &amp; ブラケット</h2>
+
+    <div class="setup-columns">
+      <div class="setup-column">
+        <h3>参加者を選択</h3>
+        <input type="text" id="participant-search-input" placeholder="選手を検索（ID・表示名）">
+        <div id="participant-checkboxes"></div>
+      </div>
+      <div class="setup-column">
+        <h3>シード順（上が1位シード）</h3>
+        <button type="button" id="shuffle-btn">ランダムに並び替え</button>
+        <button type="button" id="seed-by-ranking-btn">ランキング順に並び替え</button>
+        <ol id="selected-participant-list"></ol>
+      </div>
+    </div>
+
+    <form id="tournament-form" class="inline-form">
+      <label>
+        大会名
+        <input type="text" id="tournament-name-input" placeholder="例: 第1回大会" required>
+      </label>
+      <label>
+        開催日
+        <input type="date" id="tournament-date-input">
+      </label>
+      <button type="submit">ブラケット生成</button>
+    </form>
+
+    <h3>ブラケット</h3>
+    <label>
+      表示中の大会
+      <select id="tournament-select"></select>
+    </label>
+    <div id="bracket-container"></div>
+
+    <h3>確定済み試合ログ（matches スキーマ確認用）</h3>
+    <div id="matches-log-container"></div>
+  </section>
+
+  <section id="view-players" class="view" hidden>
+    <a class="back-link" href="#home">← ホームへ戻る</a>
+    <h2>選手登録</h2>
+    <form id="player-form" class="inline-form">
+      <label>
+        ゲームアカウントID
+        <input type="text" id="player-id-input" placeholder="例: SW-1234-5678-9012" required>
+      </label>
+      <label>
+        表示名
+        <input type="text" id="player-name-input" placeholder="例: Gyu" required>
+      </label>
+      <button type="submit">登録</button>
+    </form>
+    <div id="player-list"></div>
+  </section>
+
+  <section id="view-ranking" class="view" hidden>
+    <a class="back-link" href="#home">← ホームへ戻る</a>
+    <h2>ランキング（LumiRank軽量版）</h2>
+    <p class="note">全大会の matches から都度再計算する。ランキングスコアはどこにも保存しない。</p>
+    <div id="ranking-container"></div>
+  </section>
+
+  <section id="view-settings" class="view" hidden>
+    <a class="back-link" href="#home">← ホームへ戻る</a>
+    <h2>設定（GitHub連携）</h2>
     <form id="github-config-form" class="inline-form">
       <label>
         リポジトリ所有者
@@ -44,71 +128,6 @@
       <button type="button" id="github-save-btn">GitHubに保存</button>
     </div>
     <p id="github-status" class="status-line"></p>
-  </section>
-
-  <section id="player-section">
-    <h2>1. 選手登録</h2>
-    <form id="player-form" class="inline-form">
-      <label>
-        ゲームアカウントID
-        <input type="text" id="player-id-input" placeholder="例: SW-1234-5678-9012" required>
-      </label>
-      <label>
-        表示名
-        <input type="text" id="player-name-input" placeholder="例: Gyu" required>
-      </label>
-      <button type="submit">登録</button>
-    </form>
-    <div id="player-list"></div>
-  </section>
-
-  <section id="tournament-setup-section">
-    <h2>2. 大会作成 &amp; シード設定</h2>
-    <div class="setup-columns">
-      <div class="setup-column">
-        <h3>参加者を選択</h3>
-        <input type="text" id="participant-search-input" placeholder="選手を検索（ID・表示名）">
-        <div id="participant-checkboxes"></div>
-      </div>
-      <div class="setup-column">
-        <h3>シード順（上が1位シード）</h3>
-        <button type="button" id="shuffle-btn">ランダムに並び替え</button>
-        <button type="button" id="seed-by-ranking-btn">ランキング順に並び替え</button>
-        <ol id="selected-participant-list"></ol>
-      </div>
-    </div>
-
-    <form id="tournament-form" class="inline-form">
-      <label>
-        大会名
-        <input type="text" id="tournament-name-input" placeholder="例: 第1回大会" required>
-      </label>
-      <label>
-        開催日
-        <input type="date" id="tournament-date-input">
-      </label>
-      <button type="submit">ブラケット生成</button>
-    </form>
-  </section>
-
-  <section id="bracket-section">
-    <h2>3. ブラケット</h2>
-    <label>
-      表示中の大会
-      <select id="tournament-select"></select>
-    </label>
-    <div id="bracket-container"></div>
-  </section>
-
-  <section id="matches-log-section">
-    <h2>4. 確定済み試合ログ（matches スキーマ確認用）</h2>
-    <div id="matches-log-container"></div>
-  </section>
-
-  <section id="ranking-section">
-    <h2>5. ランキング（LumiRank軽量版）</h2>
-    <p class="note">全大会の matches から都度再計算する。ランキングスコアはどこにも保存しない。</p>
-    <div id="ranking-container"></div>
   </section>
 </main>
 
