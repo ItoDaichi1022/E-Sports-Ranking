@@ -12,7 +12,9 @@ let resizeRedrawTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(resizeRedrawTimer);
   resizeRedrawTimer = setTimeout(() => {
-    if (lastRenderArgs) renderBracket(lastRenderArgs.tournamentId, lastRenderArgs.containerEl, lastRenderArgs.onChanged);
+    if (lastRenderArgs) {
+      renderBracket(lastRenderArgs.tournamentId, lastRenderArgs.containerEl, lastRenderArgs.onChanged, lastRenderArgs.options);
+    }
   }, 150);
 });
 
@@ -56,7 +58,7 @@ function drawConnectorLines(bracket, wrapper, matchElements) {
   wrapper.appendChild(svg);
 }
 
-function renderMatchBox(tournamentId, match, onChanged) {
+function renderMatchBox(tournamentId, match, onChanged, readOnly) {
   const box = document.createElement('div');
   box.className = 'match-box';
   if (match.confirmed) box.classList.add('confirmed');
@@ -94,21 +96,28 @@ function renderMatchBox(tournamentId, match, onChanged) {
       : `確定${match.score ? ` (${escapeHtml(match.score)})` : ''}`;
     box.appendChild(status);
 
-    const editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.className = 'edit-match-btn';
-    editBtn.textContent = '編集';
-    editBtn.addEventListener('click', () => {
-      const confirmed = confirm('この試合の結果を編集しますか？以降のラウンドに既に反映・確定している結果があれば、それらも未確定に戻ります。');
-      if (!confirmed) return;
-      const result = editMatch(tournamentId, match.id);
-      if (!result.ok) {
-        alert(result.error);
-        return;
-      }
-      onChanged();
-    });
-    box.appendChild(editBtn);
+    if (!readOnly) {
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'edit-match-btn';
+      editBtn.textContent = '編集';
+      editBtn.addEventListener('click', () => {
+        const confirmed = confirm('この試合の結果を編集しますか？以降のラウンドに既に反映・確定している結果があれば、それらも未確定に戻ります。');
+        if (!confirmed) return;
+        const result = editMatch(tournamentId, match.id);
+        if (!result.ok) {
+          alert(result.error);
+          return;
+        }
+        onChanged();
+      });
+      box.appendChild(editBtn);
+    }
+  } else if (readOnly) {
+    const status = document.createElement('div');
+    status.className = 'match-status';
+    status.textContent = match.player1Id && match.player2Id ? '未実施' : '対戦カード未確定';
+    box.appendChild(status);
   } else if (match.player1Id && match.player2Id) {
     const form = document.createElement('form');
     form.className = 'match-form';
@@ -214,8 +223,9 @@ function renderMatchBox(tournamentId, match, onChanged) {
   return box;
 }
 
-export function renderBracket(tournamentId, containerEl, onChanged) {
-  lastRenderArgs = { tournamentId, containerEl, onChanged };
+export function renderBracket(tournamentId, containerEl, onChanged, options = {}) {
+  const readOnly = !!options.readOnly;
+  lastRenderArgs = { tournamentId, containerEl, onChanged, options };
 
   const bracket = state.brackets[tournamentId];
   containerEl.innerHTML = '';
@@ -251,7 +261,7 @@ export function renderBracket(tournamentId, containerEl, onChanged) {
       slot.className = 'match-slot';
       slot.style.gridRow = `${rowStart} / span ${rowSpan}`;
 
-      const box = renderMatchBox(tournamentId, match, onChanged);
+      const box = renderMatchBox(tournamentId, match, onChanged, readOnly);
       matchElements.set(match.id, box);
       slot.appendChild(box);
       body.appendChild(slot);

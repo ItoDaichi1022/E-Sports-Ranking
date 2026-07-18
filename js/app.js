@@ -6,7 +6,7 @@ import { renderMatchesTable } from './matchesLog.js';
 import { computeRankings } from './ranking.js';
 import { renderRanking } from './rankingView.js';
 import { getPlayerStats } from './playerStats.js';
-import { githubConfig, loadConfigFromStorage, saveConfigToStorage, isConfigured } from './github.js';
+import { githubConfig, loadConfigFromStorage, saveConfigToStorage, verifyWriteAccess } from './github.js';
 import { loadAllFromGitHub, saveAllToGitHub, markBracketDeleted } from './githubSync.js';
 
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
@@ -49,19 +49,43 @@ const playerBackBtn = document.getElementById('player-back-btn');
 
 const rankingContainer = document.getElementById('ranking-container');
 
-const githubConfigForm = document.getElementById('github-config-form');
-const githubOwnerInput = document.getElementById('github-owner-input');
-const githubRepoInput = document.getElementById('github-repo-input');
-const githubBranchInput = document.getElementById('github-branch-input');
-const githubPathInput = document.getElementById('github-path-input');
-const githubTokenInput = document.getElementById('github-token-input');
-const githubRememberInput = document.getElementById('github-remember-input');
 const githubLoadBtn = document.getElementById('github-load-btn');
 const githubSaveBtn = document.getElementById('github-save-btn');
 const githubStatusEl = document.getElementById('github-status');
 const dirtyBadgeEl = document.getElementById('dirty-badge');
+const modeToggleBtn = document.getElementById('mode-toggle-btn');
+
+const tokenDialog = document.getElementById('token-dialog');
+const tokenForm = document.getElementById('token-form');
+const tokenInput = document.getElementById('token-input');
+const tokenRememberInput = document.getElementById('token-remember-input');
+const tokenErrorEl = document.getElementById('token-error');
+const tokenSubmitBtn = document.getElementById('token-submit-btn');
+const tokenCancelBtn = document.getElementById('token-cancel-btn');
+
+const navTournamentLink = document.getElementById('nav-tournament-link');
+const homeCardTournament = document.getElementById('home-card-tournament');
 
 const mainNav = document.getElementById('main-nav');
+
+// ---- 編集/閲覧モード ----
+
+function isEditMode() {
+  return Boolean(githubConfig.token);
+}
+
+// モードに応じて編集系UIの表示/非表示をまとめて切り替える
+function applyModeUI() {
+  const editing = isEditMode();
+  navTournamentLink.hidden = !editing;
+  homeCardTournament.hidden = !editing;
+  githubSaveBtn.hidden = !editing;
+  playerForm.hidden = !editing;
+  tournamentEditBtn.hidden = !editing;
+  tournamentDeleteBtn.hidden = !editing;
+  if (!editing) tournamentEditForm.hidden = true;
+  modeToggleBtn.textContent = editing ? '閲覧モードへ' : '編集モード';
+}
 
 // ---- 未保存変更の管理 ----
 
@@ -97,7 +121,6 @@ const VIEW_IDS = {
   players: 'view-players',
   player: 'view-player-detail',
   ranking: 'view-ranking',
-  settings: 'view-settings',
 };
 
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
@@ -111,7 +134,13 @@ function parseHash() {
 
 function routeFromHash() {
   const { page, param } = parseHash();
-  const target = VIEW_IDS[page] ? page : 'home';
+  let target = VIEW_IDS[page] ? page : 'home';
+
+  // 大会作成は編集モード限定。閲覧者が直接URLで来た場合はホームに戻す。
+  if (target === 'tournament' && !isEditMode()) {
+    location.replace('#home');
+    target = 'home';
+  }
 
   Object.entries(VIEW_IDS).forEach(([name, id]) => {
     document.getElementById(id).hidden = name !== target;
@@ -135,8 +164,6 @@ function routeFromHash() {
     renderPlayerDetail(param);
   } else if (target === 'ranking') {
     renderRanking(rankingContainer);
-  } else if (target === 'settings') {
-    populateGithubConfigForm();
   }
 }
 
@@ -150,7 +177,7 @@ function refreshPlayerUI() {
       state.players.some((p) => p.id === id),
     );
     refreshPlayerUI();
-  });
+  }, { readOnly: !isEditMode() });
   renderParticipantCheckboxes();
 }
 
@@ -345,7 +372,7 @@ function renderBracketPage(tournamentId) {
   renderBracket(tournamentId, bracketContainer, () => {
     markDirty();
     renderBracketPage(tournamentId);
-  });
+  }, { readOnly: !isEditMode() });
   renderMatchesTable(bracketMatchesContainer, tournamentId);
 }
 
@@ -435,30 +462,7 @@ function setGithubStatus(text, type) {
   githubStatusEl.className = `status-line${type ? ` ${type}` : ''}`;
 }
 
-function populateGithubConfigForm() {
-  githubOwnerInput.value = githubConfig.owner;
-  githubRepoInput.value = githubConfig.repo;
-  githubBranchInput.value = githubConfig.branch;
-  githubPathInput.value = githubConfig.pathPrefix;
-  githubTokenInput.value = githubConfig.token;
-  githubRememberInput.checked = githubConfig.rememberToken;
-}
-
-function applyGithubConfigFromForm() {
-  githubConfig.owner = githubOwnerInput.value.trim();
-  githubConfig.repo = githubRepoInput.value.trim();
-  githubConfig.branch = githubBranchInput.value.trim() || 'main';
-  githubConfig.pathPrefix = githubPathInput.value.trim() || 'data';
-  githubConfig.token = githubTokenInput.value;
-  githubConfig.rememberToken = githubRememberInput.checked;
-  saveConfigToStorage();
-}
-
 async function handleGithubLoad() {
-  if (!isConfigured()) {
-    setGithubStatus('設定ページでリポジトリ情報を入力してください。', 'error');
-    return;
-  }
   if (dirty && !confirm('未保存の変更があります。読み込むと破棄されますが、続けますか？')) return;
   githubLoadBtn.disabled = true;
   setGithubStatus('GitHubから読み込み中...', 'loading');
@@ -479,12 +483,8 @@ async function handleGithubLoad() {
 }
 
 async function handleGithubSave() {
-  if (!isConfigured()) {
-    setGithubStatus('設定ページでリポジトリ情報を入力してください。', 'error');
-    return;
-  }
   if (!githubConfig.token) {
-    setGithubStatus('保存には書き込みトークンが必要です。設定ページで入力してください。', 'error');
+    setGithubStatus('保存には編集モードへの切り替えが必要です。', 'error');
     return;
   }
   githubSaveBtn.disabled = true;
@@ -598,10 +598,52 @@ playerBackBtn.addEventListener('click', () => {
   history.back();
 });
 
-githubConfigForm.addEventListener('submit', (e) => {
+// 編集モードへの切り替え（トークン入力ダイアログ）と閲覧モードへの復帰
+modeToggleBtn.addEventListener('click', () => {
+  if (isEditMode()) {
+    if (dirty && !confirm('未保存の変更があります。破棄して閲覧モードに戻りますか？')) return;
+    githubConfig.token = '';
+    githubConfig.rememberToken = false;
+    saveConfigToStorage();
+    clearDirty();
+    applyModeUI();
+    routeFromHash();
+    handleGithubLoad();
+    setGithubStatus('閲覧モードに戻りました。', 'success');
+    return;
+  }
+  tokenInput.value = '';
+  tokenRememberInput.checked = false;
+  tokenErrorEl.textContent = '';
+  tokenDialog.showModal();
+});
+
+tokenCancelBtn.addEventListener('click', () => {
+  tokenDialog.close();
+});
+
+tokenForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  applyGithubConfigFromForm();
-  setGithubStatus('設定を反映しました。', 'success');
+  tokenSubmitBtn.disabled = true;
+  tokenErrorEl.textContent = 'トークンを確認しています...';
+
+  githubConfig.token = tokenInput.value.trim();
+  const check = await verifyWriteAccess();
+  tokenSubmitBtn.disabled = false;
+
+  if (!check.ok) {
+    githubConfig.token = '';
+    tokenErrorEl.textContent = check.error;
+    return;
+  }
+
+  githubConfig.rememberToken = tokenRememberInput.checked;
+  saveConfigToStorage();
+  tokenDialog.close();
+  applyModeUI();
+  routeFromHash();
+  await handleGithubLoad();
+  setGithubStatus('編集モードに切り替えました。', 'success');
 });
 
 githubLoadBtn.addEventListener('click', handleGithubLoad);
@@ -612,8 +654,6 @@ window.addEventListener('hashchange', routeFromHash);
 // ---- 起動 ----
 
 loadConfigFromStorage();
-populateGithubConfigForm();
+applyModeUI();
 routeFromHash();
-if (isConfigured()) {
-  handleGithubLoad();
-}
+handleGithubLoad();

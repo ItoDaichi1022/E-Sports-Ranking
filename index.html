@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。CSS/JSを変更してデプロイするときは数字を上げる -->
-<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
 <header>
@@ -13,25 +13,42 @@
     <h1><a href="#home">トーナメント運営ツール</a></h1>
     <nav id="main-nav">
       <a href="#home" data-page="home">ホーム</a>
-      <a href="#tournament" data-page="tournament">大会作成</a>
+      <a href="#tournament" data-page="tournament" id="nav-tournament-link">大会作成</a>
       <a href="#history" data-page="history">大会履歴</a>
       <a href="#players" data-page="players">選手</a>
       <a href="#ranking" data-page="ranking">ランキング</a>
-      <a href="#settings" data-page="settings">設定</a>
     </nav>
   </div>
   <div class="sync-bar">
     <span id="dirty-badge" class="dirty-badge" hidden>未保存の変更があります</span>
     <button type="button" id="github-load-btn" class="btn-secondary">読み込み</button>
     <button type="button" id="github-save-btn">保存</button>
+    <button type="button" id="mode-toggle-btn" class="btn-secondary">編集モード</button>
     <span id="github-status" class="status-line"></span>
   </div>
 </header>
 
+<dialog id="token-dialog">
+  <h3>編集モードに切り替え</h3>
+  <p class="note">運営用の書き込みトークンを入力してください。</p>
+  <form id="token-form">
+    <input type="password" id="token-input" placeholder="ghp_..." autocomplete="off" required>
+    <label class="checkbox-inline">
+      <input type="checkbox" id="token-remember-input">
+      トークンをこの端末に保存する（共有PCでは使わないでください）
+    </label>
+    <p id="token-error" class="status-line error"></p>
+    <div class="dialog-actions">
+      <button type="button" id="token-cancel-btn" class="btn-secondary">キャンセル</button>
+      <button type="submit" id="token-submit-btn">切り替え</button>
+    </div>
+  </form>
+</dialog>
+
 <main>
   <section id="view-home" class="view">
     <div class="home-cards">
-      <a class="home-card" href="#tournament">
+      <a class="home-card" href="#tournament" id="home-card-tournament">
         <h2>大会作成</h2>
         <p>参加者とシードを決めてブラケットを生成します。</p>
       </a>
@@ -41,14 +58,13 @@
       </a>
       <a class="home-card" href="#players">
         <h2>選手</h2>
-        <p>選手の登録・編集と個人戦績の確認をします。</p>
+        <p>選手の一覧と個人戦績を確認します。</p>
       </a>
       <a class="home-card" href="#ranking">
         <h2>ランキング</h2>
         <p>LumiRank軽量版で算出した順位を表示します。</p>
       </a>
     </div>
-    <a class="settings-link" href="#settings">GitHub連携の設定</a>
   </section>
 
   <section id="view-tournament" class="view" hidden>
@@ -85,7 +101,7 @@
 
   <section id="view-history" class="view" hidden>
     <h2>大会履歴</h2>
-    <p class="note">大会を選ぶとブラケットの表示・勝敗の入力・大会情報の編集ができます。</p>
+    <p class="note">大会を選ぶとブラケット（進行状況・結果）を確認できます。</p>
     <div id="history-list"></div>
   </section>
 
@@ -131,7 +147,7 @@
       </label>
       <button type="submit">登録</button>
     </form>
-    <p class="note">表示名をクリックすると個人戦績が見られます。名前を変更しても過去名が自動で記録され、戦績は引き継がれます。</p>
+    <p class="note">表示名をクリックすると個人戦績が見られます。</p>
     <div id="player-list"></div>
   </section>
 
@@ -146,42 +162,8 @@
     <div id="ranking-container"></div>
   </section>
 
-  <section id="view-settings" class="view" hidden>
-    <h2>設定（GitHub連携）</h2>
-    <form id="github-config-form" class="inline-form">
-      <label>
-        リポジトリ所有者
-        <input type="text" id="github-owner-input" placeholder="例: your-org">
-      </label>
-      <label>
-        リポジトリ名
-        <input type="text" id="github-repo-input" placeholder="例: E-sportsRanking">
-      </label>
-      <label>
-        ブランチ
-        <input type="text" id="github-branch-input" placeholder="main">
-      </label>
-      <label>
-        データ格納先パス
-        <input type="text" id="github-path-input" placeholder="data">
-      </label>
-      <label>
-        書き込みトークン（共有トークン）
-        <input type="password" id="github-token-input" placeholder="ghp_...">
-      </label>
-      <label class="checkbox-inline">
-        <input type="checkbox" id="github-remember-input">
-        トークンをこの端末に保存する
-      </label>
-      <button type="submit">設定を反映</button>
-    </form>
-    <p class="note">
-      「トークンをこの端末に保存する」を有効にすると、ブラウザを閉じても再入力が不要になります（この端末のブラウザ内にのみ保存）。
-      共有PCでは有効にしないでください。無効の場合はタブのセッション中のみ保持されます。閲覧だけならトークンは不要です。
-    </p>
-  </section>
 </main>
 
-<script type="module" src="js/app.js?v=3"></script>
+<script type="module" src="js/app.js?v=4"></script>
 </body>
 </html>

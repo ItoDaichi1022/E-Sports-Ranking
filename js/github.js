@@ -1,10 +1,6 @@
 // GitHub Contents API の薄いラッパー。
-// 閲覧（GET）はpublicリポジトリなら認証不要。書き込み（PUT）は方式B（共有書き込みトークン）を使う。
-const CONFIG_STORAGE_KEY = 'esr-github-config';
-
-// このサイト自体が同居しているリポジトリを既定値にしておく。
-// トークンだけは秘密情報のため既定値を持たせず、本人に入力してもらう。
-// rememberToken を有効にした場合のみ localStorage に保存する（本人の明示的な選択）。
+// 閲覧はPagesの静的ファイル（認証不要）、書き込みは方式B（共有書き込みトークン）を使う。
+// リポジトリ情報はこのサイト自身が同居するリポジトリで固定（UIからは変更・閲覧できない）。
 export const githubConfig = {
   owner: 'ItoDaichi1022',
   repo: 'E-Sports-Ranking',
@@ -17,31 +13,25 @@ export const githubConfig = {
 const TOKEN_SESSION_KEY = 'esr-github-token';
 const TOKEN_LOCAL_KEY = 'esr-github-token-local';
 
+// 保存済みトークンを復元する。localStorage優先（「この端末に保存」を選んだ場合）。
 export function loadConfigFromStorage() {
   try {
-    const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
-    if (raw) Object.assign(githubConfig, JSON.parse(raw));
-  } catch {
-    // 破損データは無視して既定値を使う
-  }
-  try {
-    const token = githubConfig.rememberToken
-      ? localStorage.getItem(TOKEN_LOCAL_KEY)
-      : sessionStorage.getItem(TOKEN_SESSION_KEY);
-    if (token) githubConfig.token = token;
+    const localToken = localStorage.getItem(TOKEN_LOCAL_KEY);
+    if (localToken) {
+      githubConfig.token = localToken;
+      githubConfig.rememberToken = true;
+      return;
+    }
+    const sessionToken = sessionStorage.getItem(TOKEN_SESSION_KEY);
+    if (sessionToken) githubConfig.token = sessionToken;
   } catch {
     // ストレージ不可な環境では毎回入力してもらう
   }
 }
 
 export function saveConfigToStorage() {
-  const { owner, repo, branch, pathPrefix, rememberToken } = githubConfig;
-  localStorage.setItem(
-    CONFIG_STORAGE_KEY,
-    JSON.stringify({ owner, repo, branch, pathPrefix, rememberToken }),
-  );
   try {
-    if (githubConfig.token && rememberToken) {
+    if (githubConfig.token && githubConfig.rememberToken) {
       localStorage.setItem(TOKEN_LOCAL_KEY, githubConfig.token);
       sessionStorage.removeItem(TOKEN_SESSION_KEY);
     } else if (githubConfig.token) {
@@ -56,8 +46,22 @@ export function saveConfigToStorage() {
   }
 }
 
-export function isConfigured() {
-  return Boolean(githubConfig.owner && githubConfig.repo);
+// トークンがこのリポジトリへの書き込み権限を持つか検証する（編集モード切替時に使用）。
+export async function verifyWriteAccess() {
+  if (!githubConfig.token) return { ok: false, error: 'トークンを入力してください。' };
+  let res;
+  try {
+    res = await fetch(apiBase(), { headers: authHeaders() });
+  } catch {
+    return { ok: false, error: 'GitHubに接続できませんでした。ネットワークを確認してください。' };
+  }
+  if (res.status === 401) return { ok: false, error: 'トークンが無効です。' };
+  if (!res.ok) return { ok: false, error: `トークンの確認に失敗しました (${res.status})。` };
+  const data = await res.json();
+  if (!data.permissions?.push) {
+    return { ok: false, error: 'このトークンには書き込み権限がありません。' };
+  }
+  return { ok: true };
 }
 
 function apiBase() {

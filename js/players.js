@@ -70,7 +70,8 @@ export function removePlayer(id) {
 
 let editingPlayerId = null;
 
-export function renderPlayerTable(containerEl, onChanged) {
+export function renderPlayerTable(containerEl, onChanged, options = {}) {
+  const readOnly = !!options.readOnly;
   containerEl.innerHTML = '';
 
   if (state.players.length === 0) {
@@ -82,7 +83,7 @@ export function renderPlayerTable(containerEl, onChanged) {
   table.className = 'player-table';
   table.innerHTML = `
     <thead>
-      <tr><th>表示名</th><th>ゲームアカウントID</th><th>過去名</th><th>使用キャラ</th><th></th></tr>
+      <tr><th>表示名</th><th>ゲームアカウントID</th><th>過去名</th><th>使用キャラ</th>${readOnly ? '' : '<th></th>'}</tr>
     </thead>
   `;
   const tbody = document.createElement('tbody');
@@ -90,7 +91,7 @@ export function renderPlayerTable(containerEl, onChanged) {
   state.players.forEach((p) => {
     const tr = document.createElement('tr');
 
-    if (editingPlayerId === p.id) {
+    if (!readOnly && editingPlayerId === p.id) {
       const nameTd = document.createElement('td');
       const nameInput = document.createElement('input');
       nameInput.type = 'text';
@@ -135,7 +136,7 @@ export function renderPlayerTable(containerEl, onChanged) {
       cancelBtn.textContent = 'キャンセル';
       cancelBtn.addEventListener('click', () => {
         editingPlayerId = null;
-        renderPlayerTable(containerEl, onChanged);
+        renderPlayerTable(containerEl, onChanged, options);
       });
 
       actionTd.appendChild(saveBtn);
@@ -162,41 +163,43 @@ export function renderPlayerTable(containerEl, onChanged) {
       const charsTd = document.createElement('td');
       charsTd.textContent = p.mainCharacters.join(', ');
 
-      const actionTd = document.createElement('td');
-      actionTd.className = 'row-actions';
-
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'btn-secondary';
-      editBtn.textContent = '編集';
-      editBtn.addEventListener('click', () => {
-        editingPlayerId = p.id;
-        renderPlayerTable(containerEl, onChanged);
-      });
-
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'btn-remove';
-      removeBtn.textContent = '削除';
-      removeBtn.addEventListener('click', () => {
-        const guard = canRemovePlayer(p.id);
-        if (!guard.ok) {
-          alert(guard.reason);
-          return;
-        }
-        if (!confirm(`選手「${p.currentName}」を削除しますか？`)) return;
-        removePlayer(p.id);
-        onChanged();
-      });
-
-      actionTd.appendChild(editBtn);
-      actionTd.appendChild(removeBtn);
-
       tr.appendChild(nameTd);
       tr.appendChild(idTd);
       tr.appendChild(pastTd);
       tr.appendChild(charsTd);
-      tr.appendChild(actionTd);
+
+      if (!readOnly) {
+        const actionTd = document.createElement('td');
+        actionTd.className = 'row-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'btn-secondary';
+        editBtn.textContent = '編集';
+        editBtn.addEventListener('click', () => {
+          editingPlayerId = p.id;
+          renderPlayerTable(containerEl, onChanged, options);
+        });
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn-remove';
+        removeBtn.textContent = '削除';
+        removeBtn.addEventListener('click', () => {
+          const guard = canRemovePlayer(p.id);
+          if (!guard.ok) {
+            alert(guard.reason);
+            return;
+          }
+          if (!confirm(`選手「${p.currentName}」を削除しますか？`)) return;
+          removePlayer(p.id);
+          onChanged();
+        });
+
+        actionTd.appendChild(editBtn);
+        actionTd.appendChild(removeBtn);
+        tr.appendChild(actionTd);
+      }
     }
 
     tbody.appendChild(tr);
