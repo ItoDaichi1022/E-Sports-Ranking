@@ -2,9 +2,11 @@
 // 閲覧（GET）はpublicリポジトリなら認証不要。書き込み（PUT）は方式B（共有書き込みトークン）を使う。
 const CONFIG_STORAGE_KEY = 'esr-github-config';
 
+// このサイト自体が同居しているリポジトリを既定値にしておく。
+// トークンだけは秘密情報のため既定値を持たせず、書き込み時に毎回本人が入力する。
 export const githubConfig = {
-  owner: '',
-  repo: '',
+  owner: 'ItoDaichi1022',
+  repo: 'E-Sports-Ranking',
   branch: 'main',
   pathPrefix: 'data',
   token: '', // 秘密情報のため localStorage には保存しない（sessionStorageのみ）
