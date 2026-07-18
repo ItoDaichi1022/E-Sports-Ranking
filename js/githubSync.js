@@ -19,9 +19,40 @@ function bracketPath(tournamentId) {
   return `${githubConfig.pathPrefix}/brackets/${tournamentId}.json`;
 }
 
-// GitHub上のplayers/tournaments/matches/brackets を読み込み、in-memory stateを丸ごと置き換える。
-// 閲覧のみなら書き込みトークンは不要。
-export async function loadAllFromGitHub() {
+// サイトと同じ場所（GitHub Pages）から静的ファイルとしてJSONを取得する。
+// GitHub APIと違って認証もレート制限も無いため、閲覧者はこちらを使う。
+async function fetchStaticJson(path) {
+  const res = await fetch(`${path}?_=${Date.now()}`, { cache: 'no-store' });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`データ読み込み失敗 (${path}): ${res.status}`);
+  return res.json();
+}
+
+// 閲覧モード：データJSONはサイトと同一リポジトリに同居しているので、
+// Pagesが配信する静的ファイルを直接読む（ブラケットは大会IDからファイル名を引ける）。
+async function loadAllViaStatic() {
+  const [playersJson, tournamentsJson, matchesJson] = await Promise.all([
+    fetchStaticJson(dataPath('players.json')),
+    fetchStaticJson(dataPath('tournaments.json')),
+    fetchStaticJson(dataPath('matches.json')),
+  ]);
+
+  state.players = playersJson?.players ?? [];
+  state.tournaments = tournamentsJson?.tournaments ?? [];
+  state.matches = matchesJson?.matches ?? [];
+
+  state.brackets = {};
+  const bracketResults = await Promise.all(
+    state.tournaments.map(async (t) => ({ id: t.id, json: await fetchStaticJson(bracketPath(t.id)) })),
+  );
+  bracketResults.forEach(({ id, json }) => {
+    if (json) state.brackets[id] = json;
+  });
+}
+
+// 運営モード：GitHub API経由で読み込み、更新時の楽観ロックに使うshaも記録する。
+// 認証付きなのでレート制限は毎時5000回と実質問題にならない。
+async function loadAllViaApi() {
   const [playersFile, tournamentsFile, matchesFile] = await Promise.all([
     getFile(dataPath('players.json')),
     getFile(dataPath('tournaments.json')),
@@ -35,7 +66,6 @@ export async function loadAllFromGitHub() {
   shaCache.set('tournaments', tournamentsFile.sha);
   shaCache.set('matches', matchesFile.sha);
 
-  deletedBracketIds.clear();
   state.brackets = {};
   const entries = await listDirectory(`${githubConfig.pathPrefix}/brackets`);
   const bracketFiles = await Promise.all(
@@ -51,13 +81,36 @@ export async function loadAllFromGitHub() {
   });
 }
 
+// players/tournaments/matches/brackets を読み込み、in-memory stateを丸ごと置き換える。
+// トークンなし＝閲覧モード（静的取得）、トークンあり＝運営モード（API取得）。
+export async function loadAllFromGitHub() {
+  deletedBracketIds.clear();
+  shaCache.clear();
+
+  if (githubConfig.token) {
+    await loadAllViaApi();
+  } else {
+    await loadAllViaStatic();
+  }
+}
+
+// shaが未取得のファイル（静的読み込み後にトークンを設定して保存した場合など）は
+// 書き込み直前にAPIから現在のshaを取得して楽観ロックを成立させる。
+async function ensureSha(key, path) {
+  if (!shaCache.get(key)) {
+    const { sha } = await getFile(path);
+    shaCache.set(key, sha);
+  }
+  return shaCache.get(key);
+}
+
 // 現在のin-memory stateをGitHubへ書き込む（players/tournaments/matches + 各大会のbracket）。
 // 書き込みトークンが必要。
 export async function saveAllToGitHub() {
   const playersSha = await putFile(
     dataPath('players.json'),
     { players: state.players },
-    shaCache.get('players'),
+    await ensureSha('players', dataPath('players.json')),
     'players.json を更新',
   );
   shaCache.set('players', playersSha);
@@ -65,7 +118,7 @@ export async function saveAllToGitHub() {
   const tournamentsSha = await putFile(
     dataPath('tournaments.json'),
     { tournaments: state.tournaments },
-    shaCache.get('tournaments'),
+    await ensureSha('tournaments', dataPath('tournaments.json')),
     'tournaments.json を更新',
   );
   shaCache.set('tournaments', tournamentsSha);
@@ -73,7 +126,7 @@ export async function saveAllToGitHub() {
   const matchesSha = await putFile(
     dataPath('matches.json'),
     { matches: state.matches },
-    shaCache.get('matches'),
+    await ensureSha('matches', dataPath('matches.json')),
     'matches.json を更新',
   );
   shaCache.set('matches', matchesSha);
@@ -82,7 +135,7 @@ export async function saveAllToGitHub() {
     const sha = await putFile(
       bracketPath(tournamentId),
       bracket,
-      shaCache.get(`bracket:${tournamentId}`),
+      await ensureSha(`bracket:${tournamentId}`, bracketPath(tournamentId)),
       `bracket ${tournamentId} を更新`,
     );
     shaCache.set(`bracket:${tournamentId}`, sha);

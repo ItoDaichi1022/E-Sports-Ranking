@@ -467,7 +467,10 @@ async function handleGithubLoad() {
     selectedParticipantIds = [];
     clearDirty();
     routeFromHash();
-    setGithubStatus('GitHubから読み込みました。', 'success');
+    setGithubStatus(
+      githubConfig.token ? 'GitHubから読み込みました。' : '最新データを読み込みました（閲覧モード）。',
+      'success',
+    );
   } catch (err) {
     setGithubStatus(err.message, 'error');
   } finally {
