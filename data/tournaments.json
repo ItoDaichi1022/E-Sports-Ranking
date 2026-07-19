@@ -1,9 +1,9 @@
 {
   "tournaments": [
     {
-      "id": "t-mrrfhm2c-1",
-      "name": "test",
-      "date": "2026-07-18",
+      "id": "t-mrrg7d9o-5",
+      "name": "test1",
+      "date": "2026-07-19",
       "format": "single_elim",
       "participantIds": [
         "5190490651",
@@ -11,7 +11,7 @@
         "23995570651"
       ],
       "weight": null,
-      "rules": "テスト"
+      "rules": "test1"
     }
   ]
 }

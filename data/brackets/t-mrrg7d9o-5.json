@@ -1,5 +1,5 @@
 {
-  "tournamentId": "t-mrrfhm2c-1",
+  "tournamentId": "t-mrrg7d9o-5",
   "bracketSize": 4,
   "totalRounds": 2,
   "rounds": [
@@ -7,7 +7,7 @@
       "name": "SF",
       "matches": [
         {
-          "id": "m-mrrfhm2c-2",
+          "id": "m-mrrg7d9o-6",
           "round": "SF",
           "player1Id": "5190490651",
           "player2Id": null,
@@ -16,22 +16,23 @@
           "score": null,
           "confirmed": true,
           "isBye": true,
-          "nextMatchId": "m-mrrfhm2c-4",
+          "nextMatchId": "m-mrrg7d9o-8",
           "nextSlot": 1,
           "isWalkover": false
         },
         {
-          "id": "m-mrrfhm2c-3",
+          "id": "m-mrrg7d9o-7",
           "round": "SF",
           "player1Id": "50995370651",
           "player2Id": "23995570651",
-          "winnerId": null,
-          "loserId": null,
-          "score": null,
-          "confirmed": false,
+          "winnerId": "50995370651",
+          "loserId": "23995570651",
+          "score": "2-1",
+          "confirmed": true,
           "isBye": false,
-          "nextMatchId": "m-mrrfhm2c-4",
-          "nextSlot": 2
+          "nextMatchId": "m-mrrg7d9o-8",
+          "nextSlot": 2,
+          "isWalkover": false
         }
       ]
     },
@@ -39,17 +40,18 @@
       "name": "F",
       "matches": [
         {
-          "id": "m-mrrfhm2c-4",
+          "id": "m-mrrg7d9o-8",
           "round": "F",
           "player1Id": "5190490651",
-          "player2Id": null,
-          "winnerId": null,
-          "loserId": null,
-          "score": null,
-          "confirmed": false,
+          "player2Id": "50995370651",
+          "winnerId": "5190490651",
+          "loserId": "50995370651",
+          "score": "2-0",
+          "confirmed": true,
           "isBye": false,
           "nextMatchId": null,
-          "nextSlot": null
+          "nextSlot": null,
+          "isWalkover": false
         }
       ]
     }
