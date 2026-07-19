@@ -3,7 +3,7 @@
 export const state = {
   players: [],       // { id, currentName, pastNames: [] }
   tournaments: [],    // { id, name, date, format, participantIds: [], weight, rules }
-  matches: [],        // { id, tournamentId, winnerId, loserId, score, round }
+  matches: [],        // { id, tournamentId, winnerId, loserId, score, round }（保存時は大会ごとに matches/{tid}.json へ分割）
   brackets: {},       // tournamentId -> bracket object (js/bracket.js が構造を定義)
   publishedRanking: null, // { publishedAt, periodMonths, rankings: [...] } | null（未公開）
 };

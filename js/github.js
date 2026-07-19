@@ -135,7 +135,10 @@ export async function putFile(path, jsonValue, sha, message) {
   if (!res.ok) {
     const detail = await safeText(res);
     if (res.status === 409 || res.status === 422) {
-      throw new Error(`GitHub書き込み失敗 (${path}): 他の変更と競合した可能性があります。先に「GitHubから読み込み」してやり直してください。 (${res.status})`);
+      // 他端末が先に保存した（楽観ロック失敗）。呼び出し側が最新を取り込んでマージ・再試行する。
+      const err = new Error(`他の端末の変更と競合しました (${path})`);
+      err.isConflict = true;
+      throw err;
     }
     throw new Error(`GitHub書き込み失敗 (${path}): ${res.status} ${detail}`);
   }
@@ -143,7 +146,8 @@ export async function putFile(path, jsonValue, sha, message) {
   return data.content.sha;
 }
 
-// ファイルを削除する（大会削除時のブラケットファイル用）。
+// ファイルを削除する（大会削除時のブラケット/試合ファイル用）。
+// 既に消えている(404)場合は成功扱い。競合(409/422)は isConflict 付きで投げる。
 export async function deleteFile(path, sha, message) {
   if (!githubConfig.token) throw new Error('書き込みトークンが設定されていません。');
   const res = await fetch(`${apiBase()}/contents/${path}`, {
@@ -151,7 +155,13 @@ export async function deleteFile(path, sha, message) {
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ message, sha, branch: githubConfig.branch }),
   });
+  if (res.status === 404) return;
   if (!res.ok) {
+    if (res.status === 409 || res.status === 422) {
+      const err = new Error(`他の端末の変更と競合しました (${path})`);
+      err.isConflict = true;
+      throw err;
+    }
     throw new Error(`GitHub削除失敗 (${path}): ${res.status} ${await safeText(res)}`);
   }
 }

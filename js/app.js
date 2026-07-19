@@ -6,7 +6,7 @@ import { computeRankings, filterMatchesByPeriod } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { getPlayerStats } from './playerStats.js';
 import { githubConfig, loadConfigFromStorage, saveConfigToStorage, verifyWriteAccess } from './github.js';
-import { loadAllFromGitHub, saveAllToGitHub, markBracketDeleted } from './githubSync.js';
+import { loadAllFromGitHub, saveAllToGitHub, markTournamentDeleted } from './githubSync.js';
 
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
 let selectedParticipantIds = [];
@@ -92,14 +92,6 @@ function applyModeUI() {
   rankingEditorNoteEl.hidden = !editing;
   if (!editing) tournamentEditForm.hidden = true;
   modeToggleBtn.textContent = editing ? '閲覧モードへ' : '編集モード';
-
-  // 閲覧モードでは進行中の大会を追えるよう自動更新する。
-  // 編集モードでは未保存の編集を上書きしないため停止する。
-  if (editing) {
-    stopAutoRefresh();
-  } else {
-    startAutoRefresh();
-  }
 }
 
 // ---- 未保存変更の管理 ----
@@ -421,7 +413,7 @@ function renderBracketPage(tournamentId) {
 
 // ---- ランキング ----
 
-const PERIOD_LABELS = { 1: '直近1か月', 3: '直近3か月', 6: '直近6か月', 12: '直近12か月', all: '全期間' };
+const PERIOD_LABELS = { 1: '直近1カ月', 3: '直近3カ月', 6: '直近6カ月', 12: '直近12カ月', all: '全期間' };
 
 function formatDateTime(iso) {
   const d = new Date(iso);
@@ -599,9 +591,15 @@ async function performSave() {
   cancelPendingAutoSave();
   setGithubStatus('自動保存中...', 'loading');
   try {
-    await saveAllToGitHub();
+    const result = await saveAllToGitHub();
     clearDirty();
-    setGithubStatus(`自動保存しました（${formatTime(new Date())}）`, 'success');
+    if (result.merged) {
+      // 他端末の変更を取り込んで保存したので、表示を最新の統合結果に更新する
+      routeFromHash();
+      setGithubStatus(`他の端末の変更と統合して保存しました（${formatTime(new Date())}）`, 'success');
+    } else {
+      setGithubStatus(`自動保存しました（${formatTime(new Date())}）`, 'success');
+    }
     saveInFlight = false;
     if (saveQueuedAgain) {
       saveQueuedAgain = false;
@@ -615,21 +613,36 @@ async function performSave() {
   }
 }
 
-// ---- 閲覧モードの自動更新 ----
+// ---- 自動更新 ----
 
-// 観戦者が何もしなくても進行中の大会の最新結果が出るよう、閲覧モードでは
-// 定期的に静的データを再取得し、内容が変わったときだけ再描画する。
+// 閲覧モード: 観戦者が何もしなくても進行中の大会の最新結果が出るよう、10秒ごとに再取得する。
+// 編集モード: 他の運営者の保存を取り込むため、手元に未保存の変更が無いときだけ
+// 低めの頻度（30秒）で再取得する。入力中は再描画で消えないよう見送る。
 const AUTO_REFRESH_MS = 10 * 1000;
+const EDIT_REFRESH_MIN_MS = 30 * 1000;
 let autoRefreshTimer = null;
 let autoRefreshInFlight = false;
+let lastEditRefreshAt = 0;
 
 function formatTime(date) {
   return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 }
 
+// フォーム入力の最中か（再描画すると入力内容が飛ぶため、自動更新を見送る判定）
+function isUserTyping() {
+  const el = document.activeElement;
+  if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return true;
+  // ブラケットの未確定スコアに入力済みの値が残っている間も上書きしない
+  return [...document.querySelectorAll('.score-num-input')].some((i) => i.value !== '');
+}
+
 async function autoRefresh() {
-  // 編集モード・読み込み中・タブ非表示のときは何もしない
-  if (isEditMode() || autoRefreshInFlight || loadInFlight || dirty || document.hidden) return;
+  if (autoRefreshInFlight || loadInFlight || saveInFlight || dirty || document.hidden) return;
+  if (isEditMode()) {
+    if (isUserTyping()) return;
+    if (Date.now() - lastEditRefreshAt < EDIT_REFRESH_MIN_MS) return;
+    lastEditRefreshAt = Date.now();
+  }
   autoRefreshInFlight = true;
   try {
     const before = JSON.stringify(state);
@@ -647,11 +660,6 @@ async function autoRefresh() {
 function startAutoRefresh() {
   if (autoRefreshTimer) return;
   autoRefreshTimer = setInterval(autoRefresh, AUTO_REFRESH_MS);
-}
-
-function stopAutoRefresh() {
-  clearInterval(autoRefreshTimer);
-  autoRefreshTimer = null;
 }
 
 // タブを開き直したときは次の周期を待たずにすぐ最新化する
@@ -782,7 +790,7 @@ tournamentDeleteBtn.addEventListener('click', () => {
     alert(result.error);
     return;
   }
-  markBracketDeleted(currentBracketTournamentId);
+  markTournamentDeleted(currentBracketTournamentId);
   markDirty();
   location.hash = '#history';
 });
@@ -847,3 +855,4 @@ loadConfigFromStorage();
 applyModeUI();
 routeFromHash();
 handleGithubLoad();
+startAutoRefresh();
