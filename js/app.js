@@ -50,8 +50,6 @@ const playerBackBtn = document.getElementById('player-back-btn');
 
 const rankingContainer = document.getElementById('ranking-container');
 
-const githubLoadBtn = document.getElementById('github-load-btn');
-const githubSaveBtn = document.getElementById('github-save-btn');
 const githubStatusEl = document.getElementById('github-status');
 const dirtyBadgeEl = document.getElementById('dirty-badge');
 const modeToggleBtn = document.getElementById('mode-toggle-btn');
@@ -85,7 +83,6 @@ function applyModeUI() {
   homeCardTournament.hidden = !editing;
   navRankingLink.hidden = !editing;
   homeCardRanking.hidden = !editing;
-  githubSaveBtn.hidden = !editing;
   playerForm.hidden = !editing;
   tournamentEditBtn.hidden = !editing;
   tournamentDeleteBtn.hidden = !editing;
@@ -105,7 +102,6 @@ function applyModeUI() {
 
 function updateSyncBar() {
   dirtyBadgeEl.hidden = !dirty;
-  githubSaveBtn.classList.toggle('attention', dirty);
 }
 
 function markDirty() {
@@ -477,10 +473,12 @@ function setGithubStatus(text, type) {
   githubStatusEl.className = `status-line${type ? ` ${type}` : ''}`;
 }
 
+let loadInFlight = false;
+
 async function handleGithubLoad() {
   if (dirty && !confirm('未保存の変更があります。読み込むと破棄されますが、続けますか？')) return;
   cancelPendingAutoSave();
-  githubLoadBtn.disabled = true;
+  loadInFlight = true;
   setGithubStatus('GitHubから読み込み中...', 'loading');
   try {
     await loadAllFromGitHub();
@@ -494,23 +492,25 @@ async function handleGithubLoad() {
   } catch (err) {
     setGithubStatus(err.message, 'error');
   } finally {
-    githubLoadBtn.disabled = false;
+    loadInFlight = false;
   }
 }
 
-// ---- 保存（自動保存＋手動フォールバック） ----
+// ---- 自動保存 ----
 
 // 編集モードでは変更のたびに自動保存する。連続した操作（スコア入力→次の試合の確定など）を
 // 1回の保存にまとめるため、最後の変更から少し待ってから実行する。
+// 手動の「保存」ボタンは無いため、失敗時も次の変更を待たず自身で再試行する。
 const AUTO_SAVE_DEBOUNCE_MS = 2500;
+const AUTO_SAVE_RETRY_MS = 15 * 1000;
 let autoSaveTimer = null;
 let saveInFlight = false;
 let saveQueuedAgain = false;
 
-function scheduleAutoSave() {
+function scheduleAutoSave(delayMs = AUTO_SAVE_DEBOUNCE_MS) {
   if (!isEditMode()) return;
   clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(() => performSave(true), AUTO_SAVE_DEBOUNCE_MS);
+  autoSaveTimer = setTimeout(performSave, delayMs);
 }
 
 function cancelPendingAutoSave() {
@@ -518,11 +518,8 @@ function cancelPendingAutoSave() {
   autoSaveTimer = null;
 }
 
-async function performSave(isAuto = false) {
-  if (!githubConfig.token) {
-    if (!isAuto) setGithubStatus('保存には編集モードへの切り替えが必要です。', 'error');
-    return;
-  }
+async function performSave() {
+  if (!githubConfig.token) return;
   // 保存中に次の変更が来たら、終わってからもう一度保存する
   if (saveInFlight) {
     saveQueuedAgain = true;
@@ -530,32 +527,28 @@ async function performSave(isAuto = false) {
   }
   saveInFlight = true;
   cancelPendingAutoSave();
-  githubSaveBtn.disabled = true;
-  setGithubStatus(isAuto ? '自動保存中...' : 'GitHubに保存中...', 'loading');
+  setGithubStatus('自動保存中...', 'loading');
   try {
     await saveAllToGitHub();
     clearDirty();
-    setGithubStatus(
-      isAuto ? `自動保存しました（${formatTime(new Date())}）` : 'GitHubに保存しました。',
-      'success',
-    );
-  } catch (err) {
-    // 自動保存の失敗は次の変更時に再試行される。手動の「保存」でも再試行できる。
-    setGithubStatus(`${err.message}${isAuto ? '（「保存」ボタンで再試行できます）' : ''}`, 'error');
-  } finally {
+    setGithubStatus(`自動保存しました（${formatTime(new Date())}）`, 'success');
     saveInFlight = false;
-    githubSaveBtn.disabled = false;
     if (saveQueuedAgain) {
       saveQueuedAgain = false;
       scheduleAutoSave();
     }
+  } catch (err) {
+    setGithubStatus(`${err.message}（自動的に再試行します）`, 'error');
+    saveInFlight = false;
+    saveQueuedAgain = false;
+    scheduleAutoSave(AUTO_SAVE_RETRY_MS);
   }
 }
 
 // ---- 閲覧モードの自動更新 ----
 
-// 進行中の大会を観戦している人が「読み込み」を押さなくても最新結果が出るよう、
-// 閲覧モードでは定期的に静的データを再取得し、内容が変わったときだけ再描画する。
+// 観戦者が何もしなくても進行中の大会の最新結果が出るよう、閲覧モードでは
+// 定期的に静的データを再取得し、内容が変わったときだけ再描画する。
 const AUTO_REFRESH_MS = 30 * 1000;
 let autoRefreshTimer = null;
 let autoRefreshInFlight = false;
@@ -565,8 +558,8 @@ function formatTime(date) {
 }
 
 async function autoRefresh() {
-  // 編集モード・手動読み込み中・タブ非表示のときは何もしない
-  if (isEditMode() || autoRefreshInFlight || githubLoadBtn.disabled || dirty || document.hidden) return;
+  // 編集モード・読み込み中・タブ非表示のときは何もしない
+  if (isEditMode() || autoRefreshInFlight || loadInFlight || dirty || document.hidden) return;
   autoRefreshInFlight = true;
   try {
     const before = JSON.stringify(state);
@@ -748,9 +741,6 @@ tokenForm.addEventListener('submit', async (e) => {
   await handleGithubLoad();
   setGithubStatus('編集モードに切り替えました（変更は自動で保存されます）。', 'success');
 });
-
-githubLoadBtn.addEventListener('click', handleGithubLoad);
-githubSaveBtn.addEventListener('click', () => performSave(false));
 
 window.addEventListener('hashchange', routeFromHash);
 

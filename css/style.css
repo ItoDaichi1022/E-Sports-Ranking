@@ -91,11 +91,6 @@ header h1 a {
   font-weight: bold;
 }
 
-#github-save-btn.attention {
-  background: #b45309;
-  border-color: #b45309;
-}
-
 section {
   margin: 2rem 0;
   padding: 1rem 1.25rem;

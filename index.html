@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。CSS/JSを変更してデプロイするときは数字を上げる -->
-<link rel="stylesheet" href="css/style.css?v=5">
+<link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
 <header>
@@ -20,9 +20,7 @@
     </nav>
   </div>
   <div class="sync-bar">
-    <span id="dirty-badge" class="dirty-badge" hidden>未保存の変更があります</span>
-    <button type="button" id="github-load-btn" class="btn-secondary">読み込み</button>
-    <button type="button" id="github-save-btn">保存</button>
+    <span id="dirty-badge" class="dirty-badge" hidden>保存中...</span>
     <button type="button" id="mode-toggle-btn" class="btn-secondary">編集モード</button>
     <span id="github-status" class="status-line"></span>
   </div>
@@ -165,6 +163,6 @@
 
 </main>
 
-<script type="module" src="js/app.js?v=8"></script>
+<script type="module" src="js/app.js?v=9"></script>
 </body>
 </html>
