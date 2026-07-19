@@ -23,7 +23,7 @@ export function renderRankingTable(containerEl, rankings, emptyMessage) {
   table.className = 'ranking-table';
   table.innerHTML = `
     <thead>
-      <tr><th>順位</th>${showChange ? '<th>変動</th>' : ''}<th>選手</th><th>スコア</th><th>出場大会数</th></tr>
+      <tr><th>順位</th><th>選手</th><th>スコア</th>${showChange ? '<th>変動</th>' : ''}</tr>
     </thead>
   `;
   const tbody = document.createElement('tbody');
@@ -33,10 +33,9 @@ export function renderRankingTable(containerEl, rankings, emptyMessage) {
     tr.className = 'clickable-row' + (r.rank <= 3 ? ` rank-${r.rank}` : '');
     tr.innerHTML = `
       <td class="rank-cell">${r.rank}</td>
-      ${showChange ? `<td class="rank-change-cell">${rankChangeCell(r)}</td>` : ''}
       <td><a href="#player/${encodeURIComponent(r.id)}">${escapeHtml(r.name)}</a></td>
       <td>${r.score.toFixed(1)}</td>
-      <td>${r.tournamentsPlayed}</td>
+      ${showChange ? `<td class="rank-change-cell">${rankChangeCell(r)}</td>` : ''}
     `;
     tr.addEventListener('click', (e) => {
       if (e.target.closest('a')) return;
