@@ -1,13 +1,11 @@
-import { state } from './state.js';
-import { computeRankings } from './ranking.js';
 import { escapeHtml } from './players.js';
 
-export function renderRanking(containerEl) {
+// rankings: computeRankings() や公開済みスナップショットが返す [{ id, name, score, tournamentsPlayed, rank }] 形式の配列。
+export function renderRankingTable(containerEl, rankings, emptyMessage) {
   containerEl.innerHTML = '';
 
-  const rankings = computeRankings(state);
-  if (rankings.length === 0) {
-    containerEl.innerHTML = '<p class="empty-hint">確定した試合がまだないため、ランキングを計算できません。</p>';
+  if (!rankings || rankings.length === 0) {
+    containerEl.innerHTML = `<p class="empty-hint">${escapeHtml(emptyMessage)}</p>`;
     return;
   }
 
@@ -38,9 +36,4 @@ export function renderRanking(containerEl) {
 
   table.appendChild(tbody);
   containerEl.appendChild(table);
-
-  const note = document.createElement('p');
-  note.className = 'note';
-  note.textContent = '行をクリックすると選手の個人戦績ページが開きます。';
-  containerEl.appendChild(note);
 }

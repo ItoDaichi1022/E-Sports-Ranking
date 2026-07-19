@@ -5,6 +5,7 @@ export const state = {
   tournaments: [],    // { id, name, date, format, participantIds: [], weight, rules }
   matches: [],        // { id, tournamentId, winnerId, loserId, score, round }
   brackets: {},       // tournamentId -> bracket object (js/bracket.js が構造を定義)
+  publishedRanking: null, // { publishedAt, periodMonths, rankings: [...] } | null（未公開）
 };
 
 let idCounter = 0;

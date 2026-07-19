@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。CSS/JSを変更してデプロイするときは数字を上げる -->
-<link rel="stylesheet" href="css/style.css?v=7">
+<link rel="stylesheet" href="css/style.css?v=8">
 </head>
 <body>
 <header>
@@ -166,12 +166,28 @@
 
   <section id="view-ranking" class="view" hidden>
     <h2>ランキング（LumiRank軽量版）</h2>
-    <p class="note">全大会の試合結果から都度再計算します。</p>
+    <div id="ranking-editor" class="inline-form" hidden>
+      <label>
+        集計対象期間
+        <select id="ranking-period-select">
+          <option value="1">直近1か月</option>
+          <option value="3" selected>直近3か月</option>
+          <option value="6">直近6か月</option>
+          <option value="12">直近12か月</option>
+          <option value="all">全期間</option>
+        </select>
+      </label>
+      <button type="button" id="ranking-publish-btn">このランキングを公開する</button>
+    </div>
+    <p id="ranking-published-status" class="meta-line"></p>
     <div id="ranking-container"></div>
+    <p class="note" id="ranking-editor-note" hidden>
+      プレビューは選択した期間の試合結果から即時に計算されます。「公開する」を押すまで閲覧モードには反映されません。
+    </p>
   </section>
 
 </main>
 
-<script type="module" src="js/app.js?v=11"></script>
+<script type="module" src="js/app.js?v=12"></script>
 </body>
 </html>

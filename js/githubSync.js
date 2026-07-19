@@ -43,10 +43,11 @@ async function fetchStaticJson(path) {
 // 途中で通信が失敗した場合に中途半端な状態にならないよう、
 // すべて取得し終えてから state へ一括で反映する（自動更新でも使うため）。
 async function loadAllViaStatic() {
-  const [playersJson, tournamentsJson, matchesJson] = await Promise.all([
+  const [playersJson, tournamentsJson, matchesJson, rankingJson] = await Promise.all([
     fetchStaticJson(dataPath('players.json')),
     fetchStaticJson(dataPath('tournaments.json')),
     fetchStaticJson(dataPath('matches.json')),
+    fetchStaticJson(dataPath('ranking.json')),
   ]);
 
   const tournaments = tournamentsJson?.tournaments ?? [];
@@ -62,26 +63,31 @@ async function loadAllViaStatic() {
   state.tournaments = tournaments;
   state.matches = matchesJson?.matches ?? [];
   state.brackets = brackets;
+  state.publishedRanking = rankingJson ?? null;
 }
 
 // 運営モード：GitHub API経由で読み込み、更新時の楽観ロックに使うshaも記録する。
 // 認証付きなのでレート制限は毎時5000回と実質問題にならない。
 async function loadAllViaApi() {
-  const [playersFile, tournamentsFile, matchesFile] = await Promise.all([
+  const [playersFile, tournamentsFile, matchesFile, rankingFile] = await Promise.all([
     getFile(dataPath('players.json')),
     getFile(dataPath('tournaments.json')),
     getFile(dataPath('matches.json')),
+    getFile(dataPath('ranking.json')),
   ]);
 
   state.players = playersFile.json?.players ?? [];
   state.tournaments = tournamentsFile.json?.tournaments ?? [];
   state.matches = matchesFile.json?.matches ?? [];
+  state.publishedRanking = rankingFile.json ?? null;
   shaCache.set('players', playersFile.sha);
   shaCache.set('tournaments', tournamentsFile.sha);
   shaCache.set('matches', matchesFile.sha);
+  shaCache.set('ranking', rankingFile.sha);
   if (playersFile.json) contentCache.set('players', serialize(playersFile.json));
   if (tournamentsFile.json) contentCache.set('tournaments', serialize(tournamentsFile.json));
   if (matchesFile.json) contentCache.set('matches', serialize(matchesFile.json));
+  if (rankingFile.json) contentCache.set('ranking', serialize(rankingFile.json));
 
   state.brackets = {};
   const entries = await listDirectory(`${githubConfig.pathPrefix}/brackets`);
@@ -138,6 +144,9 @@ export async function saveAllToGitHub() {
   await putIfChanged('players', dataPath('players.json'), { players: state.players }, 'players.json を更新');
   await putIfChanged('tournaments', dataPath('tournaments.json'), { tournaments: state.tournaments }, 'tournaments.json を更新');
   await putIfChanged('matches', dataPath('matches.json'), { matches: state.matches }, 'matches.json を更新');
+  if (state.publishedRanking) {
+    await putIfChanged('ranking', dataPath('ranking.json'), state.publishedRanking, 'ranking.json を更新');
+  }
 
   for (const [tournamentId, bracket] of Object.entries(state.brackets)) {
     await putIfChanged(`bracket:${tournamentId}`, bracketPath(tournamentId), bracket, `bracket ${tournamentId} を更新`);

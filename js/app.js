@@ -3,8 +3,8 @@ import { addPlayer, renderPlayerTable, escapeHtml } from './players.js';
 import { createBracket, updateTournament, deleteTournamentData, getChampionId } from './bracket.js';
 import { renderBracket } from './bracketView.js';
 import { renderMatchesTable } from './matchesLog.js';
-import { computeRankings } from './ranking.js';
-import { renderRanking } from './rankingView.js';
+import { computeRankings, filterMatchesByPeriod } from './ranking.js';
+import { renderRankingTable } from './rankingView.js';
 import { getPlayerStats } from './playerStats.js';
 import { githubConfig, loadConfigFromStorage, saveConfigToStorage, verifyWriteAccess } from './github.js';
 import { loadAllFromGitHub, saveAllToGitHub, markBracketDeleted } from './githubSync.js';
@@ -52,6 +52,11 @@ const playerDetailEl = document.getElementById('player-detail');
 const playerBackBtn = document.getElementById('player-back-btn');
 
 const rankingContainer = document.getElementById('ranking-container');
+const rankingEditorEl = document.getElementById('ranking-editor');
+const rankingPeriodSelect = document.getElementById('ranking-period-select');
+const rankingPublishBtn = document.getElementById('ranking-publish-btn');
+const rankingPublishedStatusEl = document.getElementById('ranking-published-status');
+const rankingEditorNoteEl = document.getElementById('ranking-editor-note');
 
 const githubStatusEl = document.getElementById('github-status');
 const dirtyBadgeEl = document.getElementById('dirty-badge');
@@ -67,8 +72,6 @@ const tokenCancelBtn = document.getElementById('token-cancel-btn');
 
 const navTournamentLink = document.getElementById('nav-tournament-link');
 const homeCardTournament = document.getElementById('home-card-tournament');
-const navRankingLink = document.getElementById('nav-ranking-link');
-const homeCardRanking = document.getElementById('home-card-ranking');
 const playerSearchInput = document.getElementById('player-search-input');
 
 const mainNav = document.getElementById('main-nav');
@@ -84,11 +87,11 @@ function applyModeUI() {
   const editing = isEditMode();
   navTournamentLink.hidden = !editing;
   homeCardTournament.hidden = !editing;
-  navRankingLink.hidden = !editing;
-  homeCardRanking.hidden = !editing;
   playerForm.hidden = !editing;
   tournamentEditBtn.hidden = !editing;
   tournamentDeleteBtn.hidden = !editing;
+  rankingEditorEl.hidden = !editing;
+  rankingEditorNoteEl.hidden = !editing;
   if (!editing) tournamentEditForm.hidden = true;
   modeToggleBtn.textContent = editing ? '閲覧モードへ' : '編集モード';
 
@@ -151,8 +154,8 @@ function routeFromHash() {
   const { page, param } = parseHash();
   let target = VIEW_IDS[page] ? page : 'home';
 
-  // 大会作成とランキングは編集モード限定。閲覧者が直接URLで来た場合はホームに戻す。
-  if ((target === 'tournament' || target === 'ranking') && !isEditMode()) {
+  // 大会作成は編集モード限定。閲覧者が直接URLで来た場合はホームに戻す。
+  if (target === 'tournament' && !isEditMode()) {
     location.replace('#home');
     target = 'home';
   }
@@ -178,7 +181,7 @@ function routeFromHash() {
   } else if (target === 'player') {
     renderPlayerDetail(param);
   } else if (target === 'ranking') {
-    renderRanking(rankingContainer);
+    renderRankingPage();
   }
 }
 
@@ -420,6 +423,41 @@ function renderBracketPage(tournamentId) {
   renderMatchesTable(bracketMatchesContainer, tournamentId);
 }
 
+// ---- ランキング ----
+
+const PERIOD_LABELS = { 1: '直近1か月', 3: '直近3か月', 6: '直近6か月', 12: '直近12か月', all: '全期間' };
+
+function formatDateTime(iso) {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString('ja-JP')} ${d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function publishedStatusLine() {
+  const published = state.publishedRanking;
+  if (!published) return 'まだランキングが公開されていません。';
+  const periodLabel = PERIOD_LABELS[published.periodMonths ?? 'all'] || `直近${published.periodMonths}か月`;
+  return `公開中: ${periodLabel}（${formatDateTime(published.publishedAt)} 公開）`;
+}
+
+// 編集モードでは選択中の期間でプレビューを計算して表示し、閲覧モードでは
+// 直近に公開されたランキングのスナップショットをそのまま表示する。
+function renderRankingPage() {
+  rankingPublishedStatusEl.textContent = publishedStatusLine();
+
+  if (isEditMode()) {
+    const period = rankingPeriodSelect.value;
+    const filteredMatches = filterMatchesByPeriod(state, period === 'all' ? null : period);
+    const preview = computeRankings({ ...state, matches: filteredMatches });
+    renderRankingTable(rankingContainer, preview, 'この期間に確定した試合がまだないため、ランキングを計算できません。');
+  } else {
+    renderRankingTable(
+      rankingContainer,
+      state.publishedRanking?.rankings ?? [],
+      'まだランキングが公開されていません。',
+    );
+  }
+}
+
 // ---- 選手個人ページ ----
 
 function renderPlayerDetail(playerId) {
@@ -430,8 +468,8 @@ function renderPlayerDetail(playerId) {
   }
 
   const stats = getPlayerStats(playerId);
-  const rankings = computeRankings(state);
-  const rankEntry = rankings.find((r) => r.id === playerId);
+  const rankEntry = state.publishedRanking?.rankings.find((r) => r.id === playerId);
+  const rankLabel = state.publishedRanking ? (rankEntry ? `${rankEntry.rank}位` : '対象外') : '未公開';
   const total = stats.wins + stats.losses;
   const winRate = total > 0 ? Math.round((stats.wins / total) * 100) : null;
 
@@ -442,7 +480,7 @@ function renderPlayerDetail(playerId) {
       ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.join(', '))}</p>` : ''}
     </div>
     <div class="stat-cards">
-      ${isEditMode() ? `<div class="stat-card"><span class="stat-value">${rankEntry ? `${rankEntry.rank}位` : '対象外'}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>` : ''}
+      <div class="stat-card"><span class="stat-value">${rankLabel}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>
       <div class="stat-card"><span class="stat-value">${stats.tournaments.length}</span><span class="stat-label">出場大会数</span></div>
       <div class="stat-card"><span class="stat-value">${stats.wins}勝${stats.losses}敗</span><span class="stat-label">通算成績</span></div>
       <div class="stat-card"><span class="stat-value">${winRate === null ? '—' : `${winRate}%`}</span><span class="stat-label">勝率</span></div>
@@ -649,6 +687,31 @@ playerSearchInput.addEventListener('input', () => {
 
 shuffleBtn.addEventListener('click', shuffleSelected);
 seedByRankingBtn.addEventListener('click', seedBySelectedRanking);
+
+rankingPeriodSelect.addEventListener('change', () => {
+  if (isEditMode()) renderRankingPage();
+});
+
+rankingPublishBtn.addEventListener('click', () => {
+  const period = rankingPeriodSelect.value;
+  const periodMonths = period === 'all' ? null : Number(period);
+  const filteredMatches = filterMatchesByPeriod(state, periodMonths);
+  const rankings = computeRankings({ ...state, matches: filteredMatches });
+
+  if (rankings.length === 0) {
+    alert('この期間に確定した試合がまだないため、公開できません。');
+    return;
+  }
+  if (!confirm(`${PERIOD_LABELS[period]}のランキングを公開します。閲覧モードに反映されます。よろしいですか？`)) return;
+
+  state.publishedRanking = {
+    publishedAt: new Date().toISOString(),
+    periodMonths,
+    rankings,
+  };
+  markDirty();
+  renderRankingPage();
+});
 
 tournamentForm.addEventListener('submit', (e) => {
   e.preventDefault();

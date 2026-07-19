@@ -15,6 +15,22 @@ function getTournamentWeight(tournament) {
   return tournament.participantIds.length;
 }
 
+// 大会の開催日をもとに、直近Nヶ月以内の試合だけを残す。日付未設定の大会の試合は対象外とする
+// （いつの試合か判定できないため）。periodMonths が null/'all' の場合は全期間（フィルタなし）。
+export function filterMatchesByPeriod(state, periodMonths) {
+  if (periodMonths == null || periodMonths === 'all') return state.matches;
+
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - Number(periodMonths));
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  const dateByTournament = new Map(state.tournaments.map((t) => [t.id, t.date]));
+  return state.matches.filter((m) => {
+    const date = dateByTournament.get(m.tournamentId);
+    return date && date >= cutoffStr;
+  });
+}
+
 // state（players/tournaments/matches）からランキングを計算する。
 // 戻り値: [{ id, name, score, tournamentsPlayed, rank }] （スコア降順、足切り対象は除外）
 export function computeRankings(state) {

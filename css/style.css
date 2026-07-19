@@ -670,3 +670,12 @@ dialog h3 { margin-top: 0; }
 .rank-1 .rank-cell { color: #b8860b; }
 .rank-2 .rank-cell { color: #708090; }
 .rank-3 .rank-cell { color: #a0522d; }
+
+#ranking-editor select {
+  padding: 0.4rem 0.5rem;
+  font-size: 1rem;
+}
+
+#ranking-published-status {
+  margin-top: -0.5rem;
+}
