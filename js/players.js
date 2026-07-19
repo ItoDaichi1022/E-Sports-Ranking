@@ -79,6 +79,20 @@ export function renderPlayerTable(containerEl, onChanged, options = {}) {
     return;
   }
 
+  // 検索クエリ（ID・表示名・過去名の部分一致）で絞り込む
+  const query = (options.filterQuery ?? '').trim().toLowerCase();
+  const visiblePlayers = query
+    ? state.players.filter((p) =>
+        p.id.toLowerCase().includes(query)
+        || p.currentName.toLowerCase().includes(query)
+        || p.pastNames.some((n) => n.toLowerCase().includes(query)))
+    : state.players;
+
+  if (visiblePlayers.length === 0) {
+    containerEl.innerHTML = '<p class="empty-hint">検索条件に一致する選手がいません。</p>';
+    return;
+  }
+
   const table = document.createElement('table');
   table.className = 'player-table';
   table.innerHTML = `
@@ -88,7 +102,7 @@ export function renderPlayerTable(containerEl, onChanged, options = {}) {
   `;
   const tbody = document.createElement('tbody');
 
-  state.players.forEach((p) => {
+  visiblePlayers.forEach((p) => {
     const tr = document.createElement('tr');
 
     if (!readOnly && editingPlayerId === p.id) {

@@ -12,6 +12,7 @@ import { loadAllFromGitHub, saveAllToGitHub, markBracketDeleted } from './github
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
 let selectedParticipantIds = [];
 let participantSearchQuery = '';
+let playerSearchQuery = '';
 let currentBracketTournamentId = null;
 let dirty = false;
 
@@ -65,6 +66,9 @@ const tokenCancelBtn = document.getElementById('token-cancel-btn');
 
 const navTournamentLink = document.getElementById('nav-tournament-link');
 const homeCardTournament = document.getElementById('home-card-tournament');
+const navRankingLink = document.getElementById('nav-ranking-link');
+const homeCardRanking = document.getElementById('home-card-ranking');
+const playerSearchInput = document.getElementById('player-search-input');
 
 const mainNav = document.getElementById('main-nav');
 
@@ -79,6 +83,8 @@ function applyModeUI() {
   const editing = isEditMode();
   navTournamentLink.hidden = !editing;
   homeCardTournament.hidden = !editing;
+  navRankingLink.hidden = !editing;
+  homeCardRanking.hidden = !editing;
   githubSaveBtn.hidden = !editing;
   playerForm.hidden = !editing;
   tournamentEditBtn.hidden = !editing;
@@ -146,8 +152,8 @@ function routeFromHash() {
   const { page, param } = parseHash();
   let target = VIEW_IDS[page] ? page : 'home';
 
-  // 大会作成は編集モード限定。閲覧者が直接URLで来た場合はホームに戻す。
-  if (target === 'tournament' && !isEditMode()) {
+  // 大会作成とランキングは編集モード限定。閲覧者が直接URLで来た場合はホームに戻す。
+  if ((target === 'tournament' || target === 'ranking') && !isEditMode()) {
     location.replace('#home');
     target = 'home';
   }
@@ -187,7 +193,7 @@ function refreshPlayerUI() {
       state.players.some((p) => p.id === id),
     );
     refreshPlayerUI();
-  }, { readOnly: !isEditMode() });
+  }, { readOnly: !isEditMode(), filterQuery: playerSearchQuery });
   renderParticipantCheckboxes();
 }
 
@@ -409,7 +415,7 @@ function renderPlayerDetail(playerId) {
       ${player.mainCharacters.length ? `<p class="meta-line">使用キャラ: ${escapeHtml(player.mainCharacters.join(', '))}</p>` : ''}
     </div>
     <div class="stat-cards">
-      <div class="stat-card"><span class="stat-value">${rankEntry ? `${rankEntry.rank}位` : '対象外'}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>
+      ${isEditMode() ? `<div class="stat-card"><span class="stat-value">${rankEntry ? `${rankEntry.rank}位` : '対象外'}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>` : ''}
       <div class="stat-card"><span class="stat-value">${stats.tournaments.length}</span><span class="stat-label">出場大会数</span></div>
       <div class="stat-card"><span class="stat-value">${stats.wins}勝${stats.losses}敗</span><span class="stat-label">通算成績</span></div>
       <div class="stat-card"><span class="stat-value">${winRate === null ? '—' : `${winRate}%`}</span><span class="stat-label">勝率</span></div>
@@ -610,6 +616,11 @@ playerForm.addEventListener('submit', (e) => {
 participantSearchInput.addEventListener('input', () => {
   participantSearchQuery = participantSearchInput.value;
   renderParticipantCheckboxes();
+});
+
+playerSearchInput.addEventListener('input', () => {
+  playerSearchQuery = playerSearchInput.value;
+  refreshPlayerUI();
 });
 
 shuffleBtn.addEventListener('click', shuffleSelected);

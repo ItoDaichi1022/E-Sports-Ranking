@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。CSS/JSを変更してデプロイするときは数字を上げる -->
-<link rel="stylesheet" href="css/style.css?v=4">
+<link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
 <header>
@@ -16,7 +16,7 @@
       <a href="#tournament" data-page="tournament" id="nav-tournament-link">大会作成</a>
       <a href="#history" data-page="history">大会履歴</a>
       <a href="#players" data-page="players">選手</a>
-      <a href="#ranking" data-page="ranking">ランキング</a>
+      <a href="#ranking" data-page="ranking" id="nav-ranking-link">ランキング</a>
     </nav>
   </div>
   <div class="sync-bar">
@@ -60,7 +60,7 @@
         <h2>選手</h2>
         <p>選手の一覧と個人戦績を確認します。</p>
       </a>
-      <a class="home-card" href="#ranking">
+      <a class="home-card" href="#ranking" id="home-card-ranking">
         <h2>ランキング</h2>
         <p>LumiRank軽量版で算出した順位を表示します。</p>
       </a>
@@ -148,6 +148,7 @@
       <button type="submit">登録</button>
     </form>
     <p class="note">表示名をクリックすると個人戦績が見られます。</p>
+    <input type="text" id="player-search-input" placeholder="選手を検索（ID・表示名・過去名）">
     <div id="player-list"></div>
   </section>
 
@@ -164,6 +165,6 @@
 
 </main>
 
-<script type="module" src="js/app.js?v=6"></script>
+<script type="module" src="js/app.js?v=7"></script>
 </body>
 </html>

@@ -293,10 +293,16 @@ td code {
 
 .setup-column { flex: 1; min-width: 260px; }
 
-#participant-search-input {
+#participant-search-input,
+#player-search-input {
   width: 100%;
   padding: 0.4rem 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+#player-search-input {
+  display: block;
+  max-width: 420px;
 }
 
 /* 選手が増えても画面が縦に伸びないよう、固定高さでスクロールさせる */
