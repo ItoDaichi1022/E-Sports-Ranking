@@ -1,0 +1,57 @@
+{
+  "tournamentId": "t-mrrhc8mo-5",
+  "bracketSize": 4,
+  "totalRounds": 2,
+  "rounds": [
+    {
+      "name": "SF",
+      "matches": [
+        {
+          "id": "m-mrrhc8mo-6",
+          "round": "SF",
+          "player1Id": "23995570651",
+          "player2Id": null,
+          "winnerId": "23995570651",
+          "loserId": null,
+          "score": null,
+          "confirmed": true,
+          "isBye": true,
+          "nextMatchId": "m-mrrhc8mo-8",
+          "nextSlot": 1,
+          "isWalkover": false
+        },
+        {
+          "id": "m-mrrhc8mo-7",
+          "round": "SF",
+          "player1Id": "50995370651",
+          "player2Id": "5190490651",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrrhc8mo-8",
+          "nextSlot": 2
+        }
+      ]
+    },
+    {
+      "name": "F",
+      "matches": [
+        {
+          "id": "m-mrrhc8mo-8",
+          "round": "F",
+          "player1Id": "23995570651",
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": null,
+          "nextSlot": null
+        }
+      ]
+    }
+  ]
+}
