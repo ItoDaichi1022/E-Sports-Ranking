@@ -30,6 +30,8 @@ async function fetchStaticJson(path) {
 
 // 閲覧モード：データJSONはサイトと同一リポジトリに同居しているので、
 // Pagesが配信する静的ファイルを直接読む（ブラケットは大会IDからファイル名を引ける）。
+// 途中で通信が失敗した場合に中途半端な状態にならないよう、
+// すべて取得し終えてから state へ一括で反映する（自動更新でも使うため）。
 async function loadAllViaStatic() {
   const [playersJson, tournamentsJson, matchesJson] = await Promise.all([
     fetchStaticJson(dataPath('players.json')),
@@ -37,17 +39,19 @@ async function loadAllViaStatic() {
     fetchStaticJson(dataPath('matches.json')),
   ]);
 
-  state.players = playersJson?.players ?? [];
-  state.tournaments = tournamentsJson?.tournaments ?? [];
-  state.matches = matchesJson?.matches ?? [];
-
-  state.brackets = {};
+  const tournaments = tournamentsJson?.tournaments ?? [];
+  const brackets = {};
   const bracketResults = await Promise.all(
-    state.tournaments.map(async (t) => ({ id: t.id, json: await fetchStaticJson(bracketPath(t.id)) })),
+    tournaments.map(async (t) => ({ id: t.id, json: await fetchStaticJson(bracketPath(t.id)) })),
   );
   bracketResults.forEach(({ id, json }) => {
-    if (json) state.brackets[id] = json;
+    if (json) brackets[id] = json;
   });
+
+  state.players = playersJson?.players ?? [];
+  state.tournaments = tournaments;
+  state.matches = matchesJson?.matches ?? [];
+  state.brackets = brackets;
 }
 
 // 運営モード：GitHub API経由で読み込み、更新時の楽観ロックに使うshaも記録する。

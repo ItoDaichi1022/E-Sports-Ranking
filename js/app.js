@@ -85,6 +85,14 @@ function applyModeUI() {
   tournamentDeleteBtn.hidden = !editing;
   if (!editing) tournamentEditForm.hidden = true;
   modeToggleBtn.textContent = editing ? '閲覧モードへ' : '編集モード';
+
+  // 閲覧モードでは進行中の大会を追えるよう自動更新する。
+  // 編集モードでは未保存の編集を上書きしないため停止する。
+  if (editing) {
+    stopAutoRefresh();
+  } else {
+    startAutoRefresh();
+  }
 }
 
 // ---- 未保存変更の管理 ----
@@ -472,7 +480,7 @@ async function handleGithubLoad() {
     clearDirty();
     routeFromHash();
     setGithubStatus(
-      githubConfig.token ? 'GitHubから読み込みました。' : '最新データを読み込みました（閲覧モード）。',
+      githubConfig.token ? 'GitHubから読み込みました。' : '最新データを読み込みました（30秒ごとに自動更新）。',
       'success',
     );
   } catch (err) {
@@ -499,6 +507,51 @@ async function handleGithubSave() {
     githubSaveBtn.disabled = false;
   }
 }
+
+// ---- 閲覧モードの自動更新 ----
+
+// 進行中の大会を観戦している人が「読み込み」を押さなくても最新結果が出るよう、
+// 閲覧モードでは定期的に静的データを再取得し、内容が変わったときだけ再描画する。
+const AUTO_REFRESH_MS = 30 * 1000;
+let autoRefreshTimer = null;
+let autoRefreshInFlight = false;
+
+function formatTime(date) {
+  return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function autoRefresh() {
+  // 編集モード・手動読み込み中・タブ非表示のときは何もしない
+  if (isEditMode() || autoRefreshInFlight || githubLoadBtn.disabled || dirty || document.hidden) return;
+  autoRefreshInFlight = true;
+  try {
+    const before = JSON.stringify(state);
+    await loadAllFromGitHub();
+    if (JSON.stringify(state) !== before) {
+      routeFromHash();
+      setGithubStatus(`新しいデータを反映しました（${formatTime(new Date())}）`, 'success');
+    }
+  } catch {
+    // 一時的な通信エラーは無視し、次回の自動更新に任せる
+  } finally {
+    autoRefreshInFlight = false;
+  }
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) return;
+  autoRefreshTimer = setInterval(autoRefresh, AUTO_REFRESH_MS);
+}
+
+function stopAutoRefresh() {
+  clearInterval(autoRefreshTimer);
+  autoRefreshTimer = null;
+}
+
+// タブを開き直したときは次の周期を待たずにすぐ最新化する
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) autoRefresh();
+});
 
 // ---- イベント配線 ----
 
