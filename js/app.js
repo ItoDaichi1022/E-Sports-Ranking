@@ -2,7 +2,6 @@ import { state, generateId, getPlayerName } from './state.js';
 import { addPlayer, renderPlayerTable, escapeHtml } from './players.js';
 import { createBracket, updateTournament, deleteTournamentData, getChampionId } from './bracket.js';
 import { renderBracket } from './bracketView.js';
-import { renderMatchesTable } from './matchesLog.js';
 import { computeRankings, filterMatchesByPeriod } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { getPlayerStats } from './playerStats.js';
@@ -38,7 +37,6 @@ const historyListEl = document.getElementById('history-list');
 const bracketTitleEl = document.getElementById('bracket-title');
 const bracketMetaEl = document.getElementById('bracket-meta');
 const bracketContainer = document.getElementById('bracket-container');
-const bracketMatchesContainer = document.getElementById('bracket-matches-container');
 const tournamentEditBtn = document.getElementById('tournament-edit-btn');
 const tournamentDeleteBtn = document.getElementById('tournament-delete-btn');
 const tournamentEditForm = document.getElementById('tournament-edit-form');
@@ -407,7 +405,6 @@ function renderBracketPage(tournamentId) {
     bracketTitleEl.textContent = '大会が見つかりません';
     bracketMetaEl.textContent = '';
     bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
-    bracketMatchesContainer.innerHTML = '';
     tournamentInfoEl.innerHTML = '';
     return;
   }
@@ -420,7 +417,6 @@ function renderBracketPage(tournamentId) {
     renderBracketPage(tournamentId);
   }, { readOnly: !isEditMode() });
   renderTournamentInfo(tournament);
-  renderMatchesTable(bracketMatchesContainer, tournamentId);
 }
 
 // ---- ランキング ----
