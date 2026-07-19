@@ -96,9 +96,11 @@ function decodeBase64Utf8(b64) {
 }
 
 // 指定パスのJSONファイルを取得する。存在しない場合は { json: null, sha: null } を返す。
+// GitHub APIの応答はブラウザに最大60秒キャッシュされるため、no-storeで常に最新を取る
+// （他端末の保存を素早く取り込むために必要）。
 export async function getFile(path) {
   const url = `${apiBase()}/contents/${path}?ref=${encodeURIComponent(githubConfig.branch)}`;
-  const res = await fetch(url, { headers: authHeaders() });
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
   if (res.status === 404) return { json: null, sha: null };
   if (!res.ok) throw new Error(`GitHub読み込み失敗 (${path}): ${res.status} ${await safeText(res)}`);
   const data = await res.json();
@@ -108,11 +110,21 @@ export async function getFile(path) {
 // ディレクトリ内のファイル一覧を返す（存在しなければ空配列）。
 export async function listDirectory(path) {
   const url = `${apiBase()}/contents/${path}?ref=${encodeURIComponent(githubConfig.branch)}`;
-  const res = await fetch(url, { headers: authHeaders() });
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
   if (res.status === 404) return [];
   if (!res.ok) throw new Error(`GitHubディレクトリ一覧取得失敗 (${path}): ${res.status} ${await safeText(res)}`);
   const data = await res.json();
   return Array.isArray(data) ? data : [];
+}
+
+// ブランチの最新コミットSHAを返す。他端末が保存したかどうかを1リクエストで
+// 検知するために使う（変化があったときだけ全体を読み込み直す）。
+export async function getBranchSha() {
+  const url = `${apiBase()}/git/ref/heads/${encodeURIComponent(githubConfig.branch)}`;
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+  if (!res.ok) throw new Error(`ブランチ情報の取得に失敗しました (${res.status})`);
+  const data = await res.json();
+  return data.object?.sha ?? null;
 }
 
 // JSONを書き込む（新規作成 or 更新）。sha は更新時の楽観ロック用（新規作成時はnull/undefinedでよい）。

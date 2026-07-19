@@ -5,7 +5,7 @@ import { renderBracket } from './bracketView.js';
 import { computeRankings, filterMatchesByPeriod } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { getPlayerStats } from './playerStats.js';
-import { githubConfig, loadConfigFromStorage, saveConfigToStorage, verifyWriteAccess } from './github.js';
+import { githubConfig, loadConfigFromStorage, saveConfigToStorage, verifyWriteAccess, getBranchSha } from './github.js';
 import { loadAllFromGitHub, saveAllToGitHub, markTournamentDeleted } from './githubSync.js';
 
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
@@ -546,6 +546,10 @@ async function handleGithubLoad() {
   cancelPendingAutoSave();
   loadInFlight = true;
   try {
+    // 読み込み前のSHAを記録しておく（読み込み中に入った他端末の保存は次の自動更新で拾われる）
+    if (isEditMode()) {
+      lastSeenRemoteSha = await getBranchSha().catch(() => null);
+    }
     await loadAllFromGitHub();
     selectedParticipantIds = [];
     clearDirty();
@@ -593,6 +597,9 @@ async function performSave() {
   try {
     const result = await saveAllToGitHub();
     clearDirty();
+    // 自分の保存でブランチが進んだ。SHAをリセットし、次の自動更新周期に一度だけ
+    // 読み込み直させる（保存直後に他端末の保存が割り込んでいても取りこぼさない）。
+    lastSeenRemoteSha = null;
     if (result.merged) {
       // 他端末の変更を取り込んで保存したので、表示を最新の統合結果に更新する
       routeFromHash();
@@ -616,13 +623,13 @@ async function performSave() {
 // ---- 自動更新 ----
 
 // 閲覧モード: 観戦者が何もしなくても進行中の大会の最新結果が出るよう、10秒ごとに再取得する。
-// 編集モード: 他の運営者の保存を取り込むため、手元に未保存の変更が無いときだけ
-// 低めの頻度（30秒）で再取得する。入力中は再描画で消えないよう見送る。
+// 編集モード: 10秒ごとにブランチの最新コミットSHAだけを軽く確認し、
+// 他端末の保存を検知したときだけ全体を読み込み直す（入力中は再描画で消えないよう見送る）。
 const AUTO_REFRESH_MS = 10 * 1000;
-const EDIT_REFRESH_MIN_MS = 30 * 1000;
 let autoRefreshTimer = null;
 let autoRefreshInFlight = false;
-let lastEditRefreshAt = 0;
+// 編集モードで最後に確認したブランチのコミットSHA。nullなら次の周期で必ず読み込み直す。
+let lastSeenRemoteSha = null;
 
 function formatTime(date) {
   return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
@@ -638,17 +645,23 @@ function isUserTyping() {
 
 async function autoRefresh() {
   if (autoRefreshInFlight || loadInFlight || saveInFlight || dirty || document.hidden) return;
-  if (isEditMode()) {
-    if (isUserTyping()) return;
-    if (Date.now() - lastEditRefreshAt < EDIT_REFRESH_MIN_MS) return;
-    lastEditRefreshAt = Date.now();
-  }
   autoRefreshInFlight = true;
   try {
-    const before = JSON.stringify(state);
-    await loadAllFromGitHub();
-    if (JSON.stringify(state) !== before) {
-      routeFromHash();
+    if (isEditMode()) {
+      if (isUserTyping()) return;
+      // 変化検知はリモートのコミットSHAの比較だけで行い、無駄な全体読み込みを避ける。
+      // SHAの記録は読み込み前に行う（読み込み中に入った保存は次の周期で拾われる安全側）。
+      const remoteSha = await getBranchSha();
+      if (remoteSha && remoteSha === lastSeenRemoteSha) return;
+      const before = JSON.stringify(state);
+      await loadAllFromGitHub();
+      lastSeenRemoteSha = remoteSha;
+      // 読み込み中に入力を始めていたら再描画を見送る（次の操作時に最新が反映される）
+      if (JSON.stringify(state) !== before && !isUserTyping()) routeFromHash();
+    } else {
+      const before = JSON.stringify(state);
+      await loadAllFromGitHub();
+      if (JSON.stringify(state) !== before) routeFromHash();
     }
   } catch {
     // 一時的な通信エラーは無視し、次回の自動更新に任せる
