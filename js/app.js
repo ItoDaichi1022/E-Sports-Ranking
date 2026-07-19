@@ -2,8 +2,9 @@ import { state, generateId, getPlayerName } from './state.js';
 import { addPlayer, renderPlayerTable, escapeHtml } from './players.js';
 import { createBracket, updateTournament, deleteTournamentData, getChampionId } from './bracket.js';
 import { renderBracket } from './bracketView.js';
-import { computeRankings, filterMatchesByPeriod, withRankChange, rankChangeInfo } from './ranking.js';
+import { computeRankings, computeRankingsForPeriod, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
+import { downloadRankingCards } from './rankingCard.js';
 import { getPlayerStats } from './playerStats.js';
 import { githubConfig, loadConfigFromStorage, saveConfigToStorage, verifyWriteAccess, getBranchSha } from './github.js';
 import { loadAllFromGitHub, saveAllToGitHub, markTournamentDeleted } from './githubSync.js';
@@ -52,6 +53,7 @@ const playerBackBtn = document.getElementById('player-back-btn');
 const rankingContainer = document.getElementById('ranking-container');
 const rankingEditorEl = document.getElementById('ranking-editor');
 const rankingPeriodSelect = document.getElementById('ranking-period-select');
+const rankingExportBtn = document.getElementById('ranking-export-btn');
 const rankingPublishBtn = document.getElementById('ranking-publish-btn');
 const rankingPublishedStatusEl = document.getElementById('ranking-published-status');
 const rankingEditorNoteEl = document.getElementById('ranking-editor-note');
@@ -441,9 +443,7 @@ function renderRankingPage() {
   rankingPublishedStatusEl.textContent = publishedStatusLine();
 
   if (isEditMode()) {
-    const period = rankingPeriodSelect.value;
-    const filteredMatches = filterMatchesByPeriod(state, period === 'all' ? null : period);
-    const preview = computeRankings({ ...state, matches: filteredMatches });
+    const { rankings: preview } = computeRankingsForPeriod(state, rankingPeriodSelect.value);
     // 現在公開中のランキングと比較し、公開したら何位が動くかをプレビューの時点で見せる
     const previewWithChange = withRankChange(preview, state.publishedRanking?.rankings);
     renderRankingTable(rankingContainer, previewWithChange, 'この期間に確定した試合がまだないため、ランキングを計算できません。');
@@ -724,11 +724,28 @@ rankingPeriodSelect.addEventListener('change', () => {
   if (isEditMode()) renderRankingPage();
 });
 
+rankingExportBtn.addEventListener('click', async () => {
+  const { rankings } = computeRankingsForPeriod(state, rankingPeriodSelect.value);
+  if (rankings.length === 0) {
+    alert('この期間に確定した試合がまだないため、画像を書き出せません。');
+    return;
+  }
+
+  rankingExportBtn.disabled = true;
+  const originalLabel = rankingExportBtn.textContent;
+  try {
+    await downloadRankingCards(rankings, (done, total) => {
+      rankingExportBtn.textContent = `書き出し中... (${done}/${total})`;
+    });
+  } finally {
+    rankingExportBtn.disabled = false;
+    rankingExportBtn.textContent = originalLabel;
+  }
+});
+
 rankingPublishBtn.addEventListener('click', () => {
   const period = rankingPeriodSelect.value;
-  const periodMonths = period === 'all' ? null : Number(period);
-  const filteredMatches = filterMatchesByPeriod(state, periodMonths);
-  const rankings = computeRankings({ ...state, matches: filteredMatches });
+  const { periodMonths, rankings } = computeRankingsForPeriod(state, period);
 
   if (rankings.length === 0) {
     alert('この期間に確定した試合がまだないため、公開できません。');

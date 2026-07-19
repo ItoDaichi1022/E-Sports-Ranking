@@ -35,6 +35,14 @@ export function rankChangeInfo(previousRank, rank) {
   return { label: '―', className: 'same' };
 }
 
+// 期間セレクトの値（'1'〜'12' または 'all'）から periodMonths とランキングをまとめて計算する。
+// renderRankingPage / 公開ボタン / 画像書き出しボタンの3箇所で同じ計算が必要なため共通化する。
+export function computeRankingsForPeriod(state, period) {
+  const periodMonths = period === 'all' ? null : Number(period);
+  const filteredMatches = filterMatchesByPeriod(state, periodMonths);
+  return { periodMonths, rankings: computeRankings({ ...state, matches: filteredMatches }) };
+}
+
 // 大会の開催日をもとに、直近Nヶ月以内の試合だけを残す。日付未設定の大会の試合は対象外とする
 // （いつの試合か判定できないため）。periodMonths が null/'all' の場合は全期間（フィルタなし）。
 export function filterMatchesByPeriod(state, periodMonths) {
