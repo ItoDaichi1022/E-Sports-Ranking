@@ -13,7 +13,7 @@
       "tournamentId": "t-mrrqkax9-17",
       "winnerId": "32746230651",
       "loserId": "23995570651",
-      "score": "0-2",
+      "score": "1-2",
       "round": "SF"
     },
     {
@@ -23,6 +23,14 @@
       "loserId": "50995370651",
       "score": "2-1",
       "round": "SF"
+    },
+    {
+      "id": "m-mrrqkax9-24",
+      "tournamentId": "t-mrrqkax9-17",
+      "winnerId": "25241340651",
+      "loserId": "32746230651",
+      "score": "3-1",
+      "round": "F"
     }
   ]
 }

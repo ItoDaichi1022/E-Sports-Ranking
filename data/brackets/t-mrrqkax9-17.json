@@ -88,7 +88,7 @@
           "player2Id": "32746230651",
           "winnerId": "32746230651",
           "loserId": "23995570651",
-          "score": "0-2",
+          "score": "1-2",
           "confirmed": true,
           "isBye": false,
           "nextMatchId": "m-mrrqkax9-24",
@@ -105,13 +105,14 @@
           "round": "F",
           "player1Id": "25241340651",
           "player2Id": "32746230651",
-          "winnerId": null,
-          "loserId": null,
-          "score": null,
-          "confirmed": false,
+          "winnerId": "25241340651",
+          "loserId": "32746230651",
+          "score": "3-1",
+          "confirmed": true,
           "isBye": false,
           "nextMatchId": null,
-          "nextSlot": null
+          "nextSlot": null,
+          "isWalkover": false
         }
       ]
     }

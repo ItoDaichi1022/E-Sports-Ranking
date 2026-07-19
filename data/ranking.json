@@ -1,6 +1,6 @@
 {
-  "publishedAt": "2026-07-19T08:50:32.452Z",
-  "periodMonths": 6,
+  "publishedAt": "2026-07-19T12:24:24.741Z",
+  "periodMonths": 1,
   "rankings": [
     {
       "id": "25241340651",
@@ -12,28 +12,28 @@
     {
       "id": "23995570651",
       "name": "きん",
-      "score": 96.51908980265746,
+      "score": 96.79832040145881,
       "tournamentsPlayed": 3,
       "rank": 2
     },
     {
       "id": "32746230651",
       "name": "もみじ",
-      "score": 95.8143309731093,
+      "score": 96.15009570201707,
       "tournamentsPlayed": 1,
       "rank": 3
     },
     {
       "id": "50995370651",
       "name": "pappy",
-      "score": 95.10904546125913,
+      "score": 95.5013865695145,
       "tournamentsPlayed": 3,
       "rank": 4
     },
     {
       "id": "5190490651",
       "name": "Gyu",
-      "score": 92.50890436876566,
+      "score": 93.109822806818,
       "tournamentsPlayed": 3,
       "rank": 5
     }
