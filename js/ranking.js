@@ -15,6 +15,26 @@ function getTournamentWeight(tournament) {
   return tournament.participantIds.length;
 }
 
+// 各ランキングエントリに、前回公開時点の順位（previousRank）を付与する。
+// 前回ランキングに存在しなかった選手は previousRank が null になり、新規ランクイン扱いにできる。
+export function withRankChange(rankings, previousRankings) {
+  const prevRankById = new Map((previousRankings ?? []).map((r) => [r.id, r.rank]));
+  return rankings.map((r) => ({
+    ...r,
+    previousRank: prevRankById.has(r.id) ? prevRankById.get(r.id) : null,
+  }));
+}
+
+// previousRank と現在の rank から表示用のラベル・色分けクラスを決める。
+// previousRank が undefined（古い形式の公開データ等）の場合は表示自体を呼び出し側で省く想定。
+export function rankChangeInfo(previousRank, rank) {
+  if (previousRank == null) return { label: 'NEW', className: 'new' };
+  const diff = previousRank - rank; // 正の値 = 順位が上がった（数値が減った）
+  if (diff > 0) return { label: `▲${diff}`, className: 'up' };
+  if (diff < 0) return { label: `▼${-diff}`, className: 'down' };
+  return { label: '―', className: 'same' };
+}
+
 // 大会の開催日をもとに、直近Nヶ月以内の試合だけを残す。日付未設定の大会の試合は対象外とする
 // （いつの試合か判定できないため）。periodMonths が null/'all' の場合は全期間（フィルタなし）。
 export function filterMatchesByPeriod(state, periodMonths) {

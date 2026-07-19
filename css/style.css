@@ -762,6 +762,19 @@ dialog h3 { margin-top: 0; }
 .rank-2 .rank-cell { color: #708090; }
 .rank-3 .rank-cell { color: #a0522d; }
 
+.rank-change-cell { text-align: center; }
+
+.rank-change {
+  font-size: 0.8rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.rank-change.up { color: #15803d; }
+.rank-change.down { color: #b91c1c; }
+.rank-change.same { color: #999; font-weight: normal; }
+.rank-change.new { color: var(--accent); }
+
 #ranking-editor select {
   padding: 0.4rem 0.5rem;
   font-size: 1rem;

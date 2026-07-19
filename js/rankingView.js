@@ -1,6 +1,14 @@
 import { escapeHtml } from './players.js';
+import { rankChangeInfo } from './ranking.js';
 
-// rankings: computeRankings() や公開済みスナップショットが返す [{ id, name, score, tournamentsPlayed, rank }] 形式の配列。
+function rankChangeCell(r) {
+  const { label, className } = rankChangeInfo(r.previousRank, r.rank);
+  return `<span class="rank-change ${className}">${label}</span>`;
+}
+
+// rankings: computeRankings() や公開済みスナップショットが返す
+// [{ id, name, score, tournamentsPlayed, rank, previousRank? }] 形式の配列。
+// previousRank が付与されていれば、前回公開時からの順位変動バッジを表示する。
 export function renderRankingTable(containerEl, rankings, emptyMessage) {
   containerEl.innerHTML = '';
 
@@ -9,11 +17,13 @@ export function renderRankingTable(containerEl, rankings, emptyMessage) {
     return;
   }
 
+  const showChange = rankings.some((r) => r.previousRank !== undefined);
+
   const table = document.createElement('table');
   table.className = 'ranking-table';
   table.innerHTML = `
     <thead>
-      <tr><th>順位</th><th>選手</th><th>スコア</th><th>出場大会数</th></tr>
+      <tr><th>順位</th>${showChange ? '<th>変動</th>' : ''}<th>選手</th><th>スコア</th><th>出場大会数</th></tr>
     </thead>
   `;
   const tbody = document.createElement('tbody');
@@ -23,6 +33,7 @@ export function renderRankingTable(containerEl, rankings, emptyMessage) {
     tr.className = 'clickable-row' + (r.rank <= 3 ? ` rank-${r.rank}` : '');
     tr.innerHTML = `
       <td class="rank-cell">${r.rank}</td>
+      ${showChange ? `<td class="rank-change-cell">${rankChangeCell(r)}</td>` : ''}
       <td><a href="#player/${encodeURIComponent(r.id)}">${escapeHtml(r.name)}</a></td>
       <td>${r.score.toFixed(1)}</td>
       <td>${r.tournamentsPlayed}</td>

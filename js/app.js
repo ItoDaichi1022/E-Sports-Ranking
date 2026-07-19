@@ -2,7 +2,7 @@ import { state, generateId, getPlayerName } from './state.js';
 import { addPlayer, renderPlayerTable, escapeHtml } from './players.js';
 import { createBracket, updateTournament, deleteTournamentData, getChampionId } from './bracket.js';
 import { renderBracket } from './bracketView.js';
-import { computeRankings, filterMatchesByPeriod } from './ranking.js';
+import { computeRankings, filterMatchesByPeriod, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { getPlayerStats } from './playerStats.js';
 import { githubConfig, loadConfigFromStorage, saveConfigToStorage, verifyWriteAccess, getBranchSha } from './github.js';
@@ -444,7 +444,9 @@ function renderRankingPage() {
     const period = rankingPeriodSelect.value;
     const filteredMatches = filterMatchesByPeriod(state, period === 'all' ? null : period);
     const preview = computeRankings({ ...state, matches: filteredMatches });
-    renderRankingTable(rankingContainer, preview, 'この期間に確定した試合がまだないため、ランキングを計算できません。');
+    // 現在公開中のランキングと比較し、公開したら何位が動くかをプレビューの時点で見せる
+    const previewWithChange = withRankChange(preview, state.publishedRanking?.rankings);
+    renderRankingTable(rankingContainer, previewWithChange, 'この期間に確定した試合がまだないため、ランキングを計算できません。');
   } else {
     renderRankingTable(
       rankingContainer,
@@ -466,6 +468,12 @@ function renderPlayerDetail(playerId) {
   const stats = getPlayerStats(playerId);
   const rankEntry = state.publishedRanking?.rankings.find((r) => r.id === playerId);
   const rankLabel = state.publishedRanking ? (rankEntry ? `${rankEntry.rank}位` : '対象外') : '未公開';
+  const rankChangeHtml = rankEntry && rankEntry.previousRank !== undefined
+    ? (() => {
+        const { label, className } = rankChangeInfo(rankEntry.previousRank, rankEntry.rank);
+        return ` <span class="rank-change ${className}">${label}</span>`;
+      })()
+    : '';
   const total = stats.wins + stats.losses;
   const winRate = total > 0 ? Math.round((stats.wins / total) * 100) : null;
 
@@ -476,7 +484,7 @@ function renderPlayerDetail(playerId) {
       ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.join(', '))}</p>` : ''}
     </div>
     <div class="stat-cards">
-      <div class="stat-card"><span class="stat-value">${rankLabel}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>
+      <div class="stat-card"><span class="stat-value">${rankLabel}${rankChangeHtml}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>
       <div class="stat-card"><span class="stat-value">${stats.tournaments.length}</span><span class="stat-label">出場大会数</span></div>
       <div class="stat-card"><span class="stat-value">${stats.wins}勝${stats.losses}敗</span><span class="stat-label">通算成績</span></div>
       <div class="stat-card"><span class="stat-value">${winRate === null ? '—' : `${winRate}%`}</span><span class="stat-label">勝率</span></div>
@@ -728,13 +736,26 @@ rankingPublishBtn.addEventListener('click', () => {
   }
   if (!confirm(`${PERIOD_LABELS[period]}のランキングを公開します。閲覧モードに反映されます。よろしいですか？`)) return;
 
+  // 前回公開時点の順位を各エントリに記録し、公開後もずっと「前回との差」が分かるようにする
+  const rankingsWithChange = withRankChange(rankings, state.publishedRanking?.rankings);
+
   state.publishedRanking = {
     publishedAt: new Date().toISOString(),
     periodMonths,
-    rankings,
+    rankings: rankingsWithChange,
   };
   markDirty();
-  renderRankingPage();
+
+  // renderRankingPage() は編集モードでは常にライブプレビューを表示するが、
+  // それだと「公開した瞬間の前回比」がプレビュー基準（=公開したばかりの自分自身）と
+  // 比較されて全て「変動なし」に潰れてしまう。公開直後だけは、閲覧者が実際に見る
+  // スナップショット（正しい前回比バッジ入り）をそのまま表示する。
+  rankingPublishedStatusEl.textContent = publishedStatusLine();
+  renderRankingTable(
+    rankingContainer,
+    state.publishedRanking.rankings,
+    'この期間に確定した試合がまだないため、ランキングを計算できません。',
+  );
 });
 
 tournamentForm.addEventListener('submit', (e) => {
