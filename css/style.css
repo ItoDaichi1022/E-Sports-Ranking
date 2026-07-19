@@ -410,11 +410,12 @@ td code {
   stroke-width: 2;
 }
 
+/* Challonge風のマッチボックス：枠線付きカードに選手行を積み、行間に区切り線を引く */
 .match-box {
   position: relative;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.5rem;
+  border-radius: 5px;
+  overflow: hidden;
   background: rgba(128, 128, 128, 0.05);
 }
 
@@ -430,20 +431,73 @@ td code {
 .match-player {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.25rem 0.4rem;
-  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  min-height: 1.9rem;
+}
+
+/* 2行目（下段選手）との間に薄い区切り線 */
+.match-player + .match-player {
+  border-top: 1px solid var(--border);
 }
 
 .match-player.winner {
   font-weight: bold;
-  background: rgba(43, 108, 176, 0.2);
+  background: rgba(43, 108, 176, 0.16);
+}
+
+/* シード番号バッジ：名前の左に置く控えめな数字 */
+.seed-badge {
+  flex-shrink: 0;
+  min-width: 1.5rem;
+  padding: 0 0.3rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: #888;
+  background: rgba(128, 128, 128, 0.16);
+  border-radius: 3px;
+  line-height: 1.4;
+}
+
+.seed-badge-empty {
+  background: none;
+}
+
+.player-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* スコア枠：右端に固定幅で揃える。勝者スコアはアクセント色で強調 */
+.player-score {
+  flex-shrink: 0;
+  min-width: 1.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.match-player.winner .player-score {
+  color: var(--accent);
 }
 
 .score-num-input {
-  width: 3.2rem;
-  flex-shrink: 0;
+  width: 3rem;
+  padding: 0.15rem 0.25rem;
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+/* 勝敗入力の操作エリア（不戦勝チェック・勝者選択・確定ボタン） */
+.match-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  border-top: 1px solid var(--border);
 }
 
 .walkover-toggle {
@@ -456,34 +510,32 @@ td code {
 
 .walkover-winner select {
   width: 100%;
+  padding: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.match-controls button[type="submit"] {
+  padding: 0.3rem;
+  font-size: 0.85rem;
 }
 
 .edit-match-btn {
-  margin-top: 0.4rem;
-  padding: 0.15rem 0.6rem;
+  display: block;
+  width: 100%;
+  padding: 0.2rem 0.6rem;
   font-size: 0.75rem;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
   background: transparent;
   color: var(--accent);
-  border-color: var(--accent);
 }
 
 .match-status {
-  margin-top: 0.4rem;
+  padding: 0.3rem 0.5rem;
   font-size: 0.8rem;
   color: #666;
-}
-
-.match-form {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.match-form select,
-.match-form input {
-  padding: 0.3rem;
-  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
 }
 
 .champion-banner {
