@@ -1,26 +1,3 @@
 {
-  "tournaments": [
-    {
-      "id": "t-mrqex2ab-1",
-      "name": "test",
-      "date": "2026-07-18",
-      "format": "single_elim",
-      "participantIds": [
-        "5190490651",
-        "50995370651"
-      ],
-      "weight": null
-    },
-    {
-      "id": "t-mrqzid1p-1",
-      "name": "test2",
-      "date": null,
-      "format": "single_elim",
-      "participantIds": [
-        "5190490651",
-        "50995370651"
-      ],
-      "weight": null
-    }
-  ]
+  "tournaments": []
 }
