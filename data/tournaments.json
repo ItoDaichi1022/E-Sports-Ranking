@@ -55,6 +55,21 @@
       ],
       "weight": null,
       "rules": "test4_rule"
+    },
+    {
+      "id": "t-mrruw4ky-1",
+      "name": "鏖戦",
+      "date": null,
+      "format": "single_elim",
+      "participantIds": [
+        "25241340651",
+        "32746230651",
+        "23995570651",
+        "50995370651",
+        "5190490651"
+      ],
+      "weight": null,
+      "rules": null
     }
   ]
 }

@@ -1,41 +1,46 @@
 {
-  "publishedAt": "2026-07-19T12:24:24.741Z",
-  "periodMonths": 1,
+  "publishedAt": "2026-07-19T13:14:53.644Z",
+  "periodMonths": 3,
   "rankings": [
     {
       "id": "25241340651",
       "name": "ChatGPT",
       "score": 100,
-      "tournamentsPlayed": 1,
-      "rank": 1
-    },
-    {
-      "id": "23995570651",
-      "name": "きん",
-      "score": 96.79832040145881,
-      "tournamentsPlayed": 3,
-      "rank": 2
+      "tournamentsPlayed": 2,
+      "rank": 1,
+      "previousRank": 1
     },
     {
       "id": "32746230651",
       "name": "もみじ",
-      "score": 96.15009570201707,
-      "tournamentsPlayed": 1,
-      "rank": 3
+      "score": 97.32551995701891,
+      "tournamentsPlayed": 2,
+      "rank": 2,
+      "previousRank": 3
+    },
+    {
+      "id": "23995570651",
+      "name": "きん",
+      "score": 95.82196747328327,
+      "tournamentsPlayed": 4,
+      "rank": 3,
+      "previousRank": 2
     },
     {
       "id": "50995370651",
       "name": "pappy",
-      "score": 95.5013865695145,
-      "tournamentsPlayed": 3,
-      "rank": 4
+      "score": 95.1530702360386,
+      "tournamentsPlayed": 4,
+      "rank": 4,
+      "previousRank": 4
     },
     {
       "id": "5190490651",
       "name": "Gyu",
-      "score": 93.109822806818,
-      "tournamentsPlayed": 3,
-      "rank": 5
+      "score": 92.24598450915445,
+      "tournamentsPlayed": 4,
+      "rank": 5,
+      "previousRank": 5
     }
   ]
 }
