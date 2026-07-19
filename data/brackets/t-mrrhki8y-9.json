@@ -25,13 +25,14 @@
           "round": "QF",
           "player1Id": "25241340651",
           "player2Id": "32746230651",
-          "winnerId": null,
-          "loserId": null,
-          "score": null,
-          "confirmed": false,
+          "winnerId": "25241340651",
+          "loserId": "32746230651",
+          "score": "2-0",
+          "confirmed": true,
           "isBye": false,
           "nextMatchId": "m-mrrhki8z-14",
-          "nextSlot": 2
+          "nextSlot": 2,
+          "isWalkover": false
         },
         {
           "id": "m-mrrhki8z-12",
@@ -70,7 +71,7 @@
           "id": "m-mrrhki8z-14",
           "round": "SF",
           "player1Id": "23995570651",
-          "player2Id": null,
+          "player2Id": "25241340651",
           "winnerId": null,
           "loserId": null,
           "score": null,
