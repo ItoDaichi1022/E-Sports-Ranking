@@ -44,13 +44,14 @@
           "round": "F",
           "player1Id": "5190490651",
           "player2Id": "50995370651",
-          "winnerId": null,
-          "loserId": null,
-          "score": null,
-          "confirmed": false,
+          "winnerId": "5190490651",
+          "loserId": "50995370651",
+          "score": "2-0",
+          "confirmed": true,
           "isBye": false,
           "nextMatchId": null,
-          "nextSlot": null
+          "nextSlot": null,
+          "isWalkover": false
         }
       ]
     }
