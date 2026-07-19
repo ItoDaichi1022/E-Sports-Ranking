@@ -3,17 +3,17 @@
     {
       "id": "m-mrrg7d9o-7",
       "tournamentId": "t-mrrg7d9o-5",
-      "winnerId": "50995370651",
-      "loserId": "23995570651",
-      "score": "2-1",
+      "winnerId": "23995570651",
+      "loserId": "50995370651",
+      "score": "0-2",
       "round": "SF"
     },
     {
       "id": "m-mrrg7d9o-8",
       "tournamentId": "t-mrrg7d9o-5",
-      "winnerId": "5190490651",
-      "loserId": "50995370651",
-      "score": "2-0",
+      "winnerId": "23995570651",
+      "loserId": "5190490651",
+      "score": "2-3",
       "round": "F"
     }
   ]
