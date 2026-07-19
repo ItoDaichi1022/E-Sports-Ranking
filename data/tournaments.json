@@ -40,6 +40,21 @@
       ],
       "weight": null,
       "rules": "test3\n・あ\n・い\n・う"
+    },
+    {
+      "id": "t-mrrqkax9-17",
+      "name": "test4_tournamentName",
+      "date": "2026-07-20",
+      "format": "single_elim",
+      "participantIds": [
+        "25241340651",
+        "23995570651",
+        "32746230651",
+        "50995370651",
+        "5190490651"
+      ],
+      "weight": null,
+      "rules": "test4_rule"
     }
   ]
 }
