@@ -486,7 +486,7 @@ async function handleGithubLoad() {
     clearDirty();
     routeFromHash();
     setGithubStatus(
-      githubConfig.token ? 'GitHubから読み込みました。' : '最新データを読み込みました（30秒ごとに自動更新）。',
+      githubConfig.token ? 'GitHubから読み込みました。' : '最新データを読み込みました（10秒ごとに自動更新）。',
       'success',
     );
   } catch (err) {
@@ -549,7 +549,7 @@ async function performSave() {
 
 // 観戦者が何もしなくても進行中の大会の最新結果が出るよう、閲覧モードでは
 // 定期的に静的データを再取得し、内容が変わったときだけ再描画する。
-const AUTO_REFRESH_MS = 30 * 1000;
+const AUTO_REFRESH_MS = 10 * 1000;
 let autoRefreshTimer = null;
 let autoRefreshInFlight = false;
 
