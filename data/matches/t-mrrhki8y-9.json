@@ -1,0 +1,36 @@
+{
+  "matches": [
+    {
+      "id": "m-mrrhki8z-11",
+      "tournamentId": "t-mrrhki8y-9",
+      "winnerId": "25241340651",
+      "loserId": "32746230651",
+      "score": "2-0",
+      "round": "QF"
+    },
+    {
+      "id": "m-mrrhki8z-14",
+      "tournamentId": "t-mrrhki8y-9",
+      "winnerId": "25241340651",
+      "loserId": "23995570651",
+      "score": "1-2",
+      "round": "SF"
+    },
+    {
+      "id": "m-mrrhki8z-15",
+      "tournamentId": "t-mrrhki8y-9",
+      "winnerId": "50995370651",
+      "loserId": "5190490651",
+      "score": "2-1",
+      "round": "SF"
+    },
+    {
+      "id": "m-mrrhki8z-16",
+      "tournamentId": "t-mrrhki8y-9",
+      "winnerId": "25241340651",
+      "loserId": "50995370651",
+      "score": "3-1",
+      "round": "F"
+    }
+  ]
+}
