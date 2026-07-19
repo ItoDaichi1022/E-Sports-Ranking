@@ -8,7 +8,15 @@
     },
     {
       "id": "50995370651",
-      "currentName": "パピー",
+      "currentName": "pappy",
+      "pastNames": [
+        "パピー"
+      ],
+      "mainCharacters": []
+    },
+    {
+      "id": "23995570651",
+      "currentName": "きん",
       "pastNames": [],
       "mainCharacters": []
     }
