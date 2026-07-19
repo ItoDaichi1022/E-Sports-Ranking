@@ -53,7 +53,7 @@ export function drawRankingCard(ctx, entry) {
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(640, 80);
-  ctx.lineTo(640, 1000);
+  ctx.lineTo(640, 1030);
   ctx.stroke();
 
   // 選手名・スコア・実績（右側）
@@ -76,6 +76,27 @@ export function drawRankingCard(ctx, entry) {
   ctx.fillStyle = COLOR_TEXT;
   ctx.font = `bold 72px ${FONT_FAMILY}`;
   ctx.fillText(`${entry.tournamentsPlayed}大会`, 760, 780);
+
+  // 好成績（大会の参加人数に応じて自動選出された、選手にとって最も価値の高い成績）
+  ctx.fillStyle = COLOR_MUTED;
+  ctx.font = `40px ${FONT_FAMILY}`;
+  ctx.fillText('好成績', 760, 880);
+  ctx.fillStyle = COLOR_TEXT;
+  const achievement = entry.bestAchievement;
+  const achievementText = achievement
+    ? `${achievement.label}（${achievement.participantCount}名参加・${achievement.tier}）`
+    : '―';
+  const achievementSize = fitFontSize(ctx, achievementText, 1080, { startPx: 64, minPx: 32 });
+  ctx.font = `bold ${achievementSize}px ${FONT_FAMILY}`;
+  ctx.fillText(achievementText, 760, 960);
+
+  if (achievement) {
+    ctx.fillStyle = COLOR_MUTED;
+    ctx.font = `32px ${FONT_FAMILY}`;
+    const tournamentNameSize = fitFontSize(ctx, achievement.tournamentName, 1080, { startPx: 32, minPx: 20 });
+    ctx.font = `${tournamentNameSize}px ${FONT_FAMILY}`;
+    ctx.fillText(achievement.tournamentName, 760, 1010);
+  }
 }
 
 export function renderRankingCardCanvas(entry) {

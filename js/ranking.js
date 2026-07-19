@@ -1,3 +1,5 @@
+import { bestAchievement } from './playerStats.js';
+
 // LumiRank軽量版：相手の強さで重み付けした反復スコアリングのみを残した最小実装。
 // doc/design.md の「7. ランキング方式」に準拠する。
 export const RANKING_CONFIG = {
@@ -131,12 +133,14 @@ export function computeRankings(state) {
   return [...participantIds]
     .map((id) => {
       const player = players.find((p) => p.id === id);
-      const tournamentsPlayed = tournamentsPlayedByPlayer.get(id)?.size ?? 0;
+      const playedTournamentIds = tournamentsPlayedByPlayer.get(id);
+      const tournamentsPlayed = playedTournamentIds?.size ?? 0;
       return {
         id,
         name: player ? player.currentName : id,
         score: scores.get(id) * scale,
         tournamentsPlayed,
+        bestAchievement: bestAchievement(id, playedTournamentIds),
       };
     })
     .filter((r) => r.tournamentsPlayed >= RANKING_CONFIG.minTournaments)

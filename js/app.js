@@ -6,6 +6,7 @@ import { computeRankings, computeRankingsForPeriod, withRankChange, rankChangeIn
 import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
 import { getPlayerStats } from './playerStats.js';
+import { tournamentTier } from './tournamentTier.js';
 import { githubConfig, loadConfigFromStorage, saveConfigToStorage, verifyWriteAccess, getBranchSha } from './github.js';
 import { loadAllFromGitHub, saveAllToGitHub, markTournamentDeleted } from './githubSync.js';
 
@@ -348,7 +349,7 @@ function renderHistoryList() {
     info.className = 'history-info';
     info.innerHTML = `
       <span class="history-name">${escapeHtml(t.name)}</span>
-      <span class="history-meta">${escapeHtml(t.date || '日付未設定')} ・ ${t.participantIds.length}人参加</span>
+      <span class="history-meta">${escapeHtml(t.date || '日付未設定')} ・ ${t.participantIds.length}人参加 ・ ${tournamentTier(t.participantIds.length)}</span>
     `;
 
     const status = document.createElement('span');
@@ -376,6 +377,7 @@ function renderTournamentInfo(tournament) {
     <h3>大会情報</h3>
     <dl class="tournament-info-grid">
       <div><dt>参加人数</dt><dd>${tournament.participantIds.length}人</dd></div>
+      <div><dt>規模</dt><dd>${tournamentTier(tournament.participantIds.length)}</dd></div>
       <div><dt>形式</dt><dd>${escapeHtml(formatLabel)}</dd></div>
       <div><dt>開催日</dt><dd>${escapeHtml(tournament.date || '日付未設定')}</dd></div>
       <div><dt>進行状況</dt><dd>${escapeHtml(tournamentStatusLabel(tournament))}</dd></div>
