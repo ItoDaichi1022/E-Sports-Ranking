@@ -200,14 +200,15 @@ export function editMatch(tournamentId, matchId) {
   return { ok: true };
 }
 
-// 大会の基本情報（名前・日付）を修正する。
-export function updateTournament(tournamentId, { name, date }) {
+// 大会の基本情報（名前・日付・ルール）を修正する。
+export function updateTournament(tournamentId, { name, date, rules }) {
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) return { ok: false, error: '対象の大会が見つかりません。' };
   const newName = name.trim();
   if (!newName) return { ok: false, error: '大会名を入力してください。' };
   tournament.name = newName;
   tournament.date = date || null;
+  tournament.rules = (rules ?? '').trim() || null;
   return { ok: true };
 }
 

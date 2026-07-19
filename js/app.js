@@ -31,6 +31,7 @@ const seedByRankingBtn = document.getElementById('seed-by-ranking-btn');
 const tournamentForm = document.getElementById('tournament-form');
 const tournamentNameInput = document.getElementById('tournament-name-input');
 const tournamentDateInput = document.getElementById('tournament-date-input');
+const tournamentRulesInput = document.getElementById('tournament-rules-input');
 
 const historyListEl = document.getElementById('history-list');
 
@@ -43,7 +44,9 @@ const tournamentDeleteBtn = document.getElementById('tournament-delete-btn');
 const tournamentEditForm = document.getElementById('tournament-edit-form');
 const tournamentEditNameInput = document.getElementById('tournament-edit-name-input');
 const tournamentEditDateInput = document.getElementById('tournament-edit-date-input');
+const tournamentEditRulesInput = document.getElementById('tournament-edit-rules-input');
 const tournamentEditCancelBtn = document.getElementById('tournament-edit-cancel-btn');
+const tournamentInfoEl = document.getElementById('tournament-info');
 
 const playerDetailEl = document.getElementById('player-detail');
 const playerBackBtn = document.getElementById('player-back-btn');
@@ -365,6 +368,33 @@ function renderHistoryList() {
 
 // ---- ブラケットページ ----
 
+const FORMAT_LABELS = {
+  single_elim: 'シングルエリミネーション',
+  double_elim: 'ダブルエリミネーション',
+  round_robin: '総当たり',
+};
+
+// ブラケットの下に、参加人数・形式・ルールなど大会の基本情報をまとめて表示する。
+function renderTournamentInfo(tournament) {
+  const formatLabel = FORMAT_LABELS[tournament.format] || tournament.format;
+  let html = `
+    <h3>大会情報</h3>
+    <dl class="tournament-info-grid">
+      <div><dt>参加人数</dt><dd>${tournament.participantIds.length}人</dd></div>
+      <div><dt>形式</dt><dd>${escapeHtml(formatLabel)}</dd></div>
+      <div><dt>開催日</dt><dd>${escapeHtml(tournament.date || '日付未設定')}</dd></div>
+      <div><dt>進行状況</dt><dd>${escapeHtml(tournamentStatusLabel(tournament))}</dd></div>
+    </dl>
+  `;
+  if (tournament.rules) {
+    html += `
+      <h4>ルール</h4>
+      <p class="tournament-rules">${escapeHtml(tournament.rules)}</p>
+    `;
+  }
+  tournamentInfoEl.innerHTML = html;
+}
+
 function renderBracketPage(tournamentId) {
   currentBracketTournamentId = tournamentId;
   tournamentEditForm.hidden = true;
@@ -375,6 +405,7 @@ function renderBracketPage(tournamentId) {
     bracketMetaEl.textContent = '';
     bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
     bracketMatchesContainer.innerHTML = '';
+    tournamentInfoEl.innerHTML = '';
     return;
   }
 
@@ -385,6 +416,7 @@ function renderBracketPage(tournamentId) {
     markDirty();
     renderBracketPage(tournamentId);
   }, { readOnly: !isEditMode() });
+  renderTournamentInfo(tournament);
   renderMatchesTable(bracketMatchesContainer, tournamentId);
 }
 
@@ -638,12 +670,14 @@ tournamentForm.addEventListener('submit', (e) => {
     format: 'single_elim',
     participantIds: [...selectedParticipantIds],
     weight: null,
+    rules: tournamentRulesInput.value.trim() || null,
   };
   state.tournaments.push(tournament);
   state.brackets[tournament.id] = createBracket(tournament.id, selectedParticipantIds);
 
   tournamentNameInput.value = '';
   tournamentDateInput.value = '';
+  tournamentRulesInput.value = '';
   selectedParticipantIds = [];
   markDirty();
   location.hash = `#bracket/${encodeURIComponent(tournament.id)}`;
@@ -654,6 +688,7 @@ tournamentEditBtn.addEventListener('click', () => {
   if (!tournament) return;
   tournamentEditNameInput.value = tournament.name;
   tournamentEditDateInput.value = tournament.date || '';
+  tournamentEditRulesInput.value = tournament.rules || '';
   tournamentEditForm.hidden = !tournamentEditForm.hidden;
 });
 
@@ -666,6 +701,7 @@ tournamentEditForm.addEventListener('submit', (e) => {
   const result = updateTournament(currentBracketTournamentId, {
     name: tournamentEditNameInput.value,
     date: tournamentEditDateInput.value,
+    rules: tournamentEditRulesInput.value,
   });
   if (!result.ok) {
     alert(result.error);

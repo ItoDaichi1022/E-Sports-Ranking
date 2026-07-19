@@ -72,7 +72,8 @@
       "date": "2026-07-18",
       "format": "single_elim",
       "participantIds": ["SW-1234-5678-9012", "SW-9999-8888-7777"],
-      "weight": null
+      "weight": null,
+      "rules": "3本先取、キャラ1人縛りなし"
     }
   ]
 }
@@ -80,6 +81,7 @@
 - `format`：`single_elim` / `double_elim` / `round_robin`
 - `weight`：大会規模の重み。null の場合は参加人数から自動算出
 - `participantIds`：参加選手のID配列
+- `rules`：大会ルールの自由記述（任意・null可）。ブラケットページの下部に参加人数などと合わせて表示される
 
 ### matches.json
 ```json

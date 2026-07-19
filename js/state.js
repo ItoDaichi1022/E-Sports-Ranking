@@ -2,7 +2,7 @@
 // スキーマは doc/design.md の players.json / tournaments.json / matches.json に準拠する。
 export const state = {
   players: [],       // { id, currentName, pastNames: [] }
-  tournaments: [],    // { id, name, date, format, participantIds: [], weight }
+  tournaments: [],    // { id, name, date, format, participantIds: [], weight, rules }
   matches: [],        // { id, tournamentId, winnerId, loserId, score, round }
   brackets: {},       // tournamentId -> bracket object (js/bracket.js が構造を定義)
 };

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。CSS/JSを変更してデプロイするときは数字を上げる -->
-<link rel="stylesheet" href="css/style.css?v=6">
+<link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
 <header>
@@ -92,9 +92,13 @@
         開催日
         <input type="date" id="tournament-date-input">
       </label>
+      <label class="rules-field">
+        ルール（任意）
+        <textarea id="tournament-rules-input" rows="4" placeholder="例: 3本先取、キャラ1人縛りなし、持ちキャラ変更は大会中1回まで"></textarea>
+      </label>
       <button type="submit">ブラケット生成</button>
     </form>
-    <p class="note">生成すると、その大会のブラケット画面に移動します。</p>
+    <p class="note">生成すると、その大会のブラケット画面に移動します。ルールは大会ページの下部に表示されます。</p>
   </section>
 
   <section id="view-history" class="view" hidden>
@@ -124,10 +128,15 @@
         開催日
         <input type="date" id="tournament-edit-date-input">
       </label>
+      <label class="rules-field">
+        ルール（任意）
+        <textarea id="tournament-edit-rules-input" rows="4"></textarea>
+      </label>
       <button type="submit">保存</button>
       <button type="button" id="tournament-edit-cancel-btn" class="btn-secondary">キャンセル</button>
     </form>
     <div id="bracket-container"></div>
+    <div id="tournament-info" class="tournament-info"></div>
     <h3>試合結果</h3>
     <div id="bracket-matches-container"></div>
   </section>
@@ -163,6 +172,6 @@
 
 </main>
 
-<script type="module" src="js/app.js?v=10"></script>
+<script type="module" src="js/app.js?v=11"></script>
 </body>
 </html>
