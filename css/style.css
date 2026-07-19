@@ -174,6 +174,8 @@ h2 { margin-top: 0; }
 .status-line {
   font-size: 0.9rem;
   min-height: 1.2em;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .status-line.error { color: #b91c1c; }
@@ -240,6 +242,12 @@ button:disabled {
   font-style: italic;
 }
 
+/* 列数が多い表は狭い画面だとセルからはみ出しやすいので、必要な時だけ表自体を横スクロールさせる */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 table {
   border-collapse: collapse;
   width: 100%;
@@ -251,6 +259,8 @@ th, td {
   padding: 0.4rem 0.6rem;
   text-align: left;
   font-size: 0.9rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 tbody tr:hover {
@@ -266,6 +276,11 @@ tbody tr:hover {
 .row-actions button {
   padding: 0.2rem 0.6rem;
   font-size: 0.8rem;
+}
+
+code {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 td code {
@@ -354,9 +369,15 @@ td code {
   font-weight: bold;
   min-width: 3.5rem;
   color: var(--accent);
+  flex-shrink: 0;
 }
 
-.seed-name { flex: 1; }
+.seed-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
 
 .selected-item button {
   padding: 0.1rem 0.5rem;
@@ -547,6 +568,8 @@ td code {
   background: gold;
   color: #333;
   border-radius: 6px;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 /* --- 大会履歴 --- */
@@ -573,11 +596,14 @@ td code {
 .history-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .history-name {
   font-weight: bold;
   font-size: 1.05rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .history-meta {
@@ -589,6 +615,7 @@ td code {
   font-size: 0.9rem;
   color: var(--accent);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* --- ブラケットページ --- */
@@ -599,6 +626,12 @@ td code {
   gap: 1rem;
   flex-wrap: wrap;
   margin-bottom: 0.5rem;
+}
+
+.bracket-title-block {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 /* --- 大会情報（参加人数・形式・ルールなど、ブラケットの下に表示） --- */
@@ -632,10 +665,14 @@ td code {
 .tournament-info-grid dd {
   margin: 0.1rem 0 0;
   font-weight: bold;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .tournament-rules {
   white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
   margin: 0;
   padding: 0.75rem 1rem;
   border: 1px solid var(--border);
@@ -646,6 +683,8 @@ td code {
 /* --- 選手個人ページ --- */
 .player-detail-header h2 {
   margin-bottom: 0.25rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .stat-cards {

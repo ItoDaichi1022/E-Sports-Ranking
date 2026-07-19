@@ -35,5 +35,8 @@ export function renderRankingTable(containerEl, rankings, emptyMessage) {
   });
 
   table.appendChild(tbody);
-  containerEl.appendChild(table);
+  const scrollWrap = document.createElement('div');
+  scrollWrap.className = 'table-scroll';
+  scrollWrap.appendChild(table);
+  containerEl.appendChild(scrollWrap);
 }

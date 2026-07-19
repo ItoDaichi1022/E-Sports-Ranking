@@ -202,5 +202,8 @@ export function renderPlayerTable(containerEl, onChanged, options = {}) {
   });
 
   table.appendChild(tbody);
-  containerEl.appendChild(table);
+  const scrollWrap = document.createElement('div');
+  scrollWrap.className = 'table-scroll';
+  scrollWrap.appendChild(table);
+  containerEl.appendChild(scrollWrap);
 }

@@ -486,44 +486,48 @@ function renderPlayerDetail(playerId) {
   if (stats.tournaments.length > 0) {
     html += `
       <h3>大会別成績</h3>
-      <table>
-        <thead><tr><th>大会</th><th>日付</th><th>結果</th><th>勝敗</th></tr></thead>
-        <tbody>
-          ${[...stats.tournaments].reverse().map((entry) => `
-            <tr>
-              <td><a href="#bracket/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a></td>
-              <td>${escapeHtml(entry.tournament.date || '—')}</td>
-              <td>${escapeHtml(entry.placement || '—')}</td>
-              <td>${entry.wins}勝${entry.losses}敗</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>大会</th><th>日付</th><th>結果</th><th>勝敗</th></tr></thead>
+          <tbody>
+            ${[...stats.tournaments].reverse().map((entry) => `
+              <tr>
+                <td><a href="#bracket/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a></td>
+                <td>${escapeHtml(entry.tournament.date || '—')}</td>
+                <td>${escapeHtml(entry.placement || '—')}</td>
+                <td>${entry.wins}勝${entry.losses}敗</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     `;
   }
 
   if (stats.matches.length > 0) {
     html += `
       <h3>対戦履歴</h3>
-      <table>
-        <thead><tr><th>大会</th><th>ラウンド</th><th>対戦相手</th><th>勝敗</th><th>スコア</th></tr></thead>
-        <tbody>
-          ${[...stats.matches].reverse().map((m) => {
-            const won = m.winnerId === playerId;
-            const opponentId = won ? m.loserId : m.winnerId;
-            const tournament = state.tournaments.find((t) => t.id === m.tournamentId);
-            return `
-              <tr>
-                <td>${escapeHtml(tournament ? tournament.name : m.tournamentId)}</td>
-                <td>${escapeHtml(m.round)}</td>
-                <td><a href="#player/${encodeURIComponent(opponentId)}">${escapeHtml(getPlayerName(opponentId))}</a></td>
-                <td class="${won ? 'result-win' : 'result-loss'}">${won ? '勝ち' : '負け'}</td>
-                <td>${m.score ? escapeHtml(m.score) : '不戦勝'}</td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>大会</th><th>ラウンド</th><th>対戦相手</th><th>勝敗</th><th>スコア</th></tr></thead>
+          <tbody>
+            ${[...stats.matches].reverse().map((m) => {
+              const won = m.winnerId === playerId;
+              const opponentId = won ? m.loserId : m.winnerId;
+              const tournament = state.tournaments.find((t) => t.id === m.tournamentId);
+              return `
+                <tr>
+                  <td>${escapeHtml(tournament ? tournament.name : m.tournamentId)}</td>
+                  <td>${escapeHtml(m.round)}</td>
+                  <td><a href="#player/${encodeURIComponent(opponentId)}">${escapeHtml(getPlayerName(opponentId))}</a></td>
+                  <td class="${won ? 'result-win' : 'result-loss'}">${won ? '勝ち' : '負け'}</td>
+                  <td>${m.score ? escapeHtml(m.score) : '不戦勝'}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
     `;
   } else {
     html += '<p class="empty-hint">まだ対戦記録がありません。</p>';
