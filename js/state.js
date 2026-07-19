@@ -1,7 +1,7 @@
 // アプリ全体で共有する in-memory データストア。
 // スキーマは doc/design.md の players.json / tournaments.json / matches.json に準拠する。
 export const state = {
-  players: [],       // { id, currentName, pastNames: [], mainCharacters: [] }
+  players: [],       // { id, currentName, pastNames: [] }
   tournaments: [],    // { id, name, date, format, participantIds: [], weight }
   matches: [],        // { id, tournamentId, winnerId, loserId, score, round }
   brackets: {},       // tournamentId -> bracket object (js/bracket.js が構造を定義)

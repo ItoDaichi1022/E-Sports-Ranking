@@ -52,8 +52,7 @@
     {
       "id": "SW-1234-5678-9012",
       "currentName": "Gyu",
-      "pastNames": ["旧名A", "旧名B"],
-      "mainCharacters": ["キャラ名"]
+      "pastNames": ["旧名A", "旧名B"]
     }
   ]
 }
@@ -61,7 +60,7 @@
 - `id`：ゲームアカウントID（不変キー）
 - `currentName`：現在の表示名
 - `pastNames`：過去の名前（任意・名前変更履歴）
-- `mainCharacters`：使用キャラ（任意・ランキングには不使用）
+- 過去に存在した `mainCharacters`（使用キャラ）は廃止済み。古いデータに残っていても無視される。
 
 ### tournaments.json
 ```json

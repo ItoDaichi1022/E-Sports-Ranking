@@ -22,14 +22,13 @@ export function addPlayer(gameAccountId, displayName) {
     id,
     currentName: name,
     pastNames: [],
-    mainCharacters: [],
   });
 
   return { ok: true };
 }
 
 // 選手情報を更新する。表示名を変えた場合、旧名は pastNames に自動で残す（設計5章）。
-export function updatePlayer(id, { currentName, mainCharactersText }) {
+export function updatePlayer(id, { currentName }) {
   const player = state.players.find((p) => p.id === id);
   if (!player) return { ok: false, error: '選手が見つかりません。' };
 
@@ -42,10 +41,6 @@ export function updatePlayer(id, { currentName, mainCharactersText }) {
     }
     player.currentName = newName;
   }
-  player.mainCharacters = mainCharactersText
-    .split(/[,、]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
 
   return { ok: true };
 }
@@ -97,7 +92,7 @@ export function renderPlayerTable(containerEl, onChanged, options = {}) {
   table.className = 'player-table';
   table.innerHTML = `
     <thead>
-      <tr><th>表示名</th><th>ゲームアカウントID</th><th>過去名</th><th>使用キャラ</th>${readOnly ? '' : '<th></th>'}</tr>
+      <tr><th>表示名</th><th>ゲームアカウントID</th><th>過去名</th>${readOnly ? '' : '<th></th>'}</tr>
     </thead>
   `;
   const tbody = document.createElement('tbody');
@@ -118,13 +113,6 @@ export function renderPlayerTable(containerEl, onChanged, options = {}) {
       const pastTd = document.createElement('td');
       pastTd.textContent = p.pastNames.join(', ');
 
-      const charsTd = document.createElement('td');
-      const charsInput = document.createElement('input');
-      charsInput.type = 'text';
-      charsInput.value = p.mainCharacters.join(', ');
-      charsInput.placeholder = 'カンマ区切り';
-      charsTd.appendChild(charsInput);
-
       const actionTd = document.createElement('td');
       actionTd.className = 'row-actions';
 
@@ -134,7 +122,6 @@ export function renderPlayerTable(containerEl, onChanged, options = {}) {
       saveBtn.addEventListener('click', () => {
         const result = updatePlayer(p.id, {
           currentName: nameInput.value,
-          mainCharactersText: charsInput.value,
         });
         if (!result.ok) {
           alert(result.error);
@@ -159,7 +146,6 @@ export function renderPlayerTable(containerEl, onChanged, options = {}) {
       tr.appendChild(nameTd);
       tr.appendChild(idTd);
       tr.appendChild(pastTd);
-      tr.appendChild(charsTd);
       tr.appendChild(actionTd);
     } else {
       const nameTd = document.createElement('td');
@@ -174,13 +160,9 @@ export function renderPlayerTable(containerEl, onChanged, options = {}) {
       const pastTd = document.createElement('td');
       pastTd.textContent = p.pastNames.join(', ');
 
-      const charsTd = document.createElement('td');
-      charsTd.textContent = p.mainCharacters.join(', ');
-
       tr.appendChild(nameTd);
       tr.appendChild(idTd);
       tr.appendChild(pastTd);
-      tr.appendChild(charsTd);
 
       if (!readOnly) {
         const actionTd = document.createElement('td');

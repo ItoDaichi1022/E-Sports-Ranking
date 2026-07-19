@@ -412,7 +412,6 @@ function renderPlayerDetail(playerId) {
       <h2>${escapeHtml(player.currentName)}</h2>
       <p class="meta-line"><code>${escapeHtml(player.id)}</code></p>
       ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.join(', '))}</p>` : ''}
-      ${player.mainCharacters.length ? `<p class="meta-line">使用キャラ: ${escapeHtml(player.mainCharacters.join(', '))}</p>` : ''}
     </div>
     <div class="stat-cards">
       ${isEditMode() ? `<div class="stat-card"><span class="stat-value">${rankEntry ? `${rankEntry.rank}位` : '対象外'}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>` : ''}
