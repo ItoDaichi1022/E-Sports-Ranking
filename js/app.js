@@ -434,9 +434,17 @@ function formatDateTime(iso) {
 
 function publishedStatusLine() {
   const published = state.publishedRanking;
-  if (!published) return 'まだランキングが公開されていません。';
-  const periodLabel = PERIOD_LABELS[published.periodMonths ?? 'all'] || `直近${published.periodMonths}か月`;
-  return `公開中: ${periodLabel}（${formatDateTime(published.publishedAt)} 公開）`;
+  const periodLabel = published
+    ? (PERIOD_LABELS[published.periodMonths ?? 'all'] || `直近${published.periodMonths}か月`)
+    : '';
+
+  // 運営者には公開状況（期間と公開時刻）を示す。閲覧者には集計期間だけを添える
+  // （未公開の場合は一覧側に案内が出るので、ここは空にしておく）。
+  if (isEditMode()) {
+    if (!published) return '未公開';
+    return `公開中: ${periodLabel}（${formatDateTime(published.publishedAt)} 公開）`;
+  }
+  return published ? `集計期間: ${periodLabel}` : '';
 }
 
 // 編集モードでは選択中の期間でプレビューを計算して表示し、閲覧モードでは
@@ -549,16 +557,12 @@ async function handleGithubLoad() {
   if (dirty && !confirm('未保存の変更があります。読み込むと破棄されますが、続けますか？')) return;
   cancelPendingAutoSave();
   loadInFlight = true;
-  setGithubStatus('GitHubから読み込み中...', 'loading');
   try {
     await loadAllFromGitHub();
     selectedParticipantIds = [];
     clearDirty();
     routeFromHash();
-    setGithubStatus(
-      githubConfig.token ? 'GitHubから読み込みました。' : '最新データを読み込みました（10秒ごとに自動更新）。',
-      'success',
-    );
+    setGithubStatus('');
   } catch (err) {
     setGithubStatus(err.message, 'error');
   } finally {
@@ -636,7 +640,6 @@ async function autoRefresh() {
     await loadAllFromGitHub();
     if (JSON.stringify(state) !== before) {
       routeFromHash();
-      setGithubStatus(`新しいデータを反映しました（${formatTime(new Date())}）`, 'success');
     }
   } catch {
     // 一時的な通信エラーは無視し、次回の自動更新に任せる
@@ -804,7 +807,6 @@ modeToggleBtn.addEventListener('click', () => {
     applyModeUI();
     routeFromHash();
     handleGithubLoad();
-    setGithubStatus('閲覧モードに戻りました。', 'success');
     return;
   }
   tokenInput.value = '';
