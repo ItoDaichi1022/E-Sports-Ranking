@@ -1,0 +1,116 @@
+{
+  "tournamentId": "t-mrrhki8y-9",
+  "bracketSize": 8,
+  "totalRounds": 3,
+  "rounds": [
+    {
+      "name": "QF",
+      "matches": [
+        {
+          "id": "m-mrrhki8z-10",
+          "round": "QF",
+          "player1Id": "23995570651",
+          "player2Id": null,
+          "winnerId": "23995570651",
+          "loserId": null,
+          "score": null,
+          "confirmed": true,
+          "isBye": true,
+          "nextMatchId": "m-mrrhki8z-14",
+          "nextSlot": 1,
+          "isWalkover": false
+        },
+        {
+          "id": "m-mrrhki8z-11",
+          "round": "QF",
+          "player1Id": "25241340651",
+          "player2Id": "32746230651",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrrhki8z-14",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrrhki8z-12",
+          "round": "QF",
+          "player1Id": "50995370651",
+          "player2Id": null,
+          "winnerId": "50995370651",
+          "loserId": null,
+          "score": null,
+          "confirmed": true,
+          "isBye": true,
+          "nextMatchId": "m-mrrhki8z-15",
+          "nextSlot": 1,
+          "isWalkover": false
+        },
+        {
+          "id": "m-mrrhki8z-13",
+          "round": "QF",
+          "player1Id": "5190490651",
+          "player2Id": null,
+          "winnerId": "5190490651",
+          "loserId": null,
+          "score": null,
+          "confirmed": true,
+          "isBye": true,
+          "nextMatchId": "m-mrrhki8z-15",
+          "nextSlot": 2,
+          "isWalkover": false
+        }
+      ]
+    },
+    {
+      "name": "SF",
+      "matches": [
+        {
+          "id": "m-mrrhki8z-14",
+          "round": "SF",
+          "player1Id": "23995570651",
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrrhki8z-16",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrrhki8z-15",
+          "round": "SF",
+          "player1Id": "50995370651",
+          "player2Id": "5190490651",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrrhki8z-16",
+          "nextSlot": 2
+        }
+      ]
+    },
+    {
+      "name": "F",
+      "matches": [
+        {
+          "id": "m-mrrhki8z-16",
+          "round": "F",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": null,
+          "nextSlot": null
+        }
+      ]
+    }
+  ]
+}
