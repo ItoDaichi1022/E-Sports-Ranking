@@ -4,6 +4,16 @@ import { githubConfig, getFile, putFile, deleteFile, listDirectory } from './git
 // 各ファイルの現在のsha（楽観ロック用）。読み込み時に記録し、書き込み成功時に更新する。
 const shaCache = new Map();
 
+// 最後に読み込み/保存したときのファイル内容（整形済みJSON文字列）。
+// 自動保存で頻繁に保存されるようになったため、内容が変わっていないファイルは
+// PUTせずスキップして無意味なコミットを作らない。
+const contentCache = new Map();
+
+function serialize(value) {
+  // putFile と同じ整形（インデント2）で比較する
+  return JSON.stringify(value, null, 2);
+}
+
 // ローカルで削除された大会のブラケットファイル。次回保存時にGitHub側からも削除する。
 const deletedBracketIds = new Set();
 
@@ -69,6 +79,9 @@ async function loadAllViaApi() {
   shaCache.set('players', playersFile.sha);
   shaCache.set('tournaments', tournamentsFile.sha);
   shaCache.set('matches', matchesFile.sha);
+  if (playersFile.json) contentCache.set('players', serialize(playersFile.json));
+  if (tournamentsFile.json) contentCache.set('tournaments', serialize(tournamentsFile.json));
+  if (matchesFile.json) contentCache.set('matches', serialize(matchesFile.json));
 
   state.brackets = {};
   const entries = await listDirectory(`${githubConfig.pathPrefix}/brackets`);
@@ -82,6 +95,7 @@ async function loadAllViaApi() {
     const tournamentId = name.replace(/\.json$/, '');
     state.brackets[tournamentId] = file.json;
     shaCache.set(`bracket:${tournamentId}`, file.sha);
+    contentCache.set(`bracket:${tournamentId}`, serialize(file.json));
   });
 }
 
@@ -90,6 +104,7 @@ async function loadAllViaApi() {
 export async function loadAllFromGitHub() {
   deletedBracketIds.clear();
   shaCache.clear();
+  contentCache.clear();
 
   if (githubConfig.token) {
     await loadAllViaApi();
@@ -108,41 +123,24 @@ async function ensureSha(key, path) {
   return shaCache.get(key);
 }
 
+// 内容が前回の読み込み/保存から変わっているファイルだけをPUTする。
+async function putIfChanged(key, path, payload, message) {
+  const serialized = serialize(payload);
+  if (contentCache.get(key) === serialized) return;
+  const sha = await putFile(path, payload, await ensureSha(key, path), message);
+  shaCache.set(key, sha);
+  contentCache.set(key, serialized);
+}
+
 // 現在のin-memory stateをGitHubへ書き込む（players/tournaments/matches + 各大会のbracket）。
-// 書き込みトークンが必要。
+// 変更のないファイルはスキップされる。書き込みトークンが必要。
 export async function saveAllToGitHub() {
-  const playersSha = await putFile(
-    dataPath('players.json'),
-    { players: state.players },
-    await ensureSha('players', dataPath('players.json')),
-    'players.json を更新',
-  );
-  shaCache.set('players', playersSha);
-
-  const tournamentsSha = await putFile(
-    dataPath('tournaments.json'),
-    { tournaments: state.tournaments },
-    await ensureSha('tournaments', dataPath('tournaments.json')),
-    'tournaments.json を更新',
-  );
-  shaCache.set('tournaments', tournamentsSha);
-
-  const matchesSha = await putFile(
-    dataPath('matches.json'),
-    { matches: state.matches },
-    await ensureSha('matches', dataPath('matches.json')),
-    'matches.json を更新',
-  );
-  shaCache.set('matches', matchesSha);
+  await putIfChanged('players', dataPath('players.json'), { players: state.players }, 'players.json を更新');
+  await putIfChanged('tournaments', dataPath('tournaments.json'), { tournaments: state.tournaments }, 'tournaments.json を更新');
+  await putIfChanged('matches', dataPath('matches.json'), { matches: state.matches }, 'matches.json を更新');
 
   for (const [tournamentId, bracket] of Object.entries(state.brackets)) {
-    const sha = await putFile(
-      bracketPath(tournamentId),
-      bracket,
-      await ensureSha(`bracket:${tournamentId}`, bracketPath(tournamentId)),
-      `bracket ${tournamentId} を更新`,
-    );
-    shaCache.set(`bracket:${tournamentId}`, sha);
+    await putIfChanged(`bracket:${tournamentId}`, bracketPath(tournamentId), bracket, `bracket ${tournamentId} を更新`);
   }
 
   // ローカルで削除された大会のブラケットファイルをGitHub側からも消す。
@@ -152,6 +150,7 @@ export async function saveAllToGitHub() {
     if (!sha) sha = (await getFile(path)).sha;
     if (sha) await deleteFile(path, sha, `bracket ${tournamentId} を削除`);
     shaCache.delete(`bracket:${tournamentId}`);
+    contentCache.delete(`bracket:${tournamentId}`);
     deletedBracketIds.delete(tournamentId);
   }
 }
