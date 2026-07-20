@@ -57,10 +57,21 @@ function combineMatches(shardMatches, legacyMatches) {
   return merged;
 }
 
-// サイトと同じ場所（GitHub Pages）から静的ファイルとしてJSONを取得する。
-// GitHub APIと違って認証もレート制限も無いため、閲覧者はこちらを使う。
+// コミットされたファイルを直接配信する raw.githubusercontent.com のURLを組み立てる。
+function rawUrl(path) {
+  const { owner, repo, branch } = githubConfig;
+  return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+}
+
+// 閲覧者向けのJSON取得。認証もレート制限も（実質）無い raw.githubusercontent.com から読む。
+// 同一オリジンのGitHub Pages配信ファイルは、コミットのたびにビルド＆デプロイが完了するまで
+// 更新されず（数分〜最大10分）、閲覧モードの反映が編集モードより大きく遅れていた。raw は
+// Pagesのビルドを介さず、pushのたびにCDNキャッシュがパージされるため、コミット後は通常
+// 数秒〜1分（キャッシュ上限でも約5分）で反映される。
+// なお raw はクエリ文字列をキャッシュキーに含めない（?_= では回避できない）が、cache:'no-store'
+// でブラウザキャッシュは無効化しており、CDN側は上記パージで更新されるため問題ない。
 async function fetchStaticJson(path) {
-  const res = await fetch(`${path}?_=${Date.now()}`, { cache: 'no-store' });
+  const res = await fetch(`${rawUrl(path)}?_=${Date.now()}`, { cache: 'no-store' });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`データ読み込み失敗 (${path}): ${res.status}`);
   return res.json();
