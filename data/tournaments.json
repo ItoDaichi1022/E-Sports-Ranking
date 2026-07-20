@@ -70,6 +70,21 @@
       ],
       "weight": null,
       "rules": null
+    },
+    {
+      "id": "t-mrsihqcp-1",
+      "name": "テスト",
+      "date": "2026-07-20",
+      "format": "single_elim",
+      "participantIds": [
+        "25241340651",
+        "32746230651",
+        "23995570651",
+        "50995370651",
+        "5190490651"
+      ],
+      "weight": null,
+      "rules": null
     }
   ]
 }
