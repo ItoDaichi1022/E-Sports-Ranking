@@ -39,6 +39,14 @@
       "loserId": "S",
       "score": "1-0",
       "round": "R1"
+    },
+    {
+      "id": "m-mrsioadn-13",
+      "tournamentId": "t-mrsioadm-9",
+      "winnerId": "C",
+      "loserId": "R",
+      "score": "2-1",
+      "round": "R1"
     }
   ]
 }
