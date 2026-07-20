@@ -95,6 +95,14 @@
       "loserId": "O",
       "score": "5-1",
       "round": "R1"
+    },
+    {
+      "id": "m-mrsioadn-20",
+      "tournamentId": "t-mrsioadm-9",
+      "winnerId": "A",
+      "loserId": "T",
+      "score": "2-1",
+      "round": "R1"
     }
   ]
 }
