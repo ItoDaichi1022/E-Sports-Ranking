@@ -1,0 +1,436 @@
+{
+  "tournamentId": "t-mrsioadm-9",
+  "bracketSize": 32,
+  "totalRounds": 5,
+  "rounds": [
+    {
+      "name": "R1",
+      "matches": [
+        {
+          "id": "m-mrsioadn-10",
+          "round": "R1",
+          "player1Id": "25241340651",
+          "player2Id": null,
+          "winnerId": "25241340651",
+          "loserId": null,
+          "score": null,
+          "confirmed": true,
+          "isBye": true,
+          "nextMatchId": "m-mrsioadn-26",
+          "nextSlot": 1,
+          "isWalkover": false
+        },
+        {
+          "id": "m-mrsioadn-11",
+          "round": "R1",
+          "player1Id": "J",
+          "player2Id": "L",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-26",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-12",
+          "round": "R1",
+          "player1Id": "B",
+          "player2Id": "S",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-27",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-13",
+          "round": "R1",
+          "player1Id": "C",
+          "player2Id": "R",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-27",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-14",
+          "round": "R1",
+          "player1Id": "50995370651",
+          "player2Id": "W",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-28",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-15",
+          "round": "R1",
+          "player1Id": "G",
+          "player2Id": "M",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-28",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-16",
+          "round": "R1",
+          "player1Id": "5190490651",
+          "player2Id": "V",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-29",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-17",
+          "round": "R1",
+          "player1Id": "F",
+          "player2Id": "O",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-29",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-18",
+          "round": "R1",
+          "player1Id": "32746230651",
+          "player2Id": "Y",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-30",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-19",
+          "round": "R1",
+          "player1Id": "I",
+          "player2Id": "K",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-30",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-20",
+          "round": "R1",
+          "player1Id": "A",
+          "player2Id": "T",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-31",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-21",
+          "round": "R1",
+          "player1Id": "D",
+          "player2Id": "Q",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-31",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-22",
+          "round": "R1",
+          "player1Id": "23995570651",
+          "player2Id": "X",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-32",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-23",
+          "round": "R1",
+          "player1Id": "H",
+          "player2Id": "N",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-32",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-24",
+          "round": "R1",
+          "player1Id": "1",
+          "player2Id": "U",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-33",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-25",
+          "round": "R1",
+          "player1Id": "E",
+          "player2Id": "P",
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-33",
+          "nextSlot": 2
+        }
+      ]
+    },
+    {
+      "name": "R2",
+      "matches": [
+        {
+          "id": "m-mrsioadn-26",
+          "round": "R2",
+          "player1Id": "25241340651",
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-34",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-27",
+          "round": "R2",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-34",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-28",
+          "round": "R2",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-35",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-29",
+          "round": "R2",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-35",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-30",
+          "round": "R2",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-36",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-31",
+          "round": "R2",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-36",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-32",
+          "round": "R2",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-37",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-33",
+          "round": "R2",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-37",
+          "nextSlot": 2
+        }
+      ]
+    },
+    {
+      "name": "QF",
+      "matches": [
+        {
+          "id": "m-mrsioadn-34",
+          "round": "QF",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-38",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-35",
+          "round": "QF",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-38",
+          "nextSlot": 2
+        },
+        {
+          "id": "m-mrsioadn-36",
+          "round": "QF",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-39",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-37",
+          "round": "QF",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-39",
+          "nextSlot": 2
+        }
+      ]
+    },
+    {
+      "name": "SF",
+      "matches": [
+        {
+          "id": "m-mrsioadn-38",
+          "round": "SF",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-40",
+          "nextSlot": 1
+        },
+        {
+          "id": "m-mrsioadn-39",
+          "round": "SF",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": "m-mrsioadn-40",
+          "nextSlot": 2
+        }
+      ]
+    },
+    {
+      "name": "F",
+      "matches": [
+        {
+          "id": "m-mrsioadn-40",
+          "round": "F",
+          "player1Id": null,
+          "player2Id": null,
+          "winnerId": null,
+          "loserId": null,
+          "score": null,
+          "confirmed": false,
+          "isBye": false,
+          "nextMatchId": null,
+          "nextSlot": null
+        }
+      ]
+    }
+  ]
+}
