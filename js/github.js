@@ -177,3 +177,67 @@ export async function deleteFile(path, sha, message) {
     throw new Error(`GitHub削除失敗 (${path}): ${res.status} ${await safeText(res)}`);
   }
 }
+
+// ---- Git Data API（複数ファイルを1コミットにまとめて保存するための低レベルAPI）----
+// Contents API は「1ファイル=1コミット」で、大会作成のように複数ファイルを一度に保存すると
+// 短時間に多数のコミットが走り、GitHub側のブランチ参照更新が競合して 409 を返しやすい
+// （特にモバイル回線で顕著）。blob/tree/commit/ref を直接組むことで、何ファイル変更しても
+// 1コミットにまとめられ、Pages配信の連続キャンセルも起きなくなる。
+
+// コミットが指すツリー（そのコミット時点の全ファイル構成）のshaを返す。
+export async function getCommitTreeSha(commitSha) {
+  const url = `${apiBase()}/git/commits/${commitSha}`;
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+  if (!res.ok) throw new Error(`コミット情報の取得に失敗しました (${res.status})`);
+  const data = await res.json();
+  return data.tree?.sha ?? null;
+}
+
+// baseTreeSha を土台に、変更ファイルだけを差し替えた新しいツリーを作る。
+// files: 書き込みは { path, content }、削除は { path, delete: true }。
+// 変更していないファイルは base_tree から引き継がれる。
+export async function createTree(baseTreeSha, files) {
+  const tree = files.map((f) =>
+    f.delete
+      ? { path: f.path, mode: '100644', type: 'blob', sha: null }
+      : { path: f.path, mode: '100644', type: 'blob', content: f.content },
+  );
+  const res = await fetch(`${apiBase()}/git/trees`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ base_tree: baseTreeSha, tree }),
+  });
+  if (!res.ok) throw new Error(`ツリー作成に失敗しました (${res.status}) ${await safeText(res)}`);
+  return (await res.json()).sha;
+}
+
+// 新しいツリーを指すコミットを作る（parentSha を親にする）。
+export async function createCommit(message, treeSha, parentSha) {
+  const res = await fetch(`${apiBase()}/git/commits`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ message, tree: treeSha, parents: [parentSha] }),
+  });
+  if (!res.ok) throw new Error(`コミット作成に失敗しました (${res.status}) ${await safeText(res)}`);
+  return (await res.json()).sha;
+}
+
+// ブランチ参照を新しいコミットへ進める。force=false のため、読み込み以降に他端末が
+// ブランチを進めていた場合は非fast-forwardとして 422 が返る＝楽観ロックの競合として扱う。
+export async function updateBranchRef(commitSha) {
+  const url = `${apiBase()}/git/refs/heads/${encodeURIComponent(githubConfig.branch)}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ sha: commitSha, force: false }),
+  });
+  if (!res.ok) {
+    if (res.status === 422 || res.status === 409) {
+      const err = new Error('他の端末の変更と競合しました');
+      err.isConflict = true;
+      throw err;
+    }
+    throw new Error(`ブランチ更新に失敗しました (${res.status}) ${await safeText(res)}`);
+  }
+  return (await res.json()).object?.sha ?? commitSha;
+}

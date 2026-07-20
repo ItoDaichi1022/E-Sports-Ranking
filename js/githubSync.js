@@ -1,15 +1,24 @@
 import { state } from './state.js';
-import { githubConfig, getFile, putFile, deleteFile, listDirectory } from './github.js';
+import {
+  githubConfig, getFile, listDirectory,
+  getBranchSha, getCommitTreeSha, createTree, createCommit, updateBranchRef,
+} from './github.js';
 
-// 各ファイルの現在のsha（楽観ロック用）。読み込み時に記録し、書き込み成功時に更新する。
+// 各ファイルのsha。読み込み時にリモートの内容を把握するために記録する（楽観ロックは
+// ブランチ参照単位で行うため、書き込み時のファイル別shaは使わない）。
 const shaCache = new Map();
+
+// 自分のin-memory stateが基づいているブランチの先頭コミットsha（読み込み時に記録）。
+// 保存時はこれを親にして1コミットを作り、force=falseで参照を進める。読み込み以降に
+// 他端末がブランチを進めていれば非fast-forwardで弾かれ、競合として再読み込み・マージする。
+let baseBranchSha = null;
 
 // 最後に読み込み/保存したときのファイル内容（整形済みJSON文字列）。
 // 「変更のないファイルはPUTしない」判定と、競合マージ時のベース（三方マージの共通祖先）に使う。
 const contentCache = new Map();
 
 function serialize(value) {
-  // putFile と同じ整形（インデント2）で比較する
+  // 実際にコミットする内容（インデント2のJSON）と同じ整形で比較・キャッシュする
   return JSON.stringify(value, null, 2);
 }
 
@@ -96,6 +105,11 @@ async function loadAllViaApi() {
   shaCache.clear();
   contentCache.clear();
 
+  // 読み込むファイル群の土台となるブランチ先頭を、読み込み開始時点で記録する。
+  // 読み込み中に他端末の保存が入っても、この時点のshaを基準にすることで
+  // 保存時に確実に競合として検知できる（安全側）。
+  baseBranchSha = await getBranchSha();
+
   const [playersFile, tournamentsFile, legacyMatchesFile, rankingFile] = await Promise.all([
     getFile(dataPath('players.json')),
     getFile(dataPath('tournaments.json')),
@@ -158,43 +172,44 @@ export async function loadAllFromGitHub() {
   }
 }
 
-// 内容が前回の読み込み/保存から変わっているファイルだけをPUTする。
-// 一度も読み込んでいないファイルがリモートに既に存在する場合は、他端末が先に
-// 作成したものなので、上書きせず競合として扱い呼び出し側のマージに委ねる。
-async function putIfChanged(key, path, payload, message) {
-  const serialized = serialize(payload);
-  if (contentCache.get(key) === serialized) return;
-
-  let sha = shaCache.get(key);
-  if (!sha) {
-    const existing = await getFile(path);
-    if (existing.sha && !contentCache.has(key)) {
-      const err = new Error(`他の端末の変更と競合しました (${path})`);
-      err.isConflict = true;
-      throw err;
-    }
-    sha = existing.sha;
-  }
-
-  const newSha = await putFile(path, payload, sha, message);
-  shaCache.set(key, newSha);
-  contentCache.set(key, serialized);
+// 1コミットにまとめるコミットメッセージを、変更内容から組み立てる。
+function buildCommitMessage(files) {
+  const short = (p) => p.replace(`${githubConfig.pathPrefix}/`, '');
+  const writes = files.filter((f) => !f.delete).map((f) => short(f.path));
+  const deletes = files.filter((f) => f.delete).map((f) => short(f.path));
+  const parts = [];
+  if (writes.length) parts.push(`更新: ${writes.join(', ')}`);
+  if (deletes.length) parts.push(`削除: ${deletes.join(', ')}`);
+  const summary = parts.join(' / ') || 'データを更新';
+  return summary.length > 72 ? `${summary.slice(0, 69)}...` : summary;
 }
 
-async function deleteFileIfExists(key, path, message) {
-  let sha = shaCache.get(key);
-  if (!sha) sha = (await getFile(path)).sha;
-  if (sha) await deleteFile(path, sha, message);
-  shaCache.delete(key);
-  contentCache.delete(key);
-}
+// 現在のin-memory stateとリモート（前回読み込み内容=contentCache）を突き合わせ、
+// 変更のあったファイルだけをまとめた1コミット分の変更セットを組み立てる。
+// 戻り値 files が空なら、コミットすべき変更は無い。
+function collectChanges() {
+  const files = [];        // { key, path, content } または { key, path, delete: true }
+  const cacheWrites = [];  // 成功後に contentCache へ反映
+  const cacheDeletes = []; // 成功後に contentCache/shaCache から削除
 
-// 現在のin-memory stateをGitHubへ書き込む。変更のないファイルはスキップされる。
-async function saveAllCore() {
-  await putIfChanged('players', dataPath('players.json'), { players: state.players }, 'players.json を更新');
-  await putIfChanged('tournaments', dataPath('tournaments.json'), { tournaments: state.tournaments }, 'tournaments.json を更新');
+  const addWrite = (key, path, payload) => {
+    const serialized = serialize(payload);
+    if (contentCache.get(key) === serialized) return; // 変更なしはコミットに含めない
+    files.push({ key, path, content: serialized });
+    cacheWrites.push({ key, serialized });
+  };
+  const addDelete = (key, path) => {
+    // 読み込み済み（＝リモートに存在する）ファイルだけ削除対象にする。
+    // 既に存在しないパスにsha:nullを送るとツリー作成が失敗し得るため。
+    if (!contentCache.has(key)) return;
+    files.push({ key, path, delete: true });
+    cacheDeletes.push(key);
+  };
+
+  addWrite('players', dataPath('players.json'), { players: state.players });
+  addWrite('tournaments', dataPath('tournaments.json'), { tournaments: state.tournaments });
   if (state.publishedRanking) {
-    await putIfChanged('ranking', dataPath('ranking.json'), state.publishedRanking, 'ranking.json を更新');
+    addWrite('ranking', dataPath('ranking.json'), state.publishedRanking);
   }
 
   // 試合結果を大会ごとに分割して保存する。
@@ -210,26 +225,55 @@ async function saveAllCore() {
     if (!byTournament.has(tid) && !deletedTournamentIds.has(tid)) byTournament.set(tid, []);
   }
   for (const [tid, matches] of byTournament) {
-    await putIfChanged(`matches:${tid}`, matchesPath(tid), { matches }, `matches ${tid} を更新`);
+    addWrite(`matches:${tid}`, matchesPath(tid), { matches });
   }
 
   for (const [tournamentId, bracket] of Object.entries(state.brackets)) {
-    await putIfChanged(`bracket:${tournamentId}`, bracketPath(tournamentId), bracket, `bracket ${tournamentId} を更新`);
+    addWrite(`bracket:${tournamentId}`, bracketPath(tournamentId), bracket);
   }
 
   // ローカルで削除された大会のブラケット/試合ファイルをGitHub側からも消す。
-  for (const tid of [...deletedTournamentIds]) {
-    await deleteFileIfExists(`bracket:${tid}`, bracketPath(tid), `bracket ${tid} を削除`);
-    await deleteFileIfExists(`matches:${tid}`, matchesPath(tid), `matches ${tid} を削除`);
-    deletedTournamentIds.delete(tid);
+  for (const tid of deletedTournamentIds) {
+    addDelete(`bracket:${tid}`, bracketPath(tid));
+    addDelete(`matches:${tid}`, matchesPath(tid));
   }
 
-  // 旧形式の matches.json が残っていれば、分割ファイルへの保存が済んだ後に削除する（初回のみの移行）。
-  if (shaCache.get('matches')) {
-    await deleteFile(dataPath('matches.json'), shaCache.get('matches'), 'matches.json を大会別ファイルへ移行');
-    shaCache.delete('matches');
-    contentCache.delete('matches');
+  // 旧形式の matches.json が残っていれば、大会別ファイルへの移行に伴い削除する（初回のみ）。
+  if (contentCache.has('matches')) {
+    addDelete('matches', dataPath('matches.json'));
   }
+
+  return { files, cacheWrites, cacheDeletes };
+}
+
+// 現在のin-memory stateをGitHubへ、変更のあったファイルだけを含む「1コミット」で書き込む。
+// 複数ファイルの保存でもブランチ参照の更新は1回だけになり、連続コミットによる409レースや
+// Pages配信の連続キャンセルが起きない。読み込み以降に他端末が保存していた場合は
+// updateBranchRef が isConflict を投げ、呼び出し側がマージ・再試行する。
+async function saveAllCore() {
+  const { files, cacheWrites, cacheDeletes } = collectChanges();
+  if (files.length === 0) {
+    deletedTournamentIds.clear();
+    return;
+  }
+
+  if (!baseBranchSha) throw new Error('保存の基準となるブランチ情報がありません。読み込み直してください。');
+  const baseTreeSha = await getCommitTreeSha(baseBranchSha);
+  const newTreeSha = await createTree(baseTreeSha, files);
+  const commitSha = await createCommit(buildCommitMessage(files), newTreeSha, baseBranchSha);
+  await updateBranchRef(commitSha); // 競合時は isConflict を投げる
+
+  // 成功：ローカルのキャッシュと基準ブランチを、いま作ったコミットに合わせて進める。
+  for (const { key, serialized } of cacheWrites) {
+    contentCache.set(key, serialized);
+    shaCache.delete(key); // 正確なblob shaは保持しない（次回読み込みで復元される）
+  }
+  for (const key of cacheDeletes) {
+    contentCache.delete(key);
+    shaCache.delete(key);
+  }
+  baseBranchSha = commitSha;
+  deletedTournamentIds.clear();
 }
 
 // ---- 競合時の三方マージ ----
