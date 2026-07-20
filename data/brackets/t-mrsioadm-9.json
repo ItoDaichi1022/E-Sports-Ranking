@@ -109,13 +109,14 @@
           "round": "R1",
           "player1Id": "F",
           "player2Id": "O",
-          "winnerId": null,
-          "loserId": null,
-          "score": null,
-          "confirmed": false,
+          "winnerId": "F",
+          "loserId": "O",
+          "score": "5-1",
+          "confirmed": true,
           "isBye": false,
           "nextMatchId": "m-mrsioadn-29",
-          "nextSlot": 2
+          "nextSlot": 2,
+          "isWalkover": false
         },
         {
           "id": "m-mrsioadn-18",
@@ -274,7 +275,7 @@
           "id": "m-mrsioadn-29",
           "round": "R2",
           "player1Id": "5190490651",
-          "player2Id": null,
+          "player2Id": "F",
           "winnerId": null,
           "loserId": null,
           "score": null,
