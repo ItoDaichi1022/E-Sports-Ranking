@@ -39,6 +39,21 @@
       "id": "A",
       "currentName": "A",
       "pastNames": []
+    },
+    {
+      "id": "B",
+      "currentName": "B",
+      "pastNames": []
+    },
+    {
+      "id": "C",
+      "currentName": "C",
+      "pastNames": []
+    },
+    {
+      "id": "D",
+      "currentName": "D",
+      "pastNames": []
     }
   ]
 }
