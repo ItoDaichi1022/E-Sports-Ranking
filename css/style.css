@@ -32,7 +32,7 @@ header {
   header { background: #202124; }
 }
 
-/* 左端にアカウント、続いてタイトル、残りをナビが占める。
+/* 左からタイトル、ナビ、右端にアカウント。
    アイコンとタイトルの高さが違うので baseline ではなく中央で揃える。 */
 .header-row {
   display: flex;
