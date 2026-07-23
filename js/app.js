@@ -91,6 +91,7 @@ const rankingPublishedStatusEl = $('ranking-published-status');
 const rankingEditorNoteEl = $('ranking-editor-note');
 
 const appStatusEl = $('app-status');
+const syncBarEl = $('sync-bar');
 const accountAvatarEl = $('account-avatar');
 const loginBtn = $('login-btn');
 const logoutBtn = $('logout-btn');
@@ -117,9 +118,12 @@ function canEditPlayer(player) {
   return isAdmin() || (auth.player != null && auth.player.id === player.id);
 }
 
+// メッセージが無いときは行ごと隠す。空のまま置いておくとヘッダーが
+// 常に2段になり、上段が中途半端に見えるため。
 function setStatus(text, type) {
   appStatusEl.textContent = text;
   appStatusEl.className = `status-line${type ? ` ${type}` : ''}`;
+  syncBarEl.hidden = !text;
 }
 
 // 保存処理をまとめて包む。書き込みに失敗したら画面を最新に戻し、

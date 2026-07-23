@@ -32,11 +32,23 @@ header {
   header { background: #202124; }
 }
 
+/* 左端にアカウント、続いてタイトル、残りをナビが占める。
+   アイコンとタイトルの高さが違うので baseline ではなく中央で揃える。 */
 .header-row {
   display: flex;
-  align-items: baseline;
-  gap: 1.5rem;
+  align-items: center;
+  gap: 1rem;
   flex-wrap: wrap;
+}
+
+.header-row #main-nav {
+  margin-left: auto;
+}
+
+.header-row #login-btn {
+  padding: 0.25rem 0.9rem;
+  font-size: 0.85rem;
+  flex: none;
 }
 
 header h1 {
