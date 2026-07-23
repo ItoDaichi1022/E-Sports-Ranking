@@ -1,0 +1,410 @@
+// Supabaseとの読み書き。js/github.js + js/githubSync.js の置き換え。
+//
+// ここがDBとアプリの唯一の境界で、snake_case（DB）とcamelCase（in-memory state）の
+// 変換もここだけで行う。おかげで js/ranking.js・js/bracket.js・js/playerStats.js などの
+// 計算・描画ロジックはストレージを一切意識しない。
+//
+// GitHubをDB代わりにしていた頃に必要だった楽観ロックと三方マージは、すべて不要になった。
+// Postgresは行単位で書き込むため、別々の大会・別々の選手を同時に編集しても競合しない。
+
+import { supabase } from './supabaseClient.js';
+import { state } from './state.js';
+
+// ---------------------------------------------------------------------------
+// 行 ⇄ stateオブジェクトの変換
+// ---------------------------------------------------------------------------
+
+function toPlayer(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    currentName: row.display_name,
+    pastNames: row.past_names ?? [],
+    gameAccountId: row.game_account_id ?? '',
+    bio: row.bio ?? '',
+    mainCharacters: row.main_characters ?? [],
+    snsX: row.sns_x ?? '',
+    snsTwitch: row.sns_twitch ?? '',
+    snsYoutube: row.sns_youtube ?? '',
+    role: row.role ?? 'player',
+  };
+}
+
+// 本人が編集できる列だけを取り出す。DB側でも列単位のGRANTで守っているが、
+// 余計な列を送らないことでリクエストが弾かれるのを防ぐ。
+function toPlayerUpdate(player) {
+  return {
+    display_name: player.currentName,
+    past_names: player.pastNames ?? [],
+    game_account_id: player.gameAccountId || null,
+    bio: player.bio || null,
+    main_characters: player.mainCharacters ?? [],
+    sns_x: player.snsX || null,
+    sns_twitch: player.snsTwitch || null,
+    sns_youtube: player.snsYoutube || null,
+  };
+}
+
+function toTournament(row, participantIds) {
+  return {
+    id: row.id,
+    name: row.name,
+    date: row.date,
+    format: row.format,
+    rules: row.rules,
+    weight: row.weight,
+    status: row.status,
+    capacity: row.capacity,
+    createdBy: row.created_by,
+    participantIds,
+  };
+}
+
+function toMatch(row) {
+  return {
+    id: row.id,
+    tournamentId: row.tournament_id,
+    winnerId: row.winner_id,
+    loserId: row.loser_id,
+    score: row.score,
+    round: row.round,
+  };
+}
+
+function fromMatch(match) {
+  return {
+    id: match.id,
+    tournament_id: match.tournamentId,
+    winner_id: match.winnerId,
+    loser_id: match.loserId,
+    score: match.score,
+    round: match.round,
+  };
+}
+
+// PostgRESTのエラーを日本語にして投げ直す。
+function check(error, what) {
+  if (!error) return;
+  if (error.code === '42501' || error.message?.includes('row-level security')) {
+    throw new Error(`${what}の権限がありません。`);
+  }
+  throw new Error(`${what}に失敗しました: ${error.message}`);
+}
+
+// ---------------------------------------------------------------------------
+// 読み込み
+// ---------------------------------------------------------------------------
+
+// 全データを取得して state を丸ごと差し替える。認証は不要（RLSがSELECTを全員に許可）。
+// 途中で失敗しても中途半端な表示にならないよう、全部揃ってから state に入れる。
+export async function loadAll() {
+  const [players, tournaments, entries, brackets, matches, ranking] = await Promise.all([
+    supabase.from('players').select('*').order('display_name'),
+    supabase.from('tournaments').select('*').order('date', { ascending: true, nullsFirst: false }),
+    supabase.from('tournament_entries').select('*'),
+    supabase.from('brackets').select('*'),
+    supabase.from('matches').select('*'),
+    // スナップショットは最新の1件だけ使う（過去の公開履歴は残しておく）
+    supabase.from('published_rankings').select('*').order('published_at', { ascending: false }).limit(1),
+  ]);
+
+  check(players.error, '選手の読み込み');
+  check(tournaments.error, '大会の読み込み');
+  check(entries.error, 'エントリーの読み込み');
+  check(brackets.error, 'ブラケットの読み込み');
+  check(matches.error, '試合結果の読み込み');
+  check(ranking.error, 'ランキングの読み込み');
+
+  // participantIds はシード順（未確定なら登録順）。旧データの並び順の意味を引き継ぐ。
+  const participantsByTournament = new Map();
+  [...entries.data]
+    .sort((a, b) => {
+      if (a.seed != null && b.seed != null) return a.seed - b.seed;
+      if (a.seed != null) return -1;
+      if (b.seed != null) return 1;
+      return a.entered_at.localeCompare(b.entered_at);
+    })
+    .forEach((e) => {
+      if (!participantsByTournament.has(e.tournament_id)) participantsByTournament.set(e.tournament_id, []);
+      participantsByTournament.get(e.tournament_id).push(e.player_id);
+    });
+
+  const bracketsById = {};
+  brackets.data.forEach((b) => { bracketsById[b.tournament_id] = b.data; });
+
+  const snapshot = ranking.data?.[0];
+
+  state.players = players.data.map(toPlayer);
+  state.tournaments = tournaments.data.map((t) => toTournament(t, participantsByTournament.get(t.id) ?? []));
+  state.matches = matches.data.map(toMatch);
+  state.brackets = bracketsById;
+  state.publishedRanking = snapshot
+    ? {
+        publishedAt: snapshot.published_at,
+        periodMonths: snapshot.period_months,
+        rankings: snapshot.data?.rankings ?? [],
+      }
+    : null;
+}
+
+// ---------------------------------------------------------------------------
+// 選手
+// ---------------------------------------------------------------------------
+
+// 初回ログイン後のオンボーディングで呼ぶ。自分のアカウントに紐づく選手行を作る。
+export async function createOwnPlayer(userId, profile) {
+  const { data, error } = await supabase
+    .from('players')
+    .insert({ user_id: userId, ...toPlayerUpdate(profile) })
+    .select()
+    .single();
+  check(error, '選手登録');
+  return toPlayer(data);
+}
+
+// 運営が代理登録する選手（本人のアカウントはまだ無い）。
+export async function createProxyPlayer(profile) {
+  const { data, error } = await supabase
+    .from('players')
+    .insert({ user_id: null, ...toPlayerUpdate(profile) })
+    .select()
+    .single();
+  check(error, '選手登録');
+  return toPlayer(data);
+}
+
+// プロフィールの更新。本人か運営でなければRLSに弾かれる。
+// role と user_id は列単位のGRANTで更新不可なので、ここから触れることはない。
+export async function savePlayer(player) {
+  const { error } = await supabase
+    .from('players')
+    .update(toPlayerUpdate(player))
+    .eq('id', player.id);
+  check(error, 'プロフィールの保存');
+}
+
+export async function deletePlayer(playerId) {
+  const { error } = await supabase.from('players').delete().eq('id', playerId);
+  // 試合結果から参照されている選手は外部キー(on delete restrict)で守られている。
+  // 画面側でも事前に止めているが、他端末が同時に試合を入れた場合はここで弾かれる。
+  if (error?.code === '23503') {
+    throw new Error('この選手は試合結果に記録されているため削除できません。');
+  }
+  check(error, '選手の削除');
+}
+
+// 運営権限の付け外し。roleは直接UPDATEできないのでRPC経由。
+export async function setPlayerRole(playerId, role) {
+  const { error } = await supabase.rpc('admin_set_player_role', {
+    target_player_id: playerId,
+    new_role: role,
+  });
+  check(error, '権限の変更');
+}
+
+// 代理登録されていた選手に、本人のアカウントを対応付ける。
+export async function linkPlayerAccount(playerId, userId) {
+  const { error } = await supabase.rpc('admin_link_player_account', {
+    target_player_id: playerId,
+    target_user_id: userId,
+  });
+  check(error, 'アカウントの対応付け');
+}
+
+// 本人が先に新規登録してしまい二重になった行を、戦績のある古い行へ統合する。
+export async function mergePlayers(sourcePlayerId, targetPlayerId) {
+  const { error } = await supabase.rpc('admin_merge_players', {
+    source_player_id: sourcePlayerId,
+    target_player_id: targetPlayerId,
+  });
+  check(error, '選手の統合');
+}
+
+// ---------------------------------------------------------------------------
+// 大会
+// ---------------------------------------------------------------------------
+
+export async function createTournament(tournament) {
+  const { data, error } = await supabase
+    .from('tournaments')
+    .insert({
+      id: tournament.id,
+      name: tournament.name,
+      date: tournament.date || null,
+      format: tournament.format ?? 'single_elim',
+      rules: tournament.rules || null,
+      status: tournament.status ?? 'draft',
+      capacity: tournament.capacity ?? null,
+      weight: tournament.weight ?? null,
+      created_by: tournament.createdBy ?? null,
+    })
+    .select()
+    .single();
+  check(error, '大会の作成');
+  return data;
+}
+
+export async function saveTournament(tournament) {
+  const { error } = await supabase
+    .from('tournaments')
+    .update({
+      name: tournament.name,
+      date: tournament.date || null,
+      rules: tournament.rules || null,
+      status: tournament.status,
+      capacity: tournament.capacity ?? null,
+    })
+    .eq('id', tournament.id);
+  check(error, '大会の保存');
+}
+
+export async function setTournamentStatus(tournamentId, status) {
+  const { error } = await supabase.from('tournaments').update({ status }).eq('id', tournamentId);
+  check(error, '大会状態の変更');
+}
+
+// ブラケット・試合・エントリーは外部キーのON DELETE CASCADEで一緒に消える。
+export async function deleteTournament(tournamentId) {
+  const { error } = await supabase.from('tournaments').delete().eq('id', tournamentId);
+  check(error, '大会の削除');
+}
+
+// ---------------------------------------------------------------------------
+// エントリー
+// ---------------------------------------------------------------------------
+
+// 募集中の大会に自分でエントリーする。定員超過はDBのトリガーが弾く
+// （クライアント側で残枠を確認してからINSERTする方式は、同時に押されると両方通ってしまう）。
+export async function enterTournament(tournamentId, playerId) {
+  const { error } = await supabase
+    .from('tournament_entries')
+    .insert({ tournament_id: tournamentId, player_id: playerId });
+
+  if (error?.code === '23505') throw new Error('すでにエントリー済みです。');
+  if (error?.message?.includes('定員')) throw new Error('この大会は定員に達しています。');
+  check(error, 'エントリー');
+}
+
+export async function cancelEntry(tournamentId, playerId) {
+  const { error } = await supabase
+    .from('tournament_entries')
+    .delete()
+    .eq('tournament_id', tournamentId)
+    .eq('player_id', playerId);
+  check(error, 'エントリーの取り消し');
+}
+
+// 募集締切時に、確定したシード順をまとめて書き込む（seededPlayerIds[0] が第1シード）。
+export async function saveSeeds(tournamentId, seededPlayerIds) {
+  const rows = seededPlayerIds.map((playerId, index) => ({
+    tournament_id: tournamentId,
+    player_id: playerId,
+    seed: index + 1,
+  }));
+  const { error } = await supabase
+    .from('tournament_entries')
+    .upsert(rows, { onConflict: 'tournament_id,player_id' });
+  check(error, 'シードの保存');
+}
+
+// 運営が参加者を直接指定する場合（募集を使わず大会を立てるとき）。
+export async function replaceEntries(tournamentId, seededPlayerIds) {
+  const { error: delError } = await supabase
+    .from('tournament_entries')
+    .delete()
+    .eq('tournament_id', tournamentId);
+  check(delError, '参加者の更新');
+  if (seededPlayerIds.length === 0) return;
+  await saveSeeds(tournamentId, seededPlayerIds);
+}
+
+// ---------------------------------------------------------------------------
+// ブラケットと試合
+// ---------------------------------------------------------------------------
+
+export async function saveBracket(tournamentId, bracket) {
+  const { error } = await supabase
+    .from('brackets')
+    .upsert({ tournament_id: tournamentId, data: bracket }, { onConflict: 'tournament_id' });
+  check(error, 'ブラケットの保存');
+}
+
+// ブラケットの操作（勝敗の確定・取り消し）を1回で保存する。
+//
+// js/bracket.js の confirmMatch / editMatch は in-memory の state を書き換えるだけで、
+// 「どの試合が増えたか・減ったか」を返さない。取り消しは次ラウンド以降へ連鎖することも
+// あるため、差分を追いかけるより、その大会の試合をDBと突き合わせて揃えるほうが確実。
+// 1大会の試合は多くても数十件なので、毎回の照合でも十分に軽い。
+export async function syncTournamentProgress(tournamentId) {
+  await saveBracket(tournamentId, state.brackets[tournamentId]);
+
+  const { data, error } = await supabase
+    .from('matches')
+    .select('id')
+    .eq('tournament_id', tournamentId);
+  check(error, '試合結果の照合');
+
+  const remoteIds = new Set(data.map((r) => r.id));
+  const localMatches = state.matches.filter((m) => m.tournamentId === tournamentId);
+  const localIds = new Set(localMatches.map((m) => m.id));
+
+  const toInsert = localMatches.filter((m) => !remoteIds.has(m.id));
+  const toDelete = [...remoteIds].filter((id) => !localIds.has(id));
+
+  if (toInsert.length) {
+    const { error: insertError } = await supabase.from('matches').insert(toInsert.map(fromMatch));
+    check(insertError, '試合結果の保存');
+  }
+  if (toDelete.length) {
+    const { error: deleteError } = await supabase.from('matches').delete().in('id', toDelete);
+    check(deleteError, '試合結果の取り消し');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ランキングの公開
+// ---------------------------------------------------------------------------
+
+// 公開のたびに1行追加する（上書きではない）。過去に何をいつ公開したかが残る。
+export async function publishRanking(snapshot) {
+  const { error } = await supabase.from('published_rankings').insert({
+    published_at: snapshot.publishedAt,
+    period_months: snapshot.periodMonths,
+    data: { rankings: snapshot.rankings },
+  });
+  check(error, 'ランキングの公開');
+}
+
+// ---------------------------------------------------------------------------
+// Realtime
+//
+// 10秒ごとのポーリング（旧 app.js の autoRefresh）の置き換え。進行中の大会を
+// 見ている観戦者へ、勝敗が入った瞬間に変更がプッシュされる。
+// ---------------------------------------------------------------------------
+
+let channel = null;
+
+// いずれかのテーブルが変わったら onChange を呼ぶ。短時間に複数の変更が届いても
+// まとめて1回で済むよう、少しだけ待ってから通知する。
+export function subscribeToChanges(onChange, debounceMs = 400) {
+  unsubscribeFromChanges();
+
+  let timer = null;
+  const notify = () => {
+    clearTimeout(timer);
+    timer = setTimeout(onChange, debounceMs);
+  };
+
+  channel = supabase.channel('app-data');
+  ['players', 'tournaments', 'tournament_entries', 'brackets', 'matches', 'published_rankings']
+    .forEach((table) => {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, notify);
+    });
+  channel.subscribe();
+}
+
+export function unsubscribeFromChanges() {
+  if (!channel) return;
+  supabase.removeChannel(channel);
+  channel = null;
+}

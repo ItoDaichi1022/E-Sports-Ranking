@@ -1,137 +1,170 @@
-import { state, generateId, getPlayerName } from './state.js';
-import { addPlayer, renderPlayerTable, escapeHtml } from './players.js';
-import { createBracket, updateTournament, deleteTournamentData, getChampionId } from './bracket.js';
+import { state, newId, getPlayerName } from './state.js';
+import { renderPlayerTable, resetPlayerEditing, escapeHtml } from './players.js';
+import { createBracket, updateTournament, getChampionId } from './bracket.js';
 import { renderBracket } from './bracketView.js';
 import { computeRankings, computeRankingsForPeriod, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
 import { getPlayerStats } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
-import { githubConfig, loadConfigFromStorage, saveConfigToStorage, verifyWriteAccess, getBranchSha } from './github.js';
-import { loadAllFromGitHub, saveAllToGitHub, markTournamentDeleted } from './githubSync.js';
+import { renderProfileForm, profileSectionHtml } from './profile.js';
+import { renderRecruitPage, STATUS_LABELS } from './entries.js';
+import {
+  auth, initAuth, isAdmin, isLoggedIn, needsOnboarding, accountLabel,
+  signInWithProvider, signInWithEmail, signUpWithEmail, signOut, reloadOwnPlayer,
+} from './auth.js';
+import { isConfigured } from './supabaseClient.js';
+import * as db from './db.js';
 
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
 let selectedParticipantIds = [];
 let participantSearchQuery = '';
 let playerSearchQuery = '';
 let currentBracketTournamentId = null;
-let dirty = false;
 
-const playerForm = document.getElementById('player-form');
-const playerIdInput = document.getElementById('player-id-input');
-const playerNameInput = document.getElementById('player-name-input');
-const playerListEl = document.getElementById('player-list');
+const $ = (id) => document.getElementById(id);
 
-const participantSearchInput = document.getElementById('participant-search-input');
-const participantCheckboxesEl = document.getElementById('participant-checkboxes');
-const selectedListEl = document.getElementById('selected-participant-list');
-const selectedCountEl = document.getElementById('selected-count');
-const shuffleBtn = document.getElementById('shuffle-btn');
-const seedByRankingBtn = document.getElementById('seed-by-ranking-btn');
+const playerForm = $('player-form');
+const playerIdInput = $('player-id-input');
+const playerNameInput = $('player-name-input');
+const playerFormNote = $('player-form-note');
+const playerListEl = $('player-list');
+const playerSearchInput = $('player-search-input');
 
-const tournamentForm = document.getElementById('tournament-form');
-const tournamentNameInput = document.getElementById('tournament-name-input');
-const tournamentDateInput = document.getElementById('tournament-date-input');
-const tournamentRulesInput = document.getElementById('tournament-rules-input');
+const participantSearchInput = $('participant-search-input');
+const participantCheckboxesEl = $('participant-checkboxes');
+const selectedListEl = $('selected-participant-list');
+const selectedCountEl = $('selected-count');
+const shuffleBtn = $('shuffle-btn');
+const seedByRankingBtn = $('seed-by-ranking-btn');
+const manualParticipantsEl = $('manual-participants');
 
-const historyListEl = document.getElementById('history-list');
+const tournamentForm = $('tournament-form');
+const tournamentNameInput = $('tournament-name-input');
+const tournamentDateInput = $('tournament-date-input');
+const tournamentCapacityInput = $('tournament-capacity-input');
+const tournamentRulesInput = $('tournament-rules-input');
+const tournamentSubmitBtn = $('tournament-submit-btn');
 
-const bracketTitleEl = document.getElementById('bracket-title');
-const bracketMetaEl = document.getElementById('bracket-meta');
-const bracketContainer = document.getElementById('bracket-container');
-const tournamentEditBtn = document.getElementById('tournament-edit-btn');
-const tournamentDeleteBtn = document.getElementById('tournament-delete-btn');
-const tournamentEditForm = document.getElementById('tournament-edit-form');
-const tournamentEditNameInput = document.getElementById('tournament-edit-name-input');
-const tournamentEditDateInput = document.getElementById('tournament-edit-date-input');
-const tournamentEditRulesInput = document.getElementById('tournament-edit-rules-input');
-const tournamentEditCancelBtn = document.getElementById('tournament-edit-cancel-btn');
-const tournamentInfoEl = document.getElementById('tournament-info');
+const recruitListEl = $('recruit-list');
+const historyListEl = $('history-list');
 
-const playerDetailEl = document.getElementById('player-detail');
-const playerBackBtn = document.getElementById('player-back-btn');
+const bracketTitleEl = $('bracket-title');
+const bracketMetaEl = $('bracket-meta');
+const bracketContainer = $('bracket-container');
+const tournamentEditBtn = $('tournament-edit-btn');
+const tournamentDeleteBtn = $('tournament-delete-btn');
+const tournamentEditForm = $('tournament-edit-form');
+const tournamentEditNameInput = $('tournament-edit-name-input');
+const tournamentEditDateInput = $('tournament-edit-date-input');
+const tournamentEditRulesInput = $('tournament-edit-rules-input');
+const tournamentEditCancelBtn = $('tournament-edit-cancel-btn');
+const tournamentInfoEl = $('tournament-info');
 
-const rankingContainer = document.getElementById('ranking-container');
-const rankingEditorEl = document.getElementById('ranking-editor');
-const rankingPeriodSelect = document.getElementById('ranking-period-select');
-const rankingExportBtn = document.getElementById('ranking-export-btn');
-const rankingPublishBtn = document.getElementById('ranking-publish-btn');
-const rankingPublishedStatusEl = document.getElementById('ranking-published-status');
-const rankingEditorNoteEl = document.getElementById('ranking-editor-note');
+const playerDetailEl = $('player-detail');
+const playerBackBtn = $('player-back-btn');
 
-const githubStatusEl = document.getElementById('github-status');
-const dirtyBadgeEl = document.getElementById('dirty-badge');
-const modeToggleBtn = document.getElementById('mode-toggle-btn');
+const profileTitleEl = $('profile-title');
+const profileNoteEl = $('profile-note');
+const profileFormContainer = $('profile-form-container');
+const profileLinksEl = $('profile-links');
 
-const tokenDialog = document.getElementById('token-dialog');
-const tokenForm = document.getElementById('token-form');
-const tokenInput = document.getElementById('token-input');
-const tokenRememberInput = document.getElementById('token-remember-input');
-const tokenErrorEl = document.getElementById('token-error');
-const tokenSubmitBtn = document.getElementById('token-submit-btn');
-const tokenCancelBtn = document.getElementById('token-cancel-btn');
+const rankingContainer = $('ranking-container');
+const rankingEditorEl = $('ranking-editor');
+const rankingPeriodSelect = $('ranking-period-select');
+const rankingExportBtn = $('ranking-export-btn');
+const rankingPublishBtn = $('ranking-publish-btn');
+const rankingPublishedStatusEl = $('ranking-published-status');
+const rankingEditorNoteEl = $('ranking-editor-note');
 
-const navTournamentLink = document.getElementById('nav-tournament-link');
-const homeCardTournament = document.getElementById('home-card-tournament');
-const playerSearchInput = document.getElementById('player-search-input');
+const appStatusEl = $('app-status');
+const accountLabelEl = $('account-label');
+const profileNavLink = $('profile-link');
+const loginBtn = $('login-btn');
+const logoutBtn = $('logout-btn');
+const navTournamentLink = $('nav-tournament-link');
+const homeCardTournament = $('home-card-tournament');
+const homeCardProfile = $('home-card-profile');
+const mainNav = $('main-nav');
 
-const mainNav = document.getElementById('main-nav');
+const loginDialog = $('login-dialog');
+const emailForm = $('email-form');
+const emailInput = $('email-input');
+const passwordInput = $('password-input');
+const loginErrorEl = $('login-error');
+const emailLoginBtn = $('email-login-btn');
+const signupBtn = $('signup-btn');
+const googleLoginBtn = $('google-login-btn');
+const discordLoginBtn = $('discord-login-btn');
+const loginCancelBtn = $('login-cancel-btn');
 
-// ---- 編集/閲覧モード ----
+// ---- 権限 ----
 
-function isEditMode() {
-  return Boolean(githubConfig.token);
+// 運営は全選手を、一般ユーザーは自分の行だけ編集できる。
+function canEditPlayer(player) {
+  return isAdmin() || (auth.player != null && auth.player.id === player.id);
 }
 
-// モードに応じて編集系UIの表示/非表示をまとめて切り替える
-function applyModeUI() {
-  const editing = isEditMode();
-  navTournamentLink.hidden = !editing;
-  homeCardTournament.hidden = !editing;
-  playerForm.hidden = !editing;
-  tournamentEditBtn.hidden = !editing;
-  tournamentDeleteBtn.hidden = !editing;
-  rankingEditorEl.hidden = !editing;
-  rankingEditorNoteEl.hidden = !editing;
-  if (!editing) tournamentEditForm.hidden = true;
-  modeToggleBtn.textContent = editing ? '閲覧モードへ' : '編集モード';
+function setStatus(text, type) {
+  appStatusEl.textContent = text;
+  appStatusEl.className = `status-line${type ? ` ${type}` : ''}`;
 }
 
-// ---- 未保存変更の管理 ----
-
-function updateSyncBar() {
-  dirtyBadgeEl.hidden = !dirty;
-}
-
-function markDirty() {
-  dirty = true;
-  updateSyncBar();
-  // 編集モードでは変更のたびに自動保存を予約する（連続操作はまとめて1回）
-  scheduleAutoSave();
-}
-
-function clearDirty() {
-  dirty = false;
-  updateSyncBar();
-}
-
-window.addEventListener('beforeunload', (e) => {
-  if (dirty) {
-    e.preventDefault();
-    e.returnValue = '';
+// 保存処理をまとめて包む。書き込みに失敗したら画面を最新に戻し、
+// ローカルだけ変わって見える状態を残さない。
+async function persist(action, label) {
+  setStatus('保存中...', 'loading');
+  try {
+    await action();
+    setStatus(`保存しました（${formatTime(new Date())}）`, 'success');
+    return true;
+  } catch (err) {
+    setStatus(err.message, 'error');
+    alert(`${label}に失敗しました。\n${err.message}`);
+    await refreshFromDb();
+    return false;
   }
-});
+}
+
+// ログイン状態に応じて、運営専用・ログイン専用のUIをまとめて出し分ける。
+function applyAuthUI() {
+  const admin = isAdmin();
+  const loggedIn = isLoggedIn();
+
+  navTournamentLink.hidden = !admin;
+  homeCardTournament.hidden = !admin;
+  rankingEditorEl.hidden = !admin;
+  rankingEditorNoteEl.hidden = !admin;
+  tournamentEditBtn.hidden = !admin;
+  tournamentDeleteBtn.hidden = !admin;
+  playerForm.hidden = !admin;
+  playerFormNote.hidden = !admin;
+  if (!admin) tournamentEditForm.hidden = true;
+
+  homeCardProfile.hidden = !loggedIn;
+  profileNavLink.hidden = !loggedIn;
+  loginBtn.hidden = loggedIn;
+  logoutBtn.hidden = !loggedIn;
+
+  if (loggedIn) {
+    accountLabelEl.textContent = admin ? `${accountLabel()}（運営）` : accountLabel();
+  } else {
+    accountLabelEl.textContent = '';
+  }
+}
 
 // ---- ルーティング ----
 
 const VIEW_IDS = {
   home: 'view-home',
+  recruit: 'view-recruit',
   tournament: 'view-tournament',
   history: 'view-history',
   bracket: 'view-bracket',
   players: 'view-players',
   player: 'view-player-detail',
   ranking: 'view-ranking',
+  profile: 'view-profile',
 };
 
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
@@ -145,16 +178,29 @@ function parseHash() {
 
 function routeFromHash() {
   const { page, param } = parseHash();
+
+  // #login はページではなくログインダイアログを開くための入口
+  if (page === 'login') {
+    location.replace('#home');
+    if (!isLoggedIn()) openLoginDialog();
+    return;
+  }
+
   let target = VIEW_IDS[page] ? page : 'home';
 
-  // 大会作成は編集モード限定。閲覧者が直接URLで来た場合はホームに戻す。
-  if (target === 'tournament' && !isEditMode()) {
+  // 大会作成は運営限定、マイページはログイン限定
+  if (target === 'tournament' && !isAdmin()) {
     location.replace('#home');
     target = 'home';
   }
+  if (target === 'profile' && !isLoggedIn()) {
+    location.replace('#home');
+    target = 'home';
+    openLoginDialog();
+  }
 
   Object.entries(VIEW_IDS).forEach(([name, id]) => {
-    document.getElementById(id).hidden = name !== target;
+    $(id).hidden = name !== target;
   });
 
   const navPage = NAV_PAGE_OF[target] || target;
@@ -162,33 +208,38 @@ function routeFromHash() {
     a.classList.toggle('active', a.dataset.page === navPage);
   });
 
-  if (target === 'tournament') {
-    renderParticipantCheckboxes();
-    renderSelectedList();
-  } else if (target === 'history') {
-    renderHistoryList();
-  } else if (target === 'bracket') {
-    renderBracketPage(param);
-  } else if (target === 'players') {
-    refreshPlayerUI();
-  } else if (target === 'player') {
-    renderPlayerDetail(param);
-  } else if (target === 'ranking') {
-    renderRankingPage();
-  }
+  if (target === 'recruit') renderRecruit();
+  else if (target === 'tournament') { renderParticipantCheckboxes(); renderSelectedList(); }
+  else if (target === 'history') renderHistoryList();
+  else if (target === 'bracket') renderBracketPage(param);
+  else if (target === 'players') refreshPlayerUI();
+  else if (target === 'player') renderPlayerDetail(param);
+  else if (target === 'ranking') renderRankingPage();
+  else if (target === 'profile') renderProfilePage();
 }
 
-// ---- 選手まわり ----
+// ---- 選手 ----
 
 function refreshPlayerUI() {
-  renderPlayerTable(playerListEl, () => {
-    markDirty();
-    // 削除された選手が選択中リストに残らないようにする
-    selectedParticipantIds = selectedParticipantIds.filter((id) =>
-      state.players.some((p) => p.id === id),
-    );
-    refreshPlayerUI();
-  }, { readOnly: !isEditMode(), filterQuery: playerSearchQuery });
+  renderPlayerTable(playerListEl, {
+    canEdit: canEditPlayer,
+    isAdmin: isAdmin(),
+    filterQuery: playerSearchQuery,
+    onSave: async (player) => {
+      await db.savePlayer(player);
+      if (auth.player?.id === player.id) await reloadOwnPlayer();
+    },
+    onDelete: async (player) => {
+      await db.deletePlayer(player.id);
+      selectedParticipantIds = selectedParticipantIds.filter((id) => id !== player.id);
+      await refreshFromDb();
+    },
+    onMerge: async (sourceId, targetId) => {
+      await db.mergePlayers(sourceId, targetId);
+      await reloadOwnPlayer();
+      await refreshFromDb();
+    },
+  });
   renderParticipantCheckboxes();
 }
 
@@ -202,7 +253,9 @@ function renderParticipantCheckboxes() {
 
   const query = participantSearchQuery.trim().toLowerCase();
   const visiblePlayers = query
-    ? state.players.filter((p) => p.id.toLowerCase().includes(query) || p.currentName.toLowerCase().includes(query))
+    ? state.players.filter((p) =>
+        (p.gameAccountId ?? '').toLowerCase().includes(query)
+        || p.currentName.toLowerCase().includes(query))
     : state.players;
 
   if (visiblePlayers.length === 0) {
@@ -229,7 +282,9 @@ function renderParticipantCheckboxes() {
     });
 
     label.appendChild(checkbox);
-    label.appendChild(document.createTextNode(` ${p.currentName} (${p.id})`));
+    label.appendChild(document.createTextNode(
+      p.gameAccountId ? ` ${p.currentName} (${p.gameAccountId})` : ` ${p.currentName}`,
+    ));
     participantCheckboxesEl.appendChild(label);
   });
 }
@@ -290,11 +345,7 @@ function renderSelectedList() {
       renderSelectedList();
     });
 
-    li.appendChild(seedLabel);
-    li.appendChild(nameLabel);
-    li.appendChild(upBtn);
-    li.appendChild(downBtn);
-    li.appendChild(removeBtn);
+    li.append(seedLabel, nameLabel, upBtn, downBtn, removeBtn);
     selectedListEl.appendChild(li);
   });
 }
@@ -323,11 +374,67 @@ function seedBySelectedRanking() {
   renderSelectedList();
 }
 
+// ---- 募集ページ ----
+
+function renderRecruit() {
+  renderRecruitPage(recruitListEl, async () => {
+    await refreshFromDb();
+  });
+}
+
+// ---- マイページ ----
+
+// ログイン直後で選手行がまだ無ければ新規登録、あれば編集フォームを出す。
+function renderProfilePage() {
+  profileLinksEl.innerHTML = '';
+
+  if (needsOnboarding()) {
+    profileTitleEl.textContent = '選手登録';
+    profileNoteEl.textContent = '表示名だけでも登録できます。あとからいつでも変更できます。';
+    renderProfileForm(profileFormContainer, null, {
+      submitLabel: '登録する',
+      onSubmit: async (profile) => {
+        await db.createOwnPlayer(auth.user.id, { ...profile, pastNames: [] });
+        await reloadOwnPlayer();
+        await refreshFromDb();
+        setStatus('選手登録が完了しました。', 'success');
+        location.hash = `#player/${encodeURIComponent(auth.player.id)}`;
+      },
+    });
+    return;
+  }
+
+  profileTitleEl.textContent = 'マイページ';
+  profileNoteEl.textContent = 'ここで編集した内容は、あなたの選手ページに表示されます。';
+
+  renderProfileForm(profileFormContainer, auth.player, {
+    submitLabel: '保存',
+    onSubmit: async (profile) => {
+      // 表示名を変えたら旧名を過去名に残す（players.js の updatePlayer と同じ扱い）
+      const pastNames = [...auth.player.pastNames];
+      if (profile.currentName !== auth.player.currentName
+        && !pastNames.includes(auth.player.currentName)) {
+        pastNames.push(auth.player.currentName);
+      }
+      await db.savePlayer({ ...auth.player, ...profile, pastNames });
+      await reloadOwnPlayer();
+      await refreshFromDb();
+      setStatus('プロフィールを保存しました。', 'success');
+    },
+  });
+
+  const link = document.createElement('a');
+  link.className = 'back-link';
+  link.href = `#player/${encodeURIComponent(auth.player.id)}`;
+  link.textContent = '自分の選手ページを見る →';
+  profileLinksEl.appendChild(link);
+}
+
 // ---- 大会履歴 ----
 
 function tournamentStatusLabel(t) {
   const bracket = state.brackets[t.id];
-  if (!bracket) return '—';
+  if (!bracket) return STATUS_LABELS[t.status] ?? '—';
   const championId = getChampionId(bracket);
   return championId ? `優勝: ${getPlayerName(championId)}` : '進行中';
 }
@@ -335,12 +442,15 @@ function tournamentStatusLabel(t) {
 function renderHistoryList() {
   historyListEl.innerHTML = '';
 
-  if (state.tournaments.length === 0) {
-    historyListEl.innerHTML = '<p class="empty-hint">まだ大会がありません。「大会作成」から始めてください。</p>';
+  // 準備中・募集中は募集ページの担当。履歴には実際に始まった大会だけを並べる。
+  const visible = state.tournaments.filter((t) => t.status === 'running' || t.status === 'finished');
+
+  if (visible.length === 0) {
+    historyListEl.innerHTML = '<p class="empty-hint">まだ開催された大会がありません。</p>';
     return;
   }
 
-  [...state.tournaments].reverse().forEach((t) => {
+  [...visible].reverse().forEach((t) => {
     const item = document.createElement('a');
     item.className = 'history-item';
     item.href = `#bracket/${encodeURIComponent(t.id)}`;
@@ -356,8 +466,7 @@ function renderHistoryList() {
     status.className = 'history-status';
     status.textContent = tournamentStatusLabel(t);
 
-    item.appendChild(info);
-    item.appendChild(status);
+    item.append(info, status);
     historyListEl.appendChild(item);
   });
 }
@@ -370,7 +479,6 @@ const FORMAT_LABELS = {
   round_robin: '総当たり',
 };
 
-// ブラケットの下に、参加人数・形式・ルールなど大会の基本情報をまとめて表示する。
 function renderTournamentInfo(tournament) {
   const formatLabel = FORMAT_LABELS[tournament.format] || tournament.format;
   let html = `
@@ -408,10 +516,23 @@ function renderBracketPage(tournamentId) {
   bracketTitleEl.textContent = tournament.name;
   bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${tournament.participantIds.length}人参加 ・ ${tournamentStatusLabel(tournament)}`;
 
-  renderBracket(tournamentId, bracketContainer, () => {
-    markDirty();
+  // bracketView は state を書き換えてから onChanged を呼ぶ。ここでDBへ反映し、
+  // 決勝が確定していれば大会を「終了」にする（⑥）。
+  renderBracket(tournamentId, bracketContainer, async () => {
     renderBracketPage(tournamentId);
-  }, { readOnly: !isEditMode() });
+    await persist(async () => {
+      await db.syncTournamentProgress(tournamentId);
+
+      const finished = Boolean(getChampionId(state.brackets[tournamentId]));
+      const nextStatus = finished ? 'finished' : 'running';
+      if (tournament.status !== nextStatus) {
+        await db.setTournamentStatus(tournamentId, nextStatus);
+        tournament.status = nextStatus;
+        renderBracketPage(tournamentId);
+      }
+    }, '試合結果の保存');
+  }, { readOnly: !isAdmin() });
+
   renderTournamentInfo(tournament);
 }
 
@@ -430,23 +551,19 @@ function publishedStatusLine() {
     ? (PERIOD_LABELS[published.periodMonths ?? 'all'] || `直近${published.periodMonths}か月`)
     : '';
 
-  // 運営者には公開状況（期間と公開時刻）を示す。閲覧者には集計期間だけを添える
-  // （未公開の場合は一覧側に案内が出るので、ここは空にしておく）。
-  if (isEditMode()) {
+  if (isAdmin()) {
     if (!published) return '未公開';
     return `公開中: ${periodLabel}（${formatDateTime(published.publishedAt)} 公開）`;
   }
   return published ? `集計期間: ${periodLabel}` : '';
 }
 
-// 編集モードでは選択中の期間でプレビューを計算して表示し、閲覧モードでは
-// 直近に公開されたランキングのスナップショットをそのまま表示する。
+// 運営には選択中の期間のライブプレビューを、それ以外には公開済みスナップショットを見せる。
 function renderRankingPage() {
   rankingPublishedStatusEl.textContent = publishedStatusLine();
 
-  if (isEditMode()) {
+  if (isAdmin()) {
     const { rankings: preview } = computeRankingsForPeriod(state, rankingPeriodSelect.value);
-    // 現在公開中のランキングと比較し、公開したら何位が動くかをプレビューの時点で見せる
     const previewWithChange = withRankChange(preview, state.publishedRanking?.rankings);
     renderRankingTable(rankingContainer, previewWithChange, 'この期間に確定した試合がまだないため、ランキングを計算できません。');
   } else {
@@ -478,13 +595,15 @@ function renderPlayerDetail(playerId) {
     : '';
   const total = stats.wins + stats.losses;
   const winRate = total > 0 ? Math.round((stats.wins / total) * 100) : null;
+  const isOwn = auth.player?.id === playerId;
 
   let html = `
     <div class="player-detail-header">
       <h2>${escapeHtml(player.currentName)}</h2>
-      <p class="meta-line"><code>${escapeHtml(player.id)}</code></p>
       ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.join(', '))}</p>` : ''}
+      ${isOwn ? '<p class="meta-line"><a href="#profile">プロフィールを編集する</a></p>' : ''}
     </div>
+    ${profileSectionHtml(player)}
     <div class="stat-cards">
       <div class="stat-card"><span class="stat-value">${rankLabel}${rankChangeHtml}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>
       <div class="stat-card"><span class="stat-value">${stats.tournaments.length}</span><span class="stat-label">出場大会数</span></div>
@@ -546,167 +665,66 @@ function renderPlayerDetail(playerId) {
   playerDetailEl.innerHTML = html;
 }
 
-// ---- GitHub連携 ----
-
-function setGithubStatus(text, type) {
-  githubStatusEl.textContent = text;
-  githubStatusEl.className = `status-line${type ? ` ${type}` : ''}`;
-}
-
-let loadInFlight = false;
-
-async function handleGithubLoad() {
-  if (dirty && !confirm('未保存の変更があります。読み込むと破棄されますが、続けますか？')) return;
-  cancelPendingAutoSave();
-  loadInFlight = true;
-  try {
-    // 読み込み前のSHAを記録しておく（読み込み中に入った他端末の保存は次の自動更新で拾われる）
-    if (isEditMode()) {
-      lastSeenRemoteSha = await getBranchSha().catch(() => null);
-    }
-    await loadAllFromGitHub();
-    selectedParticipantIds = [];
-    clearDirty();
-    routeFromHash();
-    setGithubStatus('');
-  } catch (err) {
-    setGithubStatus(err.message, 'error');
-  } finally {
-    loadInFlight = false;
-  }
-}
-
-// ---- 自動保存 ----
-
-// 編集モードでは変更のたびに自動保存する。連続した操作（スコア入力→次の試合の確定など）を
-// 1回の保存にまとめるため、最後の変更から少し待ってから実行する。
-// 手動の「保存」ボタンは無いため、失敗時も次の変更を待たず自身で再試行する。
-const AUTO_SAVE_DEBOUNCE_MS = 2500;
-const AUTO_SAVE_RETRY_MS = 15 * 1000;
-let autoSaveTimer = null;
-let saveInFlight = false;
-let saveQueuedAgain = false;
-
-function scheduleAutoSave(delayMs = AUTO_SAVE_DEBOUNCE_MS) {
-  if (!isEditMode()) return;
-  clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(performSave, delayMs);
-}
-
-function cancelPendingAutoSave() {
-  clearTimeout(autoSaveTimer);
-  autoSaveTimer = null;
-}
-
-async function performSave() {
-  if (!githubConfig.token) return;
-  // 保存中に次の変更が来たら、終わってからもう一度保存する
-  if (saveInFlight) {
-    saveQueuedAgain = true;
-    return;
-  }
-  saveInFlight = true;
-  cancelPendingAutoSave();
-  setGithubStatus('自動保存中...', 'loading');
-  try {
-    const result = await saveAllToGitHub();
-    clearDirty();
-    // 自分の保存でブランチが進んだ。SHAをリセットし、次の自動更新周期に一度だけ
-    // 読み込み直させる（保存直後に他端末の保存が割り込んでいても取りこぼさない）。
-    lastSeenRemoteSha = null;
-    if (result.merged) {
-      // 他端末の変更を取り込んで保存したので、表示を最新の統合結果に更新する
-      routeFromHash();
-      setGithubStatus(`他の端末の変更と統合して保存しました（${formatTime(new Date())}）`, 'success');
-    } else {
-      setGithubStatus(`自動保存しました（${formatTime(new Date())}）`, 'success');
-    }
-    saveInFlight = false;
-    if (saveQueuedAgain) {
-      saveQueuedAgain = false;
-      scheduleAutoSave();
-    }
-  } catch (err) {
-    setGithubStatus(`${err.message}（自動的に再試行します）`, 'error');
-    saveInFlight = false;
-    saveQueuedAgain = false;
-    scheduleAutoSave(AUTO_SAVE_RETRY_MS);
-  }
-}
-
-// ---- 自動更新 ----
-
-// 閲覧モード: 観戦者が何もしなくても進行中の大会の最新結果が出るよう、10秒ごとに再取得する。
-// 編集モード: 10秒ごとにブランチの最新コミットSHAだけを軽く確認し、
-// 他端末の保存を検知したときだけ全体を読み込み直す（入力中は再描画で消えないよう見送る）。
-const AUTO_REFRESH_MS = 10 * 1000;
-let autoRefreshTimer = null;
-let autoRefreshInFlight = false;
-// 編集モードで最後に確認したブランチのコミットSHA。nullなら次の周期で必ず読み込み直す。
-let lastSeenRemoteSha = null;
+// ---- データの読み込みと自動更新 ----
 
 function formatTime(date) {
   return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 }
 
-// フォーム入力の最中か（再描画すると入力内容が飛ぶため、自動更新を見送る判定）
+let loadInFlight = false;
+let refreshQueued = false;
+
+async function refreshFromDb({ silent = false } = {}) {
+  // 読み込み中に更新通知が来たら、取りこぼさないよう終わってからもう一度読む
+  if (loadInFlight) {
+    refreshQueued = true;
+    return;
+  }
+  loadInFlight = true;
+  try {
+    await db.loadAll();
+    routeFromHash();
+    if (!silent) setStatus('');
+  } catch (err) {
+    setStatus(err.message, 'error');
+  } finally {
+    loadInFlight = false;
+    if (refreshQueued) {
+      refreshQueued = false;
+      await refreshFromDb({ silent: true });
+    }
+  }
+}
+
+// フォーム入力中は再描画で入力内容が消えるため、更新の反映を見送る。
 function isUserTyping() {
   const el = document.activeElement;
   if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return true;
-  // ブラケットの未確定スコアに入力済みの値が残っている間も上書きしない
   return [...document.querySelectorAll('.score-num-input')].some((i) => i.value !== '');
 }
 
-async function autoRefresh() {
-  if (autoRefreshInFlight || loadInFlight || saveInFlight || dirty || document.hidden) return;
-  autoRefreshInFlight = true;
-  try {
-    if (isEditMode()) {
-      if (isUserTyping()) return;
-      // 変化検知はリモートのコミットSHAの比較だけで行い、無駄な全体読み込みを避ける。
-      // SHAの記録は読み込み前に行う（読み込み中に入った保存は次の周期で拾われる安全側）。
-      const remoteSha = await getBranchSha();
-      if (remoteSha && remoteSha === lastSeenRemoteSha) return;
-      const before = JSON.stringify(state);
-      await loadAllFromGitHub();
-      lastSeenRemoteSha = remoteSha;
-      // 読み込み中に入力を始めていたら再描画を見送る（次の操作時に最新が反映される）
-      if (JSON.stringify(state) !== before && !isUserTyping()) routeFromHash();
-    } else {
-      const before = JSON.stringify(state);
-      await loadAllFromGitHub();
-      if (JSON.stringify(state) !== before) routeFromHash();
-    }
-  } catch {
-    // 一時的な通信エラーは無視し、次回の自動更新に任せる
-  } finally {
-    autoRefreshInFlight = false;
-  }
-}
-
-function startAutoRefresh() {
-  if (autoRefreshTimer) return;
-  autoRefreshTimer = setInterval(autoRefresh, AUTO_REFRESH_MS);
-}
-
-// タブを開き直したときは次の周期を待たずにすぐ最新化する
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) autoRefresh();
-});
-
 // ---- イベント配線 ----
 
-playerForm.addEventListener('submit', (e) => {
+// 運営による代理登録（アカウントを持たない選手を先に作っておく）
+playerForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const result = addPlayer(playerIdInput.value, playerNameInput.value);
-  if (!result.ok) {
-    alert(result.error);
+  const name = playerNameInput.value.trim();
+  if (!name) {
+    alert('表示名を入力してください。');
     return;
   }
+  const ok = await persist(async () => {
+    await db.createProxyPlayer({
+      currentName: name,
+      pastNames: [],
+      gameAccountId: playerIdInput.value.trim(),
+      mainCharacters: [],
+    });
+  }, '選手の登録');
+  if (!ok) return;
   playerIdInput.value = '';
   playerNameInput.value = '';
-  markDirty();
-  refreshPlayerUI();
+  await refreshFromDb();
 });
 
 participantSearchInput.addEventListener('input', () => {
@@ -722,8 +740,16 @@ playerSearchInput.addEventListener('input', () => {
 shuffleBtn.addEventListener('click', shuffleSelected);
 seedByRankingBtn.addEventListener('click', seedBySelectedRanking);
 
+// 参加者の集め方の切り替え（エントリー募集 / 運営が直接選ぶ）
+tournamentForm.addEventListener('change', (e) => {
+  if (e.target.name !== 'entry-mode') return;
+  const manual = e.target.value === 'manual';
+  manualParticipantsEl.hidden = !manual;
+  tournamentSubmitBtn.textContent = manual ? 'ブラケットを生成' : '大会を作成';
+});
+
 rankingPeriodSelect.addEventListener('change', () => {
-  if (isEditMode()) renderRankingPage();
+  if (isAdmin()) renderRankingPage();
 });
 
 rankingExportBtn.addEventListener('click', async () => {
@@ -745,7 +771,7 @@ rankingExportBtn.addEventListener('click', async () => {
   }
 });
 
-rankingPublishBtn.addEventListener('click', () => {
+rankingPublishBtn.addEventListener('click', async () => {
   const period = rankingPeriodSelect.value;
   const { periodMonths, rankings } = computeRankingsForPeriod(state, period);
 
@@ -753,31 +779,30 @@ rankingPublishBtn.addEventListener('click', () => {
     alert('この期間に確定した試合がまだないため、公開できません。');
     return;
   }
-  if (!confirm(`${PERIOD_LABELS[period]}のランキングを公開します。閲覧モードに反映されます。よろしいですか？`)) return;
+  if (!confirm(`${PERIOD_LABELS[period]}のランキングを公開します。閲覧者に反映されます。よろしいですか？`)) return;
 
-  // 前回公開時点の順位を各エントリに記録し、公開後もずっと「前回との差」が分かるようにする
-  const rankingsWithChange = withRankChange(rankings, state.publishedRanking?.rankings);
-
-  state.publishedRanking = {
+  // 前回公開時点の順位を各エントリに焼き込み、公開後もずっと「前回との差」が分かるようにする
+  const snapshot = {
     publishedAt: new Date().toISOString(),
     periodMonths,
-    rankings: rankingsWithChange,
+    rankings: withRankChange(rankings, state.publishedRanking?.rankings),
   };
-  markDirty();
 
-  // renderRankingPage() は編集モードでは常にライブプレビューを表示するが、
-  // それだと「公開した瞬間の前回比」がプレビュー基準（=公開したばかりの自分自身）と
-  // 比較されて全て「変動なし」に潰れてしまう。公開直後だけは、閲覧者が実際に見る
-  // スナップショット（正しい前回比バッジ入り）をそのまま表示する。
+  rankingPublishBtn.disabled = true;
+  const ok = await persist(() => db.publishRanking(snapshot), 'ランキングの公開');
+  rankingPublishBtn.disabled = false;
+  if (!ok) return;
+
+  state.publishedRanking = snapshot;
+
+  // renderRankingPage() は運営には常にライブプレビューを見せるが、それだと公開直後の
+  // 「前回比」がプレビュー自身との比較になって全て「変動なし」に潰れる。公開した直後だけは
+  // 閲覧者が実際に見るスナップショット（正しい前回比バッジ入り）をそのまま表示する。
   rankingPublishedStatusEl.textContent = publishedStatusLine();
-  renderRankingTable(
-    rankingContainer,
-    state.publishedRanking.rankings,
-    'この期間に確定した試合がまだないため、ランキングを計算できません。',
-  );
+  renderRankingTable(rankingContainer, snapshot.rankings, 'ランキングを計算できません。');
 });
 
-tournamentForm.addEventListener('submit', (e) => {
+tournamentForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const name = tournamentNameInput.value.trim();
@@ -785,29 +810,53 @@ tournamentForm.addEventListener('submit', (e) => {
     alert('大会名を入力してください。');
     return;
   }
-  if (selectedParticipantIds.length < 2) {
+
+  const manual = tournamentForm.elements['entry-mode'].value === 'manual';
+  if (manual && selectedParticipantIds.length < 2) {
     alert('参加者を2人以上選択してください。');
     return;
   }
 
+  const capacityRaw = tournamentCapacityInput.value.trim();
+  const capacity = capacityRaw === '' ? null : Number(capacityRaw);
+  if (capacity != null && (!Number.isInteger(capacity) || capacity < 2)) {
+    alert('定員は2以上の整数で入力してください。');
+    return;
+  }
+
   const tournament = {
-    id: generateId('t'),
+    id: newId(),
     name,
     date: tournamentDateInput.value || null,
     format: 'single_elim',
-    participantIds: [...selectedParticipantIds],
-    weight: null,
     rules: tournamentRulesInput.value.trim() || null,
+    weight: null,
+    capacity,
+    status: manual ? 'running' : 'recruiting',
+    createdBy: auth.player?.id ?? null,
+    participantIds: manual ? [...selectedParticipantIds] : [],
   };
-  state.tournaments.push(tournament);
-  state.brackets[tournament.id] = createBracket(tournament.id, selectedParticipantIds);
+
+  tournamentSubmitBtn.disabled = true;
+  const ok = await persist(async () => {
+    await db.createTournament(tournament);
+    if (manual) {
+      await db.replaceEntries(tournament.id, tournament.participantIds);
+      const bracket = createBracket(tournament.id, tournament.participantIds);
+      await db.saveBracket(tournament.id, bracket);
+    }
+  }, '大会の作成');
+  tournamentSubmitBtn.disabled = false;
+  if (!ok) return;
 
   tournamentNameInput.value = '';
   tournamentDateInput.value = '';
+  tournamentCapacityInput.value = '';
   tournamentRulesInput.value = '';
   selectedParticipantIds = [];
-  markDirty();
-  location.hash = `#bracket/${encodeURIComponent(tournament.id)}`;
+
+  await refreshFromDb();
+  location.hash = manual ? `#bracket/${encodeURIComponent(tournament.id)}` : '#recruit';
 });
 
 tournamentEditBtn.addEventListener('click', () => {
@@ -823,7 +872,7 @@ tournamentEditCancelBtn.addEventListener('click', () => {
   tournamentEditForm.hidden = true;
 });
 
-tournamentEditForm.addEventListener('submit', (e) => {
+tournamentEditForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const result = updateTournament(currentBracketTournamentId, {
     name: tournamentEditNameInput.value,
@@ -834,21 +883,20 @@ tournamentEditForm.addEventListener('submit', (e) => {
     alert(result.error);
     return;
   }
-  markDirty();
+  const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
+  await persist(() => db.saveTournament(tournament), '大会情報の保存');
   renderBracketPage(currentBracketTournamentId);
 });
 
-tournamentDeleteBtn.addEventListener('click', () => {
+tournamentDeleteBtn.addEventListener('click', async () => {
   const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
   if (!tournament) return;
   if (!confirm(`大会「${tournament.name}」と、その試合結果をすべて削除します。よろしいですか？`)) return;
-  const result = deleteTournamentData(currentBracketTournamentId);
-  if (!result.ok) {
-    alert(result.error);
-    return;
-  }
-  markTournamentDeleted(currentBracketTournamentId);
-  markDirty();
+
+  // ブラケット・試合・エントリーは外部キーのカスケードで一緒に消える
+  const ok = await persist(() => db.deleteTournament(currentBracketTournamentId), '大会の削除');
+  if (!ok) return;
+  await refreshFromDb();
   location.hash = '#history';
 });
 
@@ -856,60 +904,129 @@ playerBackBtn.addEventListener('click', () => {
   history.back();
 });
 
-// 編集モードへの切り替え（トークン入力ダイアログ）と閲覧モードへの復帰
-modeToggleBtn.addEventListener('click', () => {
-  if (isEditMode()) {
-    if (dirty && !confirm('未保存の変更があります。破棄して閲覧モードに戻りますか？')) return;
-    cancelPendingAutoSave();
-    githubConfig.token = '';
-    githubConfig.rememberToken = false;
-    saveConfigToStorage();
-    clearDirty();
-    applyModeUI();
-    routeFromHash();
-    handleGithubLoad();
-    return;
+// ---- ログイン ----
+
+function openLoginDialog() {
+  emailInput.value = '';
+  passwordInput.value = '';
+  loginErrorEl.textContent = '';
+  loginDialog.showModal();
+}
+
+loginBtn.addEventListener('click', openLoginDialog);
+loginCancelBtn.addEventListener('click', () => loginDialog.close());
+
+// 募集ページの「ログインしてエントリー」など、他モジュールからの要求
+document.addEventListener('request-login', openLoginDialog);
+
+googleLoginBtn.addEventListener('click', async () => {
+  try {
+    await signInWithProvider('google');
+  } catch (err) {
+    loginErrorEl.textContent = err.message;
   }
-  tokenInput.value = '';
-  tokenRememberInput.checked = false;
-  tokenErrorEl.textContent = '';
-  tokenDialog.showModal();
 });
 
-tokenCancelBtn.addEventListener('click', () => {
-  tokenDialog.close();
+discordLoginBtn.addEventListener('click', async () => {
+  try {
+    await signInWithProvider('discord');
+  } catch (err) {
+    loginErrorEl.textContent = err.message;
+  }
 });
 
-tokenForm.addEventListener('submit', async (e) => {
+emailForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  tokenSubmitBtn.disabled = true;
-  tokenErrorEl.textContent = 'トークンを確認しています...';
+  emailLoginBtn.disabled = true;
+  loginErrorEl.textContent = '';
+  try {
+    await signInWithEmail(emailInput.value.trim(), passwordInput.value);
+    loginDialog.close();
+  } catch (err) {
+    loginErrorEl.textContent = err.message;
+  } finally {
+    emailLoginBtn.disabled = false;
+  }
+});
 
-  githubConfig.token = tokenInput.value.trim();
-  const check = await verifyWriteAccess();
-  tokenSubmitBtn.disabled = false;
-
-  if (!check.ok) {
-    githubConfig.token = '';
-    tokenErrorEl.textContent = check.error;
+signupBtn.addEventListener('click', async () => {
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+  if (!email || !password) {
+    loginErrorEl.textContent = 'メールアドレスとパスワードを入力してください。';
     return;
   }
+  signupBtn.disabled = true;
+  loginErrorEl.textContent = '';
+  try {
+    const { needsEmailConfirmation } = await signUpWithEmail(email, password);
+    if (needsEmailConfirmation) {
+      loginErrorEl.className = 'status-line success';
+      loginErrorEl.textContent = '確認メールを送りました。メール内のリンクを開くとログインできます。';
+    } else {
+      loginDialog.close();
+    }
+  } catch (err) {
+    loginErrorEl.className = 'status-line error';
+    loginErrorEl.textContent = err.message;
+  } finally {
+    signupBtn.disabled = false;
+  }
+});
 
-  githubConfig.rememberToken = tokenRememberInput.checked;
-  saveConfigToStorage();
-  tokenDialog.close();
-  applyModeUI();
-  routeFromHash();
-  await handleGithubLoad();
-  setGithubStatus('編集モードに切り替えました（変更は自動で保存されます）。', 'success');
+logoutBtn.addEventListener('click', async () => {
+  try {
+    await signOut();
+    location.hash = '#home';
+  } catch (err) {
+    setStatus(err.message, 'error');
+  }
 });
 
 window.addEventListener('hashchange', routeFromHash);
 
+// タブを開き直したときは最新を取り込む（Realtimeが届かない間に進んでいることがある）
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !isUserTyping()) refreshFromDb({ silent: true });
+});
+
 // ---- 起動 ----
 
-loadConfigFromStorage();
-applyModeUI();
-routeFromHash();
-handleGithubLoad();
-startAutoRefresh();
+async function start() {
+  // 接続先が未設定のまま動かすと、原因の分かりにくいネットワークエラーが出続けるので
+  // 先に止めて、何をすればよいかを画面に出す（supabase/SETUP.md の手順3）。
+  if (!isConfigured()) {
+    setStatus('Supabaseの接続先が未設定です。supabase/SETUP.md の手順3にしたがって js/supabaseClient.js を設定してください。', 'error');
+    loginBtn.disabled = true;
+    return;
+  }
+
+  // ログイン状態が変わるたびに、UIの出し分けと表示中ページの描画をやり直す
+  await initAuth(() => {
+    applyAuthUI();
+    resetPlayerEditing();
+    routeFromHash();
+
+    // ログインしたのに選手行が無い＝新規登録がまだ。そのまま登録フォームへ案内する。
+    if (needsOnboarding() && parseHash().page !== 'profile') {
+      location.hash = '#profile';
+    }
+  });
+
+  await refreshFromDb();
+
+  // 10秒ポーリングの置き換え。誰かが勝敗を入力した瞬間に全員の画面へ届く。
+  db.subscribeToChanges(() => {
+    if (isUserTyping()) return;
+    refreshFromDb({ silent: true });
+  });
+
+  // 保険。WebSocketが切れたまま再接続できていない間も、進行中の大会が
+  // 古いまま放置されないようにする（通常はRealtimeが先に届くので空振りする）。
+  setInterval(() => {
+    if (document.hidden || isUserTyping()) return;
+    refreshFromDb({ silent: true });
+  }, 60 * 1000);
+}
+
+start();

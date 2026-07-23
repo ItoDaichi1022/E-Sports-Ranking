@@ -1,0 +1,10 @@
+{
+  "name": "e-sports-ranking",
+  "private": true,
+  "type": "module",
+  "description": "トーナメント運営＆ランキングサイト。ブラウザはこのファイルを使わないが、scripts/ をNodeでESMとして実行するために必要。",
+  "scripts": {
+    "migrate": "node scripts/migrate.mjs",
+    "verify-migration": "node scripts/verify-migration.mjs"
+  }
+}

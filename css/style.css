@@ -783,3 +783,151 @@ dialog h3 { margin-top: 0; }
 #ranking-published-status {
   margin-top: -0.5rem;
 }
+
+/* ---- アカウント・ログイン ---- */
+
+.account-label {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+/* リンクをボタンと同じ見た目に揃える（マイページなど） */
+.as-link {
+  display: inline-block;
+  text-decoration: none;
+  line-height: normal;
+}
+
+.oauth-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.oauth-buttons button {
+  width: 100%;
+}
+
+.divider-note {
+  margin: 0.75rem 0 0.5rem;
+  font-size: 0.8rem;
+  text-align: center;
+  opacity: 0.7;
+}
+
+#email-form input {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+/* ---- プロフィール ---- */
+
+.profile-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.field-note {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.profile-grid {
+  margin-bottom: 0.75rem;
+}
+
+.player-bio {
+  margin: 0.5rem 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  background: var(--bg-panel);
+  white-space: pre-wrap;
+}
+
+.sns-links a {
+  margin-right: 0.75rem;
+}
+
+.account-badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: var(--bg-panel);
+  opacity: 0.8;
+}
+
+.account-badge.linked {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.muted { opacity: 0.5; }
+
+/* ---- 募集とエントリー ---- */
+
+.entry-mode {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.entry-mode legend {
+  padding: 0 0.4rem;
+  font-size: 0.85rem;
+}
+
+.recruit-card {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.recruit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.recruit-header h3 {
+  margin: 0 0 0.2rem;
+}
+
+.recruit-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.status-chip {
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: var(--bg-panel);
+}
+
+.status-chip.status-recruiting {
+  color: #15803d;
+  font-weight: bold;
+}
+
+.entrant-list {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
+.entrant-chip {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  background: var(--bg-panel);
+}

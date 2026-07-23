@@ -1,18 +1,22 @@
 // アプリ全体で共有する in-memory データストア。
-// スキーマは doc/design.md の players.json / tournaments.json / matches.json に準拠する。
+// スキーマは doc/design.md のデータベース設計に準拠する。DBのsnake_caseとの変換は
+// js/db.js が境界で行うため、ここから下の計算・描画ロジックはストレージを意識しない。
 export const state = {
-  players: [],       // { id, currentName, pastNames: [] }
-  tournaments: [],    // { id, name, date, format, participantIds: [], weight, rules }
-  matches: [],        // { id, tournamentId, winnerId, loserId, score, round }（保存時は大会ごとに matches/{tid}.json へ分割）
+  // { id, currentName, pastNames: [], gameAccountId, bio, mainCharacters: [],
+  //   snsX, snsTwitch, snsYoutube, role, userId }
+  players: [],
+  // { id, name, date, format, participantIds: [], weight, rules, status, capacity }
+  tournaments: [],
+  matches: [],        // { id, tournamentId, winnerId, loserId, score, round }
   brackets: {},       // tournamentId -> bracket object (js/bracket.js が構造を定義)
   publishedRanking: null, // { publishedAt, periodMonths, rankings: [...] } | null（未公開）
 };
 
-let idCounter = 0;
-
-export function generateId(prefix) {
-  idCounter += 1;
-  return `${prefix}-${Date.now().toString(36)}-${idCounter}`;
+// 新しいレコードのID。DB側の主キーがuuidなので、クライアントで作るIDもuuidに揃える。
+// crypto.randomUUID はセキュアコンテキスト（HTTPS / localhost）でのみ使えるが、
+// GitHub Pagesは常にHTTPSなので問題ない。
+export function newId() {
+  return crypto.randomUUID();
 }
 
 // プレイヤーIDから表示用の現在名を取得する。BYE(null)は呼び出し側で扱う。

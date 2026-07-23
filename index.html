@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。CSS/JSを変更してデプロイするときは数字を上げる -->
-<link rel="stylesheet" href="css/style.css?v=11">
+<link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
 <header>
@@ -13,42 +13,54 @@
     <h1><a href="#home">トーナメント運営ツール</a></h1>
     <nav id="main-nav">
       <a href="#home" data-page="home">ホーム</a>
+      <a href="#recruit" data-page="recruit">募集中</a>
       <a href="#tournament" data-page="tournament" id="nav-tournament-link">大会作成</a>
       <a href="#history" data-page="history">大会履歴</a>
       <a href="#players" data-page="players">選手</a>
-      <a href="#ranking" data-page="ranking" id="nav-ranking-link">ランキング</a>
+      <a href="#ranking" data-page="ranking">ランキング</a>
     </nav>
   </div>
   <div class="sync-bar">
-    <span id="dirty-badge" class="dirty-badge" hidden>保存中...</span>
-    <button type="button" id="mode-toggle-btn" class="btn-secondary">編集モード</button>
-    <span id="github-status" class="status-line"></span>
+    <span id="account-label" class="account-label"></span>
+    <a href="#profile" id="profile-link" class="btn-secondary as-link" hidden>マイページ</a>
+    <button type="button" id="login-btn">ログイン</button>
+    <button type="button" id="logout-btn" class="btn-secondary" hidden>ログアウト</button>
+    <span id="app-status" class="status-line"></span>
   </div>
 </header>
 
-<dialog id="token-dialog">
-  <h3>編集モードに切り替え</h3>
-  <p class="note">運営用の書き込みトークンを入力してください。</p>
-  <form id="token-form">
-    <input type="password" id="token-input" placeholder="ghp_..." autocomplete="off" required>
-    <label class="checkbox-inline">
-      <input type="checkbox" id="token-remember-input">
-      トークンをこの端末に保存する（共有PCでは使わないでください）
-    </label>
-    <p id="token-error" class="status-line error"></p>
+<dialog id="login-dialog">
+  <h3>ログイン</h3>
+  <p class="note">ログインすると自分の選手プロフィールを編集し、大会にエントリーできます。</p>
+
+  <div class="oauth-buttons">
+    <button type="button" id="google-login-btn" class="btn-secondary">Googleでログイン</button>
+    <button type="button" id="discord-login-btn" class="btn-secondary">Discordでログイン</button>
+  </div>
+
+  <p class="divider-note">またはメールアドレスで</p>
+
+  <form id="email-form">
+    <input type="email" id="email-input" placeholder="メールアドレス" autocomplete="email" required>
+    <input type="password" id="password-input" placeholder="パスワード（6文字以上）" autocomplete="current-password" required>
+    <p id="login-error" class="status-line error"></p>
     <div class="dialog-actions">
-      <button type="button" id="token-cancel-btn" class="btn-secondary">キャンセル</button>
-      <button type="submit" id="token-submit-btn">切り替え</button>
+      <button type="button" id="signup-btn" class="btn-secondary">新規登録</button>
+      <button type="submit" id="email-login-btn">ログイン</button>
     </div>
   </form>
+
+  <div class="dialog-actions">
+    <button type="button" id="login-cancel-btn" class="btn-secondary">閉じる</button>
+  </div>
 </dialog>
 
 <main>
   <section id="view-home" class="view">
     <div class="home-cards">
-      <a class="home-card" href="#tournament" id="home-card-tournament">
-        <h2>大会作成</h2>
-        <p>参加者とシードを決めてブラケットを生成します。</p>
+      <a class="home-card" href="#recruit">
+        <h2>募集中の大会</h2>
+        <p>エントリー受付中の大会を確認して参加します。</p>
       </a>
       <a class="home-card" href="#history">
         <h2>大会履歴</h2>
@@ -58,30 +70,36 @@
         <h2>選手</h2>
         <p>選手の一覧と個人戦績を確認します。</p>
       </a>
-      <a class="home-card" href="#ranking" id="home-card-ranking">
+      <a class="home-card" href="#ranking">
         <h2>ランキング</h2>
         <p>選手の順位を表示します。</p>
+      </a>
+      <a class="home-card" href="#tournament" id="home-card-tournament">
+        <h2>大会作成</h2>
+        <p>大会を作って参加者を募集します。</p>
+      </a>
+      <a class="home-card" href="#profile" id="home-card-profile">
+        <h2>マイページ</h2>
+        <p>自分の選手プロフィールを編集します。</p>
       </a>
     </div>
   </section>
 
+  <section id="view-recruit" class="view" hidden>
+    <h2>募集中の大会</h2>
+    <p class="note">「エントリー」を押すと参加登録されます。募集中はいつでも取り消せます。</p>
+    <div id="recruit-list"></div>
+  </section>
+
+  <section id="view-profile" class="view" hidden>
+    <h2 id="profile-title">マイページ</h2>
+    <p class="note" id="profile-note"></p>
+    <div id="profile-form-container"></div>
+    <div id="profile-links"></div>
+  </section>
+
   <section id="view-tournament" class="view" hidden>
     <h2>大会作成</h2>
-    <div class="setup-columns">
-      <div class="setup-column">
-        <h3>参加者を選択</h3>
-        <input type="text" id="participant-search-input" placeholder="選手を検索（ID・表示名）">
-        <div id="participant-checkboxes" class="scroll-box"></div>
-      </div>
-      <div class="setup-column">
-        <h3>シード順（上が1位シード）<span id="selected-count" class="selected-count"></span></h3>
-        <div class="seed-actions">
-          <button type="button" id="shuffle-btn" class="btn-secondary">ランダムに並び替え</button>
-          <button type="button" id="seed-by-ranking-btn" class="btn-secondary">ランキング順に並び替え</button>
-        </div>
-        <ol id="selected-participant-list" class="scroll-box"></ol>
-      </div>
-    </div>
 
     <form id="tournament-form" class="inline-form">
       <label>
@@ -92,13 +110,48 @@
         開催日
         <input type="date" id="tournament-date-input">
       </label>
+      <label>
+        定員（任意・空欄なら無制限）
+        <input type="number" id="tournament-capacity-input" min="2" placeholder="例: 32">
+      </label>
       <label class="rules-field">
         ルール（任意）
         <textarea id="tournament-rules-input" rows="4" placeholder="例: 3本先取、キャラ1人縛りなし、持ちキャラ変更は大会中1回まで"></textarea>
       </label>
-      <button type="submit">ブラケット生成</button>
+
+      <fieldset class="entry-mode">
+        <legend>参加者の集め方</legend>
+        <label class="checkbox-inline">
+          <input type="radio" name="entry-mode" value="recruit" checked>
+          エントリーを募集する（選手が自分で参加登録）
+        </label>
+        <label class="checkbox-inline">
+          <input type="radio" name="entry-mode" value="manual">
+          運営が参加者を直接選ぶ
+        </label>
+      </fieldset>
+
+      <div id="manual-participants" hidden>
+        <div class="setup-columns">
+          <div class="setup-column">
+            <h3>参加者を選択</h3>
+            <input type="text" id="participant-search-input" placeholder="選手を検索（ID・表示名）">
+            <div id="participant-checkboxes" class="scroll-box"></div>
+          </div>
+          <div class="setup-column">
+            <h3>シード順（上が1位シード）<span id="selected-count" class="selected-count"></span></h3>
+            <div class="seed-actions">
+              <button type="button" id="shuffle-btn" class="btn-secondary">ランダムに並び替え</button>
+              <button type="button" id="seed-by-ranking-btn" class="btn-secondary">ランキング順に並び替え</button>
+            </div>
+            <ol id="selected-participant-list" class="scroll-box"></ol>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" id="tournament-submit-btn">大会を作成</button>
     </form>
-    <p class="note">生成すると、その大会のブラケット画面に移動します。ルールは大会ページの下部に表示されます。</p>
+    <p class="note">エントリー制の場合、作成後は「募集中」ページから募集を開始し、締め切るとその時点の戦績でシードが決まります。</p>
   </section>
 
   <section id="view-history" class="view" hidden>
@@ -144,14 +197,17 @@
     <form id="player-form" class="inline-form">
       <label>
         ゲームアカウントID
-        <input type="text" id="player-id-input" placeholder="例: SW-1234-5678-9012" required>
+        <input type="text" id="player-id-input" placeholder="例: SW-1234-5678-9012">
       </label>
       <label>
         表示名
         <input type="text" id="player-name-input" placeholder="例: Gyu" required>
       </label>
-      <button type="submit">登録</button>
+      <button type="submit">代理登録</button>
     </form>
+    <p class="note" id="player-form-note" hidden>
+      アカウントを持たない選手を運営が代理で登録します。本人がログインしたら、選手一覧から本人のアカウントに対応付けてください。
+    </p>
     <p class="note">表示名をクリックすると個人戦績が見られます。</p>
     <input type="text" id="player-search-input" placeholder="選手を検索（ID・表示名・過去名）">
     <div id="player-list"></div>
@@ -181,13 +237,16 @@
     <p id="ranking-published-status" class="meta-line"></p>
     <div id="ranking-container"></div>
     <p class="note" id="ranking-editor-note" hidden>
-      プレビューは選択した期間の試合結果から即時に計算されます。「公開する」を押すまで閲覧モードには反映されません。
+      プレビューは選択した期間の試合結果から即時に計算されます。「公開する」を押すまで閲覧者には反映されません。
       先に「画像を書き出す」で各順位の画像を用意し、動画で発表を終えてから「公開する」を押してください。
     </p>
   </section>
 
 </main>
 
-<script type="module" src="js/app.js?v=24"></script>
+<!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
+     モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
+<script src="js/vendor/supabase.js"></script>
+<script type="module" src="js/app.js?v=25"></script>
 </body>
 </html>

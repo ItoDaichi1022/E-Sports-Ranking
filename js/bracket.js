@@ -1,4 +1,4 @@
-import { state, generateId } from './state.js';
+import { state, newId } from './state.js';
 
 // 次の2のべき乗を返す（n=1の場合も2を返す：1人トーナメントは成立しないため呼び出し側で弾く）
 export function nextPowerOfTwo(n) {
@@ -42,7 +42,7 @@ function findMatchById(bracket, matchId) {
 
 function makeEmptyMatch(round) {
   return {
-    id: generateId('m'),
+    id: newId(),
     round,
     player1Id: null,
     player2Id: null,
@@ -209,16 +209,6 @@ export function updateTournament(tournamentId, { name, date, rules }) {
   tournament.name = newName;
   tournament.date = date || null;
   tournament.rules = (rules ?? '').trim() || null;
-  return { ok: true };
-}
-
-// 大会そのものを削除し、関連する試合記録とブラケットも取り除く。
-export function deleteTournamentData(tournamentId) {
-  const idx = state.tournaments.findIndex((t) => t.id === tournamentId);
-  if (idx === -1) return { ok: false, error: '対象の大会が見つかりません。' };
-  state.tournaments.splice(idx, 1);
-  delete state.brackets[tournamentId];
-  state.matches = state.matches.filter((m) => m.tournamentId !== tournamentId);
   return { ok: true };
 }
 
