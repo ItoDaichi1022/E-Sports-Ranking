@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>トーナメント運営ツール</title>
-<!-- ?v= はキャッシュ更新用。CSS/JSを変更してデプロイするときは数字を上げる -->
-<link rel="stylesheet" href="css/style.css?v=12">
+<!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
+     すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
+<link rel="stylesheet" href="css/style.css?v=26">
 </head>
 <body>
 <header>
@@ -246,7 +247,35 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js"></script>
-<script type="module" src="js/app.js?v=25"></script>
+<script src="js/vendor/supabase.js?v=26"></script>
+
+<!-- キャッシュ更新用の版数を1か所にまとめる。
+     app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
+     変わらないため、ブラウザは古いコピーを使い続ける。その結果「新しいapp.js＋古いstate.js」
+     のようなちぐはぐな組み合わせになり、存在しないexportを参照して起動に失敗する。
+     インポートマップは import 文の解決先を差し替えられるので、ここを書き換えるだけで
+     全モジュールが一斉に新しいURLになる。
+     CSS/JSを変更してデプロイするときは、下の ?v= の数字をまとめて上げること。 -->
+<script type="importmap">
+{
+  "imports": {
+    "./js/auth.js":           "./js/auth.js?v=26",
+    "./js/bracket.js":        "./js/bracket.js?v=26",
+    "./js/bracketView.js":    "./js/bracketView.js?v=26",
+    "./js/db.js":             "./js/db.js?v=26",
+    "./js/entries.js":        "./js/entries.js?v=26",
+    "./js/playerStats.js":    "./js/playerStats.js?v=26",
+    "./js/players.js":        "./js/players.js?v=26",
+    "./js/profile.js":        "./js/profile.js?v=26",
+    "./js/ranking.js":        "./js/ranking.js?v=26",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=26",
+    "./js/rankingView.js":    "./js/rankingView.js?v=26",
+    "./js/state.js":          "./js/state.js?v=26",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=26",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=26"
+  }
+}
+</script>
+<script type="module" src="js/app.js?v=26"></script>
 </body>
 </html>

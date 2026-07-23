@@ -5,6 +5,7 @@
   "description": "トーナメント運営＆ランキングサイト。ブラウザはこのファイルを使わないが、scripts/ をNodeでESMとして実行するために必要。",
   "scripts": {
     "migrate": "node scripts/migrate.mjs",
-    "verify-migration": "node scripts/verify-migration.mjs"
+    "verify-migration": "node scripts/verify-migration.mjs",
+    "check-cache-version": "node scripts/check-cache-version.mjs"
   }
 }
