@@ -31,26 +31,22 @@ export function canRemovePlayer(id) {
   return { ok: true };
 }
 
-let editingPlayerId = null;
-
-export function resetPlayerEditing() {
-  editingPlayerId = null;
-}
-
 // 選手一覧を描画する。
+//
+// 表示名の編集はこの表には置かない。自分の行は名前をクリックして選手ページ経由で、
+// 他人の行は運営が選手ページから編集する。一覧は「見る」ことに専念させる。
+//
 // options:
-//   canEdit(player)  -> その行の表示名を編集できるか（本人 or 運営）
+//   ownPlayerId      -> ログイン中の本人の選手ID。その行を目立たせる
 //   isAdmin          -> 削除・アカウント統合などの運営操作を出すか
 //   filterQuery      -> ID・表示名・過去名の部分一致で絞り込む
-//   onSave(player)   -> 編集を保存するとき（DBへの書き込みは呼び出し側）
 //   onDelete(player) -> 削除するとき
 //   onMerge(source, target) -> 代理登録された行に本人のアカウントを統合するとき
 export function renderPlayerTable(containerEl, options = {}) {
   const {
-    canEdit = () => false,
+    ownPlayerId = null,
     isAdmin = false,
     filterQuery = '',
-    onSave = async () => {},
     onDelete = async () => {},
     onMerge = async () => {},
   } = options;
@@ -75,7 +71,7 @@ export function renderPlayerTable(containerEl, options = {}) {
     return;
   }
 
-  const anyActions = visiblePlayers.some((p) => canEdit(p)) || isAdmin;
+  const anyActions = isAdmin;
 
   const table = document.createElement('table');
   table.className = 'player-table';
@@ -87,8 +83,6 @@ export function renderPlayerTable(containerEl, options = {}) {
     </thead>
   `;
   const tbody = document.createElement('tbody');
-
-  const rerender = () => renderPlayerTable(containerEl, options);
 
   visiblePlayers.forEach((p) => {
     const tr = document.createElement('tr');
@@ -107,50 +101,8 @@ export function renderPlayerTable(containerEl, options = {}) {
       ? '<span class="account-badge linked">本人</span>'
       : '<span class="account-badge">代理登録</span>';
 
-    if (editingPlayerId === p.id && canEdit(p)) {
-      const nameTd = document.createElement('td');
-      const nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.value = p.currentName;
-      nameTd.appendChild(nameInput);
-
-      const actionTd = document.createElement('td');
-      actionTd.className = 'row-actions';
-
-      const saveBtn = document.createElement('button');
-      saveBtn.type = 'button';
-      saveBtn.textContent = '保存';
-      saveBtn.addEventListener('click', async () => {
-        const result = updatePlayer(p.id, { currentName: nameInput.value });
-        if (!result.ok) {
-          alert(result.error);
-          return;
-        }
-        saveBtn.disabled = true;
-        try {
-          await onSave(result.player);
-          editingPlayerId = null;
-          rerender();
-        } catch (err) {
-          alert(err.message);
-          saveBtn.disabled = false;
-        }
-      });
-
-      const cancelBtn = document.createElement('button');
-      cancelBtn.type = 'button';
-      cancelBtn.className = 'btn-secondary';
-      cancelBtn.textContent = 'キャンセル';
-      cancelBtn.addEventListener('click', () => {
-        editingPlayerId = null;
-        rerender();
-      });
-
-      actionTd.append(saveBtn, cancelBtn);
-      tr.append(nameTd, idTd, pastTd, accountTd, actionTd);
-      tbody.appendChild(tr);
-      return;
-    }
+    // 自分の行はひと目で分かるようにする
+    if (ownPlayerId && p.id === ownPlayerId) tr.className = 'own-row';
 
     const nameTd = document.createElement('td');
     const nameCell = document.createElement('div');
@@ -160,6 +112,12 @@ export function renderPlayerTable(containerEl, options = {}) {
     link.href = `#player/${encodeURIComponent(p.id)}`;
     link.textContent = p.currentName;
     nameCell.appendChild(link);
+    if (ownPlayerId && p.id === ownPlayerId) {
+      const you = document.createElement('span');
+      you.className = 'you-badge';
+      you.textContent = 'あなた';
+      nameCell.appendChild(you);
+    }
     nameTd.appendChild(nameCell);
 
     tr.append(nameTd, idTd, pastTd, accountTd);
@@ -167,18 +125,6 @@ export function renderPlayerTable(containerEl, options = {}) {
     if (anyActions) {
       const actionTd = document.createElement('td');
       actionTd.className = 'row-actions';
-
-      if (canEdit(p)) {
-        const editBtn = document.createElement('button');
-        editBtn.type = 'button';
-        editBtn.className = 'btn-secondary';
-        editBtn.textContent = '編集';
-        editBtn.addEventListener('click', () => {
-          editingPlayerId = p.id;
-          rerender();
-        });
-        actionTd.appendChild(editBtn);
-      }
 
       // 代理登録された行に、本人が自分で作ったアカウントを統合する（移行してきた選手の初回だけ）。
       if (isAdmin && !p.userId) {

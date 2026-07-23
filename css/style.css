@@ -1100,3 +1100,32 @@ dialog h3 { margin-top: 0; }
 .standings-table .rank-cell {
   width: 4rem;
 }
+
+/* ---- 自分の行の強調 ---- */
+
+/* ランキングや選手一覧で、自分がどこにいるか一目で分かるようにする。
+   色だけに頼らず「あなた」バッジも併記する（色覚特性や白黒印刷でも伝わるように）。 */
+tr.own-row > td {
+  background: rgba(43, 108, 176, 0.12);
+  font-weight: bold;
+}
+
+tr.own-row > td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+tr.own-row:hover > td {
+  background: rgba(43, 108, 176, 0.2);
+}
+
+.you-badge {
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: bold;
+  vertical-align: middle;
+  white-space: nowrap;
+}

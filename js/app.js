@@ -1,5 +1,5 @@
 import { state, newId, getPlayerName } from './state.js';
-import { renderPlayerTable, resetPlayerEditing } from './players.js';
+import { renderPlayerTable, updatePlayer } from './players.js';
 import { escapeHtml, avatarHtml } from './util.js';
 import {
   createBracket, updateTournament, getChampionId, allMatchesDecided, finalStandings,
@@ -110,13 +110,6 @@ const signupBtn = $('signup-btn');
 const googleLoginBtn = $('google-login-btn');
 const discordLoginBtn = $('discord-login-btn');
 const loginCancelBtn = $('login-cancel-btn');
-
-// ---- 権限 ----
-
-// 運営は全選手を、一般ユーザーは自分の行だけ編集できる。
-function canEditPlayer(player) {
-  return isAdmin() || (auth.player != null && auth.player.id === player.id);
-}
 
 // メッセージが無いときは行ごと隠す。空のまま置いておくとヘッダーが
 // 常に2段になり、上段が中途半端に見えるため。
@@ -235,13 +228,9 @@ function routeFromHash() {
 
 function refreshPlayerUI() {
   renderPlayerTable(playerListEl, {
-    canEdit: canEditPlayer,
+    ownPlayerId: auth.player?.id ?? null,
     isAdmin: isAdmin(),
     filterQuery: playerSearchQuery,
-    onSave: async (player) => {
-      await db.savePlayer(player);
-      if (auth.player?.id === player.id) await reloadOwnPlayer();
-    },
     onDelete: async (player) => {
       await db.deletePlayer(player.id);
       selectedParticipantIds = selectedParticipantIds.filter((id) => id !== player.id);
@@ -693,10 +682,14 @@ function renderResultSection(tournament) {
   const rows = standings.map((s) => {
     const player = state.players.find((p) => p.id === s.playerId);
     const name = player ? player.currentName : s.playerId;
+    const isOwn = auth.player?.id === s.playerId;
     return `
-      <tr class="${s.rank <= 3 ? `rank-${s.rank}` : ''}">
+      <tr class="${s.rank <= 3 ? `rank-${s.rank}` : ''}${isOwn ? ' own-row' : ''}">
         <td class="rank-cell">${s.rank}</td>
-        <td><a href="#player/${encodeURIComponent(s.playerId)}">${escapeHtml(name)}</a></td>
+        <td>
+          <a href="#player/${encodeURIComponent(s.playerId)}">${escapeHtml(name)}</a>
+          ${isOwn ? '<span class="you-badge">あなた</span>' : ''}
+        </td>
       </tr>
     `;
   }).join('');
@@ -759,12 +752,18 @@ function renderRankingPage() {
   if (isAdmin()) {
     const { rankings: preview } = computeRankingsForPeriod(state, rankingPeriodSelect.value);
     const previewWithChange = withRankChange(preview, state.publishedRanking?.rankings);
-    renderRankingTable(rankingContainer, previewWithChange, 'この期間に確定した試合がまだないため、ランキングを計算できません。');
+    renderRankingTable(
+      rankingContainer,
+      previewWithChange,
+      'この期間に確定した試合がまだないため、ランキングを計算できません。',
+      auth.player?.id ?? null,
+    );
   } else {
     renderRankingTable(
       rankingContainer,
       state.publishedRanking?.rankings ?? [],
       'まだランキングが公開されていません。',
+      auth.player?.id ?? null,
     );
   }
 }
@@ -799,6 +798,7 @@ function renderPlayerDetail(playerId) {
           <h2>${escapeHtml(player.currentName)}</h2>
           ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.join(', '))}</p>` : ''}
           ${isOwn ? '<p class="meta-line"><a href="#profile">プロフィールを編集する</a></p>' : ''}
+          ${!isOwn && isAdmin() ? '<p class="meta-line"><button type="button" class="btn-secondary admin-rename-btn">表示名を変更</button></p>' : ''}
         </div>
       </div>
     </div>
@@ -862,6 +862,26 @@ function renderPlayerDetail(playerId) {
   }
 
   playerDetailEl.innerHTML = html;
+
+  // 表示名の変更。選手一覧の表からは外したので、運営はここから直す。
+  // 代理登録された選手（本人のアカウントが無い人）を直せる唯一の経路でもある。
+  const renameBtn = playerDetailEl.querySelector('.admin-rename-btn');
+  if (renameBtn) {
+    renameBtn.addEventListener('click', async () => {
+      const input = prompt(`「${player.currentName}」の新しい表示名を入力してください。`, player.currentName);
+      if (input === null) return;
+
+      const result = updatePlayer(player.id, { currentName: input });
+      if (!result.ok) {
+        alert(result.error);
+        return;
+      }
+      renameBtn.disabled = true;
+      const ok = await persist(() => db.savePlayer(result.player), '表示名の変更');
+      if (ok) await refreshFromDb();
+      else renameBtn.disabled = false;
+    });
+  }
 }
 
 // ---- データの読み込みと自動更新 ----
@@ -998,7 +1018,9 @@ rankingPublishBtn.addEventListener('click', async () => {
   // 「前回比」がプレビュー自身との比較になって全て「変動なし」に潰れる。公開した直後だけは
   // 閲覧者が実際に見るスナップショット（正しい前回比バッジ入り）をそのまま表示する。
   rankingPublishedStatusEl.textContent = publishedStatusLine();
-  renderRankingTable(rankingContainer, snapshot.rankings, 'ランキングを計算できません。');
+  renderRankingTable(
+    rankingContainer, snapshot.rankings, 'ランキングを計算できません。', auth.player?.id ?? null,
+  );
 });
 
 tournamentForm.addEventListener('submit', async (e) => {
@@ -1237,7 +1259,6 @@ async function start() {
   // ログイン状態が変わるたびに、UIの出し分けと表示中ページの描画をやり直す
   await initAuth(() => {
     applyAuthUI();
-    resetPlayerEditing();
     routeFromHash();
 
     // ログインしたのに選手行が無い＝新規登録がまだ。そのまま登録フォームへ案内する。

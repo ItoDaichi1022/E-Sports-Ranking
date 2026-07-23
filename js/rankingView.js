@@ -9,7 +9,8 @@ function rankChangeCell(r) {
 // rankings: computeRankings() や公開済みスナップショットが返す
 // [{ id, name, score, tournamentsPlayed, rank, previousRank? }] 形式の配列。
 // previousRank が付与されていれば、前回公開時からの順位変動バッジを表示する。
-export function renderRankingTable(containerEl, rankings, emptyMessage) {
+// ownPlayerId を渡すと、その選手の行を強調して自分の位置がすぐ分かるようにする。
+export function renderRankingTable(containerEl, rankings, emptyMessage, ownPlayerId = null) {
   containerEl.innerHTML = '';
 
   if (!rankings || rankings.length === 0) {
@@ -29,11 +30,17 @@ export function renderRankingTable(containerEl, rankings, emptyMessage) {
   const tbody = document.createElement('tbody');
 
   rankings.forEach((r) => {
+    const isOwn = ownPlayerId != null && r.id === ownPlayerId;
     const tr = document.createElement('tr');
-    tr.className = 'clickable-row' + (r.rank <= 3 ? ` rank-${r.rank}` : '');
+    tr.className = 'clickable-row'
+      + (r.rank <= 3 ? ` rank-${r.rank}` : '')
+      + (isOwn ? ' own-row' : '');
     tr.innerHTML = `
       <td class="rank-cell">${r.rank}</td>
-      <td><a href="#player/${encodeURIComponent(r.id)}">${escapeHtml(r.name)}</a></td>
+      <td>
+        <a href="#player/${encodeURIComponent(r.id)}">${escapeHtml(r.name)}</a>
+        ${isOwn ? '<span class="you-badge">あなた</span>' : ''}
+      </td>
       <td>${r.score.toFixed(1)}</td>
       ${showChange ? `<td class="rank-change-cell">${rankChangeCell(r)}</td>` : ''}
     `;
