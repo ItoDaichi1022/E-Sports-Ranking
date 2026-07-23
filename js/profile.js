@@ -44,6 +44,13 @@ const FIELDS = [
   { key: 'snsYoutube', label: 'YouTube', placeholder: '@handle または URL' },
 ];
 
+// フォームを作り直さずに、現在の入力内容だけを取り出せるようにしておく。
+// 背景の自動更新でフォームごと作り直すと入力が消えるため、呼び出し側が
+// 「もう建っているフォームは触らない」判断をできる必要がある。
+export function isProfileFormMounted(containerEl) {
+  return Boolean(containerEl.querySelector('form.profile-form'));
+}
+
 // プロフィール編集フォームを描画する。
 // onSubmit(profile) は入力内容をまとめたオブジェクトを受け取る。
 export function renderProfileForm(containerEl, player, { onSubmit, submitLabel = '保存', onCancel = null }) {
@@ -86,9 +93,16 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
   bioLabel.appendChild(bio);
   form.appendChild(bioLabel);
 
-  const errorEl = document.createElement('p');
-  errorEl.className = 'status-line error';
-  form.appendChild(errorEl);
+  // form-message は flex の中で必ず1行を占有する（.profile-form の flex-basis:100%）。
+  // 指定が無いと幅を持てずに潰れ、エラーが出ていても読めなかった。
+  const messageEl = document.createElement('p');
+  messageEl.className = 'form-message';
+  form.appendChild(messageEl);
+
+  const setMessage = (text, kind) => {
+    messageEl.textContent = text;
+    messageEl.className = `form-message${text ? ` ${kind}` : ''}`;
+  };
 
   const actions = document.createElement('div');
   actions.className = 'dialog-actions';
@@ -112,12 +126,14 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
     e.preventDefault();
     const name = form.elements.currentName.value.trim();
     if (!name) {
-      errorEl.textContent = '表示名を入力してください。';
+      setMessage('表示名を入力してください。', 'error');
       return;
     }
 
+    const originalLabel = submitBtn.textContent;
     submitBtn.disabled = true;
-    errorEl.textContent = '';
+    submitBtn.textContent = '送信中...';
+    setMessage('', null);
     try {
       await onSubmit({
         currentName: name,
@@ -128,10 +144,16 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
         snsYoutube: form.elements.snsYoutube.value.trim(),
         bio: bio.value.trim(),
       });
+      // 成功しても画面の見た目がほとんど変わらないことがあるので、その場に明示する
+      setMessage('保存しました。', 'success');
     } catch (err) {
-      errorEl.textContent = err.message;
+      // 画面に出すだけでなくコンソールにも残す。捕まえた例外は既定では
+      // 開発者ツールに何も出ないため、原因調査の手がかりが消えてしまう。
+      console.error('プロフィールの保存に失敗しました', err);
+      setMessage(err.message, 'error');
     } finally {
       submitBtn.disabled = false;
+      submitBtn.textContent = originalLabel;
     }
   });
 

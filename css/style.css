@@ -829,6 +829,32 @@ dialog h3 { margin-top: 0; }
   gap: 0.2rem;
 }
 
+/* フォーム内のメッセージ。flexコンテナの中で幅を指定しないと、
+   他の項目の間に押し込まれて潰れ、エラーが出ていても読めなくなる。 */
+.form-message {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.9rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.form-message.error {
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #b91c1c;
+  color: #b91c1c;
+  background: rgba(185, 28, 28, 0.08);
+}
+
+.form-message.success {
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #15803d;
+  color: #15803d;
+  background: rgba(21, 128, 61, 0.08);
+}
+
 .field-note {
   font-size: 0.75rem;
   opacity: 0.7;

@@ -83,12 +83,24 @@ function fromMatch(match) {
 }
 
 // PostgRESTのエラーを日本語にして投げ直す。
+// 原因究明のため、元のコードと詳細も必ず残す（コードだけでは何が起きたか分からない）。
 function check(error, what) {
   if (!error) return;
+
+  console.error(`[db] ${what}に失敗`, error);
+
+  const detail = [error.code, error.details, error.hint].filter(Boolean).join(' / ');
+  const suffix = detail ? `（${detail}）` : '';
+
   if (error.code === '42501' || error.message?.includes('row-level security')) {
-    throw new Error(`${what}の権限がありません。`);
+    throw new Error(
+      `${what}の権限がありません。ログインし直すか、運営権限が必要な操作でないか確認してください。${suffix}`,
+    );
   }
-  throw new Error(`${what}に失敗しました: ${error.message}`);
+  if (error.code === '23505') {
+    throw new Error(`${what}: 同じ内容が既に登録されています。${suffix}`);
+  }
+  throw new Error(`${what}に失敗しました: ${error.message}${suffix}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,12 +187,24 @@ export async function createProxyPlayer(profile) {
 
 // プロフィールの更新。本人か運営でなければRLSに弾かれる。
 // role と user_id は列単位のGRANTで更新不可なので、ここから触れることはない。
+//
+// .select() を付けて実際に更新された行を確認している。RLSで弾かれたUPDATEは
+// エラーではなく「0行更新」として成功で返るため、これが無いと何も保存されていないのに
+// 「保存しました」と表示され、原因の分からない不具合になる。
 export async function savePlayer(player) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('players')
     .update(toPlayerUpdate(player))
-    .eq('id', player.id);
+    .eq('id', player.id)
+    .select('id');
   check(error, 'プロフィールの保存');
+
+  if (!data || data.length === 0) {
+    throw new Error(
+      'プロフィールが保存されませんでした。この選手を編集する権限がありません'
+      + '（本人のアカウントでログインしているか確認してください）。',
+    );
+  }
 }
 
 export async function deletePlayer(playerId) {

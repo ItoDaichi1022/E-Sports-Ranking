@@ -7,7 +7,7 @@ import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
 import { getPlayerStats } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
-import { renderProfileForm, profileSectionHtml } from './profile.js';
+import { renderProfileForm, profileSectionHtml, isProfileFormMounted } from './profile.js';
 import { renderRecruitPage, STATUS_LABELS } from './entries.js';
 import {
   auth, initAuth, isAdmin, isLoggedIn, needsOnboarding, accountLabel,
@@ -385,12 +385,24 @@ function renderRecruit() {
 // ---- マイページ ----
 
 // ログイン直後で選手行がまだ無ければ新規登録、あれば編集フォームを出す。
+// いま建てているフォームの種別。背景の自動更新でフォームを作り直すと
+// 入力途中の内容が消えてしまうため、同じ種別のまま再描画が来たら建て替えない。
+// （入力を終えてボタンへマウスを動かす一瞬はフォーカスが外れており、
+//   isUserTyping() では守れない。編集内容が保存済みの値に巻き戻ってしまう。）
+// 種別が変わったとき（未登録→登録済み、別アカウントでログイン）は建て直す。
+let profileFormMode = null;
+
 function renderProfilePage() {
   profileLinksEl.innerHTML = '';
+
+  const mode = needsOnboarding() ? 'onboarding' : `edit:${auth.player.id}`;
+  const keepExistingForm = profileFormMode === mode && isProfileFormMounted(profileFormContainer);
+  profileFormMode = mode;
 
   if (needsOnboarding()) {
     profileTitleEl.textContent = '選手登録';
     profileNoteEl.textContent = '表示名だけでも登録できます。あとからいつでも変更できます。';
+    if (keepExistingForm) return;
     renderProfileForm(profileFormContainer, null, {
       submitLabel: '登録する',
       onSubmit: async (profile) => {
@@ -407,21 +419,23 @@ function renderProfilePage() {
   profileTitleEl.textContent = 'マイページ';
   profileNoteEl.textContent = 'ここで編集した内容は、あなたの選手ページに表示されます。';
 
-  renderProfileForm(profileFormContainer, auth.player, {
-    submitLabel: '保存',
-    onSubmit: async (profile) => {
-      // 表示名を変えたら旧名を過去名に残す（players.js の updatePlayer と同じ扱い）
-      const pastNames = [...auth.player.pastNames];
-      if (profile.currentName !== auth.player.currentName
-        && !pastNames.includes(auth.player.currentName)) {
-        pastNames.push(auth.player.currentName);
-      }
-      await db.savePlayer({ ...auth.player, ...profile, pastNames });
-      await reloadOwnPlayer();
-      await refreshFromDb();
-      setStatus('プロフィールを保存しました。', 'success');
-    },
-  });
+  if (!keepExistingForm) {
+    renderProfileForm(profileFormContainer, auth.player, {
+      submitLabel: '保存',
+      onSubmit: async (profile) => {
+        // 表示名を変えたら旧名を過去名に残す（players.js の updatePlayer と同じ扱い）
+        const pastNames = [...auth.player.pastNames];
+        if (profile.currentName !== auth.player.currentName
+          && !pastNames.includes(auth.player.currentName)) {
+          pastNames.push(auth.player.currentName);
+        }
+        await db.savePlayer({ ...auth.player, ...profile, pastNames });
+        await reloadOwnPlayer();
+        await refreshFromDb();
+        setStatus('プロフィールを保存しました。', 'success');
+      },
+    });
+  }
 
   const link = document.createElement('a');
   link.className = 'back-link';
