@@ -786,6 +786,33 @@ dialog h3 { margin-top: 0; }
 
 /* ---- アカウント・ログイン ---- */
 
+.account-avatar {
+  display: inline-flex;
+  border-radius: 50%;
+  text-decoration: none;
+  color: inherit;
+}
+
+.account-avatar:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* マイページ下部のアカウント操作（ログアウトなど） */
+.profile-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.profile-account-actions .meta-line {
+  margin: 0;
+}
+
 .account-label {
   font-size: 0.85rem;
   opacity: 0.85;

@@ -74,6 +74,13 @@ const profileTitleEl = $('profile-title');
 const profileNoteEl = $('profile-note');
 const profileFormContainer = $('profile-form-container');
 const profileLinksEl = $('profile-links');
+const profileLoginPanel = $('profile-login-panel');
+const profileLoginErrorEl = $('profile-login-error');
+const profileGoogleBtn = $('profile-google-btn');
+const profileDiscordBtn = $('profile-discord-btn');
+const profileEmailBtn = $('profile-email-btn');
+const profileAccountActions = $('profile-account-actions');
+const profileAccountEmail = $('profile-account-email');
 
 const rankingContainer = $('ranking-container');
 const rankingEditorEl = $('ranking-editor');
@@ -84,8 +91,7 @@ const rankingPublishedStatusEl = $('ranking-published-status');
 const rankingEditorNoteEl = $('ranking-editor-note');
 
 const appStatusEl = $('app-status');
-const accountLabelEl = $('account-label');
-const profileNavLink = $('profile-link');
+const accountAvatarEl = $('account-avatar');
 const loginBtn = $('login-btn');
 const logoutBtn = $('logout-btn');
 const navTournamentLink = $('nav-tournament-link');
@@ -147,15 +153,17 @@ function applyAuthUI() {
   playerFormNote.hidden = !admin;
   if (!admin) tournamentEditForm.hidden = true;
 
-  homeCardProfile.hidden = !loggedIn;
-  profileNavLink.hidden = !loggedIn;
+  // マイページはログアウト中もタブに出す（そこからログインできるため）
+  homeCardProfile.hidden = false;
   loginBtn.hidden = loggedIn;
-  logoutBtn.hidden = !loggedIn;
+  accountAvatarEl.hidden = !loggedIn;
 
+  // ログイン中は名前ではなくアイコンを出す。選手登録がまだなら頭文字が入る。
   if (loggedIn) {
-    accountLabelEl.textContent = admin ? `${accountLabel()}（運営）` : accountLabel();
+    accountAvatarEl.innerHTML = avatarHtml(auth.player ?? { currentName: accountLabel() }, 'sm');
+    accountAvatarEl.title = admin ? `${accountLabel()}（運営）` : accountLabel();
   } else {
-    accountLabelEl.textContent = '';
+    accountAvatarEl.innerHTML = '';
   }
 }
 
@@ -194,15 +202,10 @@ function routeFromHash() {
 
   let target = VIEW_IDS[page] ? page : 'home';
 
-  // 大会作成は運営限定、マイページはログイン限定
+  // 大会作成は運営限定。マイページはログアウト中でも開ける（そこからログインする）
   if (target === 'tournament' && !isAdmin()) {
     location.replace('#home');
     target = 'home';
-  }
-  if (target === 'profile' && !isLoggedIn()) {
-    location.replace('#home');
-    target = 'home';
-    openLoginDialog();
   }
 
   Object.entries(VIEW_IDS).forEach(([name, id]) => {
@@ -408,6 +411,24 @@ async function resolveAvatar(profile, currentUrl) {
 
 function renderProfilePage() {
   profileLinksEl.innerHTML = '';
+
+  // ログアウト中：ログインの入口だけを見せる
+  if (!isLoggedIn()) {
+    profileFormMode = null;
+    profileFormContainer.innerHTML = '';
+    profileLoginPanel.hidden = false;
+    profileAccountActions.hidden = true;
+    profileTitleEl.textContent = 'マイページ';
+    profileNoteEl.textContent = 'ログインすると、自分の選手プロフィールを編集したり大会にエントリーしたりできます。';
+    return;
+  }
+
+  profileLoginPanel.hidden = true;
+  profileLoginErrorEl.textContent = '';
+  profileAccountActions.hidden = false;
+  profileAccountEmail.textContent = auth.user.email
+    ? `ログイン中: ${auth.user.email}`
+    : 'ログイン中';
 
   const mode = needsOnboarding() ? 'onboarding' : `edit:${auth.player.id}`;
   const keepExistingForm = profileFormMode === mode && isProfileFormMounted(profileFormContainer);
@@ -1107,6 +1128,25 @@ loginCancelBtn.addEventListener('click', () => loginDialog.close());
 
 // 募集ページの「ログインしてエントリー」など、他モジュールからの要求
 document.addEventListener('request-login', openLoginDialog);
+
+// マイページからのログイン。Google/Discordはその場で、メールはダイアログで。
+profileGoogleBtn.addEventListener('click', async () => {
+  try {
+    await signInWithProvider('google');
+  } catch (err) {
+    profileLoginErrorEl.textContent = err.message;
+  }
+});
+
+profileDiscordBtn.addEventListener('click', async () => {
+  try {
+    await signInWithProvider('discord');
+  } catch (err) {
+    profileLoginErrorEl.textContent = err.message;
+  }
+});
+
+profileEmailBtn.addEventListener('click', openLoginDialog);
 
 googleLoginBtn.addEventListener('click', async () => {
   try {

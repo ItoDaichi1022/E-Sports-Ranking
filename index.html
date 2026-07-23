@@ -6,7 +6,7 @@
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=28">
+<link rel="stylesheet" href="css/style.css?v=29">
 </head>
 <body>
 <header>
@@ -19,13 +19,13 @@
       <a href="#history" data-page="history">大会履歴</a>
       <a href="#players" data-page="players">選手</a>
       <a href="#ranking" data-page="ranking">ランキング</a>
+      <a href="#profile" data-page="profile">マイページ</a>
     </nav>
   </div>
   <div class="sync-bar">
-    <span id="account-label" class="account-label"></span>
-    <a href="#profile" id="profile-link" class="btn-secondary as-link" hidden>マイページ</a>
+    <!-- ログイン中は名前ではなくアイコンを出す。押すとマイページへ行く -->
+    <a href="#profile" id="account-avatar" class="account-avatar" title="マイページ" hidden></a>
     <button type="button" id="login-btn">ログイン</button>
-    <button type="button" id="logout-btn" class="btn-secondary" hidden>ログアウト</button>
     <span id="app-status" class="status-line"></span>
   </div>
 </header>
@@ -95,8 +95,24 @@
   <section id="view-profile" class="view" hidden>
     <h2 id="profile-title">マイページ</h2>
     <p class="note" id="profile-note"></p>
+
+    <!-- 未ログインのときだけ出るログイン案内 -->
+    <div id="profile-login-panel" hidden>
+      <div class="oauth-buttons">
+        <button type="button" id="profile-google-btn" class="btn-secondary">Googleでログイン</button>
+        <button type="button" id="profile-discord-btn" class="btn-secondary">Discordでログイン</button>
+        <button type="button" id="profile-email-btn" class="btn-secondary">メールアドレスでログイン / 新規登録</button>
+      </div>
+      <p id="profile-login-error" class="status-line error"></p>
+    </div>
+
     <div id="profile-form-container"></div>
     <div id="profile-links"></div>
+
+    <div id="profile-account-actions" class="profile-account-actions" hidden>
+      <span id="profile-account-email" class="meta-line"></span>
+      <button type="button" id="logout-btn" class="btn-secondary">ログアウト</button>
+    </div>
   </section>
 
   <section id="view-tournament" class="view" hidden>
@@ -252,7 +268,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=28"></script>
+<script src="js/vendor/supabase.js?v=29"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -264,24 +280,24 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=28",
-    "./js/bracket.js":        "./js/bracket.js?v=28",
-    "./js/bracketView.js":    "./js/bracketView.js?v=28",
-    "./js/db.js":             "./js/db.js?v=28",
-    "./js/entries.js":        "./js/entries.js?v=28",
-    "./js/playerStats.js":    "./js/playerStats.js?v=28",
-    "./js/players.js":        "./js/players.js?v=28",
-    "./js/profile.js":        "./js/profile.js?v=28",
-    "./js/ranking.js":        "./js/ranking.js?v=28",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=28",
-    "./js/rankingView.js":    "./js/rankingView.js?v=28",
-    "./js/state.js":          "./js/state.js?v=28",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=28",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=28",
-    "./js/util.js":           "./js/util.js?v=28"
+    "./js/auth.js":           "./js/auth.js?v=29",
+    "./js/bracket.js":        "./js/bracket.js?v=29",
+    "./js/bracketView.js":    "./js/bracketView.js?v=29",
+    "./js/db.js":             "./js/db.js?v=29",
+    "./js/entries.js":        "./js/entries.js?v=29",
+    "./js/playerStats.js":    "./js/playerStats.js?v=29",
+    "./js/players.js":        "./js/players.js?v=29",
+    "./js/profile.js":        "./js/profile.js?v=29",
+    "./js/ranking.js":        "./js/ranking.js?v=29",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=29",
+    "./js/rankingView.js":    "./js/rankingView.js?v=29",
+    "./js/state.js":          "./js/state.js?v=29",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=29",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=29",
+    "./js/util.js":           "./js/util.js?v=29"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=28"></script>
+<script type="module" src="js/app.js?v=29"></script>
 </body>
 </html>
