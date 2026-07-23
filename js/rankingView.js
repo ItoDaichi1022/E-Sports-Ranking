@@ -1,9 +1,18 @@
-import { escapeHtml } from './util.js';
+import { state } from './state.js';
+import { escapeHtml, avatarHtml } from './util.js';
 import { rankChangeInfo } from './ranking.js';
 
 function rankChangeCell(r) {
   const { label, className } = rankChangeInfo(r.previousRank, r.rank);
   return `<span class="rank-change ${className}">${label}</span>`;
+}
+
+// 公開済みランキングは公開時点の名前を焼き込んでいて、アイコンは持っていない。
+// アイコンは選手の現在の情報から引き、名前はランキングに記録された値を使う。
+// 選手が削除されていても、名前の頭文字で丸が出るので崩れない。
+function rankingAvatar(entry) {
+  const player = state.players.find((p) => p.id === entry.id);
+  return avatarHtml({ ...player, currentName: entry.name }, 'sm');
 }
 
 // rankings: computeRankings() や公開済みスナップショットが返す
@@ -38,8 +47,11 @@ export function renderRankingTable(containerEl, rankings, emptyMessage, ownPlaye
     tr.innerHTML = `
       <td class="rank-cell">${r.rank}</td>
       <td>
-        <a href="#player/${encodeURIComponent(r.id)}">${escapeHtml(r.name)}</a>
-        ${isOwn ? '<span class="you-badge">あなた</span>' : ''}
+        <div class="player-identity">
+          ${rankingAvatar(r)}
+          <a href="#player/${encodeURIComponent(r.id)}">${escapeHtml(r.name)}</a>
+          ${isOwn ? '<span class="you-badge">あなた</span>' : ''}
+        </div>
       </td>
       <td>${r.score.toFixed(1)}</td>
       ${showChange ? `<td class="rank-change-cell">${rankChangeCell(r)}</td>` : ''}

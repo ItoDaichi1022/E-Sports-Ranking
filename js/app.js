@@ -687,8 +687,11 @@ function renderResultSection(tournament) {
       <tr class="${s.rank <= 3 ? `rank-${s.rank}` : ''}${isOwn ? ' own-row' : ''}">
         <td class="rank-cell">${s.rank}</td>
         <td>
-          <a href="#player/${encodeURIComponent(s.playerId)}">${escapeHtml(name)}</a>
-          ${isOwn ? '<span class="you-badge">あなた</span>' : ''}
+          <div class="player-identity">
+            ${avatarHtml(player ?? { currentName: name }, 'sm')}
+            <a href="#player/${encodeURIComponent(s.playerId)}">${escapeHtml(name)}</a>
+            ${isOwn ? '<span class="you-badge">あなた</span>' : ''}
+          </div>
         </td>
       </tr>
     `;
