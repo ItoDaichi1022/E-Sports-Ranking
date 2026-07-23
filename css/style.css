@@ -1129,3 +1129,85 @@ tr.own-row:hover > td {
   vertical-align: middle;
   white-space: nowrap;
 }
+
+/* ---- 狭い画面向けのメニュー ---- */
+
+/* 広い画面ではボタン自体を出さない。ナビはそのまま横に並ぶ。 */
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  flex: none;
+  background: transparent;
+  border-color: var(--border);
+  color: inherit;
+}
+
+/* 3本線。開いているときは中央を消して上下を交差させ、閉じる印にする。 */
+.nav-toggle-bars,
+.nav-toggle-bars::before,
+.nav-toggle-bars::after {
+  display: block;
+  width: 1.15rem;
+  height: 2px;
+  background: currentColor;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.nav-toggle-bars::before,
+.nav-toggle-bars::after {
+  content: "";
+  position: relative;
+}
+
+.nav-toggle-bars::before { top: -6px; }
+.nav-toggle-bars::after  { top: 4px; }
+
+.nav-toggle[aria-expanded="true"] .nav-toggle-bars {
+  background: transparent;
+}
+
+.nav-toggle[aria-expanded="true"] .nav-toggle-bars::before {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.nav-toggle[aria-expanded="true"] .nav-toggle-bars::after {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+/* リンクが7つあり、日本語だと横1行に収まらなくなる幅で切り替える。
+   折り返して2段になるとヘッダーが画面を占領してしまうため。 */
+@media (max-width: 900px) {
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  /* 開いたときだけ、ヘッダーの下に縦並びで出す */
+  .header-row #main-nav {
+    display: none;
+    flex-basis: 100%;
+    flex-direction: column;
+    gap: 0;
+    margin-left: 0;
+    margin-top: 0.5rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.5rem;
+  }
+
+  .header-row #main-nav.open {
+    display: flex;
+  }
+
+  #main-nav a {
+    padding: 0.7rem 0.5rem;
+    font-size: 1rem;
+    border-radius: 6px;
+  }
+
+  header h1 {
+    font-size: 1.05rem;
+  }
+}

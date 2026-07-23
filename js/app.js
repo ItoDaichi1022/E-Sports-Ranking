@@ -99,6 +99,7 @@ const navTournamentLink = $('nav-tournament-link');
 const homeCardTournament = $('home-card-tournament');
 const homeCardProfile = $('home-card-profile');
 const mainNav = $('main-nav');
+const navToggle = $('nav-toggle');
 
 const loginDialog = $('login-dialog');
 const emailForm = $('email-form');
@@ -1241,7 +1242,42 @@ logoutBtn.addEventListener('click', async () => {
   }
 });
 
-window.addEventListener('hashchange', routeFromHash);
+// ---- 狭い画面のメニュー ----
+//
+// 開閉状態は routeFromHash では触らない。背景の自動更新でも routeFromHash は
+// 走るため、そこで閉じると開いた直後に勝手に畳まれてしまう。
+// 実際に画面が変わるとき（hashchange）と、リンクを押したときだけ閉じる。
+
+function setNavOpen(open) {
+  mainNav.classList.toggle('open', open);
+  navToggle.setAttribute('aria-expanded', String(open));
+  navToggle.setAttribute('aria-label', open ? 'メニューを閉じる' : 'メニューを開く');
+}
+
+navToggle.addEventListener('click', () => {
+  setNavOpen(!mainNav.classList.contains('open'));
+});
+
+// 今いるページと同じリンクを押した場合は hashchange が起きないので、ここでも閉じる
+mainNav.addEventListener('click', (e) => {
+  if (e.target.closest('a')) setNavOpen(false);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') setNavOpen(false);
+});
+
+// メニューの外を触ったら閉じる
+document.addEventListener('click', (e) => {
+  if (!mainNav.classList.contains('open')) return;
+  if (e.target.closest('#main-nav') || e.target.closest('#nav-toggle')) return;
+  setNavOpen(false);
+});
+
+window.addEventListener('hashchange', () => {
+  setNavOpen(false);
+  routeFromHash();
+});
 
 // タブを開き直したときは最新を取り込む（Realtimeが届かない間に進んでいることがある）
 document.addEventListener('visibilitychange', () => {
