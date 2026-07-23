@@ -26,6 +26,8 @@ create table if not exists players (
   -- プロフィール表示用。本人が自由に記入・変更できる（主キーではない）
   game_account_id text,
   bio             text,
+  -- アイコン画像。Storageの avatars バケットに置いた公開URLを入れる
+  avatar_url      text,
   main_characters text[] not null default '{}',
   sns_x           text,
   sns_twitch      text,
@@ -135,6 +137,15 @@ $$;
 -- クライアント側で「残り枠があるか」を確認してからINSERTする方式は、2人が同時に
 -- 押したときに両方とも通ってしまう。大会行をFOR UPDATEでロックしてから数えることで、
 -- 同じ大会へのエントリーを直列化して超過を防ぐ。
+--
+-- 行単位のBEFORE INSERTではなく「文単位のAFTER INSERT」で、挿入後の最終人数を見る。
+-- 行単位だと次の2つの問題があった:
+--   1. 締切時にシード順を upsert（INSERT ... ON CONFLICT）で書き戻すと、
+--      既存行の更新であってもINSERTトリガーが発火し、定員ちょうどまで埋まった大会が
+--      「定員に達しています」で締め切れなくなる。
+--   2. 行単位トリガーから見た count(*) には、同じINSERT文で挿入中の行が含まれない。
+--      そのため一括挿入では全行が「まだ0人」と判定され、定員が素通りしていた。
+-- AFTER INSERT の遷移テーブルなら、何行まとめて入っても最終状態だけを1回検査できる。
 -- ---------------------------------------------------------------------------
 
 create or replace function enforce_entry_capacity() returns trigger
@@ -143,27 +154,30 @@ create or replace function enforce_entry_capacity() returns trigger
   set search_path = public
 as $$
 declare
+  rec record;
   cap int;
   cnt int;
 begin
-  select capacity into cap from tournaments where id = new.tournament_id for update;
-  if cap is null then
-    return new;
-  end if;
+  for rec in select distinct tournament_id from new_entries loop
+    -- 同じ大会への同時エントリーを直列化する（ロックしてから数える）
+    select capacity into cap from tournaments where id = rec.tournament_id for update;
+    if cap is not null then
+      select count(*) into cnt from tournament_entries where tournament_id = rec.tournament_id;
+      if cnt > cap then
+        raise exception 'この大会は定員（%人）に達しています。', cap using errcode = 'check_violation';
+      end if;
+    end if;
+  end loop;
 
-  select count(*) into cnt from tournament_entries where tournament_id = new.tournament_id;
-  if cnt >= cap then
-    raise exception 'この大会は定員に達しています。' using errcode = 'check_violation';
-  end if;
-
-  return new;
+  return null;
 end;
 $$;
 
 drop trigger if exists entries_capacity_trigger on tournament_entries;
 create trigger entries_capacity_trigger
-  before insert on tournament_entries
-  for each row execute function enforce_entry_capacity();
+  after insert on tournament_entries
+  referencing new table as new_entries
+  for each statement execute function enforce_entry_capacity();
 
 create or replace function touch_bracket_updated_at() returns trigger
   language plpgsql
@@ -199,12 +213,12 @@ grant select on players, tournaments, tournament_entries, brackets, matches, pub
   to anon, authenticated;
 
 -- 選手行の作成。idとroleは指定させない（roleは既定値'player'が入る）
-grant insert (user_id, display_name, past_names, game_account_id, bio,
+grant insert (user_id, display_name, past_names, game_account_id, bio, avatar_url,
               main_characters, sns_x, sns_twitch, sns_youtube)
   on players to authenticated;
 
 -- プロフィールの編集。roleとuser_idは意図的に含めない
-grant update (display_name, past_names, game_account_id, bio,
+grant update (display_name, past_names, game_account_id, bio, avatar_url,
               main_characters, sns_x, sns_twitch, sns_youtube)
   on players to authenticated;
 
@@ -430,6 +444,45 @@ revoke all on function admin_merge_players(uuid, uuid)     from anon, public;
 grant execute on function admin_set_player_role(uuid, text)   to authenticated;
 grant execute on function admin_link_player_account(uuid, uuid) to authenticated;
 grant execute on function admin_merge_players(uuid, uuid)     to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- アイコン画像の保管場所（Storage）
+--
+-- 誰でも見られる（公開バケット）が、書き込めるのは自分のフォルダだけ。
+-- ファイルは avatars/{自分のuser_id}/{ファイル名} に置く決まりにして、
+-- 先頭フォルダ名が自分のIDと一致するかどうかで他人の画像の差し替えを防ぐ。
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'avatars', 'avatars', true, 2097152,
+  array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+)
+on conflict (id) do update set
+  public = true,
+  file_size_limit = 2097152,
+  allowed_mime_types = array['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+drop policy if exists avatars_public_read on storage.objects;
+create policy avatars_public_read on storage.objects
+  for select to anon, authenticated
+  using (bucket_id = 'avatars');
+
+drop policy if exists avatars_own_insert on storage.objects;
+create policy avatars_own_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists avatars_own_update on storage.objects;
+create policy avatars_own_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists avatars_own_delete on storage.objects;
+create policy avatars_own_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
 -- ---------------------------------------------------------------------------
 -- Realtime

@@ -22,6 +22,7 @@ function toPlayer(row) {
     pastNames: row.past_names ?? [],
     gameAccountId: row.game_account_id ?? '',
     bio: row.bio ?? '',
+    avatarUrl: row.avatar_url ?? '',
     mainCharacters: row.main_characters ?? [],
     snsX: row.sns_x ?? '',
     snsTwitch: row.sns_twitch ?? '',
@@ -38,6 +39,7 @@ function toPlayerUpdate(player) {
     past_names: player.pastNames ?? [],
     game_account_id: player.gameAccountId || null,
     bio: player.bio || null,
+    avatar_url: player.avatarUrl || null,
     main_characters: player.mainCharacters ?? [],
     sns_x: player.snsX || null,
     sns_twitch: player.snsTwitch || null,
@@ -245,6 +247,52 @@ export async function mergePlayers(sourcePlayerId, targetPlayerId) {
 }
 
 // ---------------------------------------------------------------------------
+// アイコン画像
+// ---------------------------------------------------------------------------
+
+const AVATAR_BUCKET = 'avatars';
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+// アイコンをアップロードし、公開URLを返す。
+// 保存先は avatars/{自分のuser_id}/... で固定する。Storage側のポリシーが
+// 「先頭フォルダ名 = 自分のID」を要求しているので、他人のアイコンは差し替えられない。
+export async function uploadAvatar(userId, file) {
+  if (!AVATAR_TYPES.includes(file.type)) {
+    throw new Error('画像はPNG / JPEG / WebP / GIF のいずれかにしてください。');
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    throw new Error('画像のサイズは2MBまでにしてください。');
+  }
+
+  // 同じ名前で上書きするとCDNに古い画像が残るため、毎回別名で入れる
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const path = `${userId}/${Date.now()}.${ext || 'png'}`;
+
+  const { error } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) {
+    console.error('[db] アイコンのアップロードに失敗', error);
+    throw new Error(`アイコンのアップロードに失敗しました: ${error.message}`);
+  }
+
+  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// 古いアイコンを消す。自分のバケット内のURLでなければ何もしない。
+// 失敗しても本体の保存は済んでいるので、呼び出し側は無視してよい。
+export async function removeAvatarByUrl(url) {
+  if (!url) return;
+  const marker = `/${AVATAR_BUCKET}/`;
+  const index = url.indexOf(marker);
+  if (index === -1) return;
+  const path = url.slice(index + marker.length).split('?')[0];
+  await supabase.storage.from(AVATAR_BUCKET).remove([decodeURIComponent(path)]);
+}
+
+// ---------------------------------------------------------------------------
 // 大会
 // ---------------------------------------------------------------------------
 
@@ -332,14 +380,21 @@ export async function saveSeeds(tournamentId, seededPlayerIds) {
 }
 
 // 運営が参加者を直接指定する場合（募集を使わず大会を立てるとき）。
+//
+// 「全部消してから入れ直す」順序にしてはいけない。挿入側が失敗すると削除だけが残り、
+// 参加者0人の大会ができてしまう（実際にこの不具合が起きた）。
+// 先に入れてから不要な行を削る順序なら、途中で失敗しても元の参加者は残る。
 export async function replaceEntries(tournamentId, seededPlayerIds) {
-  const { error: delError } = await supabase
-    .from('tournament_entries')
-    .delete()
-    .eq('tournament_id', tournamentId);
-  check(delError, '参加者の更新');
-  if (seededPlayerIds.length === 0) return;
-  await saveSeeds(tournamentId, seededPlayerIds);
+  if (seededPlayerIds.length > 0) {
+    await saveSeeds(tournamentId, seededPlayerIds);
+  }
+
+  let query = supabase.from('tournament_entries').delete().eq('tournament_id', tournamentId);
+  if (seededPlayerIds.length > 0) {
+    query = query.not('player_id', 'in', `(${seededPlayerIds.join(',')})`);
+  }
+  const { error } = await query;
+  check(error, '参加者の更新');
 }
 
 // ---------------------------------------------------------------------------

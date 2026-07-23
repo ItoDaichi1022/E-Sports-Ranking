@@ -5,7 +5,7 @@
 // 運営が募集を締め切ると、それまでの戦績を元にシードを付けてブラケットを生成する。
 
 import { state } from './state.js';
-import { escapeHtml } from './players.js';
+import { escapeHtml } from './util.js';
 import { auth, isLoggedIn, isAdmin } from './auth.js';
 import { computeRankings } from './ranking.js';
 import { tournamentTier } from './tournamentTier.js';
@@ -231,6 +231,15 @@ export function renderRecruitPage(containerEl, onChanged) {
 
     const actions = document.createElement('div');
     actions.className = 'recruit-actions';
+
+    // 大会詳細ページへの導線。ルールや参加者を見てからエントリーできるようにする。
+    // 運営はこのページから大会情報の編集・削除もできる。
+    const detail = document.createElement('a');
+    detail.className = 'btn-secondary as-link';
+    detail.href = `#bracket/${encodeURIComponent(t.id)}`;
+    detail.textContent = '詳細';
+    actions.appendChild(detail);
+
     if (t.status === 'recruiting') actions.appendChild(entryButton(t, onChanged));
     if (isAdmin()) actions.appendChild(adminControls(t, onChanged));
     header.appendChild(actions);

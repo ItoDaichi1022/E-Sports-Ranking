@@ -54,6 +54,7 @@ async function refreshOwnPlayer() {
         pastNames: data.past_names ?? [],
         gameAccountId: data.game_account_id ?? '',
         bio: data.bio ?? '',
+        avatarUrl: data.avatar_url ?? '',
         mainCharacters: data.main_characters ?? [],
         snsX: data.sns_x ?? '',
         snsTwitch: data.sns_twitch ?? '',

@@ -321,7 +321,9 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
   containerEl.appendChild(wrapper);
   drawConnectorLines(bracket, wrapper, matchElements);
 
-  const championId = getChampionId(bracket);
+  // 優勝者は、運営が「結果を確定」するまで出さない。表が全部埋まった時点で
+  // 自動的に優勝者を掲げてしまうと、入力ミスに気づいて直す前に確定として広まってしまう。
+  const championId = options.showResult ? getChampionId(bracket) : null;
   if (championId) {
     const banner = document.createElement('div');
     banner.className = 'champion-banner';

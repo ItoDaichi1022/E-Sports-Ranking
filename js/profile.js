@@ -1,23 +1,11 @@
 // 選手プロフィールの入力フォームと表示。
 // 新規登録（初回ログイン後のオンボーディング）と、あとからの編集で同じフォームを使う。
 
-import { escapeHtml } from './players.js';
+import { escapeHtml, safeUrl, initialOf } from './util.js';
 
 // 使用キャラは配列で持つが、入力はカンマ区切りの1行で受ける。
 function parseCharacters(text) {
   return text.split(',').map((s) => s.trim()).filter(Boolean);
-}
-
-// href に入れてよいURLだけを通す。javascript: や data: を弾かないと、
-// プロフィールに書かれた文字列がそのままスクリプト実行に使われてしまう。
-export function safeUrl(value) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return (url.protocol === 'http:' || url.protocol === 'https:') ? url.href : null;
-  } catch {
-    return null;
-  }
 }
 
 // URLでもハンドル名でも受け付け、表示用のリンク先に整える。
@@ -82,6 +70,70 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
     form.appendChild(label);
   });
 
+  // ---- アイコン ----
+  // ファイルを選んだ時点ではまだアップロードせず、保存時にまとめて送る。
+  // 保存せずに離れた場合に、使われない画像が溜まるのを避けるため。
+  let pickedFile = null;
+
+  const avatarLabel = document.createElement('label');
+  avatarLabel.className = 'avatar-field';
+  avatarLabel.appendChild(document.createTextNode('アイコン'));
+
+  const avatarRow = document.createElement('div');
+  avatarRow.className = 'avatar-row';
+
+  const preview = document.createElement('div');
+  preview.className = 'avatar-preview';
+  const setPreview = (src, name) => {
+    preview.innerHTML = '';
+    if (src) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '';
+      preview.appendChild(img);
+    } else {
+      preview.textContent = initialOf(name);
+    }
+  };
+  setPreview(safeUrl(player?.avatarUrl), player?.currentName);
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'btn-secondary';
+  clearBtn.textContent = 'アイコンを外す';
+  clearBtn.hidden = !player?.avatarUrl;
+
+  let removeAvatar = false;
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    pickedFile = file;
+    removeAvatar = false;
+    clearBtn.hidden = false;
+    setPreview(URL.createObjectURL(file), player?.currentName);
+  });
+
+  clearBtn.addEventListener('click', () => {
+    pickedFile = null;
+    removeAvatar = true;
+    fileInput.value = '';
+    clearBtn.hidden = true;
+    setPreview(null, form.elements.currentName.value || player?.currentName);
+  });
+
+  const hint = document.createElement('span');
+  hint.className = 'field-note';
+  hint.textContent = 'PNG / JPEG / WebP / GIF、2MBまで。正方形の画像が綺麗に表示されます。';
+
+  avatarRow.append(preview, fileInput, clearBtn);
+  avatarLabel.append(avatarRow, hint);
+  form.appendChild(avatarLabel);
+
   const bioLabel = document.createElement('label');
   bioLabel.className = 'rules-field';
   bioLabel.appendChild(document.createTextNode('自己紹介'));
@@ -143,7 +195,13 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
         snsTwitch: form.elements.snsTwitch.value.trim(),
         snsYoutube: form.elements.snsYoutube.value.trim(),
         bio: bio.value.trim(),
+        // アイコンは呼び出し側でアップロードする（DBアクセスをここに持ち込まない）
+        avatarFile: pickedFile,
+        removeAvatar,
       });
+      pickedFile = null;
+      removeAvatar = false;
+      fileInput.value = '';
       // 成功しても画面の見た目がほとんど変わらないことがあるので、その場に明示する
       setMessage('保存しました。', 'success');
     } catch (err) {

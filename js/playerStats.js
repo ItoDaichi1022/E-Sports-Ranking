@@ -4,6 +4,9 @@ import { tournamentTier } from './tournamentTier.js';
 
 // ブラケットから選手の最終成績（優勝/準優勝/ベストN/進行中）を求める。
 // ブラケットが無い・出場していない場合は null。
+//
+// 運営が結果を確定させていない大会では成績を出さない。表が埋まっただけの段階で
+// 「優勝」と表示してしまうと、確定前に結果が広まり、入力ミスを直せなくなる。
 export function placementLabel(tournamentId, playerId) {
   const bracket = state.brackets[tournamentId];
   if (!bracket) return null;
@@ -12,6 +15,9 @@ export function placementLabel(tournamentId, playerId) {
     (m) => m.player1Id === playerId || m.player2Id === playerId,
   );
   if (!entered) return null;
+
+  const tournament = state.tournaments.find((t) => t.id === tournamentId);
+  if (tournament && tournament.status !== 'finished') return '進行中';
 
   if (getChampionId(bracket) === playerId) return '優勝';
 

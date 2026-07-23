@@ -200,12 +200,28 @@ export function editMatch(tournamentId, matchId) {
   return { ok: true };
 }
 
-// 大会の基本情報（名前・日付・ルール）を修正する。
-export function updateTournament(tournamentId, { name, date, rules }) {
+// 大会の基本情報（名前・日付・定員・ルール）を修正する。募集中でも変更できる。
+export function updateTournament(tournamentId, { name, date, rules, capacity }) {
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) return { ok: false, error: '対象の大会が見つかりません。' };
+
   const newName = name.trim();
   if (!newName) return { ok: false, error: '大会名を入力してください。' };
+
+  if (capacity !== undefined) {
+    if (capacity !== null && (!Number.isInteger(capacity) || capacity < 2)) {
+      return { ok: false, error: '定員は2以上の整数で入力してください。' };
+    }
+    // 既にエントリーしている人を追い出すことになる定員は受け付けない
+    if (capacity !== null && capacity < tournament.participantIds.length) {
+      return {
+        ok: false,
+        error: `既に${tournament.participantIds.length}人がエントリーしているため、定員を${capacity}人にはできません。`,
+      };
+    }
+    tournament.capacity = capacity;
+  }
+
   tournament.name = newName;
   tournament.date = date || null;
   tournament.rules = (rules ?? '').trim() || null;
@@ -217,4 +233,40 @@ export function getChampionId(bracket) {
   const finalRound = bracket.rounds[bracket.rounds.length - 1];
   const finalMatch = finalRound.matches[0];
   return finalMatch.confirmed ? finalMatch.winnerId : null;
+}
+
+// 表の全欄が埋まったか（BYEを含め、すべての試合が確定済みか）。
+// これが真になって初めて「結果を確定する」操作ができる。
+export function allMatchesDecided(bracket) {
+  if (!bracket) return false;
+  return bracket.rounds.every((round) => round.matches.every((m) => m.confirmed));
+}
+
+// シングルエリミネーションの最終順位を求める。
+//
+// 何回戦で負けたかで順位が決まる。決勝で負ければ2位、準決勝で負けた2人は同率3位、
+// 準々決勝で負けた4人は同率5位…と、負けたラウンドが1つ前になるごとに枠が倍になる。
+// 実際に何人参加したかではなく、BYEを含めた表の大きさ(bracketSize)を基準にする。
+//
+// 戻り値: [{ playerId, rank }] を順位の昇順で。limit位までに収まるものだけ返す。
+export function finalStandings(bracket, limit = 16) {
+  if (!bracket) return [];
+
+  const standings = [];
+  const champion = getChampionId(bracket);
+  if (champion) standings.push({ playerId: champion, rank: 1 });
+
+  bracket.rounds.forEach((round, roundIndex) => {
+    // そのラウンドで敗退した人の順位。決勝(最終ラウンド)の敗者が2位になる。
+    const rank = bracket.bracketSize / 2 ** (roundIndex + 1) + 1;
+    if (rank > limit) return;
+
+    round.matches.forEach((m) => {
+      // BYEは対戦が成立していないので敗者がいない
+      if (!m.confirmed || !m.loserId) return;
+      standings.push({ playerId: m.loserId, rank });
+    });
+  });
+
+  return standings.sort((a, b) => a.rank - b.rank);
 }

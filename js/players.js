@@ -1,10 +1,5 @@
 import { state } from './state.js';
-
-export function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str ?? '';
-  return div.innerHTML;
-}
+import { escapeHtml, avatarHtml } from './util.js';
 
 // 表示名を更新する。名前を変えた場合、旧名は pastNames に自動で残す。
 // 戦績は不変のid（uuid）に紐づくので、名前が変わっても分断されない。
@@ -158,10 +153,14 @@ export function renderPlayerTable(containerEl, options = {}) {
     }
 
     const nameTd = document.createElement('td');
+    const nameCell = document.createElement('div');
+    nameCell.className = 'player-identity';
+    nameCell.innerHTML = avatarHtml(p, 'sm');
     const link = document.createElement('a');
     link.href = `#player/${encodeURIComponent(p.id)}`;
     link.textContent = p.currentName;
-    nameTd.appendChild(link);
+    nameCell.appendChild(link);
+    nameTd.appendChild(nameCell);
 
     tr.append(nameTd, idTd, pastTd, accountTd);
 

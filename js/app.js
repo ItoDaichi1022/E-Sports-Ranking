@@ -1,6 +1,9 @@
 import { state, newId, getPlayerName } from './state.js';
-import { renderPlayerTable, resetPlayerEditing, escapeHtml } from './players.js';
-import { createBracket, updateTournament, getChampionId } from './bracket.js';
+import { renderPlayerTable, resetPlayerEditing } from './players.js';
+import { escapeHtml, avatarHtml } from './util.js';
+import {
+  createBracket, updateTournament, getChampionId, allMatchesDecided, finalStandings,
+} from './bracket.js';
 import { renderBracket } from './bracketView.js';
 import { computeRankings, computeRankingsForPeriod, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
@@ -60,6 +63,9 @@ const tournamentEditDateInput = $('tournament-edit-date-input');
 const tournamentEditRulesInput = $('tournament-edit-rules-input');
 const tournamentEditCancelBtn = $('tournament-edit-cancel-btn');
 const tournamentInfoEl = $('tournament-info');
+const resultSectionEl = $('result-section');
+const bracketBackLink = $('bracket-back-link');
+const tournamentEditCapacityInput = $('tournament-edit-capacity-input');
 
 const playerDetailEl = $('player-detail');
 const playerBackBtn = $('player-back-btn');
@@ -392,6 +398,14 @@ function renderRecruit() {
 // 種別が変わったとき（未登録→登録済み、別アカウントでログイン）は建て直す。
 let profileFormMode = null;
 
+// フォームが選んだ画像を実際にアップロードし、保存すべきURLを決める。
+// 画像を選んでいなければ今のURLを据え置き、「外す」を押されていれば空にする。
+async function resolveAvatar(profile, currentUrl) {
+  if (profile.avatarFile) return db.uploadAvatar(auth.user.id, profile.avatarFile);
+  if (profile.removeAvatar) return '';
+  return currentUrl ?? '';
+}
+
 function renderProfilePage() {
   profileLinksEl.innerHTML = '';
 
@@ -406,7 +420,8 @@ function renderProfilePage() {
     renderProfileForm(profileFormContainer, null, {
       submitLabel: '登録する',
       onSubmit: async (profile) => {
-        await db.createOwnPlayer(auth.user.id, { ...profile, pastNames: [] });
+        const avatarUrl = await resolveAvatar(profile, '');
+        await db.createOwnPlayer(auth.user.id, { ...profile, avatarUrl, pastNames: [] });
         await reloadOwnPlayer();
         await refreshFromDb();
         setStatus('選手登録が完了しました。', 'success');
@@ -429,7 +444,17 @@ function renderProfilePage() {
           && !pastNames.includes(auth.player.currentName)) {
           pastNames.push(auth.player.currentName);
         }
-        await db.savePlayer({ ...auth.player, ...profile, pastNames });
+        const avatarUrl = await resolveAvatar(profile, auth.player.avatarUrl);
+        const previousAvatar = auth.player.avatarUrl;
+
+        await db.savePlayer({ ...auth.player, ...profile, avatarUrl, pastNames });
+
+        // 差し替え・削除で使われなくなった画像は消しておく（無料枠を無駄に食わないため）。
+        // ここが失敗しても保存自体は済んでいるので、処理は止めない。
+        if (previousAvatar && previousAvatar !== avatarUrl) {
+          await db.removeAvatarByUrl(previousAvatar).catch(() => {});
+        }
+
         await reloadOwnPlayer();
         await refreshFromDb();
         setStatus('プロフィールを保存しました。', 'success');
@@ -446,11 +471,18 @@ function renderProfilePage() {
 
 // ---- 大会履歴 ----
 
+// 優勝者を名指しするのは、運営が結果を確定させた大会だけ。
+// 表が埋まっただけの段階では「結果待ち」に留める。
 function tournamentStatusLabel(t) {
   const bracket = state.brackets[t.id];
   if (!bracket) return STATUS_LABELS[t.status] ?? '—';
-  const championId = getChampionId(bracket);
-  return championId ? `優勝: ${getPlayerName(championId)}` : '進行中';
+
+  if (t.status === 'finished') {
+    const championId = getChampionId(bracket);
+    if (championId) return `優勝: ${getPlayerName(championId)}`;
+    return '終了';
+  }
+  return allMatchesDecided(bracket) ? '結果待ち' : '進行中';
 }
 
 function renderHistoryList() {
@@ -495,10 +527,14 @@ const FORMAT_LABELS = {
 
 function renderTournamentInfo(tournament) {
   const formatLabel = FORMAT_LABELS[tournament.format] || tournament.format;
+  const countLabel = tournament.capacity == null
+    ? `${tournament.participantIds.length}人`
+    : `${tournament.participantIds.length} / ${tournament.capacity}人`;
+
   let html = `
     <h3>大会情報</h3>
     <dl class="tournament-info-grid">
-      <div><dt>参加人数</dt><dd>${tournament.participantIds.length}人</dd></div>
+      <div><dt>${tournament.status === 'recruiting' ? 'エントリー' : '参加人数'}</dt><dd>${escapeHtml(countLabel)}</dd></div>
       <div><dt>規模</dt><dd>${tournamentTier(tournament.participantIds.length)}</dd></div>
       <div><dt>形式</dt><dd>${escapeHtml(formatLabel)}</dd></div>
       <div><dt>開催日</dt><dd>${escapeHtml(tournament.date || '日付未設定')}</dd></div>
@@ -511,6 +547,17 @@ function renderTournamentInfo(tournament) {
       <p class="tournament-rules">${escapeHtml(tournament.rules)}</p>
     `;
   }
+
+  // ブラケットが出来る前は対戦表が無いので、代わりに顔ぶれを見せる。
+  // 募集中の大会の詳細を選手が確認できるようにするための表示。
+  if (!state.brackets[tournament.id] && tournament.participantIds.length > 0) {
+    const names = tournament.participantIds.map((id) => {
+      const player = state.players.find((p) => p.id === id);
+      return `<span class="entrant-chip">${escapeHtml(player ? player.currentName : id)}</span>`;
+    }).join('');
+    html += `<h4>エントリー中の選手</h4><div class="entrant-list">${names}</div>`;
+  }
+
   tournamentInfoEl.innerHTML = html;
 }
 
@@ -530,24 +577,132 @@ function renderBracketPage(tournamentId) {
   bracketTitleEl.textContent = tournament.name;
   bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${tournament.participantIds.length}人参加 ・ ${tournamentStatusLabel(tournament)}`;
 
-  // bracketView は state を書き換えてから onChanged を呼ぶ。ここでDBへ反映し、
-  // 決勝が確定していれば大会を「終了」にする（⑥）。
+  // 募集中・準備中の大会は履歴に並ばないので、戻り先を募集ページにする
+  const fromRecruit = tournament.status === 'draft' || tournament.status === 'recruiting';
+  bracketBackLink.href = fromRecruit ? '#recruit' : '#history';
+  bracketBackLink.textContent = fromRecruit ? '← 募集中の大会へ' : '← 大会履歴へ';
+
+  const confirmed = tournament.status === 'finished';
+
+  // bracketView は state を書き換えてから onChanged を呼ぶ。ここでDBへ反映する。
   renderBracket(tournamentId, bracketContainer, async () => {
     renderBracketPage(tournamentId);
     await persist(async () => {
       await db.syncTournamentProgress(tournamentId);
 
-      const finished = Boolean(getChampionId(state.brackets[tournamentId]));
-      const nextStatus = finished ? 'finished' : 'running';
-      if (tournament.status !== nextStatus) {
-        await db.setTournamentStatus(tournamentId, nextStatus);
-        tournament.status = nextStatus;
+      // 確定済みの大会で結果を編集し直したら、確定を解いて進行中に戻す。
+      // 逆方向（進行中→終了）は運営が明示的に確定させる（自動では上げない）。
+      if (tournament.status === 'finished' && !allMatchesDecided(state.brackets[tournamentId])) {
+        await db.setTournamentStatus(tournamentId, 'running');
+        tournament.status = 'running';
         renderBracketPage(tournamentId);
       }
     }, '試合結果の保存');
-  }, { readOnly: !isAdmin() });
+  }, { readOnly: !isAdmin(), showResult: confirmed });
 
+  renderResultSection(tournament);
   renderTournamentInfo(tournament);
+}
+
+// 表が全部埋まったあとの「結果を確定する」操作と、確定後の最終順位。
+// 全欄が埋まった瞬間に自動で優勝を掲げると、入力ミスを直す前に結果として広まってしまうため、
+// 運営が内容を見てから確定させる一手間を挟む。
+function renderResultSection(tournament) {
+  resultSectionEl.innerHTML = '';
+
+  const bracket = state.brackets[tournament.id];
+  if (!bracket) return;
+
+  const decided = allMatchesDecided(bracket);
+  const confirmed = tournament.status === 'finished';
+
+  if (!decided) {
+    if (isAdmin()) {
+      const note = document.createElement('p');
+      note.className = 'note';
+      note.textContent = 'すべての対戦が終わると、ここで結果を確定できます。';
+      resultSectionEl.appendChild(note);
+    }
+    return;
+  }
+
+  if (!confirmed) {
+    const box = document.createElement('div');
+    box.className = 'result-pending';
+
+    const note = document.createElement('p');
+    note.textContent = isAdmin()
+      ? 'すべての対戦が終わりました。内容を確認して「結果を確定する」を押すと、優勝者と最終順位が公開されます。'
+      : 'すべての対戦が終わりました。運営が結果を確定するまでお待ちください。';
+    box.appendChild(note);
+
+    if (isAdmin()) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '結果を確定する';
+      btn.addEventListener('click', async () => {
+        if (!confirm(`「${tournament.name}」の結果を確定します。優勝者と最終順位が公開されます。よろしいですか？`)) return;
+        btn.disabled = true;
+        const ok = await persist(async () => {
+          await db.setTournamentStatus(tournament.id, 'finished');
+          tournament.status = 'finished';
+        }, '結果の確定');
+        if (ok) renderBracketPage(tournament.id);
+        else btn.disabled = false;
+      });
+      box.appendChild(btn);
+    }
+
+    resultSectionEl.appendChild(box);
+    return;
+  }
+
+  // ---- 確定済み：最終順位を出す ----
+  const standings = finalStandings(bracket, 16);
+  if (standings.length === 0) return;
+
+  const heading = document.createElement('h3');
+  heading.textContent = '最終順位';
+  resultSectionEl.appendChild(heading);
+
+  const rows = standings.map((s) => {
+    const player = state.players.find((p) => p.id === s.playerId);
+    const name = player ? player.currentName : s.playerId;
+    return `
+      <tr class="${s.rank <= 3 ? `rank-${s.rank}` : ''}">
+        <td class="rank-cell">${s.rank}</td>
+        <td><a href="#player/${encodeURIComponent(s.playerId)}">${escapeHtml(name)}</a></td>
+      </tr>
+    `;
+  }).join('');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'table-scroll';
+  wrap.innerHTML = `
+    <table class="standings-table">
+      <thead><tr><th>順位</th><th>選手</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+  resultSectionEl.appendChild(wrap);
+
+  if (isAdmin()) {
+    const undo = document.createElement('button');
+    undo.type = 'button';
+    undo.className = 'btn-secondary';
+    undo.textContent = '確定を取り消す';
+    undo.addEventListener('click', async () => {
+      if (!confirm('結果の確定を取り消します。優勝者と最終順位は非公開に戻ります。よろしいですか？')) return;
+      undo.disabled = true;
+      const ok = await persist(async () => {
+        await db.setTournamentStatus(tournament.id, 'running');
+        tournament.status = 'running';
+      }, '確定の取り消し');
+      if (ok) renderBracketPage(tournament.id);
+      else undo.disabled = false;
+    });
+    resultSectionEl.appendChild(undo);
+  }
 }
 
 // ---- ランキング ----
@@ -613,9 +768,14 @@ function renderPlayerDetail(playerId) {
 
   let html = `
     <div class="player-detail-header">
-      <h2>${escapeHtml(player.currentName)}</h2>
-      ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.join(', '))}</p>` : ''}
-      ${isOwn ? '<p class="meta-line"><a href="#profile">プロフィールを編集する</a></p>' : ''}
+      <div class="player-identity">
+        ${avatarHtml(player, 'lg')}
+        <div>
+          <h2>${escapeHtml(player.currentName)}</h2>
+          ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.join(', '))}</p>` : ''}
+          ${isOwn ? '<p class="meta-line"><a href="#profile">プロフィールを編集する</a></p>' : ''}
+        </div>
+      </div>
     </div>
     ${profileSectionHtml(player)}
     <div class="stat-cards">
@@ -845,7 +1005,9 @@ tournamentForm.addEventListener('submit', async (e) => {
     format: 'single_elim',
     rules: tournamentRulesInput.value.trim() || null,
     weight: null,
-    capacity,
+    // 定員はエントリー募集を制御するためのもの。運営が参加者を直接選ぶ場合は
+    // 意味を持たないうえ、選んだ人数が定員を超えると自分で自分を弾いてしまう。
+    capacity: manual ? null : capacity,
     status: manual ? 'running' : 'recruiting',
     createdBy: auth.player?.id ?? null,
     participantIds: manual ? [...selectedParticipantIds] : [],
@@ -854,10 +1016,18 @@ tournamentForm.addEventListener('submit', async (e) => {
   tournamentSubmitBtn.disabled = true;
   const ok = await persist(async () => {
     await db.createTournament(tournament);
-    if (manual) {
+    if (!manual) return;
+
+    // 参加者やブラケットの登録に失敗したら、作りかけの大会を残さない。
+    // 大会を先に作らないと参加者を紐づけられない（外部キー）ので、
+    // 失敗時に取り消す形で埋め合わせる。
+    try {
       await db.replaceEntries(tournament.id, tournament.participantIds);
       const bracket = createBracket(tournament.id, tournament.participantIds);
       await db.saveBracket(tournament.id, bracket);
+    } catch (err) {
+      await db.deleteTournament(tournament.id).catch(() => {});
+      throw err;
     }
   }, '大会の作成');
   tournamentSubmitBtn.disabled = false;
@@ -878,6 +1048,7 @@ tournamentEditBtn.addEventListener('click', () => {
   if (!tournament) return;
   tournamentEditNameInput.value = tournament.name;
   tournamentEditDateInput.value = tournament.date || '';
+  tournamentEditCapacityInput.value = tournament.capacity ?? '';
   tournamentEditRulesInput.value = tournament.rules || '';
   tournamentEditForm.hidden = !tournamentEditForm.hidden;
 });
@@ -888,17 +1059,21 @@ tournamentEditCancelBtn.addEventListener('click', () => {
 
 tournamentEditForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+
+  const capacityRaw = tournamentEditCapacityInput.value.trim();
   const result = updateTournament(currentBracketTournamentId, {
     name: tournamentEditNameInput.value,
     date: tournamentEditDateInput.value,
     rules: tournamentEditRulesInput.value,
+    capacity: capacityRaw === '' ? null : Number(capacityRaw),
   });
   if (!result.ok) {
     alert(result.error);
     return;
   }
   const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
-  await persist(() => db.saveTournament(tournament), '大会情報の保存');
+  const ok = await persist(() => db.saveTournament(tournament), '大会情報の保存');
+  if (ok) tournamentEditForm.hidden = true;
   renderBracketPage(currentBracketTournamentId);
 });
 

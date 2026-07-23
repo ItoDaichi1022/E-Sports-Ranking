@@ -1,4 +1,4 @@
-import { escapeHtml } from './players.js';
+import { escapeHtml } from './util.js';
 import { rankChangeInfo } from './ranking.js';
 
 function rankChangeCell(r) {

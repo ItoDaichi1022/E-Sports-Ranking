@@ -41,16 +41,19 @@ js/
   entries.js           募集ページとエントリー
   profile.js           プロフィールの入力と表示
   players.js           選手一覧
+  util.js              エスケープ・URL検証・アイコン描画の共通処理
   rankingView.js       ランキング表
   rankingCard.js       ランキング発表カードのPNG書き出し
   tournamentTier.js    参加人数から大会規模Tierを判定
   vendor/supabase.js   supabase-js（同梱。CDNに依存しないため）
 supabase/
   schema.sql           テーブル・RLS・トリガー・RPC
+  migration-002.sql    構築済みプロジェクトへの差分適用
   SETUP.md             セットアップ手順
 scripts/
   migrate.mjs          旧JSONデータをDBへ移行する
   verify-migration.mjs 移行前後で戦績・ランキングが一致するか検証する
+  check-cache-version.mjs デプロイ前にキャッシュ更新の版数を確認する
 data/                  移行前のJSONデータ（参照用に残してある）
 doc/design.md          設計ドキュメント
 ```

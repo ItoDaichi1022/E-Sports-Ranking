@@ -22,9 +22,18 @@ function legacyState(data) {
   for (const [tid, b] of Object.entries(data.brackets)) {
     if (b) brackets[tid] = b;
   }
+  // 旧データにstatusは無い。移行スクリプトと同じ基準（決勝が確定していれば終了）で
+  // 補ってから比べる。成績表示はstatusを見るようになったため、これが無いと
+  // 移行後だけ成績が出て一致しなくなる。
+  const statusOf = (t) => {
+    const bracket = brackets[t.id];
+    if (!bracket) return 'draft';
+    const finalMatch = bracket.rounds.at(-1)?.matches?.[0];
+    return finalMatch?.confirmed ? 'finished' : 'running';
+  };
   return {
     players: data.players.map((p) => ({ ...p })),
-    tournaments: data.tournaments.map((t) => ({ ...t })),
+    tournaments: data.tournaments.map((t) => ({ ...t, status: statusOf(t) })),
     matches,
     brackets,
   };
@@ -56,6 +65,7 @@ function migratedState(rows) {
       format: t.format,
       weight: t.weight,
       rules: t.rules,
+      status: t.status,
       participantIds: participantsByTournament.get(t.id) ?? [],
     })),
     matches: rows.matchRows.map((m) => ({
