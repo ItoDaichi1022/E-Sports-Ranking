@@ -1521,11 +1521,17 @@ signupBackBtn.addEventListener('click', () => {
 });
 
 logoutBtn.addEventListener('click', async () => {
+  // 押し間違いでログアウトすると入り直す手間がかかるので一度確認する
+  if (!confirm('ログアウトしますか？')) return;
+
+  logoutBtn.disabled = true;
   try {
     await signOut();
     location.hash = '#home';
   } catch (err) {
     setStatus(err.message, 'error');
+  } finally {
+    logoutBtn.disabled = false;
   }
 });
 
