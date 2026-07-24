@@ -1053,8 +1053,6 @@ function renderPlayerDetail(playerId) {
         return ` <span class="rank-change ${className}">${label}</span>`;
       })()
     : '';
-  const total = stats.wins + stats.losses;
-  const winRate = total > 0 ? Math.round((stats.wins / total) * 100) : null;
   const isOwn = auth.player?.id === playerId;
 
   let html = `
@@ -1073,59 +1071,32 @@ function renderPlayerDetail(playerId) {
     <div class="stat-cards">
       <div class="stat-card"><span class="stat-value">${rankLabel}${rankChangeHtml}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>
       <div class="stat-card"><span class="stat-value">${stats.tournaments.length}</span><span class="stat-label">出場大会数</span></div>
-      <div class="stat-card"><span class="stat-value">${stats.wins}勝${stats.losses}敗</span><span class="stat-label">通算成績</span></div>
-      <div class="stat-card"><span class="stat-value">${winRate === null ? '—' : `${winRate}%`}</span><span class="stat-label">勝率</span></div>
     </div>
   `;
 
+  // 出場した大会と、その大会での順位だけを並べる。
+  // 勝敗数・勝率・対戦ごとの記録は出さない（プロフィールは戦績表ではなく
+  // 「どの大会に出て、どこまで勝ち上がったか」を見る場所という位置づけ）。
   if (stats.tournaments.length > 0) {
     html += `
-      <h3>大会別成績</h3>
+      <h3>出場した大会</h3>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>大会</th><th>日付</th><th>結果</th><th>勝敗</th></tr></thead>
+          <thead><tr><th>大会</th><th>日付</th><th>結果</th></tr></thead>
           <tbody>
             ${[...stats.tournaments].reverse().map((entry) => `
               <tr>
                 <td><a href="#tournament/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a></td>
                 <td>${escapeHtml(entry.tournament.date || '—')}</td>
                 <td>${escapeHtml(entry.placement || '—')}</td>
-                <td>${entry.wins}勝${entry.losses}敗</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
       </div>
     `;
-  }
-
-  if (stats.matches.length > 0) {
-    html += `
-      <h3>対戦履歴</h3>
-      <div class="table-scroll">
-        <table>
-          <thead><tr><th>大会</th><th>ラウンド</th><th>対戦相手</th><th>勝敗</th><th>スコア</th></tr></thead>
-          <tbody>
-            ${[...stats.matches].reverse().map((m) => {
-              const won = m.winnerId === playerId;
-              const opponentId = won ? m.loserId : m.winnerId;
-              const tournament = state.tournaments.find((t) => t.id === m.tournamentId);
-              return `
-                <tr>
-                  <td>${escapeHtml(tournament ? tournament.name : m.tournamentId)}</td>
-                  <td>${escapeHtml(m.round)}</td>
-                  <td><a href="#player/${encodeURIComponent(opponentId)}">${escapeHtml(getPlayerName(opponentId))}</a></td>
-                  <td class="${won ? 'result-win' : 'result-loss'}">${won ? '勝ち' : '負け'}</td>
-                  <td>${m.score ? escapeHtml(m.score) : '不戦勝'}</td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
   } else {
-    html += '<p class="empty-hint">まだ対戦記録がありません。</p>';
+    html += '<p class="empty-hint">まだ大会に出場していません。</p>';
   }
 
   playerDetailEl.innerHTML = html;

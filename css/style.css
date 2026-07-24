@@ -1614,9 +1614,6 @@ a.card:hover {
   color: var(--text-faint);
 }
 
-.result-win  { color: var(--win); font-weight: 700; }
-.result-loss { color: var(--loss); }
-
 .player-bio {
   margin: 0.75rem 0 1.25rem;
   padding: 0.9rem 1.1rem;
