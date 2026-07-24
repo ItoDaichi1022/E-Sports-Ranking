@@ -120,6 +120,8 @@ const navToggle = $('nav-toggle');
 
 const announcementListEl = $('announcement-list');
 const announcementNewBtn = $('announcement-new-btn');
+const announcementDialog = $('announcement-dialog');
+const announcementDialogTitle = $('announcement-dialog-title');
 const announcementForm = $('announcement-form');
 const announcementIdInput = $('announcement-id-input');
 const announcementTitleInput = $('announcement-title-input');
@@ -128,6 +130,12 @@ const announcementPinnedInput = $('announcement-pinned-input');
 const announcementFormErrorEl = $('announcement-form-error');
 const announcementSubmitBtn = $('announcement-submit-btn');
 const announcementCancelBtn = $('announcement-cancel-btn');
+
+const newsHeroEl = $('news-hero');
+const newsTitleEl = $('news-title');
+const newsDateEl = $('news-date');
+const newsBodyEl = $('news-body');
+const newsActionsEl = $('news-actions');
 
 const loginDialog = $('login-dialog');
 const loginPanel = $('login-panel');
@@ -206,6 +214,7 @@ function applyAuthUI() {
 
 const VIEW_IDS = {
   home: 'view-home',
+  news: 'view-news',
   recruit: 'view-recruit',
   tournament: 'view-tournament',
   history: 'view-history',
@@ -217,7 +226,7 @@ const VIEW_IDS = {
 };
 
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
-const NAV_PAGE_OF = { bracket: 'history', player: 'players' };
+const NAV_PAGE_OF = { bracket: 'history', player: 'players', news: 'home' };
 
 function parseHash() {
   const h = location.hash.replace(/^#/, '');
@@ -253,6 +262,7 @@ function routeFromHash() {
   });
 
   if (target === 'home') renderHome();
+  else if (target === 'news') renderNewsPage(param);
   else if (target === 'recruit') renderRecruit();
   else if (target === 'tournament') { renderParticipantCheckboxes(); renderSelectedList(); }
   else if (target === 'history') renderHistoryList();
@@ -266,6 +276,7 @@ function routeFromHash() {
 // ---- ホーム（お知らせ） ----
 
 // 投稿・編集フォームを開く。announcement を渡すと編集、null なら新規。
+// ホーム（新規）と詳細ページ（編集）の両方から開くのでダイアログにしている。
 function openAnnouncementForm(announcement) {
   announcementIdInput.value = announcement?.id ?? '';
   announcementTitleInput.value = announcement?.title ?? '';
@@ -273,13 +284,14 @@ function openAnnouncementForm(announcement) {
   announcementPinnedInput.checked = Boolean(announcement?.pinned);
   announcementImagePicker.setCurrent(announcement?.imageUrl || '');
   announcementFormErrorEl.textContent = '';
+  announcementDialogTitle.textContent = announcement ? 'お知らせを編集' : '新しいお知らせ';
   announcementSubmitBtn.textContent = announcement ? '更新する' : '投稿する';
-  announcementForm.hidden = false;
+  announcementDialog.showModal();
   announcementTitleInput.focus();
 }
 
 function closeAnnouncementForm() {
-  announcementForm.hidden = true;
+  announcementDialog.close();
   announcementForm.reset();
   announcementIdInput.value = '';
   announcementImagePicker.setCurrent('');
@@ -288,27 +300,21 @@ function closeAnnouncementForm() {
 
 function renderHome() {
   announcementListEl.innerHTML = '';
-  const admin = isAdmin();
 
   if (state.announcements.length === 0) {
     announcementListEl.innerHTML = '<p class="empty-hint">まだお知らせはありません。</p>';
     return;
   }
 
-  // カードの形は募集・大会履歴と共通（css の .card 系）。ただしお知らせは
-  // 本文を読ませるので1列にする（横に詰めると本文が細切れになる）。
+  // 一覧は画像・題名・日付だけの入口。本文は詳細ページ（#news/{id}）で読ませる。
+  // カードの形と並べ方は募集・大会履歴と共通（css の .card 系）。
   const list = document.createElement('div');
-  list.className = 'card-list';
+  list.className = 'card-grid';
 
   state.announcements.forEach((a) => {
-    const card = document.createElement('article');
+    const card = document.createElement('a');
     card.className = `card${a.pinned ? ' pinned' : ''}`;
-
-    // 画像はカード上端に置く（募集・履歴と同じ並び）。お知らせは詳細ページを
-    // 持たず、ここが画像を見る唯一の場所なので枠を広めに取る。
-    // 画像が無いお知らせでは枠ごと省く。文章だけの告知が大半で、
-    // 頭文字の箱を出すとかえって場所を取るため。
-    if (a.imageUrl) card.appendChild(cardThumb(a.imageUrl, a.title, { tall: true }));
+    card.href = `#news/${encodeURIComponent(a.id)}`;
 
     const body = document.createElement('div');
     body.className = 'card-body';
@@ -329,46 +335,55 @@ function renderHome() {
     date.textContent = formatDateTime(a.createdAt);
     body.appendChild(date);
 
-    if (a.body) {
-      // 本文はユーザー入力。textContentで入れ、改行はCSS(white-space:pre-wrap)で見せる
-      const text = document.createElement('p');
-      text.className = 'card-text';
-      text.textContent = a.body;
-      body.appendChild(text);
-    }
-
-    if (admin) {
-      const actions = document.createElement('div');
-      actions.className = 'card-actions';
-
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'btn-secondary';
-      editBtn.textContent = '編集';
-      editBtn.addEventListener('click', () => openAnnouncementForm(a));
-
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'btn-secondary';
-      delBtn.textContent = '削除';
-      delBtn.addEventListener('click', async () => {
-        if (!confirm(`お知らせ「${a.title}」を削除しますか？`)) return;
-        const ok = await persist(() => db.deleteAnnouncement(a.id), 'お知らせの削除');
-        if (ok) {
-          if (a.imageUrl) await db.removeImageByUrl(a.imageUrl).catch(() => {});
-          await refreshFromDb();
-        }
-      });
-
-      actions.append(editBtn, delBtn);
-      body.appendChild(actions);
-    }
-
-    card.appendChild(body);
+    card.append(cardThumb(a.imageUrl, a.title), body);
     list.appendChild(card);
   });
 
   announcementListEl.appendChild(list);
+}
+
+// お知らせの詳細。画像 → 題名 → 日付 → 本文 → 運営操作 の順に出す。
+function renderNewsPage(id) {
+  newsActionsEl.innerHTML = '';
+
+  const a = state.announcements.find((x) => x.id === id);
+  if (!a) {
+    renderHero(newsHeroEl, null);
+    newsTitleEl.textContent = 'お知らせが見つかりません';
+    newsDateEl.textContent = '';
+    newsBodyEl.textContent = 'このお知らせは存在しないか、削除されています。';
+    return;
+  }
+
+  renderHero(newsHeroEl, a.imageUrl);
+  newsTitleEl.textContent = a.title;
+  newsDateEl.textContent = formatDateTime(a.createdAt);
+  // 本文はユーザー入力。textContentで入れ、改行はCSS(white-space:pre-wrap)で見せる
+  newsBodyEl.textContent = a.body || '';
+
+  if (!isAdmin()) return;
+
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'btn-secondary';
+  editBtn.textContent = '編集';
+  editBtn.addEventListener('click', () => openAnnouncementForm(a));
+
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'btn-remove';
+  delBtn.textContent = '削除';
+  delBtn.addEventListener('click', async () => {
+    if (!confirm(`お知らせ「${a.title}」を削除しますか？`)) return;
+    const ok = await persist(() => db.deleteAnnouncement(a.id), 'お知らせの削除');
+    if (!ok) return;
+    if (a.imageUrl) await db.removeImageByUrl(a.imageUrl).catch(() => {});
+    await refreshFromDb();
+    // 消したお知らせのページに留まらないよう一覧へ戻す
+    location.hash = '#home';
+  });
+
+  newsActionsEl.append(editBtn, delBtn);
 }
 
 // ---- 選手 ----
@@ -715,16 +730,16 @@ const FORMAT_LABELS = {
   round_robin: '総当たり',
 };
 
-// 大会画像をページ上端のヘッダーとして出す。
-// 画像が無い大会では枠ごと隠し、余白だけが残らないようにする。
-function renderTournamentHero(tournament) {
-  const url = safeUrl(tournament?.imageUrl);
+// 詳細ページ（大会・お知らせ）の画像ヘッダー。
+// 画像が無いときは枠ごと隠し、余白だけが残らないようにする。
+function renderHero(el, imageUrl) {
+  const url = safeUrl(imageUrl);
   if (url) {
-    tournamentHeroEl.innerHTML = `<img src="${escapeHtml(url)}" alt="" loading="lazy">`;
-    tournamentHeroEl.hidden = false;
+    el.innerHTML = `<img src="${escapeHtml(url)}" alt="" loading="lazy">`;
+    el.hidden = false;
   } else {
-    tournamentHeroEl.innerHTML = '';
-    tournamentHeroEl.hidden = true;
+    el.innerHTML = '';
+    el.hidden = true;
   }
 }
 
@@ -770,7 +785,7 @@ function renderBracketPage(tournamentId) {
 
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
-    renderTournamentHero(null);
+    renderHero(tournamentHeroEl, null);
     bracketTitleEl.textContent = '大会が見つかりません';
     bracketMetaEl.textContent = '';
     bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
@@ -780,7 +795,7 @@ function renderBracketPage(tournamentId) {
     return;
   }
 
-  renderTournamentHero(tournament);
+  renderHero(tournamentHeroEl, tournament.imageUrl);
   bracketTitleEl.textContent = tournament.name;
   bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${tournament.participantIds.length}人参加 ・ ${tournamentStatusLabel(tournament)}`;
 

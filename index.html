@@ -8,7 +8,7 @@
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=47">
+<link rel="stylesheet" href="css/style.css?v=48">
 </head>
 <body>
 <header>
@@ -84,6 +84,40 @@
   </div>
 </dialog>
 
+<!-- お知らせの投稿・編集。ホーム（新規）と詳細ページ（編集）の両方から開くので、
+     どちらの画面にも属さないダイアログにしている。 -->
+<dialog id="announcement-dialog" class="dialog-wide">
+  <h3 id="announcement-dialog-title">新しいお知らせ</h3>
+  <form id="announcement-form" class="inline-form">
+    <input type="hidden" id="announcement-id-input">
+    <label>
+      タイトル
+      <input type="text" id="announcement-title-input" placeholder="例: 第5回大会の募集を開始しました" required>
+    </label>
+    <label class="rules-field">
+      本文（任意）
+      <textarea id="announcement-body-input" rows="6" placeholder="詳細や補足があれば記入します。"></textarea>
+    </label>
+    <label class="image-field">
+      画像（任意・5MBまで）
+      <input type="file" id="announcement-image-input" accept="image/png,image/jpeg,image/webp,image/gif">
+    </label>
+    <div class="image-preview-row">
+      <img id="announcement-image-preview" class="image-preview" alt="" hidden>
+      <button type="button" id="announcement-image-remove-btn" class="btn-secondary" hidden>画像を外す</button>
+    </div>
+    <label class="checkbox-inline">
+      <input type="checkbox" id="announcement-pinned-input">
+      先頭に固定する
+    </label>
+    <p id="announcement-form-error" class="status-line error"></p>
+    <div class="dialog-actions">
+      <button type="button" id="announcement-cancel-btn" class="btn-secondary">キャンセル</button>
+      <button type="submit" id="announcement-submit-btn">投稿する</button>
+    </div>
+  </form>
+</dialog>
+
 <main>
   <section id="view-home" class="view">
     <div class="hero">
@@ -111,38 +145,19 @@
         <button type="button" id="announcement-new-btn" class="btn-secondary" hidden>新しいお知らせ</button>
       </div>
 
-      <!-- 運営の投稿・編集フォーム。既定は隠しておき、ボタンで開く -->
-      <form id="announcement-form" class="inline-form" hidden>
-        <input type="hidden" id="announcement-id-input">
-        <label>
-          タイトル
-          <input type="text" id="announcement-title-input" placeholder="例: 第5回大会の募集を開始しました" required>
-        </label>
-        <label class="rules-field">
-          本文（任意）
-          <textarea id="announcement-body-input" rows="4" placeholder="詳細や補足があれば記入します。"></textarea>
-        </label>
-        <label class="image-field">
-          画像（任意・5MBまで）
-          <input type="file" id="announcement-image-input" accept="image/png,image/jpeg,image/webp,image/gif">
-        </label>
-        <div class="image-preview-row">
-          <img id="announcement-image-preview" class="image-preview" alt="" hidden>
-          <button type="button" id="announcement-image-remove-btn" class="btn-secondary" hidden>画像を外す</button>
-        </div>
-        <label class="checkbox-inline">
-          <input type="checkbox" id="announcement-pinned-input">
-          先頭に固定する
-        </label>
-        <p id="announcement-form-error" class="status-line error"></p>
-        <div class="dialog-actions">
-          <button type="button" id="announcement-cancel-btn" class="btn-secondary">キャンセル</button>
-          <button type="submit" id="announcement-submit-btn">投稿する</button>
-        </div>
-      </form>
-
       <div id="announcement-list"></div>
     </div>
+  </section>
+
+  <!-- お知らせの詳細。一覧のカードは画像・題名・日付だけの入口にしているので、
+       本文はここで読ませる。上から 画像 → 題名 → 日付 → 本文 → 運営操作。 -->
+  <section id="view-news" class="view" hidden>
+    <a class="back-link" id="news-back-link" href="#home">← ホームへ</a>
+    <div id="news-hero" class="detail-hero" hidden></div>
+    <h2 id="news-title"></h2>
+    <p id="news-date" class="meta-line"></p>
+    <p id="news-body" class="news-body"></p>
+    <div id="news-actions"></div>
   </section>
 
   <section id="view-recruit" class="view" hidden>
@@ -250,7 +265,7 @@
     <a class="back-link" id="bracket-back-link" href="#history">← 大会履歴へ</a>
 
     <!-- 大会画像のヘッダー。画像が無い大会ではJSが丸ごと隠す。 -->
-    <div id="tournament-hero" class="tournament-hero" hidden></div>
+    <div id="tournament-hero" class="detail-hero" hidden></div>
 
     <div class="bracket-page-header">
       <div class="bracket-title-block">
@@ -354,7 +369,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=47"></script>
+<script src="js/vendor/supabase.js?v=48"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -366,24 +381,24 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=47",
-    "./js/bracket.js":        "./js/bracket.js?v=47",
-    "./js/bracketView.js":    "./js/bracketView.js?v=47",
-    "./js/db.js":             "./js/db.js?v=47",
-    "./js/entries.js":        "./js/entries.js?v=47",
-    "./js/playerStats.js":    "./js/playerStats.js?v=47",
-    "./js/players.js":        "./js/players.js?v=47",
-    "./js/profile.js":        "./js/profile.js?v=47",
-    "./js/ranking.js":        "./js/ranking.js?v=47",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=47",
-    "./js/rankingView.js":    "./js/rankingView.js?v=47",
-    "./js/state.js":          "./js/state.js?v=47",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=47",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=47",
-    "./js/util.js":           "./js/util.js?v=47"
+    "./js/auth.js":           "./js/auth.js?v=48",
+    "./js/bracket.js":        "./js/bracket.js?v=48",
+    "./js/bracketView.js":    "./js/bracketView.js?v=48",
+    "./js/db.js":             "./js/db.js?v=48",
+    "./js/entries.js":        "./js/entries.js?v=48",
+    "./js/playerStats.js":    "./js/playerStats.js?v=48",
+    "./js/players.js":        "./js/players.js?v=48",
+    "./js/profile.js":        "./js/profile.js?v=48",
+    "./js/ranking.js":        "./js/ranking.js?v=48",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=48",
+    "./js/rankingView.js":    "./js/rankingView.js?v=48",
+    "./js/state.js":          "./js/state.js?v=48",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=48",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=48",
+    "./js/util.js":           "./js/util.js?v=48"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=47"></script>
+<script type="module" src="js/app.js?v=48"></script>
 </body>
 </html>

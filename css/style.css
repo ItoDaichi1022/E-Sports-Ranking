@@ -1112,6 +1112,35 @@ a.card:hover {
   font-size: 0.82rem;
 }
 
+/* ---- お知らせ詳細 ---- */
+
+#news-title {
+  margin-bottom: 0.35rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+#news-date { margin-bottom: 1.5rem; }
+
+/* 本文の改行を入力どおり見せる（textContentで入れているのでHTMLは混ざらない） */
+.news-body {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 運営の操作はページ最後に置き、本文と線で切り離す */
+#news-actions:not(:empty) {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-soft);
+}
+
 /* 大会詳細のエントリー・運営操作。ページ最後に置くので、上に区切りを入れて
    本文（大会情報）と切り離す。 */
 .tournament-actions-row {
@@ -1170,9 +1199,10 @@ a.card:hover {
    ブラケット
    --------------------------------------------------------------------------- */
 
-/* 大会画像のヘッダー。セクションの左右いっぱいまで広げて「見出し」らしく見せる。
-   画像自体は切り抜かず、枠の中に全体を収める（下の画像共通ルール）。 */
-.tournament-hero {
+/* 詳細ページ（大会・お知らせ）の画像ヘッダー。セクションの左右いっぱいまで
+   広げて「見出し」らしく見せる。画像自体は切り抜かず、枠の中に全体を収める
+   （下の画像共通ルール）。 */
+.detail-hero {
   display: flex;
   justify-content: center;
   margin: 0 -1.5rem 1.5rem;
@@ -1675,6 +1705,13 @@ dialog {
   box-shadow: var(--shadow-lg);
 }
 
+/* 本文を書き込むフォーム（お知らせの投稿）は横幅を広めに取る */
+dialog.dialog-wide { max-width: 560px; }
+
+/* ダイアログ内のフォームは横並びをやめて1列に積む（幅が限られるため） */
+dialog .inline-form > label,
+dialog .inline-form > .image-preview-row { flex: 1 1 100%; }
+
 dialog::backdrop {
   background: rgba(5, 7, 12, 0.7);
   backdrop-filter: blur(3px);
@@ -1822,7 +1859,7 @@ dialog h3 {
        PCとスマホで高さも切り取られ方も変わる原因だった。
      * 縦横比は原寸のまま、幅と高さの「上限」だけを決めて中に収める。
      * 原寸より拡大しない（小さい画像がぼやけない）。 */
-.tournament-hero img {
+.detail-hero img {
   display: block;
   margin-left: auto;
   margin-right: auto;
@@ -1898,7 +1935,7 @@ dialog h3 {
   .card-thumb.is-tall { height: 200px; }
 
   /* セクションの余白が狭くなるぶん、画像ヘッダーのはみ出し量も合わせる */
-  .tournament-hero {
+  .detail-hero {
     margin: 0 -1rem 1.25rem;
     padding: 0.75rem 1rem;
   }
