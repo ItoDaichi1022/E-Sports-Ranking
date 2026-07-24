@@ -54,6 +54,55 @@ export function cardThumb(imageUrl, fallbackName, { tall = false } = {}) {
   return el;
 }
 
+// アップロード前に画像を縮小する。
+//
+// スマートフォンの写真は数千ピクセル・数MBあるが、この画面で使うのはせいぜい
+// 数百ピクセル。そのまま保存すると保管容量と通信量を無駄に食うので、表示に
+// 必要な大きさまで落としてから送る（無料枠を長持ちさせるための要）。
+//
+// 触らずにそのまま返す場合:
+//   * アニメーションGIF … canvasに描くと1コマ目だけになってしまう
+//   * 画像として読めなかった … 判断はStorage側の検査に任せる
+//   * 変換しても小さくならなかった … 元より悪くしない
+export async function downscaleImage(file, maxDimension) {
+  if (!file?.type?.startsWith('image/') || file.type === 'image/gif') return file;
+  if (typeof createImageBitmap !== 'function') return file;
+
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    return file;
+  }
+
+  try {
+    // 長辺を maxDimension に収める。元から小さければ拡大はしない。
+    const longest = Math.max(bitmap.width, bitmap.height);
+    const scale = Math.min(1, maxDimension / longest);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+
+    // WebPを使うのは、JPEGと違って透過を保てるため（アイコンのPNGが黒く潰れない）。
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/webp', 0.85);
+    });
+
+    if (!blob || blob.size >= file.size) return file;
+
+    const name = `${file.name.replace(/\.[^.]+$/, '')}.webp`;
+    return new File([blob], name, { type: 'image/webp' });
+  } catch {
+    return file;
+  } finally {
+    bitmap.close?.();
+  }
+}
+
 // 大会・お知らせの画像アップロード用ピッカー。HTML側に用意した
 // ファイル入力・プレビュー用img・「画像を外す」ボタンを配線する。
 // 大会作成／編集／お知らせの3フォームで同じ配線を使い回すためのもの。

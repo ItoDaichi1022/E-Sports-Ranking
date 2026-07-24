@@ -1158,6 +1158,15 @@ function formatTime(date) {
 let loadInFlight = false;
 let refreshQueued = false;
 
+// 保険の全件取得をどれくらいの間隔で行うか。
+// 判定は「前回DBから読んでからの経過時間」で見るので、Realtimeでの更新や
+// 保存操作で読み直した直後は、その分だけ次の照合が先送りされる。
+const POLL_TICK_MS = 60 * 1000;              // 判定そのものは1分ごと
+const POLL_CONNECTED_MS = 15 * 60 * 1000;    // 届いている間は15分に1回だけ照合
+const POLL_DISCONNECTED_MS = 60 * 1000;      // 届いていないときは1分ごとに取りに行く
+
+let lastLoadedAt = 0;
+
 async function refreshFromDb({ silent = false } = {}) {
   // 読み込み中に更新通知が来たら、取りこぼさないよう終わってからもう一度読む
   if (loadInFlight) {
@@ -1167,6 +1176,7 @@ async function refreshFromDb({ silent = false } = {}) {
   loadInFlight = true;
   try {
     await db.loadAll();
+    lastLoadedAt = Date.now();
     routeFromHash();
     if (!silent) setStatus('');
   } catch (err) {
@@ -1682,12 +1692,21 @@ async function start() {
     refreshFromDb({ silent: true });
   });
 
-  // 保険。WebSocketが切れたまま再接続できていない間も、進行中の大会が
-  // 古いまま放置されないようにする（通常はRealtimeが先に届くので空振りする）。
+  // 保険の全件取得。WebSocketが切れたまま再接続できていない間も、進行中の大会が
+  // 古いまま放置されないようにする。
+  //
+  // Realtimeが正常に届いている間は、これはほぼ毎回空振りする。それでも通信量は
+  // 満額かかる（loadAllは常に全テーブルを全件取る）ので、届いているときは
+  // 間隔を大きく空ける。完全に止めないのは、再接続の瞬間に起きた変更は
+  // 通知が届かず取りこぼし得るため。長めでも照合が入れば必ず正しい状態に戻る。
   setInterval(() => {
     if (document.hidden || isUserTyping()) return;
+
+    const needed = db.isRealtimeConnected() ? POLL_CONNECTED_MS : POLL_DISCONNECTED_MS;
+    if (Date.now() - lastLoadedAt < needed) return;
+
     refreshFromDb({ silent: true });
-  }, 60 * 1000);
+  }, POLL_TICK_MS);
 }
 
 start();

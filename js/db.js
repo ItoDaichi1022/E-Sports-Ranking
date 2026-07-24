@@ -9,6 +9,7 @@
 
 import { supabase } from './supabaseClient.js';
 import { state } from './state.js';
+import { downscaleImage } from './util.js';
 
 // ---------------------------------------------------------------------------
 // 行 ⇄ stateオブジェクトの変換
@@ -270,6 +271,8 @@ export async function mergePlayers(sourcePlayerId, targetPlayerId) {
 const AVATAR_BUCKET = 'avatars';
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+// アイコンは最大でも5rem（80px）の丸で出る。高精細画面を考えても512pxあれば足りる。
+const AVATAR_MAX_DIMENSION = 512;
 
 // アイコンをアップロードし、公開URLを返す。
 // 保存先は avatars/{自分のuser_id}/... で固定する。Storage側のポリシーが
@@ -278,17 +281,21 @@ export async function uploadAvatar(userId, file) {
   if (!AVATAR_TYPES.includes(file.type)) {
     throw new Error('画像はPNG / JPEG / WebP / GIF のいずれかにしてください。');
   }
-  if (file.size > AVATAR_MAX_BYTES) {
+
+  // 先に縮小してから容量を見る。スマホの写真はそのままだと数MBあるが、
+  // 縮小後は数十KBに収まるので、この順なら「大きすぎます」で弾かれずに済む。
+  const upload = await downscaleImage(file, AVATAR_MAX_DIMENSION);
+  if (upload.size > AVATAR_MAX_BYTES) {
     throw new Error('画像のサイズは2MBまでにしてください。');
   }
 
   // 同じ名前で上書きするとCDNに古い画像が残るため、毎回別名で入れる
-  const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const ext = (upload.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
   const path = `${userId}/${Date.now()}.${ext || 'png'}`;
 
   const { error } = await supabase.storage
     .from(AVATAR_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: false });
+    .upload(path, upload, { contentType: upload.type, upsert: false });
   if (error) {
     console.error('[db] アイコンのアップロードに失敗', error);
     throw new Error(`アイコンのアップロードに失敗しました: ${error.message}`);
@@ -319,22 +326,28 @@ export async function removeAvatarByUrl(url) {
 const IMAGE_BUCKET = 'images';
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+// 詳細ページのヘッダーで最大22rem（352px）、一覧のカードでは160〜260px。
+// 高精細画面でも足りるよう長辺1600pxまでに収める。
+const IMAGE_MAX_DIMENSION = 1600;
 
 // 画像をアップロードして公開URLを返す。folder は 'tournaments' / 'announcements' など。
 export async function uploadImage(file, folder = 'misc') {
   if (!IMAGE_TYPES.includes(file.type)) {
     throw new Error('画像はPNG / JPEG / WebP / GIF のいずれかにしてください。');
   }
-  if (file.size > IMAGE_MAX_BYTES) {
+
+  // 先に縮小してから容量を見る（uploadAvatar と同じ理由）
+  const upload = await downscaleImage(file, IMAGE_MAX_DIMENSION);
+  if (upload.size > IMAGE_MAX_BYTES) {
     throw new Error('画像のサイズは5MBまでにしてください。');
   }
 
-  const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const ext = (upload.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
   const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext || 'png'}`;
 
   const { error } = await supabase.storage
     .from(IMAGE_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: false });
+    .upload(path, upload, { contentType: upload.type, upsert: false });
   if (error) {
     console.error('[db] 画像のアップロードに失敗', error);
     throw new Error(`画像のアップロードに失敗しました: ${error.message}`);
@@ -567,6 +580,16 @@ export async function deleteAnnouncement(id) {
 // ---------------------------------------------------------------------------
 
 let channel = null;
+let realtimeConnected = false;
+
+// 変更のプッシュが今ちゃんと届く状態か。
+//
+// 呼び出し側は、これが真の間は保険の全件取得を控えてよい（無駄な通信を減らす）。
+// WebSocketが黙って切れる事故はあるが、supabase-jsが25秒ごとにハートビートを
+// 送っていて、応答が無ければ SUBSCRIBED から外れるので、この値で判断できる。
+export function isRealtimeConnected() {
+  return realtimeConnected;
+}
 
 // いずれかのテーブルが変わったら onChange を呼ぶ。短時間に複数の変更が届いても
 // まとめて1回で済むよう、少しだけ待ってから通知する。
@@ -584,10 +607,15 @@ export function subscribeToChanges(onChange, debounceMs = 400) {
     .forEach((table) => {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, notify);
     });
-  channel.subscribe();
+
+  // status は SUBSCRIBED / CHANNEL_ERROR / TIMED_OUT / CLOSED のいずれか
+  channel.subscribe((status) => {
+    realtimeConnected = status === 'SUBSCRIBED';
+  });
 }
 
 export function unsubscribeFromChanges() {
+  realtimeConnected = false;
   if (!channel) return;
   supabase.removeChannel(channel);
   channel = null;
