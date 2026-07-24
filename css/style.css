@@ -1860,9 +1860,17 @@ dialog h3 {
   color: var(--text-faint);
 }
 
-#email-form input {
+#email-form input,
+#signup-form input {
   width: 100%;
   margin-bottom: 0.6rem;
+}
+
+/* 新規登録は「ログインできなかった理由」の説明を読ませたいので、
+   案内文を通常のnoteより見やすくする。 */
+#signup-note {
+  margin-top: 0;
+  line-height: 1.7;
 }
 
 /* ---------------------------------------------------------------------------

@@ -124,17 +124,31 @@ export async function signInWithProvider(provider) {
   if (error) throw new Error(`ログインに失敗しました: ${error.message}`);
 }
 
+// 失敗時は Error に reason を添える。呼び出し側が「新規登録へ案内するか」を
+// 判断できるようにするため（文言の一致で分岐させない）。
+function loginError(message, reason) {
+  const err = new Error(message);
+  err.reason = reason;
+  return err;
+}
+
 export async function signInWithEmail(email, password) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    if (error.message.includes('Invalid login credentials')) {
-      throw new Error('メールアドレスまたはパスワードが違います。');
-    }
-    if (error.message.includes('Email not confirmed')) {
-      throw new Error('メールアドレスの確認が済んでいません。届いているメールのリンクを開いてください。');
-    }
-    throw new Error(`ログインに失敗しました: ${error.message}`);
+  if (!error) return;
+
+  // Supabaseは「未登録」と「パスワード違い」を同じ Invalid login credentials で返す。
+  // 外部からメールアドレスの存在を探れないようにするための仕様なので、
+  // どちらなのかはクライアントからは判別できない。
+  if (error.message.includes('Invalid login credentials')) {
+    throw loginError('メールアドレスまたはパスワードが違います。', 'invalid_credentials');
   }
+  if (error.message.includes('Email not confirmed')) {
+    throw loginError(
+      'メールアドレスの確認が済んでいません。届いているメールのリンクを開いてください。',
+      'email_not_confirmed',
+    );
+  }
+  throw loginError(`ログインに失敗しました: ${error.message}`, 'other');
 }
 
 // 新規登録。プロジェクトの設定によっては確認メールのリンクを開くまで
@@ -147,13 +161,21 @@ export async function signUpWithEmail(email, password) {
   });
   if (error) {
     if (error.message.includes('already registered')) {
-      throw new Error('このメールアドレスは既に登録されています。ログインしてください。');
+      throw loginError('このメールアドレスは既に登録されています。', 'already_registered');
     }
     if (error.message.includes('Password should be')) {
-      throw new Error('パスワードは6文字以上にしてください。');
+      throw loginError('パスワードは6文字以上にしてください。', 'weak_password');
     }
-    throw new Error(`登録に失敗しました: ${error.message}`);
+    throw loginError(`登録に失敗しました: ${error.message}`, 'other');
   }
+
+  // メール確認が有効なプロジェクトでは、既存のアドレスで登録しようとしても
+  // エラーではなく「成功」で返る（アドレスの存在を隠すため）。ただしその場合は
+  // identities が空になるので、新しく作られたのではないと判断できる。
+  if (Array.isArray(data.user?.identities) && data.user.identities.length === 0) {
+    throw loginError('このメールアドレスは既に登録されています。', 'already_registered');
+  }
+
   return { needsEmailConfirmation: !data.session };
 }
 

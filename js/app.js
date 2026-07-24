@@ -128,15 +128,24 @@ const announcementSubmitBtn = $('announcement-submit-btn');
 const announcementCancelBtn = $('announcement-cancel-btn');
 
 const loginDialog = $('login-dialog');
+const loginPanel = $('login-panel');
 const emailForm = $('email-form');
 const emailInput = $('email-input');
 const passwordInput = $('password-input');
 const loginErrorEl = $('login-error');
 const emailLoginBtn = $('email-login-btn');
-const signupBtn = $('signup-btn');
 const googleLoginBtn = $('google-login-btn');
 const discordLoginBtn = $('discord-login-btn');
 const loginCancelBtn = $('login-cancel-btn');
+
+const signupPanel = $('signup-panel');
+const signupNoteEl = $('signup-note');
+const signupForm = $('signup-form');
+const signupEmailInput = $('signup-email-input');
+const signupPasswordInput = $('signup-password-input');
+const signupErrorEl = $('signup-error');
+const signupSubmitBtn = $('signup-submit-btn');
+const signupBackBtn = $('signup-back-btn');
 
 // メッセージが無いときは行ごと隠す。空のまま置いておくとヘッダーが
 // 常に2段になり、上段が中途半端に見えるため。
@@ -1383,12 +1392,38 @@ announcementForm.addEventListener('submit', async (e) => {
   }
 });
 
-// ---- ログイン ----
+// ---- ログイン / 新規登録 ----
+//
+// ダイアログは「ログイン」と「新規登録」の2画面を持ち、既定はログイン。
+// 新規登録は最初から見せず、ログインを試して入れなかったときに切り替える。
+// （Supabaseは「未登録」と「パスワード違い」を区別せず同じエラーを返すため、
+//  未登録だと断定はできない。どちらの可能性もあると伝えて利用者に選ばせる。）
+
+function showLoginMode(message = '') {
+  loginPanel.hidden = false;
+  signupPanel.hidden = true;
+  loginErrorEl.className = message ? 'status-line error' : 'status-line';
+  loginErrorEl.textContent = message;
+}
+
+// 入力済みのメールアドレスを引き継いで新規登録へ切り替える。
+function showSignupMode(email) {
+  loginPanel.hidden = true;
+  signupPanel.hidden = false;
+  signupEmailInput.value = email;
+  signupPasswordInput.value = '';
+  signupErrorEl.className = 'status-line error';
+  signupErrorEl.textContent = '';
+  signupNoteEl.textContent = 'このメールアドレスではログインできませんでした。'
+    + 'まだアカウントをお持ちでなければ、このまま新規登録できます。'
+    + 'パスワードの入力間違いかもしれない場合は「ログインに戻る」からやり直してください。';
+  signupPasswordInput.focus();
+}
 
 function openLoginDialog() {
   emailInput.value = '';
   passwordInput.value = '';
-  loginErrorEl.textContent = '';
+  showLoginMode();
   loginDialog.showModal();
 }
 
@@ -1435,41 +1470,54 @@ discordLoginBtn.addEventListener('click', async () => {
 
 emailForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+  const email = emailInput.value.trim();
   emailLoginBtn.disabled = true;
   loginErrorEl.textContent = '';
   try {
-    await signInWithEmail(emailInput.value.trim(), passwordInput.value);
+    await signInWithEmail(email, passwordInput.value);
     loginDialog.close();
   } catch (err) {
-    loginErrorEl.textContent = err.message;
+    // 未登録の可能性があるときは、そのまま新規登録へ進めるようにする
+    if (err.reason === 'invalid_credentials') showSignupMode(email);
+    else loginErrorEl.textContent = err.message;
   } finally {
     emailLoginBtn.disabled = false;
   }
 });
 
-signupBtn.addEventListener('click', async () => {
-  const email = emailInput.value.trim();
-  const password = passwordInput.value;
-  if (!email || !password) {
-    loginErrorEl.textContent = 'メールアドレスとパスワードを入力してください。';
-    return;
-  }
-  signupBtn.disabled = true;
-  loginErrorEl.textContent = '';
+signupForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = signupEmailInput.value.trim();
+  signupSubmitBtn.disabled = true;
+  signupErrorEl.className = 'status-line error';
+  signupErrorEl.textContent = '';
   try {
-    const { needsEmailConfirmation } = await signUpWithEmail(email, password);
+    const { needsEmailConfirmation } = await signUpWithEmail(email, signupPasswordInput.value);
     if (needsEmailConfirmation) {
-      loginErrorEl.className = 'status-line success';
-      loginErrorEl.textContent = '確認メールを送りました。メール内のリンクを開くとログインできます。';
+      signupErrorEl.className = 'status-line success';
+      signupErrorEl.textContent = '確認メールを送りました。メール内のリンクを開くとログインできます。';
     } else {
       loginDialog.close();
     }
   } catch (err) {
-    loginErrorEl.className = 'status-line error';
-    loginErrorEl.textContent = err.message;
+    // 登録済みだった＝入れなかった原因はパスワード違い。ログイン画面へ戻す。
+    if (err.reason === 'already_registered') {
+      emailInput.value = email;
+      passwordInput.value = '';
+      showLoginMode('このメールアドレスは登録済みです。パスワードを確かめてもう一度お試しください。');
+      passwordInput.focus();
+      return;
+    }
+    signupErrorEl.textContent = err.message;
   } finally {
-    signupBtn.disabled = false;
+    signupSubmitBtn.disabled = false;
   }
+});
+
+signupBackBtn.addEventListener('click', () => {
+  passwordInput.value = '';
+  showLoginMode();
+  passwordInput.focus();
 });
 
 logoutBtn.addEventListener('click', async () => {

@@ -8,7 +8,7 @@
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=41">
+<link rel="stylesheet" href="css/style.css?v=42">
 </head>
 <body>
 <header>
@@ -40,25 +40,44 @@
 </header>
 
 <dialog id="login-dialog">
-  <h3>ログイン</h3>
-  <p class="note">ログインすると自分の選手プロフィールを編集し、大会にエントリーできます。</p>
+  <!-- ログイン。既定はこちらを出す。 -->
+  <div id="login-panel">
+    <h3>ログイン</h3>
+    <p class="note">ログインすると自分の選手プロフィールを編集し、大会にエントリーできます。</p>
 
-  <div class="oauth-buttons">
-    <button type="button" id="google-login-btn" class="btn-secondary">Googleでログイン</button>
-    <button type="button" id="discord-login-btn" class="btn-secondary">Discordでログイン</button>
+    <div class="oauth-buttons">
+      <button type="button" id="google-login-btn" class="btn-secondary">Googleでログイン</button>
+      <button type="button" id="discord-login-btn" class="btn-secondary">Discordでログイン</button>
+    </div>
+
+    <p class="divider-note">またはメールアドレスで</p>
+
+    <form id="email-form">
+      <input type="email" id="email-input" placeholder="メールアドレス" autocomplete="email" required>
+      <input type="password" id="password-input" placeholder="パスワード" autocomplete="current-password" required>
+      <p id="login-error" class="status-line error"></p>
+      <div class="dialog-actions">
+        <button type="submit" id="email-login-btn">ログイン</button>
+      </div>
+    </form>
   </div>
 
-  <p class="divider-note">またはメールアドレスで</p>
+  <!-- 新規登録。ログインを試して入れなかったときに、入力済みのメールアドレスを
+       引き継いでこちらへ切り替える。 -->
+  <div id="signup-panel" hidden>
+    <h3>新規登録</h3>
+    <p class="note" id="signup-note"></p>
 
-  <form id="email-form">
-    <input type="email" id="email-input" placeholder="メールアドレス" autocomplete="email" required>
-    <input type="password" id="password-input" placeholder="パスワード（6文字以上）" autocomplete="current-password" required>
-    <p id="login-error" class="status-line error"></p>
-    <div class="dialog-actions">
-      <button type="button" id="signup-btn" class="btn-secondary">新規登録</button>
-      <button type="submit" id="email-login-btn">ログイン</button>
-    </div>
-  </form>
+    <form id="signup-form">
+      <input type="email" id="signup-email-input" placeholder="メールアドレス" autocomplete="email" required>
+      <input type="password" id="signup-password-input" placeholder="パスワード（6文字以上）" autocomplete="new-password" minlength="6" required>
+      <p id="signup-error" class="status-line error"></p>
+      <div class="dialog-actions">
+        <button type="button" id="signup-back-btn" class="btn-secondary">ログインに戻る</button>
+        <button type="submit" id="signup-submit-btn">登録する</button>
+      </div>
+    </form>
+  </div>
 
   <div class="dialog-actions">
     <button type="button" id="login-cancel-btn" class="btn-secondary">閉じる</button>
@@ -324,7 +343,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=41"></script>
+<script src="js/vendor/supabase.js?v=42"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -336,24 +355,24 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=41",
-    "./js/bracket.js":        "./js/bracket.js?v=41",
-    "./js/bracketView.js":    "./js/bracketView.js?v=41",
-    "./js/db.js":             "./js/db.js?v=41",
-    "./js/entries.js":        "./js/entries.js?v=41",
-    "./js/playerStats.js":    "./js/playerStats.js?v=41",
-    "./js/players.js":        "./js/players.js?v=41",
-    "./js/profile.js":        "./js/profile.js?v=41",
-    "./js/ranking.js":        "./js/ranking.js?v=41",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=41",
-    "./js/rankingView.js":    "./js/rankingView.js?v=41",
-    "./js/state.js":          "./js/state.js?v=41",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=41",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=41",
-    "./js/util.js":           "./js/util.js?v=41"
+    "./js/auth.js":           "./js/auth.js?v=42",
+    "./js/bracket.js":        "./js/bracket.js?v=42",
+    "./js/bracketView.js":    "./js/bracketView.js?v=42",
+    "./js/db.js":             "./js/db.js?v=42",
+    "./js/entries.js":        "./js/entries.js?v=42",
+    "./js/playerStats.js":    "./js/playerStats.js?v=42",
+    "./js/players.js":        "./js/players.js?v=42",
+    "./js/profile.js":        "./js/profile.js?v=42",
+    "./js/ranking.js":        "./js/ranking.js?v=42",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=42",
+    "./js/rankingView.js":    "./js/rankingView.js?v=42",
+    "./js/state.js":          "./js/state.js?v=42",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=42",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=42",
+    "./js/util.js":           "./js/util.js?v=42"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=41"></script>
+<script type="module" src="js/app.js?v=42"></script>
 </body>
 </html>
