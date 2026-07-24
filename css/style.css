@@ -1063,17 +1063,13 @@ td code { font-size: 0.85em; }
   border-color: var(--border-strong);
 }
 
+/* 大会のバナー。切り抜かず、画像の全体が必ず見えるようにする（下の共通ルール参照）。 */
 .recruit-banner {
   display: block;
   line-height: 0;
+  padding: 0;
   background: var(--surface-2);
-}
-
-.recruit-banner img {
-  width: 100%;
-  height: clamp(120px, 26vw, 220px);
-  object-fit: cover;
-  display: block;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .recruit-body { padding: 1.25rem 1.4rem; }
@@ -1960,22 +1956,34 @@ dialog h3 {
    大会・お知らせの画像
    --------------------------------------------------------------------------- */
 
-/* 表示用。横幅に合わせて縮み、縦は原寸比のまま。大きすぎる画像で
-   レイアウトが崩れないよう高さの上限を設ける。 */
+/* 表示用の画像は、募集バナー・大会詳細・お知らせで同じ規則にそろえる。
+   PCとスマホで見え方が変わらないようにするための決まりごと:
+     * 切り抜かない。以前は object-fit:cover で帯状に切っていたが、大会の
+       告知画像は縦長のこともあり、上下が見切れて内容が読めなくなっていた。
+     * 高さを画面幅に連動させない。以前の height:clamp(...,26vw,...) は
+       PCとスマホで高さも切り取られ方も変わる原因だった。
+     * 縦横比は原寸のまま、幅と高さの「上限」だけを決めて中に収める。
+     * 原寸より拡大しない（小さい画像がぼやけない）。 */
+.recruit-banner img,
 .announcement-image,
 .tournament-image {
   display: block;
+  margin-left: auto;
+  margin-right: auto;
   max-width: 100%;
-  max-height: 420px;
+  max-height: 22rem;
   width: auto;
   height: auto;
-  margin: 0.9rem 0 0;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--r);
-  object-fit: contain;
 }
 
-.tournament-image { margin: 0 0 1.25rem; }
+.announcement-image,
+.tournament-image {
+  margin-top: 0.9rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+}
+
+.tournament-image { margin: 0 auto 1.25rem; }
 
 /* フォームのプレビュー。選択した画像や既存画像の確認用。 */
 .image-preview-row {
