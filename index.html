@@ -8,7 +8,7 @@
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=44">
+<link rel="stylesheet" href="css/style.css?v=45">
 </head>
 <body>
 <header>
@@ -147,7 +147,7 @@
 
   <section id="view-recruit" class="view" hidden>
     <h2>募集中の大会</h2>
-    <p class="note">「エントリー」を押すと参加登録されます。募集中はいつでも取り消せます。</p>
+    <p class="note">大会を選ぶと、ルールや参加者を確認してエントリーできます。募集中はいつでも取り消せます。</p>
     <div id="recruit-list"></div>
   </section>
 
@@ -284,6 +284,9 @@
       <button type="submit">保存</button>
       <button type="button" id="tournament-edit-cancel-btn" class="btn-secondary">キャンセル</button>
     </form>
+    <!-- エントリーと運営の募集操作。募集一覧のカードは入口だけにしたので、
+         実際の操作はこちらに集約している。 -->
+    <div id="tournament-actions"></div>
     <div id="bracket-container"></div>
     <div id="result-section" class="result-section"></div>
     <div id="tournament-info" class="tournament-info"></div>
@@ -343,7 +346,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=44"></script>
+<script src="js/vendor/supabase.js?v=45"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -355,24 +358,24 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=44",
-    "./js/bracket.js":        "./js/bracket.js?v=44",
-    "./js/bracketView.js":    "./js/bracketView.js?v=44",
-    "./js/db.js":             "./js/db.js?v=44",
-    "./js/entries.js":        "./js/entries.js?v=44",
-    "./js/playerStats.js":    "./js/playerStats.js?v=44",
-    "./js/players.js":        "./js/players.js?v=44",
-    "./js/profile.js":        "./js/profile.js?v=44",
-    "./js/ranking.js":        "./js/ranking.js?v=44",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=44",
-    "./js/rankingView.js":    "./js/rankingView.js?v=44",
-    "./js/state.js":          "./js/state.js?v=44",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=44",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=44",
-    "./js/util.js":           "./js/util.js?v=44"
+    "./js/auth.js":           "./js/auth.js?v=45",
+    "./js/bracket.js":        "./js/bracket.js?v=45",
+    "./js/bracketView.js":    "./js/bracketView.js?v=45",
+    "./js/db.js":             "./js/db.js?v=45",
+    "./js/entries.js":        "./js/entries.js?v=45",
+    "./js/playerStats.js":    "./js/playerStats.js?v=45",
+    "./js/players.js":        "./js/players.js?v=45",
+    "./js/profile.js":        "./js/profile.js?v=45",
+    "./js/ranking.js":        "./js/ranking.js?v=45",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=45",
+    "./js/rankingView.js":    "./js/rankingView.js?v=45",
+    "./js/state.js":          "./js/state.js?v=45",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=45",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=45",
+    "./js/util.js":           "./js/util.js?v=45"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=44"></script>
+<script type="module" src="js/app.js?v=45"></script>
 </body>
 </html>

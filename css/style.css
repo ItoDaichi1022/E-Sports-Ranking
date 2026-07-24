@@ -139,8 +139,6 @@ a:hover { color: #c4b6ff; }
 .rank-cell,
 .player-score,
 .stat-value,
-.capacity-text,
-.fact-value,
 td {
   font-variant-numeric: tabular-nums;
 }
@@ -1042,186 +1040,103 @@ td code { font-size: 0.85em; }
 }
 
 /* ---------------------------------------------------------------------------
-   募集カード
+   募集一覧
 
-   1枚に「状態・名前・日付・規模・定員・ルール・参加者・操作」が入るため、
-   並べ方を決めないとすぐ字の塊になる。上から
-   バナー → 状態 → 名前 → 事実（日付/規模） → 定員 → ルール → 顔ぶれ → 操作
-   の順に固定し、役割ごとに余白で区切る。
+   一覧は「どの大会があるか」を見渡す場所。大会名・画像・開催日だけを出し、
+   カード全体を詳細への入口にする。カードの中にボタンを置かないので、
+   丸ごと1つのリンクにでき、スマートフォンでも押し外しにくい。
    --------------------------------------------------------------------------- */
 
+.recruit-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
 .recruit-card {
-  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--border-soft);
   border-radius: var(--r-lg);
   background: var(--surface);
-  overflow: hidden;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .recruit-card:hover {
-  border-color: var(--border-strong);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  color: inherit;
 }
 
-/* 大会のバナー。切り抜かず、画像の全体が必ず見えるようにする（下の共通ルール参照）。 */
-.recruit-banner {
-  display: block;
-  line-height: 0;
-  padding: 0;
+/* 画像の枠。高さを固定して一覧の見た目をそろえつつ、中の画像は切り抜かず
+   全体を収める（縦長の告知画像でも内容が欠けない）。 */
+.recruit-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  padding: 0.5rem;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border-soft);
 }
 
-.recruit-body { padding: 1.25rem 1.4rem; }
-
-.recruit-title {
-  margin: 0.55rem 0 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.35;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-.recruit-title a {
-  color: var(--text);
-  text-decoration: none;
-}
-
-.recruit-title a:hover { color: var(--accent-bright); }
-
-/* 日付・規模を「ラベル＋値」で並べる。文章で繋げるより走査しやすい。 */
-.recruit-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.75rem;
-  margin: 1.1rem 0 0;
-}
-
-.fact { display: flex; flex-direction: column; gap: 0.15rem; }
-
-.fact-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-.fact-value {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-/* 定員は数字だけより、埋まり具合が一目で分かるバーにする */
-.capacity { margin-top: 1.1rem; }
-
-.capacity-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.4rem;
-}
-
-.capacity-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-.capacity-text {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-dim);
-}
-
-.capacity-track {
-  height: 6px;
-  border-radius: var(--r-pill);
-  background: var(--surface-3);
-  overflow: hidden;
-}
-
-.capacity-fill {
-  display: block;
-  height: 100%;
-  border-radius: var(--r-pill);
-  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
-  transition: width 0.3s ease;
-}
-
-.capacity.full .capacity-fill { background: linear-gradient(90deg, #d99a3d, var(--gold)); }
-.capacity.full .capacity-text { color: var(--gold); }
-
-.recruit-rules {
-  margin: 1.1rem 0 0;
-  padding: 0.8rem 1rem;
+.recruit-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
   border-radius: var(--r-sm);
-  background: var(--surface-2);
-  color: var(--text-dim);
-  font-size: 0.88rem;
-  line-height: 1.7;
-  white-space: pre-wrap;
+}
+
+/* 画像が無い大会は頭文字で枠を埋める。高さが変わらないので一覧が乱れない。 */
+.recruit-thumb.is-empty {
+  color: var(--text-faint);
+  font-size: 2.5rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.recruit-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.recruit-name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.4;
   overflow-wrap: break-word;
   word-break: break-word;
-  /* 長いルールでカードが縦に伸びきらないよう、4行で畳んで詳細ページへ誘導する */
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
-/* 参加者は名前のチップを全部並べると壁になるので、顔だけ並べて残りは「+N」 */
-.entrant-strip {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  flex-wrap: wrap;
-  margin-top: 1.1rem;
-}
-
-.entrant-avatar {
-  display: inline-flex;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px var(--surface);
-}
-
-.entrant-more {
-  padding: 0 0.55rem;
-  height: 1.75rem;
-  display: inline-flex;
-  align-items: center;
-  border-radius: var(--r-pill);
-  background: var(--surface-3);
-  color: var(--text-dim);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.entrant-empty {
+.recruit-date {
+  margin: 0;
   font-size: 0.85rem;
-  color: var(--text-faint);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
 }
 
-.recruit-actions {
+/* 大会詳細のエントリー・運営操作 */
+.tournament-actions-row {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   flex-wrap: wrap;
-  margin-top: 1.35rem;
-  padding-top: 1.15rem;
-  border-top: 1px solid var(--border-soft);
+  margin-bottom: 1.5rem;
 }
 
 /* 運営の操作は主導線（エントリー）から離し、右端に寄せる */
-.recruit-actions .row-actions { margin-left: auto; }
+.tournament-actions-row .row-actions { margin-left: auto; }
 
-/* 旧・参加者チップ（大会情報の「エントリー中の選手」で使用） */
+/* 参加者チップ（大会情報の「エントリー中の選手」で使用） */
 .entrant-list {
   display: flex;
   gap: 0.4rem;
@@ -1964,7 +1879,7 @@ dialog h3 {
    大会・お知らせの画像
    --------------------------------------------------------------------------- */
 
-/* 表示用の画像は、募集バナー・大会詳細・お知らせで同じ規則にそろえる。
+/* 表示用の画像は、大会詳細・お知らせ・募集一覧のサムネイルで同じ規則にそろえる。
    PCとスマホで見え方が変わらないようにするための決まりごと:
      * 切り抜かない。以前は object-fit:cover で帯状に切っていたが、大会の
        告知画像は縦長のこともあり、上下が見切れて内容が読めなくなっていた。
@@ -1972,7 +1887,6 @@ dialog h3 {
        PCとスマホで高さも切り取られ方も変わる原因だった。
      * 縦横比は原寸のまま、幅と高さの「上限」だけを決めて中に収める。
      * 原寸より拡大しない（小さい画像がぼやけない）。 */
-.recruit-banner img,
 .announcement-image,
 .tournament-image {
   display: block;
@@ -2055,24 +1969,20 @@ dialog h3 {
   .hero-actions > * { flex: 1 1 auto; }
 
   .announcement { padding: 1.1rem; }
-  .recruit-body { padding: 1.1rem; }
-
-  /* 事実の並びは2列に落とす。1行に詰めると値が折り返して読みにくい。 */
-  .recruit-facts { gap: 1rem 1.5rem; }
+  .recruit-card-body { padding: 0.9rem 1rem 1rem; }
 
   /* 主導線（エントリー）を横いっぱいにして押しやすくする */
-  .recruit-actions > button,
-  .recruit-actions > .as-link {
+  .tournament-actions-row > button {
     flex: 1 1 100%;
     min-height: 2.75rem;
   }
 
-  .recruit-actions .row-actions {
+  .tournament-actions-row .row-actions {
     margin-left: 0;
     width: 100%;
   }
 
-  .recruit-actions .row-actions button { flex: 1; }
+  .tournament-actions-row .row-actions button { flex: 1; }
 
   .history-item {
     gap: 0.75rem;

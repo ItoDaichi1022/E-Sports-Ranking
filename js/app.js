@@ -11,7 +11,7 @@ import { downloadRankingCards } from './rankingCard.js';
 import { getPlayerStats } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
 import { renderProfileForm, profileSectionHtml, isProfileFormMounted } from './profile.js';
-import { renderRecruitPage, STATUS_LABELS } from './entries.js';
+import { renderRecruitPage, renderTournamentActions, STATUS_LABELS } from './entries.js';
 import {
   auth, initAuth, isAdmin, isLoggedIn, needsOnboarding, accountLabel,
   signInWithProvider, signInWithEmail, signUpWithEmail, signOut, reloadOwnPlayer,
@@ -80,6 +80,7 @@ const tournamentEditDateInput = $('tournament-edit-date-input');
 const tournamentEditRulesInput = $('tournament-edit-rules-input');
 const tournamentEditCancelBtn = $('tournament-edit-cancel-btn');
 const tournamentInfoEl = $('tournament-info');
+const tournamentActionsEl = $('tournament-actions');
 const resultSectionEl = $('result-section');
 const bracketBackLink = $('bracket-back-link');
 const tournamentEditCapacityInput = $('tournament-edit-capacity-input');
@@ -522,9 +523,7 @@ function seedBySelectedRanking() {
 // ---- 募集ページ ----
 
 function renderRecruit() {
-  renderRecruitPage(recruitListEl, async () => {
-    await refreshFromDb();
-  });
+  renderRecruitPage(recruitListEl);
 }
 
 // ---- マイページ ----
@@ -800,6 +799,11 @@ function renderBracketPage(tournamentId) {
       }
     }, '試合結果の保存');
   }, { readOnly: !isAdmin(), showResult: confirmed });
+
+  // エントリーと運営の募集操作。募集一覧のカードは入口だけにしたので、ここが操作の場所。
+  renderTournamentActions(tournamentActionsEl, tournament, async () => {
+    await refreshFromDb();
+  });
 
   renderResultSection(tournament);
   renderTournamentInfo(tournament);

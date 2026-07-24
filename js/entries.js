@@ -5,10 +5,9 @@
 // 運営が募集を締め切ると、それまでの戦績を元にシードを付けてブラケットを生成する。
 
 import { state } from './state.js';
-import { escapeHtml, safeUrl, avatarHtml } from './util.js';
+import { escapeHtml, safeUrl, initialOf } from './util.js';
 import { auth, isLoggedIn, isAdmin } from './auth.js';
 import { computeRankings } from './ranking.js';
-import { tournamentTier } from './tournamentTier.js';
 import { createBracket } from './bracket.js';
 import * as db from './db.js';
 
@@ -152,6 +151,9 @@ function adminControls(tournament, onChanged) {
       try {
         await closeRecruitmentAndStart(tournament.id);
         location.hash = `#bracket/${encodeURIComponent(tournament.id)}`;
+        // 既にその大会の詳細を開いていた場合は hashchange が起きず再描画されない。
+        // 明示的に更新して、生成されたブラケットを出す。
+        await onChanged();
       } catch (err) {
         alert(err.message);
         closeBtn.disabled = false;
@@ -179,85 +181,35 @@ function adminControls(tournament, onChanged) {
   return wrap;
 }
 
-// エントリー済みの顔ぶれ。名前のチップを全員分並べると字の壁になるので、
-// アイコンだけを並べて、入りきらない分は「+N」にまとめる。
-// 名前は title 属性で読めるようにしておく。
-const ENTRANT_FACES = 12;
+// 大会詳細ページ用の操作。エントリーと、運営の募集操作をまとめて置く。
+//
+// 募集一覧のカードは大会名・画像・開催日だけの入口にしたので、実際に手を動かす
+// 操作はすべてこちら（詳細）に集約する。一覧に操作を置くと、カード全体を
+// タップ領域にできず（リンクの中にボタンが入れ子になる）、押し間違いも起きる。
+export function renderTournamentActions(containerEl, tournament, onChanged) {
+  containerEl.innerHTML = '';
+  if (!tournament) return;
 
-function entrantStrip(tournament) {
-  const el = document.createElement('div');
-  el.className = 'entrant-strip';
+  const row = document.createElement('div');
+  row.className = 'tournament-actions-row';
 
-  const ids = tournament.participantIds;
-  if (ids.length === 0) {
-    el.innerHTML = '<span class="entrant-empty">まだエントリーがありません</span>';
-    return el;
+  if (tournament.status === 'recruiting') {
+    row.appendChild(entryButton(tournament, onChanged));
+  }
+  if (isAdmin()) {
+    const admin = adminControls(tournament, onChanged);
+    if (admin.children.length > 0) row.appendChild(admin);
   }
 
-  const shown = ids.slice(0, ENTRANT_FACES);
-  const rest = ids.length - shown.length;
-
-  const faces = shown.map((id) => {
-    const player = state.players.find((p) => p.id === id);
-    const name = player ? player.currentName : id;
-    return `<span class="entrant-avatar" title="${escapeHtml(name)}">`
-      + `${avatarHtml(player ?? { currentName: name }, 'sm')}</span>`;
-  }).join('');
-
-  el.innerHTML = faces + (rest > 0 ? `<span class="entrant-more">+${rest}</span>` : '');
-  return el;
-}
-
-// 日付と規模を「ラベル＋値」で並べる。1行の文章に繋げるより目で追いやすい。
-function factsEl(tournament) {
-  const el = document.createElement('div');
-  el.className = 'recruit-facts';
-  const facts = [
-    ['開催日', tournament.date || '未定'],
-    ['規模', tournamentTier(tournament.participantIds.length)],
-  ];
-  el.innerHTML = facts.map(([label, value]) => `
-    <div class="fact">
-      <span class="fact-label">${escapeHtml(label)}</span>
-      <span class="fact-value">${escapeHtml(value)}</span>
-    </div>
-  `).join('');
-  return el;
-}
-
-// 定員は数字だけでなく、埋まり具合をバーで見せる。
-// 定員なしの大会はバーを出さず、現在の人数だけを示す。
-function capacityEl(tournament) {
-  const count = tournament.participantIds.length;
-  const el = document.createElement('div');
-  el.className = 'capacity';
-
-  if (tournament.capacity == null) {
-    el.innerHTML = `
-      <div class="capacity-head">
-        <span class="capacity-label">エントリー</span>
-        <span class="capacity-text">${count}人（定員なし）</span>
-      </div>
-    `;
-    return el;
-  }
-
-  const pct = Math.min(100, Math.round((count / tournament.capacity) * 100));
-  if (count >= tournament.capacity) el.classList.add('full');
-  el.innerHTML = `
-    <div class="capacity-head">
-      <span class="capacity-label">エントリー</span>
-      <span class="capacity-text">${count} / ${tournament.capacity}人</span>
-    </div>
-    <div class="capacity-track">
-      <span class="capacity-fill" style="width: ${pct}%"></span>
-    </div>
-  `;
-  return el;
+  if (row.children.length === 0) return;
+  containerEl.appendChild(row);
 }
 
 // 募集ページ。運営には準備中の大会も見せる。
-export function renderRecruitPage(containerEl, onChanged) {
+//
+// 一覧は「どの大会があるか」を見渡すための場所なので、大会名・画像・開催日だけを
+// 出す。定員やルール、参加者、エントリーボタンは詳細ページの担当。
+export function renderRecruitPage(containerEl) {
   containerEl.innerHTML = '';
 
   const visible = state.tournaments.filter((t) =>
@@ -268,56 +220,41 @@ export function renderRecruitPage(containerEl, onChanged) {
     return;
   }
 
-  visible.forEach((t) => {
-    const card = document.createElement('section');
-    card.className = 'recruit-card';
-    const detailHref = `#bracket/${encodeURIComponent(t.id)}`;
+  const list = document.createElement('div');
+  list.className = 'recruit-list';
 
-    // 画像があればカード上端に全幅のバナーとして敷く。押すと詳細へ。
+  visible.forEach((t) => {
+    // カードの中にボタンやリンクを置かないので、カード全体を1つのリンクにできる。
+    // どこを押しても詳細へ行くため、スマートフォンでも押し外しにくい。
+    const card = document.createElement('a');
+    card.className = 'recruit-card';
+    card.href = `#bracket/${encodeURIComponent(t.id)}`;
+
+    // 画像は切り抜かずに収める。無ければ大会名の頭文字で枠を埋め、
+    // 画像の有無でカードの高さが変わらないようにする。
     const imageUrl = safeUrl(t.imageUrl);
+    const thumb = document.createElement('div');
+    thumb.className = 'recruit-thumb';
     if (imageUrl) {
-      const banner = document.createElement('a');
-      banner.className = 'recruit-banner';
-      banner.href = detailHref;
-      banner.innerHTML = `<img src="${escapeHtml(imageUrl)}" alt="" loading="lazy">`;
-      card.appendChild(banner);
+      thumb.innerHTML = `<img src="${escapeHtml(imageUrl)}" alt="" loading="lazy">`;
+    } else {
+      thumb.classList.add('is-empty');
+      thumb.textContent = initialOf(t.name);
     }
 
     const body = document.createElement('div');
-    body.className = 'recruit-body';
-
-    // 状態 → 大会名 → 事実 → 定員 の順に、上から重要な情報を積む
+    body.className = 'recruit-card-body';
+    // 準備中はまだ公開していない大会。運営にしか見えないので、
+    // 募集中のものと取り違えないよう印を付ける。
     body.innerHTML = `
-      <span class="status-chip status-${t.status}">${STATUS_LABELS[t.status]}</span>
-      <h3 class="recruit-title"><a href="${escapeHtml(detailHref)}">${escapeHtml(t.name)}</a></h3>
+      <h3 class="recruit-name">${escapeHtml(t.name)}</h3>
+      <p class="recruit-date">${escapeHtml(t.date || '開催日未定')}</p>
+      ${t.status === 'draft' ? `<span class="status-chip status-draft">${STATUS_LABELS.draft}</span>` : ''}
     `;
-    body.appendChild(factsEl(t));
-    body.appendChild(capacityEl(t));
 
-    if (t.rules) {
-      const rules = document.createElement('p');
-      rules.className = 'recruit-rules';
-      rules.textContent = t.rules;
-      body.appendChild(rules);
-    }
-
-    body.appendChild(entrantStrip(t));
-
-    // 主導線のエントリーを先に置き、詳細と運営操作はその後ろへ回す。
-    const actions = document.createElement('div');
-    actions.className = 'recruit-actions';
-    if (t.status === 'recruiting') actions.appendChild(entryButton(t, onChanged));
-
-    const detail = document.createElement('a');
-    detail.className = 'btn-secondary as-link';
-    detail.href = detailHref;
-    detail.textContent = '詳細を見る';
-    actions.appendChild(detail);
-
-    if (isAdmin()) actions.appendChild(adminControls(t, onChanged));
-    body.appendChild(actions);
-
-    card.appendChild(body);
-    containerEl.appendChild(card);
+    card.append(thumb, body);
+    list.appendChild(card);
   });
+
+  containerEl.appendChild(list);
 }
