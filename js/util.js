@@ -34,3 +34,77 @@ export function avatarHtml(player, size = 'md') {
   }
   return `<span class="avatar avatar-${size}">${escapeHtml(initialOf(player?.currentName))}</span>`;
 }
+
+// 大会・お知らせの画像アップロード用ピッカー。HTML側に用意した
+// ファイル入力・プレビュー用img・「画像を外す」ボタンを配線する。
+// 大会作成／編集／お知らせの3フォームで同じ配線を使い回すためのもの。
+//
+// setCurrent(url) で既存の画像URLをセットし直す（編集フォームを開くたびに呼ぶ）。
+// get() は保存時に呼び、{ file, remove, currentUrl } を返す:
+//   file       … 新しく選ばれた画像（未選択ならnull）
+//   remove     … 「外す」が押されたか
+//   currentUrl … 元の画像URL（据え置きの判定に使う）
+export function setupImagePicker({ fileInput, preview, removeBtn }) {
+  let currentUrl = '';
+  let file = null;
+  let remove = false;
+  // 選択中ファイルのプレビューURL。作り直すたびに前のものを解放する。
+  let objectUrl = null;
+
+  function releaseObjectUrl() {
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      objectUrl = null;
+    }
+  }
+
+  function render() {
+    releaseObjectUrl();
+    let shown = null;
+    if (file) {
+      objectUrl = URL.createObjectURL(file);
+      shown = objectUrl;
+    } else if (!remove) {
+      shown = safeUrl(currentUrl);
+    }
+
+    if (shown) {
+      preview.src = shown;
+      preview.hidden = false;
+    } else {
+      preview.removeAttribute('src');
+      preview.hidden = true;
+    }
+    if (removeBtn) removeBtn.hidden = !(file || (currentUrl && !remove));
+  }
+
+  fileInput.addEventListener('change', () => {
+    const picked = fileInput.files?.[0];
+    if (!picked) return;
+    file = picked;
+    remove = false;
+    render();
+  });
+
+  if (removeBtn) {
+    removeBtn.addEventListener('click', () => {
+      file = null;
+      remove = true;
+      fileInput.value = '';
+      render();
+    });
+  }
+
+  return {
+    setCurrent(url) {
+      currentUrl = url || '';
+      file = null;
+      remove = false;
+      fileInput.value = '';
+      render();
+    },
+    get() {
+      return { file, remove, currentUrl };
+    },
+  };
+}

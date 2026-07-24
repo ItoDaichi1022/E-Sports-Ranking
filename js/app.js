@@ -1,6 +1,6 @@
 import { state, newId, getPlayerName } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
-import { escapeHtml, avatarHtml } from './util.js';
+import { escapeHtml, avatarHtml, safeUrl, setupImagePicker } from './util.js';
 import {
   createBracket, updateTournament, getChampionId, allMatchesDecided, finalStandings,
 } from './bracket.js';
@@ -48,6 +48,23 @@ const tournamentDateInput = $('tournament-date-input');
 const tournamentCapacityInput = $('tournament-capacity-input');
 const tournamentRulesInput = $('tournament-rules-input');
 const tournamentSubmitBtn = $('tournament-submit-btn');
+
+// 大会作成・大会編集・お知らせの画像アップロード。HTML側の入力を配線する。
+const tournamentImagePicker = setupImagePicker({
+  fileInput: $('tournament-image-input'),
+  preview: $('tournament-image-preview'),
+  removeBtn: $('tournament-image-remove-btn'),
+});
+const tournamentEditImagePicker = setupImagePicker({
+  fileInput: $('tournament-edit-image-input'),
+  preview: $('tournament-edit-image-preview'),
+  removeBtn: $('tournament-edit-image-remove-btn'),
+});
+const announcementImagePicker = setupImagePicker({
+  fileInput: $('announcement-image-input'),
+  preview: $('announcement-image-preview'),
+  removeBtn: $('announcement-image-remove-btn'),
+});
 
 const recruitListEl = $('recruit-list');
 const historyListEl = $('history-list');
@@ -243,6 +260,7 @@ function openAnnouncementForm(announcement) {
   announcementTitleInput.value = announcement?.title ?? '';
   announcementBodyInput.value = announcement?.body ?? '';
   announcementPinnedInput.checked = Boolean(announcement?.pinned);
+  announcementImagePicker.setCurrent(announcement?.imageUrl || '');
   announcementFormErrorEl.textContent = '';
   announcementSubmitBtn.textContent = announcement ? '更新する' : '投稿する';
   announcementForm.hidden = false;
@@ -253,6 +271,7 @@ function closeAnnouncementForm() {
   announcementForm.hidden = true;
   announcementForm.reset();
   announcementIdInput.value = '';
+  announcementImagePicker.setCurrent('');
   announcementFormErrorEl.textContent = '';
 }
 
@@ -290,6 +309,16 @@ function renderHome() {
 
     card.appendChild(head);
 
+    const imageUrl = safeUrl(a.imageUrl);
+    if (imageUrl) {
+      const img = document.createElement('img');
+      img.className = 'announcement-image';
+      img.src = imageUrl;
+      img.alt = '';
+      img.loading = 'lazy';
+      card.appendChild(img);
+    }
+
     if (a.body) {
       // 本文はユーザー入力。textContentで入れ、改行はCSS(white-space:pre-wrap)で見せる
       const body = document.createElement('p');
@@ -315,7 +344,10 @@ function renderHome() {
       delBtn.addEventListener('click', async () => {
         if (!confirm(`お知らせ「${a.title}」を削除しますか？`)) return;
         const ok = await persist(() => db.deleteAnnouncement(a.id), 'お知らせの削除');
-        if (ok) await refreshFromDb();
+        if (ok) {
+          if (a.imageUrl) await db.removeImageByUrl(a.imageUrl).catch(() => {});
+          await refreshFromDb();
+        }
       });
 
       actions.append(editBtn, delBtn);
@@ -504,6 +536,15 @@ async function resolveAvatar(profile, currentUrl) {
   return currentUrl ?? '';
 }
 
+// 画像ピッカーの状態から、保存すべき画像URLを決める。
+// 新しい画像を選んでいればアップロードし、「外す」なら空、どちらでもなければ据え置き。
+async function resolveImageUrl(picker, folder) {
+  const { file, remove, currentUrl } = picker.get();
+  if (file) return db.uploadImage(file, folder);
+  if (remove) return '';
+  return currentUrl ?? '';
+}
+
 function renderProfilePage() {
   profileLinksEl.innerHTML = '';
 
@@ -647,7 +688,13 @@ function renderTournamentInfo(tournament) {
     ? `${tournament.participantIds.length}人`
     : `${tournament.participantIds.length} / ${tournament.capacity}人`;
 
+  const imageUrl = safeUrl(tournament.imageUrl);
+  const imageHtml = imageUrl
+    ? `<img class="tournament-image" src="${escapeHtml(imageUrl)}" alt="" loading="lazy">`
+    : '';
+
   let html = `
+    ${imageHtml}
     <h3>大会情報</h3>
     <dl class="tournament-info-grid">
       <div><dt>${tournament.status === 'recruiting' ? 'エントリー' : '参加人数'}</dt><dd>${escapeHtml(countLabel)}</dd></div>
@@ -1156,6 +1203,7 @@ tournamentForm.addEventListener('submit', async (e) => {
     date: tournamentDateInput.value || null,
     format: 'single_elim',
     rules: tournamentRulesInput.value.trim() || null,
+    imageUrl: '',
     weight: null,
     // 定員はエントリー募集を制御するためのもの。運営が参加者を直接選ぶ場合は
     // 意味を持たないうえ、選んだ人数が定員を超えると自分で自分を弾いてしまう。
@@ -1167,6 +1215,8 @@ tournamentForm.addEventListener('submit', async (e) => {
 
   tournamentSubmitBtn.disabled = true;
   const ok = await persist(async () => {
+    // 先に画像を上げてURLを確定させてから大会を作る
+    tournament.imageUrl = await resolveImageUrl(tournamentImagePicker, 'tournaments');
     await db.createTournament(tournament);
     if (!manual) return;
 
@@ -1189,6 +1239,7 @@ tournamentForm.addEventListener('submit', async (e) => {
   tournamentDateInput.value = '';
   tournamentCapacityInput.value = '';
   tournamentRulesInput.value = '';
+  tournamentImagePicker.setCurrent('');
   selectedParticipantIds = [];
 
   await refreshFromDb();
@@ -1202,6 +1253,7 @@ tournamentEditBtn.addEventListener('click', () => {
   tournamentEditDateInput.value = tournament.date || '';
   tournamentEditCapacityInput.value = tournament.capacity ?? '';
   tournamentEditRulesInput.value = tournament.rules || '';
+  tournamentEditImagePicker.setCurrent(tournament.imageUrl || '');
   tournamentEditForm.hidden = !tournamentEditForm.hidden;
 });
 
@@ -1224,7 +1276,15 @@ tournamentEditForm.addEventListener('submit', async (e) => {
     return;
   }
   const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
-  const ok = await persist(() => db.saveTournament(tournament), '大会情報の保存');
+  const previousImage = tournament.imageUrl || '';
+  const ok = await persist(async () => {
+    tournament.imageUrl = await resolveImageUrl(tournamentEditImagePicker, 'tournaments');
+    await db.saveTournament(tournament);
+    // 差し替え・削除で使われなくなった画像は消しておく。失敗しても保存は済んでいる。
+    if (previousImage && previousImage !== tournament.imageUrl) {
+      await db.removeImageByUrl(previousImage).catch(() => {});
+    }
+  }, '大会情報の保存');
   if (ok) tournamentEditForm.hidden = true;
   renderBracketPage(currentBracketTournamentId);
 });
@@ -1235,8 +1295,10 @@ tournamentDeleteBtn.addEventListener('click', async () => {
   if (!confirm(`大会「${tournament.name}」と、その試合結果をすべて削除します。よろしいですか？`)) return;
 
   // ブラケット・試合・エントリーは外部キーのカスケードで一緒に消える
+  const imageUrl = tournament.imageUrl || '';
   const ok = await persist(() => db.deleteTournament(currentBracketTournamentId), '大会の削除');
   if (!ok) return;
+  if (imageUrl) await db.removeImageByUrl(imageUrl).catch(() => {});
   await refreshFromDb();
   location.hash = '#history';
 });
@@ -1259,19 +1321,29 @@ announcementForm.addEventListener('submit', async (e) => {
   }
 
   const id = announcementIdInput.value;
-  const payload = {
-    title,
-    body: announcementBodyInput.value.trim(),
-    pinned: announcementPinnedInput.checked,
-  };
+  const previousImage = id
+    ? (state.announcements.find((a) => a.id === id)?.imageUrl || '')
+    : '';
 
   announcementSubmitBtn.disabled = true;
-  const ok = await persist(
-    () => (id
-      ? db.updateAnnouncement(id, payload)
-      : db.createAnnouncement({ ...payload, createdBy: auth.player?.id ?? null })),
-    id ? 'お知らせの更新' : 'お知らせの投稿',
-  );
+  const ok = await persist(async () => {
+    const imageUrl = await resolveImageUrl(announcementImagePicker, 'announcements');
+    const payload = {
+      title,
+      body: announcementBodyInput.value.trim(),
+      imageUrl,
+      pinned: announcementPinnedInput.checked,
+    };
+    if (id) {
+      await db.updateAnnouncement(id, payload);
+    } else {
+      await db.createAnnouncement({ ...payload, createdBy: auth.player?.id ?? null });
+    }
+    // 差し替え・削除で使われなくなった画像は消しておく
+    if (previousImage && previousImage !== imageUrl) {
+      await db.removeImageByUrl(previousImage).catch(() => {});
+    }
+  }, id ? 'お知らせの更新' : 'お知らせの投稿');
   announcementSubmitBtn.disabled = false;
 
   if (ok) {

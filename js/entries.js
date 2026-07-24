@@ -5,7 +5,7 @@
 // 運営が募集を締め切ると、それまでの戦績を元にシードを付けてブラケットを生成する。
 
 import { state } from './state.js';
-import { escapeHtml } from './util.js';
+import { escapeHtml, safeUrl } from './util.js';
 import { auth, isLoggedIn, isAdmin } from './auth.js';
 import { computeRankings } from './ranking.js';
 import { tournamentTier } from './tournamentTier.js';
@@ -245,6 +245,16 @@ export function renderRecruitPage(containerEl, onChanged) {
     header.appendChild(actions);
 
     card.appendChild(header);
+
+    const imageUrl = safeUrl(t.imageUrl);
+    if (imageUrl) {
+      const img = document.createElement('img');
+      img.className = 'tournament-image';
+      img.src = imageUrl;
+      img.alt = '';
+      img.loading = 'lazy';
+      card.appendChild(img);
+    }
 
     if (t.rules) {
       const rules = document.createElement('p');

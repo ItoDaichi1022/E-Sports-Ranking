@@ -5,13 +5,13 @@ export const state = {
   // { id, currentName, pastNames: [], gameAccountId, bio, mainCharacters: [],
   //   snsX, snsTwitch, snsYoutube, role, userId }
   players: [],
-  // { id, name, date, format, participantIds: [], weight, rules, status, capacity }
+  // { id, name, date, format, participantIds: [], weight, rules, imageUrl, status, capacity }
   tournaments: [],
   matches: [],        // { id, tournamentId, winnerId, loserId, score, round }
   brackets: {},       // tournamentId -> bracket object (js/bracket.js が構造を定義)
   publishedRanking: null, // { publishedAt, periodMonths, rankings: [...] } | null（未公開）
   // ホーム画面の運営からのお知らせ。pinned優先＋新しい順で並べて持つ。
-  announcements: [],  // { id, title, body, pinned, createdAt, updatedAt }
+  announcements: [],  // { id, title, body, imageUrl, pinned, createdAt, updatedAt }
 };
 
 // 新しいレコードのID。DB側の主キーがuuidなので、クライアントで作るIDもuuidに揃える。

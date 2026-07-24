@@ -6,7 +6,7 @@
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=36">
+<link rel="stylesheet" href="css/style.css?v=37">
 </head>
 <body>
 <header>
@@ -97,6 +97,14 @@
           本文（任意）
           <textarea id="announcement-body-input" rows="4" placeholder="詳細や補足があれば記入します。"></textarea>
         </label>
+        <label class="image-field">
+          画像（任意・5MBまで）
+          <input type="file" id="announcement-image-input" accept="image/png,image/jpeg,image/webp,image/gif">
+        </label>
+        <div class="image-preview-row">
+          <img id="announcement-image-preview" class="image-preview" alt="" hidden>
+          <button type="button" id="announcement-image-remove-btn" class="btn-secondary" hidden>画像を外す</button>
+        </div>
         <label class="checkbox-inline">
           <input type="checkbox" id="announcement-pinned-input">
           先頭に固定する
@@ -161,6 +169,14 @@
         ルール（任意）
         <textarea id="tournament-rules-input" rows="4" placeholder="例: 3本先取、キャラ1人縛りなし、持ちキャラ変更は大会中1回まで"></textarea>
       </label>
+      <label class="image-field">
+        画像（任意・5MBまで）
+        <input type="file" id="tournament-image-input" accept="image/png,image/jpeg,image/webp,image/gif">
+      </label>
+      <div class="image-preview-row">
+        <img id="tournament-image-preview" class="image-preview" alt="" hidden>
+        <button type="button" id="tournament-image-remove-btn" class="btn-secondary" hidden>画像を外す</button>
+      </div>
 
       <fieldset class="entry-mode">
         <legend>参加者の集め方</legend>
@@ -232,6 +248,14 @@
         ルール（任意）
         <textarea id="tournament-edit-rules-input" rows="4"></textarea>
       </label>
+      <label class="image-field">
+        画像（任意・5MBまで）
+        <input type="file" id="tournament-edit-image-input" accept="image/png,image/jpeg,image/webp,image/gif">
+      </label>
+      <div class="image-preview-row">
+        <img id="tournament-edit-image-preview" class="image-preview" alt="" hidden>
+        <button type="button" id="tournament-edit-image-remove-btn" class="btn-secondary" hidden>画像を外す</button>
+      </div>
       <button type="submit">保存</button>
       <button type="button" id="tournament-edit-cancel-btn" class="btn-secondary">キャンセル</button>
     </form>
@@ -294,7 +318,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=36"></script>
+<script src="js/vendor/supabase.js?v=37"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -306,24 +330,24 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=36",
-    "./js/bracket.js":        "./js/bracket.js?v=36",
-    "./js/bracketView.js":    "./js/bracketView.js?v=36",
-    "./js/db.js":             "./js/db.js?v=36",
-    "./js/entries.js":        "./js/entries.js?v=36",
-    "./js/playerStats.js":    "./js/playerStats.js?v=36",
-    "./js/players.js":        "./js/players.js?v=36",
-    "./js/profile.js":        "./js/profile.js?v=36",
-    "./js/ranking.js":        "./js/ranking.js?v=36",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=36",
-    "./js/rankingView.js":    "./js/rankingView.js?v=36",
-    "./js/state.js":          "./js/state.js?v=36",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=36",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=36",
-    "./js/util.js":           "./js/util.js?v=36"
+    "./js/auth.js":           "./js/auth.js?v=37",
+    "./js/bracket.js":        "./js/bracket.js?v=37",
+    "./js/bracketView.js":    "./js/bracketView.js?v=37",
+    "./js/db.js":             "./js/db.js?v=37",
+    "./js/entries.js":        "./js/entries.js?v=37",
+    "./js/playerStats.js":    "./js/playerStats.js?v=37",
+    "./js/players.js":        "./js/players.js?v=37",
+    "./js/profile.js":        "./js/profile.js?v=37",
+    "./js/ranking.js":        "./js/ranking.js?v=37",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=37",
+    "./js/rankingView.js":    "./js/rankingView.js?v=37",
+    "./js/state.js":          "./js/state.js?v=37",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=37",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=37",
+    "./js/util.js":           "./js/util.js?v=37"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=36"></script>
+<script type="module" src="js/app.js?v=37"></script>
 </body>
 </html>

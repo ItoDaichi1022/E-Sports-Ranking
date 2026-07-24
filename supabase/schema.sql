@@ -44,6 +44,8 @@ create table if not exists tournaments (
   date       date,
   format     text not null default 'single_elim',
   rules      text,
+  -- 大会のバナー画像。Storageの images バケットに置いた公開URL
+  image_url  text,
   -- draft(準備中) → recruiting(募集中) → running(進行中) → finished(終了)
   status     text not null default 'draft',
   capacity   int,
@@ -98,6 +100,8 @@ create table if not exists announcements (
   id          uuid primary key default gen_random_uuid(),
   title       text not null,
   body        text not null default '',
+  -- お知らせに添える画像。Storageの images バケットに置いた公開URL
+  image_url   text,
   pinned      boolean not null default false,
   created_by  uuid references players(id) on delete set null,
   created_at  timestamptz not null default now(),
@@ -513,6 +517,44 @@ drop policy if exists avatars_own_delete on storage.objects;
 create policy avatars_own_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------------------------------------------------------------------------
+-- 大会・お知らせの画像の保管場所（Storage）
+--
+-- 誰でも見られる（公開バケット）が、書き込めるのは運営だけ。
+-- アイコンと違って本人フォルダの制約は不要なので、is_admin() で判定する。
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'images', 'images', true, 5242880,
+  array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+)
+on conflict (id) do update set
+  public = true,
+  file_size_limit = 5242880,
+  allowed_mime_types = array['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+drop policy if exists images_public_read on storage.objects;
+create policy images_public_read on storage.objects
+  for select to anon, authenticated
+  using (bucket_id = 'images');
+
+drop policy if exists images_admin_insert on storage.objects;
+create policy images_admin_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'images' and is_admin());
+
+drop policy if exists images_admin_update on storage.objects;
+create policy images_admin_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'images' and is_admin())
+  with check (bucket_id = 'images' and is_admin());
+
+drop policy if exists images_admin_delete on storage.objects;
+create policy images_admin_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'images' and is_admin());
 
 -- ---------------------------------------------------------------------------
 -- Realtime

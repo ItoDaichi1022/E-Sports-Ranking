@@ -54,6 +54,7 @@ function toTournament(row, participantIds) {
     date: row.date,
     format: row.format,
     rules: row.rules,
+    imageUrl: row.image_url ?? '',
     weight: row.weight,
     status: row.status,
     capacity: row.capacity,
@@ -89,6 +90,7 @@ function toAnnouncement(row) {
     id: row.id,
     title: row.title,
     body: row.body ?? '',
+    imageUrl: row.image_url ?? '',
     pinned: row.pinned ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -308,6 +310,52 @@ export async function removeAvatarByUrl(url) {
 }
 
 // ---------------------------------------------------------------------------
+// 大会・お知らせの画像
+//
+// アイコンと違い、書き込めるのは運営だけ（Storageのポリシーが is_admin() を要求）。
+// バナー用途なので上限を少し大きめ（5MB）にしている。
+// ---------------------------------------------------------------------------
+
+const IMAGE_BUCKET = 'images';
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+// 画像をアップロードして公開URLを返す。folder は 'tournaments' / 'announcements' など。
+export async function uploadImage(file, folder = 'misc') {
+  if (!IMAGE_TYPES.includes(file.type)) {
+    throw new Error('画像はPNG / JPEG / WebP / GIF のいずれかにしてください。');
+  }
+  if (file.size > IMAGE_MAX_BYTES) {
+    throw new Error('画像のサイズは5MBまでにしてください。');
+  }
+
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext || 'png'}`;
+
+  const { error } = await supabase.storage
+    .from(IMAGE_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) {
+    console.error('[db] 画像のアップロードに失敗', error);
+    throw new Error(`画像のアップロードに失敗しました: ${error.message}`);
+  }
+
+  const { data } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// 使われなくなった画像を消す。images バケットのURLでなければ何もしない。
+// 失敗しても本体の保存は済んでいるので、呼び出し側は無視してよい。
+export async function removeImageByUrl(url) {
+  if (!url) return;
+  const marker = `/${IMAGE_BUCKET}/`;
+  const index = url.indexOf(marker);
+  if (index === -1) return;
+  const path = url.slice(index + marker.length).split('?')[0];
+  await supabase.storage.from(IMAGE_BUCKET).remove([decodeURIComponent(path)]);
+}
+
+// ---------------------------------------------------------------------------
 // 大会
 // ---------------------------------------------------------------------------
 
@@ -320,6 +368,7 @@ export async function createTournament(tournament) {
       date: tournament.date || null,
       format: tournament.format ?? 'single_elim',
       rules: tournament.rules || null,
+      image_url: tournament.imageUrl || null,
       status: tournament.status ?? 'draft',
       capacity: tournament.capacity ?? null,
       weight: tournament.weight ?? null,
@@ -338,6 +387,7 @@ export async function saveTournament(tournament) {
       name: tournament.name,
       date: tournament.date || null,
       rules: tournament.rules || null,
+      image_url: tournament.imageUrl || null,
       status: tournament.status,
       capacity: tournament.capacity ?? null,
     })
@@ -475,12 +525,13 @@ export async function publishRanking(snapshot) {
 // 投稿・編集・削除はRLSで運営だけに絞られている。created_by は本人の選手行。
 // ---------------------------------------------------------------------------
 
-export async function createAnnouncement({ title, body, pinned, createdBy }) {
+export async function createAnnouncement({ title, body, imageUrl, pinned, createdBy }) {
   const { data, error } = await supabase
     .from('announcements')
     .insert({
       title,
       body: body ?? '',
+      image_url: imageUrl || null,
       pinned: Boolean(pinned),
       created_by: createdBy ?? null,
     })
@@ -490,10 +541,10 @@ export async function createAnnouncement({ title, body, pinned, createdBy }) {
   return toAnnouncement(data);
 }
 
-export async function updateAnnouncement(id, { title, body, pinned }) {
+export async function updateAnnouncement(id, { title, body, imageUrl, pinned }) {
   const { data, error } = await supabase
     .from('announcements')
-    .update({ title, body: body ?? '', pinned: Boolean(pinned) })
+    .update({ title, body: body ?? '', image_url: imageUrl || null, pinned: Boolean(pinned) })
     .eq('id', id)
     .select('id');
   check(error, 'お知らせの更新');
