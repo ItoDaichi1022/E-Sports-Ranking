@@ -58,6 +58,7 @@ export async function closeRecruitmentAndStart(tournamentId) {
   await db.setTournamentStatus(tournamentId, 'running');
 
   state.brackets[tournamentId] = bracket;
+  state.bracketIds.add(tournamentId);
   tournament.participantIds = seeded;
   tournament.status = 'running';
   return bracket;

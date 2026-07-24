@@ -10,7 +10,7 @@ import { transform, loadLegacyData } from './migrate.mjs';
 import { state } from '../js/state.js';
 import { computeRankings } from '../js/ranking.js';
 import { getPlayerStats } from '../js/playerStats.js';
-import { getChampionId } from '../js/bracket.js';
+import { getChampionId, finalPlacements } from '../js/bracket.js';
 
 // 旧JSON群 → in-memory state（移行前のアプリが持っていた形）
 function legacyState(data) {
@@ -87,6 +87,17 @@ function withState(snapshot, fn) {
   state.tournaments = snapshot.tournaments;
   state.matches = snapshot.matches;
   state.brackets = snapshot.brackets;
+
+  // 本番では tournament_entries.placement に保存されている値。ここでは移行前後の
+  // どちらのスナップショットも対戦表しか持たないので、保存するときと同じ関数で組み直す。
+  state.bracketIds = new Set(Object.keys(snapshot.brackets));
+  state.placements = {};
+  Object.entries(snapshot.brackets).forEach(([tid, bracket]) => {
+    state.placements[tid] = Object.fromEntries(
+      finalPlacements(bracket).map((p) => [p.playerId, p.depth]),
+    );
+  });
+
   return fn();
 }
 

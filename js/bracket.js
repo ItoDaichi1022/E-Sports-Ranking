@@ -242,6 +242,30 @@ export function allMatchesDecided(bracket) {
   return bracket.rounds.every((round) => round.matches.every((m) => m.confirmed));
 }
 
+// 各選手の「勝ち上がりの深さ」を求める。優勝=1、準優勝=2、ベスト4=4 …。
+// 第Rラウンド（0始まり）で負けた人の深さは bracketSize / 2^R になる。
+//
+// 運営が結果を確定したときにDBへ書き込むためのもの。これを保存しておけば、
+// 選手ページやランキングは対戦表そのものを読まなくても順位を出せる。
+// BYEは対戦が成立していないので loserId が無く、ここには現れない。
+export function finalPlacements(bracket) {
+  if (!bracket) return [];
+
+  const placements = [];
+  const champion = getChampionId(bracket);
+  if (champion) placements.push({ playerId: champion, depth: 1 });
+
+  bracket.rounds.forEach((round, roundIndex) => {
+    const depth = bracket.bracketSize / 2 ** roundIndex;
+    round.matches.forEach((m) => {
+      if (!m.confirmed || !m.loserId) return;
+      placements.push({ playerId: m.loserId, depth });
+    });
+  });
+
+  return placements;
+}
+
 // シングルエリミネーションの最終順位を求める。
 //
 // 何回戦で負けたかで順位が決まる。決勝で負ければ2位、準決勝で負けた2人は同率3位、

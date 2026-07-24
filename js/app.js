@@ -2,13 +2,13 @@ import { state, newId, getPlayerName } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
 import { escapeHtml, avatarHtml, safeUrl, cardThumb, setupImagePicker } from './util.js';
 import {
-  createBracket, updateTournament, getChampionId, allMatchesDecided, finalStandings,
+  createBracket, updateTournament, allMatchesDecided, finalStandings, finalPlacements,
 } from './bracket.js';
 import { renderBracket } from './bracketView.js';
 import { computeRankings, computeRankingsForPeriod, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
-import { getPlayerStats } from './playerStats.js';
+import { getPlayerStats, championOfTournament } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
 import { renderProfileForm, profileSectionHtml, isProfileFormMounted } from './profile.js';
 import { renderRecruitPage, renderTournamentActions, STATUS_LABELS } from './entries.js';
@@ -671,20 +671,23 @@ function renderProfilePage() {
 // 状態と優勝者は別々に返す。履歴一覧では別の要素として並べたいので、
 // 「優勝: ○○」という1本の文字列にまとめてしまうと分解できなくなる。
 function tournamentStatusInfo(t) {
-  const bracket = state.brackets[t.id];
-  if (!bracket) {
+  if (!state.bracketIds.has(t.id)) {
     return { label: STATUS_LABELS[t.status] ?? '—', tone: t.status, champion: null };
   }
 
   if (t.status === 'finished') {
-    const championId = getChampionId(bracket);
+    const championId = championOfTournament(t.id);
     return {
       label: '終了',
       tone: 'finished',
       champion: championId ? getPlayerName(championId) : null,
     };
   }
-  return allMatchesDecided(bracket)
+
+  // 「結果待ち（表は埋まったが運営が確定していない）」は対戦表を見ないと分からない。
+  // 一覧では対戦表を読み込まないので、その場合は「進行中」までの表示に留める。
+  const bracket = state.brackets[t.id];
+  return bracket && allMatchesDecided(bracket)
     ? { label: '結果待ち', tone: 'pending', champion: null }
     : { label: '進行中', tone: 'running', champion: null };
 }
@@ -779,7 +782,7 @@ function renderTournamentInfo(tournament) {
 
   // ブラケットが出来る前は対戦表が無いので、代わりに顔ぶれを見せる。
   // 募集中の大会の詳細を選手が確認できるようにするための表示。
-  if (!state.brackets[tournament.id] && tournament.participantIds.length > 0) {
+  if (!state.bracketIds.has(tournament.id) && tournament.participantIds.length > 0) {
     const names = tournament.participantIds.map((id) => {
       const player = state.players.find((p) => p.id === id);
       return `<span class="entrant-chip">${escapeHtml(player ? player.currentName : id)}</span>`;
@@ -826,9 +829,9 @@ function renderTournamentDetail(tournamentId) {
 
   // 対戦表がまだ組まれていない（募集中など）大会では、入口を出しても空のページに
   // 行き着くだけなので隠す。
-  const bracket = state.brackets[tournamentId];
-  bracketLinkEl.hidden = !bracket;
-  if (bracket) {
+  const hasBracket = state.bracketIds.has(tournamentId);
+  bracketLinkEl.hidden = !hasBracket;
+  if (hasBracket) {
     bracketLinkEl.href = `#bracket/${encodeURIComponent(tournamentId)}`;
     bracketLinkNoteEl.textContent = tournament.status === 'finished'
       ? '対戦表と最終結果'
@@ -844,7 +847,10 @@ function renderTournamentDetail(tournamentId) {
 }
 
 // 対戦表のページ。大会詳細から分けて、対戦表だけに集中できるようにする。
-function renderBracketPage(tournamentId) {
+//
+// 対戦表の中身はこのページに来て初めて取りに行く（loadAll は持ってこない）。
+// そのぶん最初の描画が一拍遅れるので、見出しだけは先に出しておく。
+async function renderBracketPage(tournamentId) {
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
     bracketTitleEl.textContent = '大会が見つかりません';
@@ -863,6 +869,20 @@ function renderBracketPage(tournamentId) {
   bracketBackLink.href = `#tournament/${encodeURIComponent(tournamentId)}`;
   bracketBackLink.textContent = '← 大会の詳細へ';
 
+  if (!state.brackets[tournamentId] && state.bracketIds.has(tournamentId)) {
+    bracketContainer.innerHTML = '<p class="empty-hint">対戦表を読み込んでいます…</p>';
+    resultSectionEl.innerHTML = '';
+    try {
+      await db.loadBracket(tournamentId);
+    } catch (err) {
+      bracketContainer.innerHTML = `<p class="empty-hint">${escapeHtml(err.message)}</p>`;
+      return;
+    }
+    // 読み込んでいる間に別のページへ移っていたら、そこへ古い表を描かない
+    const { page, param } = parseHash();
+    if (page !== 'bracket' || param !== tournamentId) return;
+  }
+
   // bracketView は state を書き換えてから onChanged を呼ぶ。ここでDBへ反映する。
   renderBracket(tournamentId, bracketContainer, async () => {
     renderBracketPage(tournamentId);
@@ -872,9 +892,11 @@ function renderBracketPage(tournamentId) {
       // 確定済みの大会で結果を編集し直したら、確定を解いて進行中に戻す。
       // 逆方向（進行中→終了）は運営が明示的に確定させる（自動では上げない）。
       if (tournament.status === 'finished' && !allMatchesDecided(state.brackets[tournamentId])) {
+        await db.clearEntryPlacements(tournamentId);
         await db.setTournamentStatus(tournamentId, 'running');
+        delete state.placements[tournamentId];
         tournament.status = 'running';
-        renderBracketPage(tournamentId);
+        await renderBracketPage(tournamentId);
       }
     }, '試合結果の保存');
   }, { readOnly: !isAdmin() });
@@ -922,10 +944,18 @@ function renderResultSection(tournament) {
         if (!confirm(`「${tournament.name}」の結果を確定します。優勝者と最終順位が公開されます。よろしいですか？`)) return;
         btn.disabled = true;
         const ok = await persist(async () => {
+          // 順位を先に書いてから確定する。順に失敗しても「終了と表示されているのに
+          // 順位が無い」状態にはならない（逆順だとそうなる）。
+          const placements = finalPlacements(state.brackets[tournament.id]);
+          await db.saveEntryPlacements(tournament.id, placements);
           await db.setTournamentStatus(tournament.id, 'finished');
+
+          state.placements[tournament.id] = Object.fromEntries(
+            placements.map((p) => [p.playerId, p.depth]),
+          );
           tournament.status = 'finished';
         }, '結果の確定');
-        if (ok) renderBracketPage(tournament.id);
+        if (ok) await renderBracketPage(tournament.id);
         else btn.disabled = false;
       });
       box.appendChild(btn);
@@ -980,10 +1010,14 @@ function renderResultSection(tournament) {
       if (!confirm('結果の確定を取り消します。優勝者と最終順位は非公開に戻ります。よろしいですか？')) return;
       undo.disabled = true;
       const ok = await persist(async () => {
+        // 先に進行中へ戻す。順位だけ残っても表示には出ない（確定済みの大会しか見ない）ので、
+        // 途中で失敗したときに結果が公開されたままになることはない。
         await db.setTournamentStatus(tournament.id, 'running');
+        await db.clearEntryPlacements(tournament.id);
+        delete state.placements[tournament.id];
         tournament.status = 'running';
       }, '確定の取り消し');
-      if (ok) renderBracketPage(tournament.id);
+      if (ok) await renderBracketPage(tournament.id);
       else undo.disabled = false;
     });
     resultSectionEl.appendChild(undo);

@@ -22,6 +22,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { finalPlacements } from '../js/bracket.js';
 
 const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 
@@ -148,6 +149,8 @@ export function transform(data) {
   // -- brackets（IDの参照をすべて書き換える）--
   const bracketRows = [];
   const championByTournament = new Map();
+  // 確定した成績はエントリー行に持たせる（アプリが対戦表を読まずに順位を出せるように）
+  const placementByTournament = new Map();
   for (const [oldTid, bracket] of Object.entries(brackets)) {
     if (!bracket) continue;
     const newTid = tournamentMap.get(oldTid);
@@ -175,6 +178,10 @@ export function transform(data) {
 
     const finalMatch = rewritten.rounds.at(-1)?.matches?.[0];
     championByTournament.set(oldTid, finalMatch?.confirmed ? finalMatch.winnerId : null);
+    placementByTournament.set(
+      newTid,
+      new Map(finalPlacements(rewritten).map((p) => [p.playerId, p.depth])),
+    );
   }
 
   // -- tournaments --
@@ -195,6 +202,10 @@ export function transform(data) {
   // -- tournament_entries（旧participantIdsはシード順そのもの）--
   const entryRows = [];
   tournaments.forEach((t) => {
+    const newTid = tournamentMap.get(t.id);
+    // 順位は結果が確定した大会にだけ入れる（決勝が確定していない＝まだ進行中）
+    const placements = championByTournament.get(t.id) ? placementByTournament.get(newTid) : null;
+
     (t.participantIds ?? []).forEach((pid, index) => {
       const playerId = mapPlayer(pid);
       if (!playerId) {
@@ -202,9 +213,10 @@ export function transform(data) {
         return;
       }
       entryRows.push({
-        tournament_id: tournamentMap.get(t.id),
+        tournament_id: newTid,
         player_id: playerId,
         seed: index + 1,
+        placement: placements?.get(playerId) ?? null,
       });
     });
   });

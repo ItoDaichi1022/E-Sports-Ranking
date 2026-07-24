@@ -65,6 +65,12 @@ create table if not exists tournament_entries (
   player_id     uuid not null references players(id) on delete cascade,
   -- 募集締切後に確定するシード順（1 = 第1シード）。締切前は null
   seed          int,
+  -- 確定した成績を「勝ち上がりの深さ」で持つ。優勝=1、準優勝=2、ベスト4=4 …
+  -- 小さいほど上位。null は未確定（進行中、または結果を確定していない大会）。
+  --
+  -- ブラケットのJSONから毎回計算することもできるが、それだと選手ページを開くだけで
+  -- 全大会の対戦表を読む必要があり、通信量の大半をブラケットが占めてしまう。
+  placement     int,
   entered_at    timestamptz not null default now(),
   primary key (tournament_id, player_id)
 );

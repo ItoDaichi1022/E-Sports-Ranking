@@ -8,7 +8,16 @@ export const state = {
   // { id, name, date, format, participantIds: [], weight, rules, imageUrl, status, capacity }
   tournaments: [],
   matches: [],        // { id, tournamentId, winnerId, loserId, score, round }
+
+  // ブラケットは対戦表を開いたときだけ取りに行く（中身が大きく、一覧では使わないため）。
+  // brackets は読み込み済みのものだけを持つキャッシュで、bracketIds は
+  // 「対戦表が組まれている大会」の一覧。入口を出すかどうかの判定はこちらで行う。
   brackets: {},       // tournamentId -> bracket object (js/bracket.js が構造を定義)
+  bracketIds: new Set(),
+
+  // 確定済みの成績。tournamentId -> { playerId: 勝ち上がりの深さ }。
+  // 優勝=1、準優勝=2、ベストN=N で、小さいほど上位（DBの tournament_entries.placement）。
+  placements: {},
   publishedRanking: null, // { publishedAt, periodMonths, rankings: [...] } | null（未公開）
   // ホーム画面の運営からのお知らせ。pinned優先＋新しい順で並べて持つ。
   announcements: [],  // { id, title, body, imageUrl, pinned, createdAt, updatedAt }

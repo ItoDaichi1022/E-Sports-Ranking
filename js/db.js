@@ -125,12 +125,25 @@ function check(error, what) {
 
 // 全データを取得して state を丸ごと差し替える。認証は不要（RLSがSELECTを全員に許可）。
 // 途中で失敗しても中途半端な表示にならないよう、全部揃ってから state に入れる。
+//
+// ブラケットだけは中身を持ってこない。JSONBが1大会あたり数KB〜数十KBあり、
+// 全大会分となるとこの読み込みの大半を占めるのに、使うのは対戦表を開いた1大会だけだから。
+// ここでは「どの大会に対戦表があるか」のIDだけを取り、中身は loadBracket で取りに行く。
+// 順位（優勝/準優勝/ベストN）は tournament_entries.placement に保存済みなので、
+// 一覧や選手ページはブラケットが無くてもこれまで通り表示できる。
 export async function loadAll() {
-  const [players, tournaments, entries, brackets, matches, ranking, announcements] = await Promise.all([
+  // 既に開いている対戦表は中身も取り直す。Realtimeで勝敗が届いたときに
+  // 見ている表がその場で更新されるようにするため（通常は0件か1件）。
+  const openBracketIds = Object.keys(state.brackets);
+
+  const [players, tournaments, entries, bracketIds, openBrackets, matches, ranking, announcements] = await Promise.all([
     supabase.from('players').select('*').order('display_name'),
     supabase.from('tournaments').select('*').order('date', { ascending: true, nullsFirst: false }),
     supabase.from('tournament_entries').select('*'),
-    supabase.from('brackets').select('*'),
+    supabase.from('brackets').select('tournament_id'),
+    openBracketIds.length > 0
+      ? supabase.from('brackets').select('tournament_id, data').in('tournament_id', openBracketIds)
+      : Promise.resolve({ data: [], error: null }),
     supabase.from('matches').select('*'),
     // スナップショットは最新の1件だけ使う（過去の公開履歴は残しておく）
     supabase.from('published_rankings').select('*').order('published_at', { ascending: false }).limit(1),
@@ -141,13 +154,15 @@ export async function loadAll() {
   check(players.error, '選手の読み込み');
   check(tournaments.error, '大会の読み込み');
   check(entries.error, 'エントリーの読み込み');
-  check(brackets.error, 'ブラケットの読み込み');
+  check(bracketIds.error, 'ブラケットの読み込み');
+  check(openBrackets.error, 'ブラケットの読み込み');
   check(matches.error, '試合結果の読み込み');
   check(ranking.error, 'ランキングの読み込み');
   check(announcements.error, 'お知らせの読み込み');
 
   // participantIds はシード順（未確定なら登録順）。旧データの並び順の意味を引き継ぐ。
   const participantsByTournament = new Map();
+  const placementsByTournament = {};
   [...entries.data]
     .sort((a, b) => {
       if (a.seed != null && b.seed != null) return a.seed - b.seed;
@@ -158,10 +173,15 @@ export async function loadAll() {
     .forEach((e) => {
       if (!participantsByTournament.has(e.tournament_id)) participantsByTournament.set(e.tournament_id, []);
       participantsByTournament.get(e.tournament_id).push(e.player_id);
+
+      if (e.placement == null) return;
+      if (!placementsByTournament[e.tournament_id]) placementsByTournament[e.tournament_id] = {};
+      placementsByTournament[e.tournament_id][e.player_id] = e.placement;
     });
 
+  // 取り直した分だけをキャッシュに残す。消された大会のブラケットもここで落ちる。
   const bracketsById = {};
-  brackets.data.forEach((b) => { bracketsById[b.tournament_id] = b.data; });
+  openBrackets.data.forEach((b) => { bracketsById[b.tournament_id] = b.data; });
 
   const snapshot = ranking.data?.[0];
 
@@ -169,6 +189,8 @@ export async function loadAll() {
   state.tournaments = tournaments.data.map((t) => toTournament(t, participantsByTournament.get(t.id) ?? []));
   state.matches = matches.data.map(toMatch);
   state.brackets = bracketsById;
+  state.bracketIds = new Set(bracketIds.data.map((b) => b.tournament_id));
+  state.placements = placementsByTournament;
   state.publishedRanking = snapshot
     ? {
         publishedAt: snapshot.published_at,
@@ -479,6 +501,27 @@ export async function replaceEntries(tournamentId, seededPlayerIds) {
 // ブラケットと試合
 // ---------------------------------------------------------------------------
 
+// 1大会分の対戦表を取りに行き、state のキャッシュに載せる。
+// loadAll は中身を持ってこないので、対戦表を開くときはここを通す。
+//
+// 一度読めば以後の loadAll が中身も取り直すため、開いている間は最新に保たれる。
+export async function loadBracket(tournamentId) {
+  if (state.brackets[tournamentId]) return state.brackets[tournamentId];
+  // 対戦表がまだ組まれていない大会は問い合わせるまでもない
+  if (!state.bracketIds.has(tournamentId)) return null;
+
+  const { data, error } = await supabase
+    .from('brackets')
+    .select('data')
+    .eq('tournament_id', tournamentId)
+    .maybeSingle();
+  check(error, 'ブラケットの読み込み');
+
+  if (!data) return null;
+  state.brackets[tournamentId] = data.data;
+  return data.data;
+}
+
 export async function saveBracket(tournamentId, bracket) {
   const { error } = await supabase
     .from('brackets')
@@ -516,6 +559,39 @@ export async function syncTournamentProgress(tournamentId) {
     const { error: deleteError } = await supabase.from('matches').delete().in('id', toDelete);
     check(deleteError, '試合結果の取り消し');
   }
+}
+
+// ---------------------------------------------------------------------------
+// 確定した成績
+//
+// 運営が「結果を確定する」を押した時点の順位を、エントリー行に書き込んでおく。
+// こうしておけば選手ページやランキングが対戦表を読まずに済む（loadAll のコメント参照）。
+// 書けるのは運営だけ（RLSの entries_update が is_admin() を要求する）。
+// ---------------------------------------------------------------------------
+
+// placements は [{ playerId, depth }]。depth は優勝=1、準優勝=2、ベストN=N。
+// seed 列は送らないので、既に入っているシード順はそのまま残る。
+export async function saveEntryPlacements(tournamentId, placements) {
+  if (placements.length === 0) return;
+  const rows = placements.map(({ playerId, depth }) => ({
+    tournament_id: tournamentId,
+    player_id: playerId,
+    placement: depth,
+  }));
+  const { error } = await supabase
+    .from('tournament_entries')
+    .upsert(rows, { onConflict: 'tournament_id,player_id' });
+  check(error, '最終順位の保存');
+}
+
+// 確定を取り消したとき用。順位を消しておかないと、進行中に戻したはずの大会の
+// 成績が選手ページに残り続ける。
+export async function clearEntryPlacements(tournamentId) {
+  const { error } = await supabase
+    .from('tournament_entries')
+    .update({ placement: null })
+    .eq('tournament_id', tournamentId);
+  check(error, '最終順位の取り消し');
 }
 
 // ---------------------------------------------------------------------------
