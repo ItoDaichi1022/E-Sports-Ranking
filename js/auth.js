@@ -115,11 +115,28 @@ export async function reloadOwnPlayer() {
 
 // ---- ログイン手段 ----
 
+// 認可画面へ渡す追加パラメータ（プロバイダごと）。
+//
+// Googleは一度ログインした端末だと、次からアカウント選択を挟まずに前回の
+// アカウントで自動的に入ってしまう。複数のGoogleアカウントを使い分けられるよう、
+// 毎回アカウント選択画面を出させる。
+// prompt=consent ではなく select_account を使うのは、権限の再承認まで
+// 毎回求めると余計な手間になるため（選び直したいだけなのでこちらで足りる）。
+//
+// Discordは既定で認可画面が出て、そこからアカウントを切り替えられるので指定しない。
+const OAUTH_QUERY_PARAMS = {
+  google: { prompt: 'select_account' },
+};
+
 // Google / Discord。認可画面へ遷移し、戻ってきたときにセッションが確立される。
 export async function signInWithProvider(provider) {
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo: redirectUrl() },
+    options: {
+      redirectTo: redirectUrl(),
+      // 未指定のプロバイダでは undefined になり、URLには何も足されない
+      queryParams: OAUTH_QUERY_PARAMS[provider],
+    },
   });
   if (error) throw new Error(`ログインに失敗しました: ${error.message}`);
 }

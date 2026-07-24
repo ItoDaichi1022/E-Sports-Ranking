@@ -8,7 +8,7 @@
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=42">
+<link rel="stylesheet" href="css/style.css?v=43">
 </head>
 <body>
 <header>
@@ -343,7 +343,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=42"></script>
+<script src="js/vendor/supabase.js?v=43"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -355,24 +355,24 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=42",
-    "./js/bracket.js":        "./js/bracket.js?v=42",
-    "./js/bracketView.js":    "./js/bracketView.js?v=42",
-    "./js/db.js":             "./js/db.js?v=42",
-    "./js/entries.js":        "./js/entries.js?v=42",
-    "./js/playerStats.js":    "./js/playerStats.js?v=42",
-    "./js/players.js":        "./js/players.js?v=42",
-    "./js/profile.js":        "./js/profile.js?v=42",
-    "./js/ranking.js":        "./js/ranking.js?v=42",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=42",
-    "./js/rankingView.js":    "./js/rankingView.js?v=42",
-    "./js/state.js":          "./js/state.js?v=42",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=42",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=42",
-    "./js/util.js":           "./js/util.js?v=42"
+    "./js/auth.js":           "./js/auth.js?v=43",
+    "./js/bracket.js":        "./js/bracket.js?v=43",
+    "./js/bracketView.js":    "./js/bracketView.js?v=43",
+    "./js/db.js":             "./js/db.js?v=43",
+    "./js/entries.js":        "./js/entries.js?v=43",
+    "./js/playerStats.js":    "./js/playerStats.js?v=43",
+    "./js/players.js":        "./js/players.js?v=43",
+    "./js/profile.js":        "./js/profile.js?v=43",
+    "./js/ranking.js":        "./js/ranking.js?v=43",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=43",
+    "./js/rankingView.js":    "./js/rankingView.js?v=43",
+    "./js/state.js":          "./js/state.js?v=43",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=43",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=43",
+    "./js/util.js":           "./js/util.js?v=43"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=42"></script>
+<script type="module" src="js/app.js?v=43"></script>
 </body>
 </html>
