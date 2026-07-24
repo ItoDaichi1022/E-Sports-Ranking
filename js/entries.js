@@ -239,7 +239,7 @@ export function renderRecruitPage(containerEl) {
     // どこを押しても詳細へ行くため、スマートフォンでも押し外しにくい。
     const card = document.createElement('a');
     card.className = 'card';
-    card.href = `#bracket/${encodeURIComponent(t.id)}`;
+    card.href = `#tournament/${encodeURIComponent(t.id)}`;
 
     const body = document.createElement('div');
     body.className = 'card-body';

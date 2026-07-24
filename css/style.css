@@ -1112,6 +1112,53 @@ a.card:hover {
   font-size: 0.82rem;
 }
 
+/* ---- 別ページへの入口（大会詳細からブラケットへ など） ----
+   ボタンではなく「行」で見せる。ページ内の操作ではなく移動であることが
+   分かるよう、右端に矢印を置く。 */
+.link-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.link-card:hover {
+  border-color: var(--accent);
+  background: var(--surface-3);
+  color: inherit;
+}
+
+.link-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.link-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.link-card-note {
+  font-size: 0.82rem;
+  color: var(--text-faint);
+}
+
+.link-card-arrow {
+  flex: none;
+  font-size: 1.1rem;
+  color: var(--accent-bright);
+}
+
 /* ---- お知らせ詳細 ---- */
 
 #news-title {

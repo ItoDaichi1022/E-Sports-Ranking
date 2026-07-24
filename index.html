@@ -8,7 +8,7 @@
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=48">
+<link rel="stylesheet" href="css/style.css?v=49">
 </head>
 <body>
 <header>
@@ -22,7 +22,7 @@
     <nav id="main-nav">
       <a href="#home" data-page="home">ホーム</a>
       <a href="#recruit" data-page="recruit">募集中</a>
-      <a href="#tournament" data-page="tournament" id="nav-tournament-link">大会作成</a>
+      <a href="#create" data-page="create" id="nav-tournament-link">大会作成</a>
       <a href="#history" data-page="history">大会履歴</a>
       <a href="#players" data-page="players">選手</a>
       <a href="#ranking" data-page="ranking">ランキング</a>
@@ -259,18 +259,19 @@
     <div id="history-list"></div>
   </section>
 
-  <!-- 大会詳細。上から 画像 → 大会名 → ブラケット → 大会情報 → エントリー の順に並べる。
+  <!-- 大会詳細。上から 画像 → 大会名 → ブラケットへの入口 → 大会情報 → エントリー。
+       ブラケットは別ページに分けてあり、ここからは入口だけを出す。
        エントリーは内容を確認してから押すものなので最後に置く。 -->
-  <section id="view-bracket" class="view" hidden>
-    <a class="back-link" id="bracket-back-link" href="#history">← 大会履歴へ</a>
+  <section id="view-tournament-detail" class="view" hidden>
+    <a class="back-link" id="tournament-back-link" href="#history">← 大会履歴へ</a>
 
     <!-- 大会画像のヘッダー。画像が無い大会ではJSが丸ごと隠す。 -->
     <div id="tournament-hero" class="detail-hero" hidden></div>
 
     <div class="bracket-page-header">
       <div class="bracket-title-block">
-        <h2 id="bracket-title"></h2>
-        <p id="bracket-meta" class="meta-line"></p>
+        <h2 id="tournament-title"></h2>
+        <p id="tournament-meta" class="meta-line"></p>
       </div>
       <div class="row-actions">
         <button type="button" id="tournament-edit-btn" class="btn-secondary">大会情報を編集</button>
@@ -305,14 +306,30 @@
       <button type="submit">保存</button>
       <button type="button" id="tournament-edit-cancel-btn" class="btn-secondary">キャンセル</button>
     </form>
-    <div id="bracket-container"></div>
-    <div id="result-section" class="result-section"></div>
+    <!-- ブラケット（対戦表）への入口。まだ組まれていない大会ではJSが隠す。 -->
+    <a class="link-card" id="bracket-link" href="#home" hidden>
+      <span class="link-card-main">
+        <span class="link-card-title">ブラケットを見る</span>
+        <span class="link-card-note" id="bracket-link-note"></span>
+      </span>
+      <span class="link-card-arrow" aria-hidden="true">→</span>
+    </a>
+
     <div id="tournament-info" class="tournament-info"></div>
 
     <!-- エントリーと運営の募集操作。募集一覧のカードは入口だけにしたので、
          実際の操作はこちらに集約している。ルールや参加者を確認したうえで
          押せるよう、ページの最後に置く。 -->
     <div id="tournament-actions"></div>
+  </section>
+
+  <!-- ブラケット（対戦表）。大会詳細から分けて、対戦表だけに集中できるようにする。 -->
+  <section id="view-bracket" class="view" hidden>
+    <a class="back-link" id="bracket-back-link" href="#history">← 大会へ</a>
+    <h2 id="bracket-title"></h2>
+    <p id="bracket-meta" class="meta-line"></p>
+    <div id="bracket-container"></div>
+    <div id="result-section" class="result-section"></div>
   </section>
 
   <section id="view-players" class="view" hidden>
@@ -369,7 +386,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=48"></script>
+<script src="js/vendor/supabase.js?v=49"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -381,24 +398,24 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=48",
-    "./js/bracket.js":        "./js/bracket.js?v=48",
-    "./js/bracketView.js":    "./js/bracketView.js?v=48",
-    "./js/db.js":             "./js/db.js?v=48",
-    "./js/entries.js":        "./js/entries.js?v=48",
-    "./js/playerStats.js":    "./js/playerStats.js?v=48",
-    "./js/players.js":        "./js/players.js?v=48",
-    "./js/profile.js":        "./js/profile.js?v=48",
-    "./js/ranking.js":        "./js/ranking.js?v=48",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=48",
-    "./js/rankingView.js":    "./js/rankingView.js?v=48",
-    "./js/state.js":          "./js/state.js?v=48",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=48",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=48",
-    "./js/util.js":           "./js/util.js?v=48"
+    "./js/auth.js":           "./js/auth.js?v=49",
+    "./js/bracket.js":        "./js/bracket.js?v=49",
+    "./js/bracketView.js":    "./js/bracketView.js?v=49",
+    "./js/db.js":             "./js/db.js?v=49",
+    "./js/entries.js":        "./js/entries.js?v=49",
+    "./js/playerStats.js":    "./js/playerStats.js?v=49",
+    "./js/players.js":        "./js/players.js?v=49",
+    "./js/profile.js":        "./js/profile.js?v=49",
+    "./js/ranking.js":        "./js/ranking.js?v=49",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=49",
+    "./js/rankingView.js":    "./js/rankingView.js?v=49",
+    "./js/state.js":          "./js/state.js?v=49",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=49",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=49",
+    "./js/util.js":           "./js/util.js?v=49"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=48"></script>
+<script type="module" src="js/app.js?v=49"></script>
 </body>
 </html>

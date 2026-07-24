@@ -82,6 +82,11 @@ const tournamentEditCancelBtn = $('tournament-edit-cancel-btn');
 const tournamentInfoEl = $('tournament-info');
 const tournamentActionsEl = $('tournament-actions');
 const tournamentHeroEl = $('tournament-hero');
+const tournamentTitleEl = $('tournament-title');
+const tournamentMetaEl = $('tournament-meta');
+const tournamentBackLink = $('tournament-back-link');
+const bracketLinkEl = $('bracket-link');
+const bracketLinkNoteEl = $('bracket-link-note');
 const resultSectionEl = $('result-section');
 const bracketBackLink = $('bracket-back-link');
 const tournamentEditCapacityInput = $('tournament-edit-capacity-input');
@@ -216,7 +221,10 @@ const VIEW_IDS = {
   home: 'view-home',
   news: 'view-news',
   recruit: 'view-recruit',
-  tournament: 'view-tournament',
+  // create=大会作成（運営）、tournament=大会詳細、bracket=対戦表。
+  // 詳細と対戦表は別ページに分けてある。
+  create: 'view-tournament',
+  tournament: 'view-tournament-detail',
   history: 'view-history',
   bracket: 'view-bracket',
   players: 'view-players',
@@ -226,7 +234,9 @@ const VIEW_IDS = {
 };
 
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
-const NAV_PAGE_OF = { bracket: 'history', player: 'players', news: 'home' };
+const NAV_PAGE_OF = {
+  tournament: 'history', bracket: 'history', player: 'players', news: 'home',
+};
 
 function parseHash() {
   const h = location.hash.replace(/^#/, '');
@@ -247,7 +257,7 @@ function routeFromHash() {
   let target = VIEW_IDS[page] ? page : 'home';
 
   // 大会作成は運営限定。マイページはログアウト中でも開ける（そこからログインする）
-  if (target === 'tournament' && !isAdmin()) {
+  if (target === 'create' && !isAdmin()) {
     location.replace('#home');
     target = 'home';
   }
@@ -264,7 +274,8 @@ function routeFromHash() {
   if (target === 'home') renderHome();
   else if (target === 'news') renderNewsPage(param);
   else if (target === 'recruit') renderRecruit();
-  else if (target === 'tournament') { renderParticipantCheckboxes(); renderSelectedList(); }
+  else if (target === 'create') { renderParticipantCheckboxes(); renderSelectedList(); }
+  else if (target === 'tournament') renderTournamentDetail(param);
   else if (target === 'history') renderHistoryList();
   else if (target === 'bracket') renderBracketPage(param);
   else if (target === 'players') refreshPlayerUI();
@@ -702,7 +713,7 @@ function renderHistoryList() {
   [...visible].reverse().forEach((t) => {
     const card = document.createElement('a');
     card.className = 'card';
-    card.href = `#bracket/${encodeURIComponent(t.id)}`;
+    card.href = `#tournament/${encodeURIComponent(t.id)}`;
 
     const { label, tone, champion } = tournamentStatusInfo(t);
 
@@ -779,30 +790,78 @@ function renderTournamentInfo(tournament) {
   tournamentInfoEl.innerHTML = html;
 }
 
-function renderBracketPage(tournamentId) {
+// 大会の一覧（募集・履歴）から戻るときの行き先。
+// 募集中・準備中の大会は履歴に並ばないので、戻り先を募集ページにする。
+function backToListLink(tournament) {
+  const fromRecruit = tournament.status === 'draft' || tournament.status === 'recruiting';
+  return fromRecruit
+    ? { href: '#recruit', text: '← 募集中の大会へ' }
+    : { href: '#history', text: '← 大会履歴へ' };
+}
+
+// 大会詳細。対戦表そのものは別ページ（#bracket/{id}）に分けてあり、
+// ここには「ブラケットを見る」という入口だけを置く。
+function renderTournamentDetail(tournamentId) {
   currentBracketTournamentId = tournamentId;
   tournamentEditForm.hidden = true;
 
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
     renderHero(tournamentHeroEl, null);
-    bracketTitleEl.textContent = '大会が見つかりません';
-    bracketMetaEl.textContent = '';
-    bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
-    tournamentInfoEl.innerHTML = '';
-    resultSectionEl.innerHTML = '';
+    tournamentTitleEl.textContent = '大会が見つかりません';
+    tournamentMetaEl.textContent = '';
+    tournamentInfoEl.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
     tournamentActionsEl.innerHTML = '';
+    bracketLinkEl.hidden = true;
     return;
   }
 
   renderHero(tournamentHeroEl, tournament.imageUrl);
+  tournamentTitleEl.textContent = tournament.name;
+  tournamentMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${tournament.participantIds.length}人参加 ・ ${tournamentStatusLabel(tournament)}`;
+
+  const back = backToListLink(tournament);
+  tournamentBackLink.href = back.href;
+  tournamentBackLink.textContent = back.text;
+
+  // 対戦表がまだ組まれていない（募集中など）大会では、入口を出しても空のページに
+  // 行き着くだけなので隠す。
+  const bracket = state.brackets[tournamentId];
+  bracketLinkEl.hidden = !bracket;
+  if (bracket) {
+    bracketLinkEl.href = `#bracket/${encodeURIComponent(tournamentId)}`;
+    bracketLinkNoteEl.textContent = tournament.status === 'finished'
+      ? '対戦表と最終結果'
+      : '対戦表と進行状況';
+  }
+
+  // エントリーと運営の募集操作。募集一覧のカードは入口だけにしたので、ここが操作の場所。
+  renderTournamentActions(tournamentActionsEl, tournament, async () => {
+    await refreshFromDb();
+  });
+
+  renderTournamentInfo(tournament);
+}
+
+// 対戦表のページ。大会詳細から分けて、対戦表だけに集中できるようにする。
+function renderBracketPage(tournamentId) {
+  const tournament = state.tournaments.find((t) => t.id === tournamentId);
+  if (!tournament) {
+    bracketTitleEl.textContent = '大会が見つかりません';
+    bracketMetaEl.textContent = '';
+    bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
+    resultSectionEl.innerHTML = '';
+    bracketBackLink.href = '#history';
+    bracketBackLink.textContent = '← 大会履歴へ';
+    return;
+  }
+
   bracketTitleEl.textContent = tournament.name;
   bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${tournament.participantIds.length}人参加 ・ ${tournamentStatusLabel(tournament)}`;
 
-  // 募集中・準備中の大会は履歴に並ばないので、戻り先を募集ページにする
-  const fromRecruit = tournament.status === 'draft' || tournament.status === 'recruiting';
-  bracketBackLink.href = fromRecruit ? '#recruit' : '#history';
-  bracketBackLink.textContent = fromRecruit ? '← 募集中の大会へ' : '← 大会履歴へ';
+  // 戻り先は大会詳細。ここへは詳細から来るため。
+  bracketBackLink.href = `#tournament/${encodeURIComponent(tournamentId)}`;
+  bracketBackLink.textContent = '← 大会の詳細へ';
 
   const confirmed = tournament.status === 'finished';
 
@@ -822,13 +881,7 @@ function renderBracketPage(tournamentId) {
     }, '試合結果の保存');
   }, { readOnly: !isAdmin(), showResult: confirmed });
 
-  // エントリーと運営の募集操作。募集一覧のカードは入口だけにしたので、ここが操作の場所。
-  renderTournamentActions(tournamentActionsEl, tournament, async () => {
-    await refreshFromDb();
-  });
-
   renderResultSection(tournament);
-  renderTournamentInfo(tournament);
 }
 
 // 表が全部埋まったあとの「結果を確定する」操作と、確定後の最終順位。
@@ -1036,7 +1089,7 @@ function renderPlayerDetail(playerId) {
           <tbody>
             ${[...stats.tournaments].reverse().map((entry) => `
               <tr>
-                <td><a href="#bracket/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a></td>
+                <td><a href="#tournament/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a></td>
                 <td>${escapeHtml(entry.tournament.date || '—')}</td>
                 <td>${escapeHtml(entry.placement || '—')}</td>
                 <td>${entry.wins}勝${entry.losses}敗</td>
@@ -1307,7 +1360,7 @@ tournamentForm.addEventListener('submit', async (e) => {
   selectedParticipantIds = [];
 
   await refreshFromDb();
-  location.hash = manual ? `#bracket/${encodeURIComponent(tournament.id)}` : '#recruit';
+  location.hash = manual ? `#tournament/${encodeURIComponent(tournament.id)}` : '#recruit';
 });
 
 tournamentEditBtn.addEventListener('click', () => {
@@ -1350,7 +1403,7 @@ tournamentEditForm.addEventListener('submit', async (e) => {
     }
   }, '大会情報の保存');
   if (ok) tournamentEditForm.hidden = true;
-  renderBracketPage(currentBracketTournamentId);
+  renderTournamentDetail(currentBracketTournamentId);
 });
 
 tournamentDeleteBtn.addEventListener('click', async () => {
