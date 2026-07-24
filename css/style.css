@@ -1124,17 +1124,41 @@ td code { font-size: 0.85em; }
   font-variant-numeric: tabular-nums;
 }
 
-/* 大会詳細のエントリー・運営操作 */
+/* 大会詳細のエントリー・運営操作。ページ最後に置くので、上に区切りを入れて
+   本文（大会情報）と切り離す。 */
 .tournament-actions-row {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  margin-bottom: 1.5rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-soft);
 }
 
 /* 運営の操作は主導線（エントリー）から離し、右端に寄せる */
 .tournament-actions-row .row-actions { margin-left: auto; }
+
+/* エントリーはこのページの主目的。他のボタンより一回り大きくし、
+   塗りに幅を持たせて視線が最初に止まるようにする。 */
+.btn-entry {
+  min-height: 3rem;
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  background: linear-gradient(135deg, var(--accent), #8b74ff);
+  box-shadow: 0 4px 16px -4px var(--accent-ring);
+}
+
+.btn-entry:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent-hover), #9d89ff);
+  box-shadow: 0 6px 20px -4px var(--accent-ring);
+}
+
+.btn-entry:active:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent-active), #8b74ff);
+}
 
 /* 参加者チップ（大会情報の「エントリー中の選手」で使用） */
 .entrant-list {
@@ -1246,6 +1270,18 @@ td code { font-size: 0.85em; }
 /* ---------------------------------------------------------------------------
    ブラケット
    --------------------------------------------------------------------------- */
+
+/* 大会画像のヘッダー。セクションの左右いっぱいまで広げて「見出し」らしく見せる。
+   画像自体は切り抜かず、枠の中に全体を収める（下の画像共通ルール）。 */
+.tournament-hero {
+  display: flex;
+  justify-content: center;
+  margin: 0 -1.5rem 1.5rem;
+  padding: 1rem 1.5rem;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
 
 .bracket-page-header {
   display: flex;
@@ -1888,7 +1924,7 @@ dialog h3 {
      * 縦横比は原寸のまま、幅と高さの「上限」だけを決めて中に収める。
      * 原寸より拡大しない（小さい画像がぼやけない）。 */
 .announcement-image,
-.tournament-image {
+.tournament-hero img {
   display: block;
   margin-left: auto;
   margin-right: auto;
@@ -1898,14 +1934,13 @@ dialog h3 {
   height: auto;
 }
 
-.announcement-image,
-.tournament-image {
+.announcement-image {
   margin-top: 0.9rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--r);
 }
 
-.tournament-image { margin: 0 auto 1.25rem; }
+.tournament-hero img { border-radius: var(--r-sm); }
 
 /* フォームのプレビュー。選択した画像や既存画像の確認用。 */
 .image-preview-row {
@@ -1971,11 +2006,20 @@ dialog h3 {
   .announcement { padding: 1.1rem; }
   .recruit-card-body { padding: 0.9rem 1rem 1rem; }
 
-  /* 主導線（エントリー）を横いっぱいにして押しやすくする */
+  /* セクションの余白が狭くなるぶん、画像ヘッダーのはみ出し量も合わせる */
+  .tournament-hero {
+    margin: 0 -1rem 1.25rem;
+    padding: 0.75rem 1rem;
+  }
+
+  /* 主導線（エントリー）を横いっぱいにして押しやすくする。
+     高さは縮めない（詳細ページで一番押させたいボタンのため）。 */
   .tournament-actions-row > button {
     flex: 1 1 100%;
     min-height: 2.75rem;
   }
+
+  .tournament-actions-row > .btn-entry { min-height: 3rem; }
 
   .tournament-actions-row .row-actions {
     margin-left: 0;

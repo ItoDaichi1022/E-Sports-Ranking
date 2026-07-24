@@ -70,11 +70,13 @@ function entryButton(tournament, onChanged) {
   const entered = isEntered(tournament);
   const left = remainingSlots(tournament);
 
+  // エントリーはこのページの主目的なので、その入口になるボタンは目立たせる
+  // （ログイン・選手登録もエントリーへ向かう導線なので同じ扱いにする）。
   if (!isLoggedIn()) {
     btn.type = 'button';
-    btn.className = 'btn-secondary';
+    btn.className = 'btn-entry';
     btn.textContent = 'ログインしてエントリー';
-    // ページ遷移せずダイアログだけ開く（募集一覧を見ていた場所を失わないように）
+    // ページ遷移せずダイアログだけ開く（見ていた大会を失わないように）
     btn.addEventListener('click', () => {
       document.dispatchEvent(new CustomEvent('request-login'));
     });
@@ -83,7 +85,7 @@ function entryButton(tournament, onChanged) {
 
   if (!auth.player) {
     btn.type = 'button';
-    btn.className = 'btn-secondary';
+    btn.className = 'btn-entry';
     btn.textContent = '選手登録してエントリー';
     btn.addEventListener('click', () => { location.hash = '#profile'; });
     return btn;
@@ -91,6 +93,7 @@ function entryButton(tournament, onChanged) {
 
   btn.type = 'button';
   if (entered) {
+    // 取り消しは主導線ではないので、目立たせない
     btn.className = 'btn-secondary';
     btn.textContent = 'エントリーを取り消す';
   } else if (left === 0) {
@@ -99,10 +102,17 @@ function entryButton(tournament, onChanged) {
     btn.disabled = true;
     return btn;
   } else {
-    btn.textContent = 'エントリー';
+    btn.className = 'btn-entry';
+    btn.textContent = 'エントリーする';
   }
 
   btn.addEventListener('click', async () => {
+    // 押し間違いで参加・辞退が確定しないよう、どちらも一度確認する
+    const confirmed = entered
+      ? confirm(`「${tournament.name}」のエントリーを取り消しますか？`)
+      : confirm(`「${tournament.name}」にエントリーしますか？`);
+    if (!confirmed) return;
+
     btn.disabled = true;
     try {
       if (entered) {

@@ -81,6 +81,7 @@ const tournamentEditRulesInput = $('tournament-edit-rules-input');
 const tournamentEditCancelBtn = $('tournament-edit-cancel-btn');
 const tournamentInfoEl = $('tournament-info');
 const tournamentActionsEl = $('tournament-actions');
+const tournamentHeroEl = $('tournament-hero');
 const resultSectionEl = $('result-section');
 const bracketBackLink = $('bracket-back-link');
 const tournamentEditCapacityInput = $('tournament-edit-capacity-input');
@@ -719,19 +720,26 @@ const FORMAT_LABELS = {
   round_robin: '総当たり',
 };
 
+// 大会画像をページ上端のヘッダーとして出す。
+// 画像が無い大会では枠ごと隠し、余白だけが残らないようにする。
+function renderTournamentHero(tournament) {
+  const url = safeUrl(tournament?.imageUrl);
+  if (url) {
+    tournamentHeroEl.innerHTML = `<img src="${escapeHtml(url)}" alt="" loading="lazy">`;
+    tournamentHeroEl.hidden = false;
+  } else {
+    tournamentHeroEl.innerHTML = '';
+    tournamentHeroEl.hidden = true;
+  }
+}
+
 function renderTournamentInfo(tournament) {
   const formatLabel = FORMAT_LABELS[tournament.format] || tournament.format;
   const countLabel = tournament.capacity == null
     ? `${tournament.participantIds.length}人`
     : `${tournament.participantIds.length} / ${tournament.capacity}人`;
 
-  const imageUrl = safeUrl(tournament.imageUrl);
-  const imageHtml = imageUrl
-    ? `<img class="tournament-image" src="${escapeHtml(imageUrl)}" alt="" loading="lazy">`
-    : '';
-
   let html = `
-    ${imageHtml}
     <h3>大会情報</h3>
     <dl class="tournament-info-grid">
       <div><dt>${tournament.status === 'recruiting' ? 'エントリー' : '参加人数'}</dt><dd>${escapeHtml(countLabel)}</dd></div>
@@ -767,13 +775,17 @@ function renderBracketPage(tournamentId) {
 
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
+    renderTournamentHero(null);
     bracketTitleEl.textContent = '大会が見つかりません';
     bracketMetaEl.textContent = '';
     bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
     tournamentInfoEl.innerHTML = '';
+    resultSectionEl.innerHTML = '';
+    tournamentActionsEl.innerHTML = '';
     return;
   }
 
+  renderTournamentHero(tournament);
   bracketTitleEl.textContent = tournament.name;
   bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${tournament.participantIds.length}人参加 ・ ${tournamentStatusLabel(tournament)}`;
 
