@@ -3,10 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- モバイルのブラウザUI（アドレスバー）も暗い面に揃える -->
+<meta name="theme-color" content="#0b0e15">
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=37">
+<link rel="stylesheet" href="css/style.css?v=38">
 </head>
 <body>
 <header>
@@ -65,18 +67,22 @@
 
 <main>
   <section id="view-home" class="view">
-    <div class="home-intro">
-      <h2>ようこそ</h2>
-      <p>
-        このサイトは対戦ゲームの大会運営とランキングをまとめる場所です。
-        大会の履歴やブラケット、選手のプロフィールや戦歴、シーズンのランキングを
+    <div class="hero">
+      <p class="hero-eyebrow">Tournament &amp; Ranking</p>
+      <h2 class="hero-title">大会の記録と、選手のランキング。</h2>
+      <p class="hero-lead">
+        大会の履歴やブラケット、選手のプロフィールと戦歴、シーズンのランキングを
         ログインなしで自由に閲覧できます。
       </p>
-      <p>
-        Googleなどでログインすると自分の選手プロフィールを作成・編集でき、
+      <p class="hero-lead">
+        ログインすると自分の選手プロフィールを作成・編集でき、
         募集中の大会に「エントリー」ボタン一つで参加登録できます。
-        各ページへは左上のメニュー（<span aria-hidden="true">☰</span>）から移動してください。
+        各ページへは左上のメニュー（<span aria-hidden="true">☰</span>）から移動できます。
       </p>
+      <div class="hero-actions">
+        <a class="as-link" href="#recruit">募集中の大会を見る</a>
+        <a class="as-link btn-secondary" href="#ranking">ランキング</a>
+      </div>
     </div>
 
     <div class="home-section">
@@ -318,7 +324,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=37"></script>
+<script src="js/vendor/supabase.js?v=38"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -330,24 +336,24 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=37",
-    "./js/bracket.js":        "./js/bracket.js?v=37",
-    "./js/bracketView.js":    "./js/bracketView.js?v=37",
-    "./js/db.js":             "./js/db.js?v=37",
-    "./js/entries.js":        "./js/entries.js?v=37",
-    "./js/playerStats.js":    "./js/playerStats.js?v=37",
-    "./js/players.js":        "./js/players.js?v=37",
-    "./js/profile.js":        "./js/profile.js?v=37",
-    "./js/ranking.js":        "./js/ranking.js?v=37",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=37",
-    "./js/rankingView.js":    "./js/rankingView.js?v=37",
-    "./js/state.js":          "./js/state.js?v=37",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=37",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=37",
-    "./js/util.js":           "./js/util.js?v=37"
+    "./js/auth.js":           "./js/auth.js?v=38",
+    "./js/bracket.js":        "./js/bracket.js?v=38",
+    "./js/bracketView.js":    "./js/bracketView.js?v=38",
+    "./js/db.js":             "./js/db.js?v=38",
+    "./js/entries.js":        "./js/entries.js?v=38",
+    "./js/playerStats.js":    "./js/playerStats.js?v=38",
+    "./js/players.js":        "./js/players.js?v=38",
+    "./js/profile.js":        "./js/profile.js?v=38",
+    "./js/ranking.js":        "./js/ranking.js?v=38",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=38",
+    "./js/rankingView.js":    "./js/rankingView.js?v=38",
+    "./js/state.js":          "./js/state.js?v=38",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=38",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=38",
+    "./js/util.js":           "./js/util.js?v=38"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=37"></script>
+<script type="module" src="js/app.js?v=38"></script>
 </body>
 </html>

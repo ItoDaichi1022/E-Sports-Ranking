@@ -1,9 +1,69 @@
+/* ============================================================================
+   トーナメント運営＆ランキングサイト スタイル
+
+   設計方針:
+     * ダークテーマ専用。eスポーツの画面に馴染ませ、明暗の切り替えは持たない
+       （両対応にすると色の指定が二重になり、どちらも詰めきれないため）。
+     * 色は役割で分ける。紫＝操作できる場所 / 金＝王座・上位 / 緑赤＝勝敗。
+       この3系統以外に色を増やさないことで、情報そのものが目立つようにする。
+     * 面は「枠線で囲む」のではなく「背景の明度差」で分ける。線を減らすほど
+       1枚のカードの中の情報が読みやすくなる。
+     * 数値は等幅数字（tabular-nums）で桁を揃える。
+   ========================================================================== */
+
 :root {
-  color-scheme: light dark;
-  --border: #888;
-  --accent: #2b6cb0;
-  --bye: #999;
-  --bg-panel: rgba(128, 128, 128, 0.08);
+  color-scheme: dark;
+
+  /* ---- 面（下から上へ明るくなる） ---- */
+  --bg: #0b0e15;
+  --surface: #131824;
+  --surface-2: #1a2130;
+  --surface-3: #222a3c;
+
+  /* ---- 線 ---- */
+  --border: #262f42;
+  --border-soft: #1e2534;
+  --border-strong: #38445e;
+
+  /* ---- 文字 ---- */
+  --text: #e7ebf5;
+  --text-dim: #9aa5bd;
+  --text-faint: #808da6;
+
+  /* ---- アクセント（操作）----
+     塗り(--accent)は白文字とのコントラストを確保するため暗め、
+     文字色(--accent-bright)は暗い背景で読めるよう明るめ、と使い分ける。 */
+  --accent: #6d51e8;
+  --accent-hover: #7e63f2;
+  --accent-active: #5c42cf;
+  --accent-bright: #a996ff;
+  --accent-soft: rgba(109, 81, 232, 0.16);
+  --accent-ring: rgba(139, 116, 255, 0.5);
+
+  /* ---- 意味を持つ色 ---- */
+  --gold: #f0c05a;
+  --silver: #c3cbdb;
+  --bronze: #cf8b57;
+  --win: #43d9a3;
+  --loss: #ff6f85;
+  --warn: #f5b544;
+  --info: #5fb8ff;
+  --danger: #e2445c;
+
+  /* ---- 角丸 ---- */
+  --r-sm: 6px;
+  --r: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* ---- 影 ---- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 12px 28px -16px rgba(0, 0, 0, 0.8);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.35), 0 24px 48px -20px rgba(0, 0, 0, 0.9);
+
+  /* 旧変数名の互換。JS/HTMLからは参照していないが、記述漏れがあっても崩れないように */
+  --bg-panel: var(--surface-2);
+  --bye: var(--text-faint);
 }
 
 * { box-sizing: border-box; }
@@ -11,54 +71,175 @@
 /* display:flex 等の指定があっても hidden 属性を必ず優先させる */
 [hidden] { display: none !important; }
 
+html { -webkit-text-size-adjust: 100%; }
+
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+               "Noto Sans JP", sans-serif;
   margin: 0;
-  padding: 0 1.5rem 3rem;
-  line-height: 1.5;
+  padding: 0 1.5rem 4rem;
+  line-height: 1.6;
+  background: var(--bg);
+  color: var(--text);
+  /* 上部に薄く光を置いて、画面全体が真っ平らに見えないようにする */
+  background-image: radial-gradient(1200px 400px at 50% -200px, rgba(109, 81, 232, 0.14), transparent 70%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
+
+::selection {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* 暗い面にスクロールバーを馴染ませる */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--r-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* キーボード操作の現在地を必ず見せる。マウス操作では出さない。 */
+:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ---------------------------------------------------------------------------
+   タイポグラフィ
+   --------------------------------------------------------------------------- */
+
+h1, h2, h3, h4 {
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+
+h2 {
+  margin: 0 0 1.1rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+h3 { font-size: 1.05rem; }
+
+a { color: var(--accent-bright); }
+
+a:hover { color: #c4b6ff; }
+
+/* 数値の桁を揃える。順位・スコア・人数が縦に並んだときに読みやすい。 */
+.rank-cell,
+.player-score,
+.stat-value,
+.capacity-text,
+.fact-value,
+td {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   ヘッダーとナビゲーション
+   --------------------------------------------------------------------------- */
 
 header {
   position: sticky;
   top: 0;
   z-index: 20;
-  margin: 0 -1.5rem 0.5rem;
-  padding: 0.75rem 1.5rem 0.6rem;
-  border-bottom: 1px solid var(--border);
-  background: #ffffff;
+  margin: 0 -1.5rem 1.5rem;
+  padding: 0.6rem 1.5rem;
+  border-bottom: 1px solid var(--border-soft);
+  background: rgba(11, 14, 21, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
-@media (prefers-color-scheme: dark) {
-  header { background: #202124; }
-}
-
-/* 左からタイトル、ナビ、右端にアカウント。
+/* 左からメニューボタン、タイトル、右端にアカウント。
    アイコンとタイトルの高さが違うので baseline ではなく中央で揃える。 */
 .header-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-/* ナビはハンバーガーで開くドロップダウンに統一した（画面幅を問わず）。
-   タイトルに margin-right:auto を持たせて、アイコンとログインを右端へ寄せる。 */
-.header-row #login-btn {
-  padding: 0.25rem 0.9rem;
-  font-size: 0.85rem;
-  flex: none;
+  gap: 0.75rem;
 }
 
 header h1 {
   margin: 0;
   margin-right: auto;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  min-width: 0;
 }
 
 header h1 a {
-  color: inherit;
+  color: var(--text);
   text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
+
+.header-row #login-btn {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  flex: none;
+}
+
+/* ---- ハンバーガーメニュー（全画面共通） ---- */
+
+/* 画面幅を問わず常に表示し、これがサイトの主ナビになる。 */
+.nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.nav-toggle:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+/* 3本線。開いているときは中央を消して上下を交差させ、閉じる印にする。 */
+.nav-toggle-bars,
+.nav-toggle-bars::before,
+.nav-toggle-bars::after {
+  display: block;
+  width: 1.1rem;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.nav-toggle-bars::before,
+.nav-toggle-bars::after {
+  content: "";
+  position: relative;
+}
+
+.nav-toggle-bars::before { top: -6px; }
+.nav-toggle-bars::after  { top: 4px; }
+
+.nav-toggle[aria-expanded="true"] .nav-toggle-bars { background: transparent; }
+.nav-toggle[aria-expanded="true"] .nav-toggle-bars::before { transform: translateY(6px) rotate(45deg); }
+.nav-toggle[aria-expanded="true"] .nav-toggle-bars::after  { transform: translateY(-6px) rotate(-45deg); }
 
 /* 既定で隠し、.open のときだけヘッダーの下へ重ねて出す。
    ヘッダー内に積むとヘッダーが伸びて本文が下にずれるため、絶対配置で「重ねる」。
@@ -71,44 +252,54 @@ header h1 a {
   right: 0;
   z-index: 30;
   flex-direction: column;
-  gap: 0;
+  gap: 2px;
   margin: 0;
-  padding: 0.5rem 1.5rem 0.75rem;
+  padding: 0.5rem;
   max-height: 80vh;
   overflow-y: auto;
-  background: #ffffff;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
 }
 
-#main-nav.open {
-  display: flex;
-}
-
-@media (prefers-color-scheme: dark) {
-  #main-nav {
-    background: #202124;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
-  }
-}
+#main-nav.open { display: flex; }
 
 #main-nav a {
-  padding: 0.7rem 0.5rem;
-  border-radius: 6px;
-  color: inherit;
+  position: relative;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--r-sm);
+  color: var(--text-dim);
   text-decoration: none;
-  font-size: 1rem;
+  font-size: 0.98rem;
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 #main-nav a:hover {
-  background: var(--bg-panel);
+  background: var(--surface-2);
+  color: var(--text);
 }
 
+/* 現在のページは塗りつぶさず、左のバーと文字色で示す。
+   全面を塗ると開いた瞬間に一箇所だけ強く光って落ち着かないため。 */
 #main-nav a.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
 }
 
+#main-nav a.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 3px;
+  border-radius: var(--r-pill);
+  background: var(--accent-bright);
+}
+
+/* 保存中などのメッセージ行 */
 .sync-bar {
   display: flex;
   align-items: center;
@@ -118,328 +309,362 @@ header h1 a {
 }
 
 .sync-bar button {
-  padding: 0.25rem 0.9rem;
+  padding: 0.3rem 0.9rem;
   font-size: 0.85rem;
 }
 
 .dirty-badge {
   font-size: 0.8rem;
-  color: #b45309;
-  font-weight: bold;
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.status-line {
+  font-size: 0.88rem;
+  min-height: 1.2em;
+  color: var(--text-dim);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.status-line.error   { color: var(--loss); }
+.status-line.success { color: var(--win); }
+.status-line.loading { color: var(--warn); }
+
+/* ---------------------------------------------------------------------------
+   セクション（各ページの器）
+   --------------------------------------------------------------------------- */
+
+main {
+  max-width: 1080px;
+  margin: 0 auto;
 }
 
 section {
-  margin: 2rem 0;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-panel);
+  margin: 0 0 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
+  background: var(--surface);
 }
 
-h2 { margin-top: 0; }
-
+/* ホームは中で複数のブロックを積むので、外側の器は持たない */
 #view-home {
   border: none;
   background: none;
   padding: 0;
 }
 
-/* ---- ホーム（説明＋お知らせ） ---- */
-
-.home-intro p {
-  line-height: 1.7;
-}
-
-.home-section {
-  margin-top: 2rem;
-}
-
+/* 見出しと右側のボタンを1行に並べる（「お知らせ」＋「新しいお知らせ」など） */
 .home-section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+  margin-bottom: 1rem;
 }
 
-.home-section-head h2 {
-  margin: 0;
+.home-section-head h2 { margin: 0; }
+
+.note {
+  color: var(--text-dim);
+  font-size: 0.88rem;
 }
 
-.announcement {
-  padding: 1rem 1.25rem;
-  margin-top: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-panel);
-}
-
-/* 固定したお知らせは左に色帯を付けて目立たせる */
-.announcement.pinned {
-  border-left: 4px solid var(--accent);
-}
-
-.announcement-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.announcement-title {
-  margin: 0;
-  font-size: 1.05rem;
-}
-
-.pin-badge {
-  display: inline-block;
-  margin-right: 0.5rem;
-  padding: 0.05rem 0.5rem;
-  font-size: 0.72rem;
-  font-weight: bold;
-  color: #fff;
-  background: var(--accent);
-  border-radius: 999px;
-  vertical-align: middle;
-}
-
-.announcement-date {
-  font-size: 0.8rem;
-  color: #777;
-  white-space: nowrap;
-}
-
-/* 本文の改行を入力どおり見せる（textContentで入れているのでHTMLは混ざらない） */
-.announcement-body {
-  margin: 0.6rem 0 0;
-  line-height: 1.65;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.announcement-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.announcement-actions button {
-  padding: 0.25rem 0.9rem;
+.meta-line {
+  margin: 0.2rem 0;
+  color: var(--text-faint);
   font-size: 0.85rem;
 }
 
-/* ---- 大会・お知らせの画像 ---- */
-
-/* 表示用。横幅に合わせて縮み、縦は原寸比のまま。大きすぎる画像で
-   レイアウトが崩れないよう高さの上限を設ける。 */
-.announcement-image,
-.tournament-image {
-  display: block;
-  max-width: 100%;
-  max-height: 420px;
-  width: auto;
-  height: auto;
-  margin: 0.75rem 0 0;
-  border-radius: 8px;
-  object-fit: contain;
-}
-
-/* フォームのプレビュー。選択した画像や既存画像の確認用。 */
-.image-preview-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.image-preview {
-  max-width: 220px;
-  max-height: 160px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  object-fit: contain;
-}
-
-.image-preview-row button {
-  padding: 0.25rem 0.9rem;
-  font-size: 0.85rem;
-}
-
-.settings-link {
-  display: inline-block;
-  margin-top: 0.5rem;
-  color: var(--accent);
+.empty-hint {
+  margin: 0;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-faint);
   font-size: 0.9rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.muted { color: var(--text-faint); }
+
+/* ---------------------------------------------------------------------------
+   ボタン
+   --------------------------------------------------------------------------- */
+
+/* ボタンとして見せるリンク（.as-link）にも同じ箱を与える。
+   別々に書くと、リンクだけ余白が付かないといったズレが起きるため。 */
+button,
+.as-link {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.4rem;
+  padding: 0.5rem 1.1rem;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.2;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.15s ease, border-color 0.15s ease,
+              transform 0.08s ease, color 0.15s ease;
+}
+
+button:hover:not(:disabled),
+.as-link:hover { background: var(--accent-hover); color: #fff; }
+
+button:active:not(:disabled),
+.as-link:active { background: var(--accent-active); transform: translateY(1px); }
+
+button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 補助的な操作。面の色と枠線だけで、主操作より一段弱く見せる。 */
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.btn-secondary:hover:not(:disabled),
+a.btn-secondary:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.btn-secondary:active:not(:disabled) { background: var(--surface-3); }
+
+.btn-remove {
+  background: transparent;
+  color: var(--loss);
+  border-color: rgba(226, 68, 92, 0.4);
+  box-shadow: none;
+}
+
+.btn-remove:hover:not(:disabled) {
+  background: rgba(226, 68, 92, 0.14);
+  border-color: var(--loss);
+}
+
+.btn-remove:active:not(:disabled) { background: rgba(226, 68, 92, 0.2); }
+
+/* リンクをボタンと同じ見た目に揃える */
+.as-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  line-height: 1.2;
 }
 
 .back-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   margin-bottom: 1rem;
-  color: var(--accent);
+  color: var(--text-dim);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
-.back-link:hover {
-  text-decoration: underline;
-}
+.back-link:hover { color: var(--text); }
 
 .back-link.as-button {
   background: none;
   border: none;
   padding: 0;
+  min-height: 0;
+  box-shadow: none;
+  font-weight: 400;
   cursor: pointer;
+}
+
+.back-link.as-button:hover { background: none; }
+
+.settings-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  color: var(--accent-bright);
   font-size: 0.9rem;
 }
 
-.status-line {
-  font-size: 0.9rem;
-  min-height: 1.2em;
-  overflow-wrap: break-word;
-  word-break: break-word;
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.status-line.error { color: #b91c1c; }
-.status-line.success { color: #15803d; }
-.status-line.loading { color: #b45309; }
+.row-actions button {
+  min-height: 2.1rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+/* ---------------------------------------------------------------------------
+   フォーム
+   --------------------------------------------------------------------------- */
 
 .inline-form {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
   align-items: flex-end;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
-.inline-form label {
+.inline-form label,
+.profile-form label {
   display: flex;
   flex-direction: column;
-  font-size: 0.85rem;
-  gap: 0.25rem;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
 }
 
-.inline-form input,
-.inline-form textarea {
-  padding: 0.4rem 0.5rem;
-  font-size: 1rem;
+input,
+textarea,
+select {
   font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 0.55rem 0.7rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.inline-form .rules-field {
+input::placeholder,
+textarea::placeholder { color: var(--text-faint); }
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+input[type="file"] {
+  padding: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+input[type="file"]::file-selector-button {
+  margin-right: 0.6rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button:hover { border-color: var(--border-strong); }
+
+.inline-form .rules-field,
+.inline-form .image-field {
   flex: 1 1 100%;
 }
 
 .inline-form .rules-field textarea {
   resize: vertical;
-}
-
-button {
-  cursor: pointer;
-  padding: 0.45rem 0.9rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.95rem;
-}
-
-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.btn-remove {
-  background: #b91c1c;
-}
-
-.btn-secondary {
-  background: transparent;
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-.empty-hint {
-  color: #777;
-  font-style: italic;
-}
-
-/* 列数が多い表は狭い画面だとセルからはみ出しやすいので、必要な時だけ表自体を横スクロールさせる */
-.table-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-  margin-top: 0.5rem;
-}
-
-th, td {
-  border: 1px solid var(--border);
-  padding: 0.4rem 0.6rem;
-  text-align: left;
-  font-size: 0.9rem;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-tbody tr:hover {
-  background: var(--bg-panel);
-}
-
-.row-actions {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.row-actions button {
-  padding: 0.2rem 0.6rem;
-  font-size: 0.8rem;
-}
-
-code {
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-td code {
-  font-size: 0.85em;
-}
-
-.meta-line {
-  margin: 0.2rem 0;
-  color: #777;
-  font-size: 0.9rem;
-}
-
-.note {
-  color: #b45309;
-  font-size: 0.9rem;
+  min-height: 5rem;
 }
 
 .checkbox-inline {
   flex-direction: row !important;
   align-items: center;
-  gap: 0.4rem !important;
+  gap: 0.5rem !important;
+  font-size: 0.9rem !important;
+  font-weight: 500 !important;
+  color: var(--text) !important;
+  cursor: pointer;
 }
 
-.setup-columns {
-  display: flex;
-  gap: 2rem;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
+.entry-mode {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
 }
 
-.setup-column { flex: 1; min-width: 260px; }
+.entry-mode legend {
+  padding: 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.field-note {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+/* フォーム内のメッセージ。flexコンテナの中で幅を指定しないと、
+   他の項目の間に押し込まれて潰れ、エラーが出ていても読めなくなる。 */
+.form-message {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.9rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.form-message.error,
+.form-message.success {
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--r-sm);
+  border: 1px solid;
+}
+
+.form-message.error {
+  border-color: rgba(255, 111, 133, 0.45);
+  color: var(--loss);
+  background: rgba(255, 111, 133, 0.1);
+}
+
+.form-message.success {
+  border-color: rgba(67, 217, 163, 0.45);
+  color: var(--win);
+  background: rgba(67, 217, 163, 0.1);
+}
 
 #participant-search-input,
 #player-search-input {
   width: 100%;
-  padding: 0.4rem 0.5rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 #player-search-input {
@@ -452,61 +677,682 @@ td code {
   max-height: 320px;
   overflow-y: auto;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  background: rgba(128, 128, 128, 0.04);
+  border-radius: var(--r);
+  padding: 0.6rem 0.8rem;
+  background: var(--surface-2);
+}
+
+.setup-columns {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.setup-column { flex: 1; min-width: 260px; }
+
+.setup-column h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.92rem;
+  color: var(--text-dim);
 }
 
 .selected-count {
-  font-weight: normal;
-  font-size: 0.85rem;
-  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--accent-bright);
 }
 
 .seed-actions {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.6rem;
   flex-wrap: wrap;
 }
 
+.seed-actions button {
+  min-height: 2.1rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.82rem;
+}
+
 .checkbox-item {
-  display: block;
-  padding: 0.15rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  font-size: 0.9rem;
+  cursor: pointer;
 }
 
 #selected-participant-list {
   list-style: none;
   margin: 0;
+  padding: 0;
 }
 
 .selected-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border-soft);
 }
 
+.selected-item:last-child { border-bottom: none; }
+
 .seed-label {
-  font-weight: bold;
-  min-width: 3.5rem;
-  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.8rem;
+  min-width: 3rem;
+  color: var(--accent-bright);
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .seed-name {
   flex: 1;
   min-width: 0;
+  font-size: 0.9rem;
   overflow-wrap: break-word;
   word-break: break-word;
 }
 
 .selected-item button {
-  padding: 0.1rem 0.5rem;
-  font-size: 0.85rem;
+  min-height: 1.9rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
 }
 
-/* --- ブラケット --- */
+/* ---------------------------------------------------------------------------
+   チップ・バッジ
+   --------------------------------------------------------------------------- */
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* 状態を示す小さな丸。色だけに頼らず文字も併記しているので、
+   丸は「どの状態か」を素早く見分けるための補助。 */
+.status-chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.status-chip.status-recruiting {
+  color: var(--win);
+  border-color: rgba(67, 217, 163, 0.4);
+  background: rgba(67, 217, 163, 0.12);
+}
+
+.status-chip.status-running {
+  color: var(--info);
+  border-color: rgba(95, 184, 255, 0.4);
+  background: rgba(95, 184, 255, 0.12);
+}
+
+.status-chip.status-pending {
+  color: var(--warn);
+  border-color: rgba(245, 181, 68, 0.4);
+  background: rgba(245, 181, 68, 0.12);
+}
+
+.status-chip.status-finished {
+  color: var(--text-faint);
+}
+
+.status-chip.status-draft {
+  color: var(--text-faint);
+  border-style: dashed;
+}
+
+.pin-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.5rem;
+  padding: 0.12rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+  border: 1px solid rgba(139, 116, 255, 0.35);
+  border-radius: var(--r-pill);
+  vertical-align: middle;
+}
+
+.you-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.45rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.account-badge {
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--r-pill);
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+}
+
+.account-badge.linked {
+  color: var(--accent-bright);
+  border-color: rgba(139, 116, 255, 0.35);
+  background: var(--accent-soft);
+}
+
+.account-label {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+/* ---------------------------------------------------------------------------
+   テーブル
+
+   全セルを罫線で囲むと表が「野暮ったく」見えるので、横罫線だけにする。
+   --------------------------------------------------------------------------- */
+
+/* 列数が多い表は狭い画面だとセルからはみ出しやすいので、必要な時だけ表自体を横スクロールさせる */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--r);
+  border: 1px solid var(--border-soft);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  padding: 0.7rem 0.9rem;
+  text-align: left;
+  font-size: 0.9rem;
+  border: none;
+  border-bottom: 1px solid var(--border-soft);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* 見出し行は固定しない。ページ側の sticky ヘッダーと重なって
+   どちらが手前か分かりにくくなるため。 */
+thead th {
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+tbody tr { transition: background 0.12s ease; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface-2); }
+
+code {
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: var(--surface-3);
+  color: var(--text-dim);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+td code { font-size: 0.85em; }
+
+/* ---------------------------------------------------------------------------
+   ホーム：ヒーローとお知らせ
+   --------------------------------------------------------------------------- */
+
+.hero {
+  padding: 2.25rem 1.75rem;
+  margin-bottom: 2rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(600px 200px at 12% -40%, rgba(109, 81, 232, 0.3), transparent 70%),
+    linear-gradient(160deg, var(--surface-2), var(--surface));
+}
+
+.hero-eyebrow {
+  margin: 0 0 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+}
+
+.hero-title {
+  margin: 0 0 0.85rem;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.hero-lead {
+  margin: 0 0 0.6rem;
+  max-width: 46rem;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  line-height: 1.75;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.announcement {
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface);
+  transition: border-color 0.15s ease;
+}
+
+.announcement:hover { border-color: var(--border); }
+
+/* 固定したお知らせは左に色帯を付けて目立たせる */
+.announcement.pinned {
+  border-left: 3px solid var(--accent-bright);
+  background: linear-gradient(90deg, var(--accent-soft), transparent 30%), var(--surface);
+}
+
+/* 日付をタイトルの右で取り合うと、狭い画面で折り返して読みにくい。
+   縦に積んで、タイトル → 日付の順に必ず読ませる。 */
+.announcement-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.announcement-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.announcement-date {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 本文の改行を入力どおり見せる（textContentで入れているのでHTMLは混ざらない） */
+.announcement-body {
+  margin: 0.75rem 0 0;
+  color: var(--text-dim);
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.announcement-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.announcement-actions button {
+  min-height: 2.1rem;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+}
+
+/* ---------------------------------------------------------------------------
+   募集カード
+
+   1枚に「状態・名前・日付・規模・定員・ルール・参加者・操作」が入るため、
+   並べ方を決めないとすぐ字の塊になる。上から
+   バナー → 状態 → 名前 → 事実（日付/規模） → 定員 → ルール → 顔ぶれ → 操作
+   の順に固定し、役割ごとに余白で区切る。
+   --------------------------------------------------------------------------- */
+
+.recruit-card {
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.recruit-card:hover {
+  border-color: var(--border-strong);
+}
+
+.recruit-banner {
+  display: block;
+  line-height: 0;
+  background: var(--surface-2);
+}
+
+.recruit-banner img {
+  width: 100%;
+  height: clamp(120px, 26vw, 220px);
+  object-fit: cover;
+  display: block;
+}
+
+.recruit-body { padding: 1.25rem 1.4rem; }
+
+.recruit-title {
+  margin: 0.55rem 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.recruit-title a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.recruit-title a:hover { color: var(--accent-bright); }
+
+/* 日付・規模を「ラベル＋値」で並べる。文章で繋げるより走査しやすい。 */
+.recruit-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.75rem;
+  margin: 1.1rem 0 0;
+}
+
+.fact { display: flex; flex-direction: column; gap: 0.15rem; }
+
+.fact-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.fact-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* 定員は数字だけより、埋まり具合が一目で分かるバーにする */
+.capacity { margin-top: 1.1rem; }
+
+.capacity-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.capacity-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.capacity-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.capacity-track {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.capacity-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+  transition: width 0.3s ease;
+}
+
+.capacity.full .capacity-fill { background: linear-gradient(90deg, #d99a3d, var(--gold)); }
+.capacity.full .capacity-text { color: var(--gold); }
+
+.recruit-rules {
+  margin: 1.1rem 0 0;
+  padding: 0.8rem 1rem;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  /* 長いルールでカードが縦に伸びきらないよう、4行で畳んで詳細ページへ誘導する */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 参加者は名前のチップを全部並べると壁になるので、顔だけ並べて残りは「+N」 */
+.entrant-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  margin-top: 1.1rem;
+}
+
+.entrant-avatar {
+  display: inline-flex;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.entrant-more {
+  padding: 0 0.55rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.entrant-empty {
+  font-size: 0.85rem;
+  color: var(--text-faint);
+}
+
+.recruit-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1.35rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* 運営の操作は主導線（エントリー）から離し、右端に寄せる */
+.recruit-actions .row-actions { margin-left: auto; }
+
+/* 旧・参加者チップ（大会情報の「エントリー中の選手」で使用） */
+.entrant-list {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
+.entrant-chip {
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+/* ---------------------------------------------------------------------------
+   大会履歴
+
+   状態と優勝者を1つの文字列に詰めず、別々の要素として並べる。
+   --------------------------------------------------------------------------- */
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 0.6rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  color: inherit;
+  text-decoration: none;
+  background: var(--surface);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.history-item:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+/* 画像があればその縮小、無ければ大会名の頭文字。行の高さが揃って一覧が落ち着く。 */
+.history-thumb {
+  flex: none;
+  width: 3.25rem;
+  height: 3.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  color: var(--text-faint);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.history-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.history-name {
+  font-weight: 700;
+  font-size: 1rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.history-meta {
+  font-size: 0.82rem;
+  color: var(--text-faint);
+}
+
+.history-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.history-champion {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--gold);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   ブラケット
+   --------------------------------------------------------------------------- */
+
+.bracket-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.bracket-title-block {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.bracket-title-block h2 { margin-bottom: 0.25rem; }
+
 .bracket {
   position: relative;
   display: flex;
@@ -524,9 +1370,12 @@ td code {
 
 .round-header {
   text-align: center;
-  font-weight: bold;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   margin-bottom: 1rem;
-  color: var(--accent);
+  color: var(--text-faint);
 }
 
 .round-body {
@@ -535,9 +1384,7 @@ td code {
   align-items: center;
 }
 
-.match-slot {
-  min-width: 0;
-}
+.match-slot { min-width: 0; }
 
 .bracket-lines {
   position: absolute;
@@ -553,40 +1400,39 @@ td code {
   stroke-width: 2;
 }
 
-/* Challonge風のマッチボックス：枠線付きカードに選手行を積み、行間に区切り線を引く */
+/* Challonge風のマッチボックス：カードに選手行を積み、行間に区切り線を引く */
 .match-box {
   position: relative;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--r-sm);
   overflow: hidden;
-  background: rgba(128, 128, 128, 0.05);
+  background: var(--surface-2);
 }
 
 .match-box.bye {
   border-style: dashed;
-  opacity: 0.75;
+  opacity: 0.6;
 }
 
-.match-box.confirmed {
-  border-color: var(--accent);
-}
+.match-box.confirmed { border-color: var(--border-strong); }
 
 .match-player {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.3rem 0.5rem;
-  min-height: 1.9rem;
+  padding: 0.4rem 0.55rem;
+  min-height: 2rem;
+  font-size: 0.88rem;
 }
 
 /* 2行目（下段選手）との間に薄い区切り線 */
-.match-player + .match-player {
-  border-top: 1px solid var(--border);
-}
+.match-player + .match-player { border-top: 1px solid var(--border-soft); }
 
+/* 勝者は左の帯と太字で示す。背景だけだと隣の行と見分けにくい。 */
 .match-player.winner {
-  font-weight: bold;
-  background: rgba(43, 108, 176, 0.16);
+  font-weight: 700;
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent-bright);
 }
 
 /* シード番号バッジ：名前の左に置く控えめな数字 */
@@ -595,17 +1441,15 @@ td code {
   min-width: 1.5rem;
   padding: 0 0.3rem;
   text-align: center;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
-  color: #888;
-  background: rgba(128, 128, 128, 0.16);
+  color: var(--text-faint);
+  background: var(--surface-3);
   border-radius: 3px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
-.seed-badge-empty {
-  background: none;
-}
+.seed-badge-empty { background: none; }
 
 .player-name {
   flex: 1;
@@ -620,16 +1464,14 @@ td code {
   flex-shrink: 0;
   min-width: 1.5rem;
   text-align: right;
-  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
 }
 
-.match-player.winner .player-score {
-  color: var(--accent);
-}
+.match-player.winner .player-score { color: var(--accent-bright); }
 
 .score-num-input {
   width: 3rem;
-  padding: 0.15rem 0.25rem;
+  padding: 0.2rem 0.3rem;
   font-size: 0.85rem;
   text-align: right;
 }
@@ -638,155 +1480,133 @@ td code {
 .match-controls {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.4rem 0.5rem;
-  border-top: 1px solid var(--border);
+  gap: 0.5rem;
+  padding: 0.55rem;
+  border-top: 1px solid var(--border-soft);
+  background: var(--surface);
 }
 
 .walkover-toggle {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.8rem;
-  color: #666;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  cursor: pointer;
 }
 
 .walkover-winner select {
   width: 100%;
-  padding: 0.3rem;
+  padding: 0.35rem;
   font-size: 0.85rem;
 }
 
 .match-controls button[type="submit"] {
-  padding: 0.3rem;
-  font-size: 0.85rem;
+  min-height: 2rem;
+  padding: 0.35rem;
+  font-size: 0.82rem;
 }
 
 .edit-match-btn {
   display: block;
   width: 100%;
-  padding: 0.2rem 0.6rem;
+  min-height: 0;
+  padding: 0.3rem 0.6rem;
   font-size: 0.75rem;
+  font-weight: 500;
   border: none;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-soft);
   border-radius: 0;
   background: transparent;
-  color: var(--accent);
+  color: var(--text-faint);
+  box-shadow: none;
+}
+
+.edit-match-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .match-status {
-  padding: 0.3rem 0.5rem;
-  font-size: 0.8rem;
-  color: #666;
-  border-top: 1px solid var(--border);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  border-top: 1px solid var(--border-soft);
 }
 
+/* 優勝の発表。金色は上位を示す色としてここと順位表だけに使う。 */
 .champion-banner {
   margin-top: 1.5rem;
-  padding: 0.75rem 1rem;
-  font-size: 1.2rem;
-  font-weight: bold;
+  padding: 1.1rem 1.25rem;
+  font-size: 1.15rem;
+  font-weight: 800;
   text-align: center;
-  background: gold;
-  color: #333;
-  border-radius: 6px;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(240, 192, 90, 0.45);
+  border-radius: var(--r);
+  background: linear-gradient(160deg, rgba(240, 192, 90, 0.2), rgba(240, 192, 90, 0.05));
+  color: var(--gold);
   overflow-wrap: break-word;
   word-break: break-word;
 }
 
-/* --- 大会履歴 --- */
-.history-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: inherit;
-  text-decoration: none;
-  background: rgba(128, 128, 128, 0.04);
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
+/* ---------------------------------------------------------------------------
+   大会情報（ブラケットの下）
+   --------------------------------------------------------------------------- */
 
-.history-item:hover {
-  border-color: var(--accent);
-  background: var(--bg-panel);
-}
-
-.history-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.history-name {
-  font-weight: bold;
-  font-size: 1.05rem;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-.history-meta {
-  font-size: 0.85rem;
-  color: #777;
-}
-
-.history-status {
-  font-size: 0.9rem;
-  color: var(--accent);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* --- ブラケットページ --- */
-.bracket-page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.5rem;
-}
-
-.bracket-title-block {
-  min-width: 0;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-/* --- 大会情報（参加人数・形式・ルールなど、ブラケットの下に表示） --- */
 .tournament-info {
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-soft);
 }
 
 .tournament-info h3 {
-  margin-bottom: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
 
 .tournament-info h4 {
-  margin: 1rem 0 0.4rem;
-  font-size: 0.95rem;
+  margin: 1.5rem 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
 
+/* 項目を等幅のカードに並べ、ラベルと値の関係を崩さない */
 .tournament-info-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1px;
   margin: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--border-soft);
+  overflow: hidden;
+}
+
+.tournament-info-grid > div {
+  padding: 0.8rem 1rem;
+  background: var(--surface);
 }
 
 .tournament-info-grid dt {
-  font-size: 0.8rem;
-  color: #777;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
 
 .tournament-info-grid dd {
-  margin: 0.1rem 0 0;
-  font-weight: bold;
+  margin: 0.3rem 0 0;
+  font-weight: 700;
+  font-size: 0.95rem;
   overflow-wrap: break-word;
   word-break: break-word;
 }
@@ -796,13 +1616,58 @@ td code {
   overflow-wrap: break-word;
   word-break: break-word;
   margin: 0;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: rgba(128, 128, 128, 0.05);
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  line-height: 1.75;
+  font-size: 0.9rem;
 }
 
-/* --- 選手個人ページ --- */
+/* ---------------------------------------------------------------------------
+   結果の確定と最終順位
+   --------------------------------------------------------------------------- */
+
+.result-section { margin: 1.5rem 0; }
+
+.result-pending {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid rgba(245, 181, 68, 0.4);
+  border-radius: var(--r);
+  background: rgba(245, 181, 68, 0.08);
+}
+
+.result-pending p {
+  margin: 0;
+  flex: 1 1 20rem;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+.standings-table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 30rem;
+}
+
+.standings-table th,
+.standings-table td {
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+}
+
+.standings-table .rank-cell { width: 4rem; }
+
+/* ---------------------------------------------------------------------------
+   選手個人ページ
+   --------------------------------------------------------------------------- */
+
 .player-detail-header h2 {
   margin-bottom: 0.25rem;
   overflow-wrap: break-word;
@@ -810,114 +1675,73 @@ td code {
 }
 
 .stat-cards {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin: 1rem 0 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+  margin: 1.25rem 0 1.75rem;
 }
 
 .stat-card {
-  flex: 1;
-  min-width: 140px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: rgba(128, 128, 128, 0.04);
+  gap: 0.25rem;
+  padding: 1.1rem 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface-2);
 }
 
 .stat-value {
-  font-size: 1.3rem;
-  font-weight: bold;
-  color: var(--accent);
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text);
 }
 
 .stat-label {
-  font-size: 0.8rem;
-  color: #777;
-  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
 
-.result-win { color: #15803d; font-weight: bold; }
-.result-loss { color: #b91c1c; }
+.result-win  { color: var(--win); font-weight: 700; }
+.result-loss { color: var(--loss); }
 
-/* --- トークン入力ダイアログ --- */
-dialog {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1.25rem 1.5rem;
-  max-width: 420px;
-  width: calc(100% - 2rem);
+.player-bio {
+  margin: 0.75rem 0 1.25rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  line-height: 1.75;
+  white-space: pre-wrap;
 }
 
-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.45);
-}
+.profile-grid { margin-bottom: 1rem; }
 
-dialog h3 { margin-top: 0; }
-
-#token-form {
+.sns-links {
   display: flex;
-  flex-direction: column;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-#token-input {
-  padding: 0.5rem;
-  font-size: 1rem;
-}
-
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-
-/* --- ランキング --- */
-.clickable-row { cursor: pointer; }
-
-.rank-cell { font-weight: bold; text-align: center; }
-
-.rank-1 .rank-cell { color: #b8860b; }
-.rank-2 .rank-cell { color: #708090; }
-.rank-3 .rank-cell { color: #a0522d; }
-
-.rank-change-cell { text-align: center; }
-
-.rank-change {
-  font-size: 0.8rem;
-  font-weight: bold;
-  white-space: nowrap;
-}
-
-.rank-change.up { color: #15803d; }
-.rank-change.down { color: #b91c1c; }
-.rank-change.same { color: #999; font-weight: normal; }
-.rank-change.new { color: var(--accent); }
-
-#ranking-editor select {
-  padding: 0.4rem 0.5rem;
-  font-size: 1rem;
-}
-
-#ranking-published-status {
-  margin-top: -0.5rem;
-}
-
-/* ---- アカウント・ログイン ---- */
-
-.account-avatar {
-  display: inline-flex;
-  border-radius: 50%;
+.sns-links a {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.85rem;
   text-decoration: none;
-  color: inherit;
 }
 
-.account-avatar:hover {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.sns-links a:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
 /* マイページ下部のアカウント操作（ログアウトなど） */
@@ -926,188 +1750,128 @@ dialog h3 { margin-top: 0; }
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-soft);
 }
 
-.profile-account-actions .meta-line {
-  margin: 0;
+.profile-account-actions .meta-line { margin: 0; }
+
+/* ---------------------------------------------------------------------------
+   ランキング
+   --------------------------------------------------------------------------- */
+
+.clickable-row { cursor: pointer; }
+
+.rank-cell {
+  font-weight: 800;
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--text-dim);
 }
 
-.account-label {
-  font-size: 0.85rem;
-  opacity: 0.85;
+.rank-1 .rank-cell { color: var(--gold); }
+.rank-2 .rank-cell { color: var(--silver); }
+.rank-3 .rank-cell { color: var(--bronze); }
+
+/* 上位3名は行そのものを淡く染めて、表の中で自然に浮かせる */
+.ranking-table tr.rank-1 td { background: rgba(240, 192, 90, 0.07); }
+.ranking-table tr.rank-2 td { background: rgba(195, 203, 219, 0.05); }
+.ranking-table tr.rank-3 td { background: rgba(207, 139, 87, 0.05); }
+
+.rank-change-cell { text-align: center; }
+
+.rank-change {
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-/* リンクをボタンと同じ見た目に揃える（マイページなど） */
-.as-link {
-  display: inline-block;
-  text-decoration: none;
-  line-height: normal;
+.rank-change.up   { color: var(--win); }
+.rank-change.down { color: var(--loss); }
+.rank-change.same { color: var(--text-faint); font-weight: 400; }
+.rank-change.new  { color: var(--accent-bright); }
+
+#ranking-editor {
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  margin-bottom: 1rem;
+}
+
+#ranking-published-status { margin-top: 0; }
+
+/* ---- 自分の行の強調 ----
+   ランキングや選手一覧で、自分がどこにいるか一目で分かるようにする。
+   色だけに頼らず「あなた」バッジも併記する（色覚特性でも伝わるように）。 */
+tr.own-row > td {
+  background: var(--accent-soft) !important;
+  font-weight: 600;
+}
+
+tr.own-row > td:first-child { box-shadow: inset 3px 0 0 var(--accent-bright); }
+
+tr.own-row:hover > td { background: rgba(109, 81, 232, 0.24) !important; }
+
+/* ---------------------------------------------------------------------------
+   ダイアログ
+   --------------------------------------------------------------------------- */
+
+dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+  max-width: 420px;
+  width: calc(100% - 2rem);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+
+dialog::backdrop {
+  background: rgba(5, 7, 12, 0.7);
+  backdrop-filter: blur(3px);
+}
+
+dialog h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1rem;
 }
 
 .oauth-buttons {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
 }
 
-.oauth-buttons button {
-  width: 100%;
-}
+.oauth-buttons button { width: 100%; }
 
 .divider-note {
-  margin: 0.75rem 0 0.5rem;
-  font-size: 0.8rem;
+  margin: 1rem 0 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-align: center;
-  opacity: 0.7;
+  color: var(--text-faint);
 }
 
 #email-form input {
   width: 100%;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.6rem;
 }
 
-/* ---- プロフィール ---- */
-
-.profile-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-/* フォーム内のメッセージ。flexコンテナの中で幅を指定しないと、
-   他の項目の間に押し込まれて潰れ、エラーが出ていても読めなくなる。 */
-.form-message {
-  flex: 1 1 100%;
-  margin: 0;
-  font-size: 0.9rem;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-.form-message.error {
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  border: 1px solid #b91c1c;
-  color: #b91c1c;
-  background: rgba(185, 28, 28, 0.08);
-}
-
-.form-message.success {
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  border: 1px solid #15803d;
-  color: #15803d;
-  background: rgba(21, 128, 61, 0.08);
-}
-
-.field-note {
-  font-size: 0.75rem;
-  opacity: 0.7;
-}
-
-.profile-grid {
-  margin-bottom: 0.75rem;
-}
-
-.player-bio {
-  margin: 0.5rem 0 1rem;
-  padding: 0.6rem 0.8rem;
-  border-radius: 6px;
-  background: var(--bg-panel);
-  white-space: pre-wrap;
-}
-
-.sns-links a {
-  margin-right: 0.75rem;
-}
-
-.account-badge {
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  background: var(--bg-panel);
-  opacity: 0.8;
-}
-
-.account-badge.linked {
-  color: var(--accent);
-  opacity: 1;
-}
-
-.muted { opacity: 0.5; }
-
-/* ---- 募集とエントリー ---- */
-
-.entry-mode {
-  margin: 0.5rem 0;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.entry-mode legend {
-  padding: 0 0.4rem;
-  font-size: 0.85rem;
-}
-
-.recruit-card {
-  margin-bottom: 1rem;
-  padding: 0.9rem 1.1rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.recruit-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.recruit-header h3 {
-  margin: 0 0 0.2rem;
-}
-
-.recruit-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.status-chip {
-  margin-left: 0.4rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  background: var(--bg-panel);
-}
-
-.status-chip.status-recruiting {
-  color: #15803d;
-  font-weight: bold;
-}
-
-.entrant-list {
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-  margin-top: 0.6rem;
-}
-
-.entrant-chip {
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  background: var(--bg-panel);
-}
-
-/* ---- アイコン ---- */
+/* ---------------------------------------------------------------------------
+   アイコン
+   --------------------------------------------------------------------------- */
 
 .avatar {
   display: inline-flex;
@@ -1116,9 +1880,9 @@ dialog h3 { margin-top: 0; }
   flex: none;
   overflow: hidden;
   border-radius: 50%;
-  background: var(--bg-panel);
-  color: inherit;
-  font-weight: bold;
+  background: var(--surface-3);
+  color: var(--text-dim);
+  font-weight: 700;
   text-transform: uppercase;
   user-select: none;
 }
@@ -1129,25 +1893,44 @@ dialog h3 { margin-top: 0; }
   object-fit: cover;
 }
 
-.avatar-sm { width: 1.75rem; height: 1.75rem; font-size: 0.8rem; }
-.avatar-md { width: 3rem;    height: 3rem;    font-size: 1.2rem; }
-.avatar-lg { width: 5rem;    height: 5rem;    font-size: 2rem; }
+.avatar-sm { width: 1.75rem; height: 1.75rem; font-size: 0.75rem; }
+.avatar-md { width: 3rem;    height: 3rem;    font-size: 1.15rem; }
+.avatar-lg { width: 5rem;    height: 5rem;    font-size: 1.9rem; }
 
-/* 名前とアイコンを横に並べる（選手一覧・選手ページ） */
+/* 名前とアイコンを横に並べる（選手一覧・ランキング・選手ページ） */
 .player-identity {
   display: flex;
   align-items: center;
   gap: 0.6rem;
 }
 
-.avatar-field {
-  flex: 1 1 100%;
+.player-identity a {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
 }
+
+.player-identity a:hover { color: var(--accent-bright); }
+
+.account-avatar {
+  display: inline-flex;
+  border-radius: 50%;
+  text-decoration: none;
+  color: inherit;
+  flex: none;
+}
+
+.account-avatar:hover {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+.avatar-field { flex: 1 1 100%; }
 
 .avatar-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.9rem;
   flex-wrap: wrap;
 }
 
@@ -1161,9 +1944,10 @@ dialog h3 { margin-top: 0; }
   overflow: hidden;
   border-radius: 50%;
   border: 1px solid var(--border);
-  background: var(--bg-panel);
+  background: var(--surface-3);
+  color: var(--text-dim);
   font-size: 1.5rem;
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .avatar-preview img {
@@ -1172,125 +1956,150 @@ dialog h3 { margin-top: 0; }
   object-fit: cover;
 }
 
-/* ---- 結果の確定と最終順位 ---- */
+/* ---------------------------------------------------------------------------
+   大会・お知らせの画像
+   --------------------------------------------------------------------------- */
 
-.result-section {
-  margin: 1.5rem 0;
-}
-
-.result-pending {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding: 0.9rem 1.1rem;
-  border: 1px solid var(--accent);
-  border-radius: 8px;
-  background: var(--bg-panel);
-}
-
-.result-pending p {
-  margin: 0;
-  flex: 1 1 20rem;
-}
-
-.standings-table {
-  border-collapse: collapse;
-  width: 100%;
-  max-width: 28rem;
-}
-
-.standings-table th,
-.standings-table td {
-  padding: 0.35rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-}
-
-.standings-table .rank-cell {
-  width: 4rem;
-}
-
-/* ---- 自分の行の強調 ---- */
-
-/* ランキングや選手一覧で、自分がどこにいるか一目で分かるようにする。
-   色だけに頼らず「あなた」バッジも併記する（色覚特性や白黒印刷でも伝わるように）。 */
-tr.own-row > td {
-  background: rgba(43, 108, 176, 0.12);
-  font-weight: bold;
-}
-
-tr.own-row > td:first-child {
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-
-tr.own-row:hover > td {
-  background: rgba(43, 108, 176, 0.2);
-}
-
-.you-badge {
-  margin-left: 0.4rem;
-  padding: 0.05rem 0.45rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: bold;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-/* ---- ハンバーガーメニュー（全画面共通） ---- */
-
-/* 画面幅を問わず常に表示し、これがサイトの主ナビになる。 */
-.nav-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  padding: 0;
-  flex: none;
-  background: transparent;
-  border-color: var(--border);
-  color: inherit;
-}
-
-/* 3本線。開いているときは中央を消して上下を交差させ、閉じる印にする。 */
-.nav-toggle-bars,
-.nav-toggle-bars::before,
-.nav-toggle-bars::after {
+/* 表示用。横幅に合わせて縮み、縦は原寸比のまま。大きすぎる画像で
+   レイアウトが崩れないよう高さの上限を設ける。 */
+.announcement-image,
+.tournament-image {
   display: block;
-  width: 1.15rem;
-  height: 2px;
-  background: currentColor;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  max-width: 100%;
+  max-height: 420px;
+  width: auto;
+  height: auto;
+  margin: 0.9rem 0 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  object-fit: contain;
 }
 
-.nav-toggle-bars::before,
-.nav-toggle-bars::after {
-  content: "";
-  position: relative;
+.tournament-image { margin: 0 0 1.25rem; }
+
+/* フォームのプレビュー。選択した画像や既存画像の確認用。 */
+.image-preview-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  flex: 1 1 100%;
 }
 
-.nav-toggle-bars::before { top: -6px; }
-.nav-toggle-bars::after  { top: 4px; }
-
-.nav-toggle[aria-expanded="true"] .nav-toggle-bars {
-  background: transparent;
+.image-preview {
+  max-width: 220px;
+  max-height: 160px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  object-fit: contain;
+  background: var(--surface-2);
 }
 
-.nav-toggle[aria-expanded="true"] .nav-toggle-bars::before {
-  transform: translateY(6px) rotate(45deg);
+.image-preview-row button {
+  min-height: 2.1rem;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
 }
 
-.nav-toggle[aria-expanded="true"] .nav-toggle-bars::after {
-  transform: translateY(-6px) rotate(-45deg);
+/* ---------------------------------------------------------------------------
+   狭い画面の調整
+
+   スマートフォンからの閲覧が多い想定なので、タップ領域を確保し、
+   横に並べていたものを縦へ落とす。
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  body { padding: 0 1rem 4rem; }
+
+  header {
+    margin: 0 -1rem 1.25rem;
+    padding: 0.55rem 1rem;
+  }
+
+  #main-nav { padding: 0.4rem; }
+
+  /* 指で押せる高さを確保する */
+  #main-nav a { padding: 0.85rem 0.9rem; }
+
+  section {
+    padding: 1.15rem 1rem;
+    border-radius: var(--r);
+  }
+
+  h2 { font-size: 1.15rem; }
+
+  .hero {
+    padding: 1.75rem 1.25rem;
+    border-radius: var(--r);
+  }
+
+  .hero-title { font-size: 1.35rem; }
+
+  .hero-actions { gap: 0.5rem; }
+  .hero-actions > * { flex: 1 1 auto; }
+
+  .announcement { padding: 1.1rem; }
+  .recruit-body { padding: 1.1rem; }
+
+  /* 事実の並びは2列に落とす。1行に詰めると値が折り返して読みにくい。 */
+  .recruit-facts { gap: 1rem 1.5rem; }
+
+  /* 主導線（エントリー）を横いっぱいにして押しやすくする */
+  .recruit-actions > button,
+  .recruit-actions > .as-link {
+    flex: 1 1 100%;
+    min-height: 2.75rem;
+  }
+
+  .recruit-actions .row-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .recruit-actions .row-actions button { flex: 1; }
+
+  .history-item {
+    gap: 0.75rem;
+    padding: 0.8rem 0.9rem;
+  }
+
+  .history-thumb { width: 2.75rem; height: 2.75rem; }
+
+  /* 状態と優勝者を右端に縦積みすると幅が足りないので、名前の下へ回す */
+  .history-item { flex-wrap: wrap; }
+
+  .history-side {
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+    gap: 0.6rem;
+    padding-left: 3.5rem;
+  }
+
+  .history-champion { max-width: none; }
+
+  th, td { padding: 0.6rem 0.7rem; }
+
+  .stat-cards { gap: 0.6rem; }
+  .stat-value { font-size: 1.3rem; }
+
+  .setup-columns { gap: 1.25rem; }
+
+  .dialog-actions { flex-direction: column-reverse; }
+  .dialog-actions button { width: 100%; min-height: 2.75rem; }
+
+  /* フォームの各項目は横並びをやめて1列にする */
+  .inline-form { gap: 0.9rem; }
+  .inline-form > label { flex: 1 1 100%; }
+  .inline-form > button { width: 100%; min-height: 2.75rem; }
 }
 
-/* 狭い画面ではタイトルを少し縮めて、アイコンとログインが右端に収まるようにする。 */
-@media (max-width: 640px) {
-  header h1 {
-    font-size: 1.05rem;
+/* 動きを減らす設定を尊重する */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

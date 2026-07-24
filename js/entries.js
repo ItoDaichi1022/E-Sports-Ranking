@@ -5,7 +5,7 @@
 // 運営が募集を締め切ると、それまでの戦績を元にシードを付けてブラケットを生成する。
 
 import { state } from './state.js';
-import { escapeHtml, safeUrl } from './util.js';
+import { escapeHtml, safeUrl, avatarHtml } from './util.js';
 import { auth, isLoggedIn, isAdmin } from './auth.js';
 import { computeRankings } from './ranking.js';
 import { tournamentTier } from './tournamentTier.js';
@@ -179,19 +179,80 @@ function adminControls(tournament, onChanged) {
   return wrap;
 }
 
-// エントリー済みの選手名を一覧で見せる（誰が出るのか分かるように）。
-function entrantList(tournament) {
+// エントリー済みの顔ぶれ。名前のチップを全員分並べると字の壁になるので、
+// アイコンだけを並べて、入りきらない分は「+N」にまとめる。
+// 名前は title 属性で読めるようにしておく。
+const ENTRANT_FACES = 12;
+
+function entrantStrip(tournament) {
   const el = document.createElement('div');
-  el.className = 'entrant-list';
-  if (tournament.participantIds.length === 0) {
-    el.innerHTML = '<p class="empty-hint">まだエントリーがありません。</p>';
+  el.className = 'entrant-strip';
+
+  const ids = tournament.participantIds;
+  if (ids.length === 0) {
+    el.innerHTML = '<span class="entrant-empty">まだエントリーがありません</span>';
     return el;
   }
-  const names = tournament.participantIds.map((id) => {
+
+  const shown = ids.slice(0, ENTRANT_FACES);
+  const rest = ids.length - shown.length;
+
+  const faces = shown.map((id) => {
     const player = state.players.find((p) => p.id === id);
-    return escapeHtml(player ? player.currentName : id);
-  });
-  el.innerHTML = names.map((n) => `<span class="entrant-chip">${n}</span>`).join('');
+    const name = player ? player.currentName : id;
+    return `<span class="entrant-avatar" title="${escapeHtml(name)}">`
+      + `${avatarHtml(player ?? { currentName: name }, 'sm')}</span>`;
+  }).join('');
+
+  el.innerHTML = faces + (rest > 0 ? `<span class="entrant-more">+${rest}</span>` : '');
+  return el;
+}
+
+// 日付と規模を「ラベル＋値」で並べる。1行の文章に繋げるより目で追いやすい。
+function factsEl(tournament) {
+  const el = document.createElement('div');
+  el.className = 'recruit-facts';
+  const facts = [
+    ['開催日', tournament.date || '未定'],
+    ['規模', tournamentTier(tournament.participantIds.length)],
+  ];
+  el.innerHTML = facts.map(([label, value]) => `
+    <div class="fact">
+      <span class="fact-label">${escapeHtml(label)}</span>
+      <span class="fact-value">${escapeHtml(value)}</span>
+    </div>
+  `).join('');
+  return el;
+}
+
+// 定員は数字だけでなく、埋まり具合をバーで見せる。
+// 定員なしの大会はバーを出さず、現在の人数だけを示す。
+function capacityEl(tournament) {
+  const count = tournament.participantIds.length;
+  const el = document.createElement('div');
+  el.className = 'capacity';
+
+  if (tournament.capacity == null) {
+    el.innerHTML = `
+      <div class="capacity-head">
+        <span class="capacity-label">エントリー</span>
+        <span class="capacity-text">${count}人（定員なし）</span>
+      </div>
+    `;
+    return el;
+  }
+
+  const pct = Math.min(100, Math.round((count / tournament.capacity) * 100));
+  if (count >= tournament.capacity) el.classList.add('full');
+  el.innerHTML = `
+    <div class="capacity-head">
+      <span class="capacity-label">エントリー</span>
+      <span class="capacity-text">${count} / ${tournament.capacity}人</span>
+    </div>
+    <div class="capacity-track">
+      <span class="capacity-fill" style="width: ${pct}%"></span>
+    </div>
+  `;
   return el;
 }
 
@@ -210,60 +271,53 @@ export function renderRecruitPage(containerEl, onChanged) {
   visible.forEach((t) => {
     const card = document.createElement('section');
     card.className = 'recruit-card';
+    const detailHref = `#bracket/${encodeURIComponent(t.id)}`;
 
-    const left = remainingSlots(t);
-    const capacityText = t.capacity == null
-      ? `${t.participantIds.length}人がエントリー中`
-      : `${t.participantIds.length} / ${t.capacity}人（残り${left}）`;
-
-    const header = document.createElement('div');
-    header.className = 'recruit-header';
-    header.innerHTML = `
-      <div>
-        <h3>${escapeHtml(t.name)}</h3>
-        <p class="meta-line">
-          ${escapeHtml(t.date || '日付未設定')} ・ ${escapeHtml(capacityText)}
-          ・ ${escapeHtml(tournamentTier(t.participantIds.length))}
-          <span class="status-chip status-${t.status}">${STATUS_LABELS[t.status]}</span>
-        </p>
-      </div>
-    `;
-
-    const actions = document.createElement('div');
-    actions.className = 'recruit-actions';
-
-    // 大会詳細ページへの導線。ルールや参加者を見てからエントリーできるようにする。
-    // 運営はこのページから大会情報の編集・削除もできる。
-    const detail = document.createElement('a');
-    detail.className = 'btn-secondary as-link';
-    detail.href = `#bracket/${encodeURIComponent(t.id)}`;
-    detail.textContent = '詳細';
-    actions.appendChild(detail);
-
-    if (t.status === 'recruiting') actions.appendChild(entryButton(t, onChanged));
-    if (isAdmin()) actions.appendChild(adminControls(t, onChanged));
-    header.appendChild(actions);
-
-    card.appendChild(header);
-
+    // 画像があればカード上端に全幅のバナーとして敷く。押すと詳細へ。
     const imageUrl = safeUrl(t.imageUrl);
     if (imageUrl) {
-      const img = document.createElement('img');
-      img.className = 'tournament-image';
-      img.src = imageUrl;
-      img.alt = '';
-      img.loading = 'lazy';
-      card.appendChild(img);
+      const banner = document.createElement('a');
+      banner.className = 'recruit-banner';
+      banner.href = detailHref;
+      banner.innerHTML = `<img src="${escapeHtml(imageUrl)}" alt="" loading="lazy">`;
+      card.appendChild(banner);
     }
+
+    const body = document.createElement('div');
+    body.className = 'recruit-body';
+
+    // 状態 → 大会名 → 事実 → 定員 の順に、上から重要な情報を積む
+    body.innerHTML = `
+      <span class="status-chip status-${t.status}">${STATUS_LABELS[t.status]}</span>
+      <h3 class="recruit-title"><a href="${escapeHtml(detailHref)}">${escapeHtml(t.name)}</a></h3>
+    `;
+    body.appendChild(factsEl(t));
+    body.appendChild(capacityEl(t));
 
     if (t.rules) {
       const rules = document.createElement('p');
-      rules.className = 'tournament-rules';
+      rules.className = 'recruit-rules';
       rules.textContent = t.rules;
-      card.appendChild(rules);
+      body.appendChild(rules);
     }
 
-    card.appendChild(entrantList(t));
+    body.appendChild(entrantStrip(t));
+
+    // 主導線のエントリーを先に置き、詳細と運営操作はその後ろへ回す。
+    const actions = document.createElement('div');
+    actions.className = 'recruit-actions';
+    if (t.status === 'recruiting') actions.appendChild(entryButton(t, onChanged));
+
+    const detail = document.createElement('a');
+    detail.className = 'btn-secondary as-link';
+    detail.href = detailHref;
+    detail.textContent = '詳細を見る';
+    actions.appendChild(detail);
+
+    if (isAdmin()) actions.appendChild(adminControls(t, onChanged));
+    body.appendChild(actions);
+
+    card.appendChild(body);
     containerEl.appendChild(card);
   });
 }

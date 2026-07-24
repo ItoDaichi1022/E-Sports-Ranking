@@ -1,6 +1,6 @@
 import { state, newId, getPlayerName } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
-import { escapeHtml, avatarHtml, safeUrl, setupImagePicker } from './util.js';
+import { escapeHtml, avatarHtml, safeUrl, initialOf, setupImagePicker } from './util.js';
 import {
   createBracket, updateTournament, getChampionId, allMatchesDecided, finalStandings,
 } from './bracket.js';
@@ -630,16 +630,32 @@ function renderProfilePage() {
 
 // 優勝者を名指しするのは、運営が結果を確定させた大会だけ。
 // 表が埋まっただけの段階では「結果待ち」に留める。
-function tournamentStatusLabel(t) {
+//
+// 状態と優勝者は別々に返す。履歴一覧では別の要素として並べたいので、
+// 「優勝: ○○」という1本の文字列にまとめてしまうと分解できなくなる。
+function tournamentStatusInfo(t) {
   const bracket = state.brackets[t.id];
-  if (!bracket) return STATUS_LABELS[t.status] ?? '—';
+  if (!bracket) {
+    return { label: STATUS_LABELS[t.status] ?? '—', tone: t.status, champion: null };
+  }
 
   if (t.status === 'finished') {
     const championId = getChampionId(bracket);
-    if (championId) return `優勝: ${getPlayerName(championId)}`;
-    return '終了';
+    return {
+      label: '終了',
+      tone: 'finished',
+      champion: championId ? getPlayerName(championId) : null,
+    };
   }
-  return allMatchesDecided(bracket) ? '結果待ち' : '進行中';
+  return allMatchesDecided(bracket)
+    ? { label: '結果待ち', tone: 'pending', champion: null }
+    : { label: '進行中', tone: 'running', champion: null };
+}
+
+// 大会情報の「進行状況」欄用。1行に収めたいので優勝者も含めて文字列にする。
+function tournamentStatusLabel(t) {
+  const { label, champion } = tournamentStatusInfo(t);
+  return champion ? `優勝: ${champion}` : label;
 }
 
 function renderHistoryList() {
@@ -658,18 +674,31 @@ function renderHistoryList() {
     item.className = 'history-item';
     item.href = `#bracket/${encodeURIComponent(t.id)}`;
 
+    // 画像があればその縮小、無ければ大会名の頭文字。
+    // 常に同じ大きさの箱を置くことで、行の高さと文字の開始位置が揃う。
+    const imageUrl = safeUrl(t.imageUrl);
+    const thumb = document.createElement('span');
+    thumb.className = 'history-thumb';
+    if (imageUrl) {
+      thumb.innerHTML = `<img src="${escapeHtml(imageUrl)}" alt="" loading="lazy">`;
+    } else {
+      thumb.textContent = initialOf(t.name);
+    }
+
     const info = document.createElement('div');
     info.className = 'history-info';
     info.innerHTML = `
       <span class="history-name">${escapeHtml(t.name)}</span>
-      <span class="history-meta">${escapeHtml(t.date || '日付未設定')} ・ ${t.participantIds.length}人参加 ・ ${tournamentTier(t.participantIds.length)}</span>
+      <span class="history-meta">${escapeHtml(t.date || '日付未設定')} ・ ${t.participantIds.length}人参加 ・ ${escapeHtml(tournamentTier(t.participantIds.length))}</span>
     `;
 
-    const status = document.createElement('span');
-    status.className = 'history-status';
-    status.textContent = tournamentStatusLabel(t);
+    const { label, tone, champion } = tournamentStatusInfo(t);
+    const side = document.createElement('div');
+    side.className = 'history-side';
+    side.innerHTML = `<span class="status-chip status-${tone}">${escapeHtml(label)}</span>`
+      + (champion ? `<span class="history-champion">優勝 ${escapeHtml(champion)}</span>` : '');
 
-    item.append(info, status);
+    item.append(thumb, info, side);
     historyListEl.appendChild(item);
   });
 }
