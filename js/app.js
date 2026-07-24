@@ -1037,6 +1037,15 @@ function renderRankingPage() {
 
 // ---- 選手個人ページ ----
 
+// 出場した大会は最初この件数だけ見せ、残りは「もっと見る」で開く。
+// 出場数が多い選手でもページが縦に伸びきらないようにするため。
+const VISIBLE_TOURNAMENTS = 3;
+
+// 「もっと見る」で開いたかどうかを覚えておく（対象の選手ID）。
+// 背景の自動更新でも renderPlayerDetail は走るので、覚えておかないと
+// 読んでいる最中に勝手に畳まれてしまう。
+let expandedTournamentsFor = null;
+
 function renderPlayerDetail(playerId) {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) {
@@ -1078,14 +1087,18 @@ function renderPlayerDetail(playerId) {
   // 勝敗数・勝率・対戦ごとの記録は出さない（プロフィールは戦績表ではなく
   // 「どの大会に出て、どこまで勝ち上がったか」を見る場所という位置づけ）。
   if (stats.tournaments.length > 0) {
+    const entries = [...stats.tournaments].reverse();
+    const expanded = expandedTournamentsFor === playerId;
+    const hiddenCount = expanded ? 0 : Math.max(0, entries.length - VISIBLE_TOURNAMENTS);
+
     html += `
       <h3>出場した大会</h3>
       <div class="table-scroll">
         <table>
           <thead><tr><th>大会</th><th>日付</th><th>結果</th></tr></thead>
           <tbody>
-            ${[...stats.tournaments].reverse().map((entry) => `
-              <tr>
+            ${entries.map((entry, i) => `
+              <tr${!expanded && i >= VISIBLE_TOURNAMENTS ? ' class="extra-row" hidden' : ''}>
                 <td><a href="#tournament/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a></td>
                 <td>${escapeHtml(entry.tournament.date || '—')}</td>
                 <td>${escapeHtml(entry.placement || '—')}</td>
@@ -1094,12 +1107,26 @@ function renderPlayerDetail(playerId) {
           </tbody>
         </table>
       </div>
+      ${hiddenCount > 0
+        ? `<button type="button" class="btn-secondary show-more-btn">もっと見る（残り${hiddenCount}件）</button>`
+        : ''}
     `;
   } else {
     html += '<p class="empty-hint">まだ大会に出場していません。</p>';
   }
 
   playerDetailEl.innerHTML = html;
+
+  // 「もっと見る」。開いたことを覚えてから残りの行を出す
+  // （覚えないと、次の自動更新で描き直されたときに畳まれてしまう）。
+  const showMoreBtn = playerDetailEl.querySelector('.show-more-btn');
+  if (showMoreBtn) {
+    showMoreBtn.addEventListener('click', () => {
+      expandedTournamentsFor = playerId;
+      playerDetailEl.querySelectorAll('.extra-row').forEach((row) => { row.hidden = false; });
+      showMoreBtn.remove();
+    });
+  }
 
   // 表示名の変更。選手一覧の表からは外したので、運営はここから直す。
   // 代理登録された選手（本人のアカウントが無い人）を直せる唯一の経路でもある。

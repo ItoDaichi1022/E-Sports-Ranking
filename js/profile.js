@@ -234,13 +234,6 @@ export function profileSectionHtml(player) {
   if (player.mainCharacters?.length) {
     rows.push(`<div><dt>使用キャラクター</dt><dd>${escapeHtml(player.mainCharacters.join('、'))}</dd></div>`);
   }
-  if (links.length) {
-    const linkHtml = links
-      .map(([label, url]) =>
-        `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`)
-      .join(' ');
-    rows.push(`<div><dt>リンク</dt><dd class="sns-links">${linkHtml}</dd></div>`);
-  }
 
   let html = '';
   if (rows.length) {
@@ -248,6 +241,16 @@ export function profileSectionHtml(player) {
   }
   if (player.bio) {
     html += `<p class="player-bio">${escapeHtml(player.bio)}</p>`;
+  }
+
+  // SNSリンクはプロフィールの一番下にまとめる。
+  // 外部へ出ていく導線なので、先に本人の紹介を読ませてから見せる。
+  if (links.length) {
+    const linkHtml = links
+      .map(([label, url]) =>
+        `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`)
+      .join('');
+    html += `<div class="sns-links">${linkHtml}</div>`;
   }
   return html;
 }
