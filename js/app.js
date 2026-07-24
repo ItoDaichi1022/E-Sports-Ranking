@@ -863,8 +863,6 @@ function renderBracketPage(tournamentId) {
   bracketBackLink.href = `#tournament/${encodeURIComponent(tournamentId)}`;
   bracketBackLink.textContent = '← 大会の詳細へ';
 
-  const confirmed = tournament.status === 'finished';
-
   // bracketView は state を書き換えてから onChanged を呼ぶ。ここでDBへ反映する。
   renderBracket(tournamentId, bracketContainer, async () => {
     renderBracketPage(tournamentId);
@@ -879,7 +877,7 @@ function renderBracketPage(tournamentId) {
         renderBracketPage(tournamentId);
       }
     }, '試合結果の保存');
-  }, { readOnly: !isAdmin(), showResult: confirmed });
+  }, { readOnly: !isAdmin() });
 
   renderResultSection(tournament);
 }

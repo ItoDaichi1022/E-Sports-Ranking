@@ -1457,22 +1457,6 @@ a.card:hover {
   border-top: 1px solid var(--border-soft);
 }
 
-/* 優勝の発表。金色は上位を示す色としてここと順位表だけに使う。 */
-.champion-banner {
-  margin-top: 1.5rem;
-  padding: 1.1rem 1.25rem;
-  font-size: 1.15rem;
-  font-weight: 800;
-  text-align: center;
-  letter-spacing: 0.02em;
-  border: 1px solid rgba(240, 192, 90, 0.45);
-  border-radius: var(--r);
-  background: linear-gradient(160deg, rgba(240, 192, 90, 0.2), rgba(240, 192, 90, 0.05));
-  color: var(--gold);
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
 /* ---------------------------------------------------------------------------
    大会情報（ブラケットの下）
    --------------------------------------------------------------------------- */

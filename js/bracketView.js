@@ -1,5 +1,5 @@
 import { state, getPlayerName } from './state.js';
-import { confirmMatch, editMatch, getChampionId } from './bracket.js';
+import { confirmMatch, editMatch } from './bracket.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
 // 実際のトーナメント表のように中央揃えで配置される。
@@ -320,14 +320,4 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
 
   containerEl.appendChild(wrapper);
   drawConnectorLines(bracket, wrapper, matchElements);
-
-  // 優勝者は、運営が「結果を確定」するまで出さない。表が全部埋まった時点で
-  // 自動的に優勝者を掲げてしまうと、入力ミスに気づいて直す前に確定として広まってしまう。
-  const championId = options.showResult ? getChampionId(bracket) : null;
-  if (championId) {
-    const banner = document.createElement('div');
-    banner.className = 'champion-banner';
-    banner.textContent = `優勝: ${getPlayerName(championId)}`;
-    containerEl.appendChild(banner);
-  }
 }
