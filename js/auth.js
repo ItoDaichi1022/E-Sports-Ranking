@@ -77,15 +77,30 @@ export async function initAuth(handler) {
   auth.ready = true;
 
   // OAuthから戻ってきた直後や、トークン更新・ログアウトのたびに発火する。
-  supabase.auth.onAuthStateChange(async (event, session) => {
+  //
+  // 重要: このコールバックの中で supabase を await してはいけない。
+  // supabase-jsはNavigator LockManagerの排他ロックを保持したままこのコールバックを
+  // await で待つ。そのためコールバック内で supabase.from(...) や getSession を呼ぶと、
+  // それらが同じロックを取り直そうとして「ロックを持っている処理（＝このコールバック）の
+  // 完了」を待つ循環になり、デッドロックする。ロックは解放されないまま残るので、
+  // 以後の保存・ログアウト等がすべて無反応で固まり、再読み込みするまで直らない。
+  // → auth.user の更新だけ同期で行い、DB取得と再描画は setTimeout でロックの外へ逃がす。
+  supabase.auth.onAuthStateChange((event, session) => {
     const nextUser = session?.user ?? null;
     const changed = nextUser?.id !== auth.user?.id;
     auth.user = nextUser;
 
     // TOKEN_REFRESHED では同じユーザーのままなので選手行を引き直す必要はない
     if (changed || event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-      await refreshOwnPlayer();
-      onChange();
+      setTimeout(async () => {
+        try {
+          await refreshOwnPlayer();
+        } catch (err) {
+          console.error('[auth] 選手行の取得に失敗', err);
+          auth.player = null;
+        }
+        onChange();
+      }, 0);
     }
   });
 
