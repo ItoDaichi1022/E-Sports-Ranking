@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { escapeHtml, avatarHtml } from './util.js';
+import { avatarHtml } from './util.js';
 
 // 表示名を更新する。名前を変えた場合、旧名は pastNames に自動で残す。
 // 戦績は不変のid（uuid）に紐づくので、名前が変わっても分断されない。
@@ -33,13 +33,15 @@ export function canRemovePlayer(id) {
 
 // 選手一覧を描画する。
 //
-// 表示名の編集はこの表には置かない。自分の行は名前をクリックして選手ページ経由で、
+// 一覧に出すのは名前とアイコンだけ。ゲームアカウントIDや過去名、アカウント種別は
+// 詳細（選手ページ）で見られれば十分で、一覧では並べない（見やすさを優先）。
+// 表示名の編集もこの表には置かない。自分の行は名前をクリックして選手ページ経由で、
 // 他人の行は運営が選手ページから編集する。一覧は「見る」ことに専念させる。
 //
 // options:
 //   ownPlayerId      -> ログイン中の本人の選手ID。その行を目立たせる
 //   isAdmin          -> 削除・アカウント統合などの運営操作を出すか
-//   filterQuery      -> ID・表示名・過去名の部分一致で絞り込む
+//   filterQuery      -> 表示名・過去名の部分一致で絞り込む（改名しても見つかるように過去名も対象）
 //   onDelete(player) -> 削除するとき
 //   onMerge(source, target) -> 代理登録された行に本人のアカウントを統合するとき
 export function renderPlayerTable(containerEl, options = {}) {
@@ -61,8 +63,7 @@ export function renderPlayerTable(containerEl, options = {}) {
   const query = filterQuery.trim().toLowerCase();
   const visiblePlayers = query
     ? state.players.filter((p) =>
-        (p.gameAccountId ?? '').toLowerCase().includes(query)
-        || p.currentName.toLowerCase().includes(query)
+        p.currentName.toLowerCase().includes(query)
         || p.pastNames.some((n) => n.toLowerCase().includes(query)))
     : state.players;
 
@@ -78,7 +79,7 @@ export function renderPlayerTable(containerEl, options = {}) {
   table.innerHTML = `
     <thead>
       <tr>
-        <th>表示名</th><th>ゲームアカウントID</th><th>過去名</th><th>アカウント</th>${anyActions ? '<th></th>' : ''}
+        <th>選手</th>${anyActions ? '<th></th>' : ''}
       </tr>
     </thead>
   `;
@@ -86,20 +87,6 @@ export function renderPlayerTable(containerEl, options = {}) {
 
   visiblePlayers.forEach((p) => {
     const tr = document.createElement('tr');
-
-    const idTd = document.createElement('td');
-    idTd.innerHTML = p.gameAccountId
-      ? `<code>${escapeHtml(p.gameAccountId)}</code>`
-      : '<span class="muted">—</span>';
-
-    const pastTd = document.createElement('td');
-    pastTd.textContent = p.pastNames.join(', ');
-
-    // 本人のアカウントが紐づいているか。紐づいていない行＝運営が代理登録した選手。
-    const accountTd = document.createElement('td');
-    accountTd.innerHTML = p.userId
-      ? '<span class="account-badge linked">本人</span>'
-      : '<span class="account-badge">代理登録</span>';
 
     // 自分の行はひと目で分かるようにする
     if (ownPlayerId && p.id === ownPlayerId) tr.className = 'own-row';
@@ -120,7 +107,7 @@ export function renderPlayerTable(containerEl, options = {}) {
     }
     nameTd.appendChild(nameCell);
 
-    tr.append(nameTd, idTd, pastTd, accountTd);
+    tr.append(nameTd);
 
     if (anyActions) {
       const actionTd = document.createElement('td');
