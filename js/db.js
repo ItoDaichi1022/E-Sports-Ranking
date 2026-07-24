@@ -84,6 +84,17 @@ function fromMatch(match) {
   };
 }
 
+function toAnnouncement(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body ?? '',
+    pinned: row.pinned ?? false,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 // PostgRESTのエラーを日本語にして投げ直す。
 // 原因究明のため、元のコードと詳細も必ず残す（コードだけでは何が起きたか分からない）。
 function check(error, what) {
@@ -112,7 +123,7 @@ function check(error, what) {
 // 全データを取得して state を丸ごと差し替える。認証は不要（RLSがSELECTを全員に許可）。
 // 途中で失敗しても中途半端な表示にならないよう、全部揃ってから state に入れる。
 export async function loadAll() {
-  const [players, tournaments, entries, brackets, matches, ranking] = await Promise.all([
+  const [players, tournaments, entries, brackets, matches, ranking, announcements] = await Promise.all([
     supabase.from('players').select('*').order('display_name'),
     supabase.from('tournaments').select('*').order('date', { ascending: true, nullsFirst: false }),
     supabase.from('tournament_entries').select('*'),
@@ -120,6 +131,8 @@ export async function loadAll() {
     supabase.from('matches').select('*'),
     // スナップショットは最新の1件だけ使う（過去の公開履歴は残しておく）
     supabase.from('published_rankings').select('*').order('published_at', { ascending: false }).limit(1),
+    // 固定を先頭に、あとは新しい順
+    supabase.from('announcements').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
   ]);
 
   check(players.error, '選手の読み込み');
@@ -128,6 +141,7 @@ export async function loadAll() {
   check(brackets.error, 'ブラケットの読み込み');
   check(matches.error, '試合結果の読み込み');
   check(ranking.error, 'ランキングの読み込み');
+  check(announcements.error, 'お知らせの読み込み');
 
   // participantIds はシード順（未確定なら登録順）。旧データの並び順の意味を引き継ぐ。
   const participantsByTournament = new Map();
@@ -159,6 +173,7 @@ export async function loadAll() {
         rankings: snapshot.data?.rankings ?? [],
       }
     : null;
+  state.announcements = announcements.data.map(toAnnouncement);
 }
 
 // ---------------------------------------------------------------------------
@@ -455,6 +470,45 @@ export async function publishRanking(snapshot) {
 }
 
 // ---------------------------------------------------------------------------
+// お知らせ（ホーム画面）
+//
+// 投稿・編集・削除はRLSで運営だけに絞られている。created_by は本人の選手行。
+// ---------------------------------------------------------------------------
+
+export async function createAnnouncement({ title, body, pinned, createdBy }) {
+  const { data, error } = await supabase
+    .from('announcements')
+    .insert({
+      title,
+      body: body ?? '',
+      pinned: Boolean(pinned),
+      created_by: createdBy ?? null,
+    })
+    .select()
+    .single();
+  check(error, 'お知らせの投稿');
+  return toAnnouncement(data);
+}
+
+export async function updateAnnouncement(id, { title, body, pinned }) {
+  const { data, error } = await supabase
+    .from('announcements')
+    .update({ title, body: body ?? '', pinned: Boolean(pinned) })
+    .eq('id', id)
+    .select('id');
+  check(error, 'お知らせの更新');
+  // RLSで弾かれたUPDATEは0行の「成功」で返るため、更新された行を確認する
+  if (!data || data.length === 0) {
+    throw new Error('お知らせを更新できませんでした。運営権限が必要です。');
+  }
+}
+
+export async function deleteAnnouncement(id) {
+  const { error } = await supabase.from('announcements').delete().eq('id', id);
+  check(error, 'お知らせの削除');
+}
+
+// ---------------------------------------------------------------------------
 // Realtime
 //
 // 10秒ごとのポーリング（旧 app.js の autoRefresh）の置き換え。進行中の大会を
@@ -475,7 +529,7 @@ export function subscribeToChanges(onChange, debounceMs = 400) {
   };
 
   channel = supabase.channel('app-data');
-  ['players', 'tournaments', 'tournament_entries', 'brackets', 'matches', 'published_rankings']
+  ['players', 'tournaments', 'tournament_entries', 'brackets', 'matches', 'published_rankings', 'announcements']
     .forEach((table) => {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, notify);
     });

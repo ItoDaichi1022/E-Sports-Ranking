@@ -96,10 +96,19 @@ const accountAvatarEl = $('account-avatar');
 const loginBtn = $('login-btn');
 const logoutBtn = $('logout-btn');
 const navTournamentLink = $('nav-tournament-link');
-const homeCardTournament = $('home-card-tournament');
-const homeCardProfile = $('home-card-profile');
 const mainNav = $('main-nav');
 const navToggle = $('nav-toggle');
+
+const announcementListEl = $('announcement-list');
+const announcementNewBtn = $('announcement-new-btn');
+const announcementForm = $('announcement-form');
+const announcementIdInput = $('announcement-id-input');
+const announcementTitleInput = $('announcement-title-input');
+const announcementBodyInput = $('announcement-body-input');
+const announcementPinnedInput = $('announcement-pinned-input');
+const announcementFormErrorEl = $('announcement-form-error');
+const announcementSubmitBtn = $('announcement-submit-btn');
+const announcementCancelBtn = $('announcement-cancel-btn');
 
 const loginDialog = $('login-dialog');
 const emailForm = $('email-form');
@@ -142,7 +151,7 @@ function applyAuthUI() {
   const loggedIn = isLoggedIn();
 
   navTournamentLink.hidden = !admin;
-  homeCardTournament.hidden = !admin;
+  announcementNewBtn.hidden = !admin;
   rankingEditorEl.hidden = !admin;
   rankingEditorNoteEl.hidden = !admin;
   tournamentEditBtn.hidden = !admin;
@@ -150,9 +159,9 @@ function applyAuthUI() {
   playerForm.hidden = !admin;
   playerFormNote.hidden = !admin;
   if (!admin) tournamentEditForm.hidden = true;
+  // 運営でなくなったら投稿フォームも畳む
+  if (!admin) closeAnnouncementForm();
 
-  // マイページはログアウト中もタブに出す（そこからログインできるため）
-  homeCardProfile.hidden = false;
   loginBtn.hidden = loggedIn;
   accountAvatarEl.hidden = !loggedIn;
 
@@ -215,7 +224,8 @@ function routeFromHash() {
     a.classList.toggle('active', a.dataset.page === navPage);
   });
 
-  if (target === 'recruit') renderRecruit();
+  if (target === 'home') renderHome();
+  else if (target === 'recruit') renderRecruit();
   else if (target === 'tournament') { renderParticipantCheckboxes(); renderSelectedList(); }
   else if (target === 'history') renderHistoryList();
   else if (target === 'bracket') renderBracketPage(param);
@@ -223,6 +233,97 @@ function routeFromHash() {
   else if (target === 'player') renderPlayerDetail(param);
   else if (target === 'ranking') renderRankingPage();
   else if (target === 'profile') renderProfilePage();
+}
+
+// ---- ホーム（お知らせ） ----
+
+// 投稿・編集フォームを開く。announcement を渡すと編集、null なら新規。
+function openAnnouncementForm(announcement) {
+  announcementIdInput.value = announcement?.id ?? '';
+  announcementTitleInput.value = announcement?.title ?? '';
+  announcementBodyInput.value = announcement?.body ?? '';
+  announcementPinnedInput.checked = Boolean(announcement?.pinned);
+  announcementFormErrorEl.textContent = '';
+  announcementSubmitBtn.textContent = announcement ? '更新する' : '投稿する';
+  announcementForm.hidden = false;
+  announcementTitleInput.focus();
+}
+
+function closeAnnouncementForm() {
+  announcementForm.hidden = true;
+  announcementForm.reset();
+  announcementIdInput.value = '';
+  announcementFormErrorEl.textContent = '';
+}
+
+function renderHome() {
+  announcementListEl.innerHTML = '';
+  const admin = isAdmin();
+
+  if (state.announcements.length === 0) {
+    announcementListEl.innerHTML = '<p class="empty-hint">まだお知らせはありません。</p>';
+    return;
+  }
+
+  state.announcements.forEach((a) => {
+    const card = document.createElement('article');
+    card.className = `announcement${a.pinned ? ' pinned' : ''}`;
+
+    const head = document.createElement('div');
+    head.className = 'announcement-head';
+
+    const title = document.createElement('h3');
+    title.className = 'announcement-title';
+    if (a.pinned) {
+      const pin = document.createElement('span');
+      pin.className = 'pin-badge';
+      pin.textContent = '固定';
+      title.appendChild(pin);
+    }
+    title.appendChild(document.createTextNode(a.title));
+    head.appendChild(title);
+
+    const date = document.createElement('span');
+    date.className = 'announcement-date';
+    date.textContent = formatDateTime(a.createdAt);
+    head.appendChild(date);
+
+    card.appendChild(head);
+
+    if (a.body) {
+      // 本文はユーザー入力。textContentで入れ、改行はCSS(white-space:pre-wrap)で見せる
+      const body = document.createElement('p');
+      body.className = 'announcement-body';
+      body.textContent = a.body;
+      card.appendChild(body);
+    }
+
+    if (admin) {
+      const actions = document.createElement('div');
+      actions.className = 'announcement-actions';
+
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'btn-secondary';
+      editBtn.textContent = '編集';
+      editBtn.addEventListener('click', () => openAnnouncementForm(a));
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn-secondary';
+      delBtn.textContent = '削除';
+      delBtn.addEventListener('click', async () => {
+        if (!confirm(`お知らせ「${a.title}」を削除しますか？`)) return;
+        const ok = await persist(() => db.deleteAnnouncement(a.id), 'お知らせの削除');
+        if (ok) await refreshFromDb();
+      });
+
+      actions.append(editBtn, delBtn);
+      card.appendChild(actions);
+    }
+
+    announcementListEl.appendChild(card);
+  });
 }
 
 // ---- 選手 ----
@@ -1142,6 +1243,43 @@ tournamentDeleteBtn.addEventListener('click', async () => {
 
 playerBackBtn.addEventListener('click', () => {
   history.back();
+});
+
+// ---- お知らせ（運営） ----
+
+announcementNewBtn.addEventListener('click', () => openAnnouncementForm(null));
+announcementCancelBtn.addEventListener('click', closeAnnouncementForm);
+
+announcementForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const title = announcementTitleInput.value.trim();
+  if (!title) {
+    announcementFormErrorEl.textContent = 'タイトルを入力してください。';
+    return;
+  }
+
+  const id = announcementIdInput.value;
+  const payload = {
+    title,
+    body: announcementBodyInput.value.trim(),
+    pinned: announcementPinnedInput.checked,
+  };
+
+  announcementSubmitBtn.disabled = true;
+  const ok = await persist(
+    () => (id
+      ? db.updateAnnouncement(id, payload)
+      : db.createAnnouncement({ ...payload, createdBy: auth.player?.id ?? null })),
+    id ? 'お知らせの更新' : 'お知らせの投稿',
+  );
+  announcementSubmitBtn.disabled = false;
+
+  if (ok) {
+    closeAnnouncementForm();
+    await refreshFromDb();
+  } else {
+    announcementFormErrorEl.textContent = '保存に失敗しました。もう一度お試しください。';
+  }
 });
 
 // ---- ログイン ----

@@ -41,10 +41,8 @@ header {
   flex-wrap: wrap;
 }
 
-.header-row #main-nav {
-  margin-left: auto;
-}
-
+/* ナビはハンバーガーで開くドロップダウンに統一した（画面幅を問わず）。
+   タイトルに margin-right:auto を持たせて、アイコンとログインを右端へ寄せる。 */
 .header-row #login-btn {
   padding: 0.25rem 0.9rem;
   font-size: 0.85rem;
@@ -53,6 +51,7 @@ header {
 
 header h1 {
   margin: 0;
+  margin-right: auto;
   font-size: 1.25rem;
 }
 
@@ -61,18 +60,44 @@ header h1 a {
   text-decoration: none;
 }
 
+/* 既定で隠し、.open のときだけヘッダーの下へ重ねて出す。
+   ヘッダー内に積むとヘッダーが伸びて本文が下にずれるため、絶対配置で「重ねる」。
+   位置の基準は sticky なヘッダー。 */
 #main-nav {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0.5rem 1.5rem 0.75rem;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+#main-nav.open {
   display: flex;
-  gap: 0.25rem;
-  flex-wrap: wrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  #main-nav {
+    background: #202124;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+  }
 }
 
 #main-nav a {
-  padding: 0.3rem 0.75rem;
+  padding: 0.7rem 0.5rem;
   border-radius: 6px;
   color: inherit;
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 #main-nav a:hover {
@@ -119,41 +144,89 @@ h2 { margin-top: 0; }
   padding: 0;
 }
 
-.home-cards {
+/* ---- ホーム（説明＋お知らせ） ---- */
+
+.home-intro p {
+  line-height: 1.7;
+}
+
+.home-section {
+  margin-top: 2rem;
+}
+
+.home-section-head {
   display: flex;
-  gap: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   flex-wrap: wrap;
-  margin: 1.5rem 0;
 }
 
-.home-card {
-  flex: 1;
-  min-width: 220px;
-  display: block;
-  padding: 2rem 1.5rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-panel);
-  color: inherit;
-  text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-}
-
-.home-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
-  border-color: var(--accent);
-}
-
-.home-card h2 {
-  margin: 0 0 0.5rem;
-  color: var(--accent);
-}
-
-.home-card p {
+.home-section-head h2 {
   margin: 0;
-  font-size: 0.9rem;
+}
+
+.announcement {
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+
+/* 固定したお知らせは左に色帯を付けて目立たせる */
+.announcement.pinned {
+  border-left: 4px solid var(--accent);
+}
+
+.announcement-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.announcement-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.pin-badge {
+  display: inline-block;
+  margin-right: 0.5rem;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: bold;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.announcement-date {
+  font-size: 0.8rem;
   color: #777;
+  white-space: nowrap;
+}
+
+/* 本文の改行を入力どおり見せる（textContentで入れているのでHTMLは混ざらない） */
+.announcement-body {
+  margin: 0.6rem 0 0;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.announcement-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.announcement-actions button {
+  padding: 0.25rem 0.9rem;
+  font-size: 0.85rem;
 }
 
 .settings-link {
@@ -1130,11 +1203,11 @@ tr.own-row:hover > td {
   white-space: nowrap;
 }
 
-/* ---- 狭い画面向けのメニュー ---- */
+/* ---- ハンバーガーメニュー（全画面共通） ---- */
 
-/* 広い画面ではボタン自体を出さない。ナビはそのまま横に並ぶ。 */
+/* 画面幅を問わず常に表示し、これがサイトの主ナビになる。 */
 .nav-toggle {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 2.5rem;
@@ -1178,54 +1251,8 @@ tr.own-row:hover > td {
   transform: translateY(-6px) rotate(-45deg);
 }
 
-/* リンクが7つあり、日本語だと横1行に収まらなくなる幅で切り替える。
-   折り返して2段になるとヘッダーが画面を占領してしまうため。 */
-@media (max-width: 900px) {
-  .nav-toggle {
-    display: inline-flex;
-  }
-
-  /* 開いたときだけ、ヘッダーの下に縦並びで出す。
-     ヘッダーの中に積むとヘッダー自体が伸びて本文が下にずれるので、
-     絶対配置にしてヘッダーの下へ「重ねる」。本文の位置は動かない。
-     位置の基準は sticky なヘッダー（sticky も配置済み要素なので基準になる）。 */
-  .header-row #main-nav {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    z-index: 30;
-    flex-direction: column;
-    gap: 0;
-    margin: 0;
-    padding: 0.5rem 1.5rem 0.75rem;
-    /* 横向きなど画面が低いときにメニューが画面外へはみ出さないようにする */
-    max-height: 80vh;
-    overflow-y: auto;
-    background: #ffffff;
-    border-bottom: 1px solid var(--border);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
-  }
-
-  .header-row #main-nav.open {
-    display: flex;
-  }
-
-  /* ヘッダーと同じ配色にする。透けると下の本文と重なって読めなくなるため。 */
-  @media (prefers-color-scheme: dark) {
-    .header-row #main-nav {
-      background: #202124;
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
-    }
-  }
-
-  #main-nav a {
-    padding: 0.7rem 0.5rem;
-    font-size: 1rem;
-    border-radius: 6px;
-  }
-
+/* 狭い画面ではタイトルを少し縮めて、アイコンとログインが右端に収まるようにする。 */
+@media (max-width: 640px) {
   header h1 {
     font-size: 1.05rem;
   }

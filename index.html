@@ -6,12 +6,12 @@
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=35">
+<link rel="stylesheet" href="css/style.css?v=36">
 </head>
 <body>
 <header>
   <div class="header-row">
-    <!-- 画面が狭いときだけ出るメニューボタン。広い画面ではCSSで隠し、ナビを直接並べる -->
+    <!-- 全画面共通のメニューボタン。ナビはここから開くドロップダウンに統一している -->
     <button type="button" id="nav-toggle" class="nav-toggle"
             aria-controls="main-nav" aria-expanded="false" aria-label="メニューを開く">
       <span class="nav-toggle-bars"></span>
@@ -65,31 +65,50 @@
 
 <main>
   <section id="view-home" class="view">
-    <div class="home-cards">
-      <a class="home-card" href="#recruit">
-        <h2>募集中の大会</h2>
-        <p>エントリー受付中の大会を確認して参加します。</p>
-      </a>
-      <a class="home-card" href="#history">
-        <h2>大会履歴</h2>
-        <p>過去・進行中の大会のブラケットと結果を見ます。</p>
-      </a>
-      <a class="home-card" href="#players">
-        <h2>選手</h2>
-        <p>選手の一覧と個人戦績を確認します。</p>
-      </a>
-      <a class="home-card" href="#ranking">
-        <h2>ランキング</h2>
-        <p>選手の順位を表示します。</p>
-      </a>
-      <a class="home-card" href="#tournament" id="home-card-tournament">
-        <h2>大会作成</h2>
-        <p>大会を作って参加者を募集します。</p>
-      </a>
-      <a class="home-card" href="#profile" id="home-card-profile">
-        <h2>マイページ</h2>
-        <p>自分の選手プロフィールを編集します。</p>
-      </a>
+    <div class="home-intro">
+      <h2>ようこそ</h2>
+      <p>
+        このサイトは対戦ゲームの大会運営とランキングをまとめる場所です。
+        大会の履歴やブラケット、選手のプロフィールや戦歴、シーズンのランキングを
+        ログインなしで自由に閲覧できます。
+      </p>
+      <p>
+        Googleなどでログインすると自分の選手プロフィールを作成・編集でき、
+        募集中の大会に「エントリー」ボタン一つで参加登録できます。
+        各ページへは左上のメニュー（<span aria-hidden="true">☰</span>）から移動してください。
+      </p>
+    </div>
+
+    <div class="home-section">
+      <div class="home-section-head">
+        <h2>お知らせ</h2>
+        <!-- 運営のときだけ表示。新規投稿フォームを開く -->
+        <button type="button" id="announcement-new-btn" class="btn-secondary" hidden>新しいお知らせ</button>
+      </div>
+
+      <!-- 運営の投稿・編集フォーム。既定は隠しておき、ボタンで開く -->
+      <form id="announcement-form" class="inline-form" hidden>
+        <input type="hidden" id="announcement-id-input">
+        <label>
+          タイトル
+          <input type="text" id="announcement-title-input" placeholder="例: 第5回大会の募集を開始しました" required>
+        </label>
+        <label class="rules-field">
+          本文（任意）
+          <textarea id="announcement-body-input" rows="4" placeholder="詳細や補足があれば記入します。"></textarea>
+        </label>
+        <label class="checkbox-inline">
+          <input type="checkbox" id="announcement-pinned-input">
+          先頭に固定する
+        </label>
+        <p id="announcement-form-error" class="status-line error"></p>
+        <div class="dialog-actions">
+          <button type="button" id="announcement-cancel-btn" class="btn-secondary">キャンセル</button>
+          <button type="submit" id="announcement-submit-btn">投稿する</button>
+        </div>
+      </form>
+
+      <div id="announcement-list"></div>
     </div>
   </section>
 
@@ -275,7 +294,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=35"></script>
+<script src="js/vendor/supabase.js?v=36"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -287,24 +306,24 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=35",
-    "./js/bracket.js":        "./js/bracket.js?v=35",
-    "./js/bracketView.js":    "./js/bracketView.js?v=35",
-    "./js/db.js":             "./js/db.js?v=35",
-    "./js/entries.js":        "./js/entries.js?v=35",
-    "./js/playerStats.js":    "./js/playerStats.js?v=35",
-    "./js/players.js":        "./js/players.js?v=35",
-    "./js/profile.js":        "./js/profile.js?v=35",
-    "./js/ranking.js":        "./js/ranking.js?v=35",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=35",
-    "./js/rankingView.js":    "./js/rankingView.js?v=35",
-    "./js/state.js":          "./js/state.js?v=35",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=35",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=35",
-    "./js/util.js":           "./js/util.js?v=35"
+    "./js/auth.js":           "./js/auth.js?v=36",
+    "./js/bracket.js":        "./js/bracket.js?v=36",
+    "./js/bracketView.js":    "./js/bracketView.js?v=36",
+    "./js/db.js":             "./js/db.js?v=36",
+    "./js/entries.js":        "./js/entries.js?v=36",
+    "./js/playerStats.js":    "./js/playerStats.js?v=36",
+    "./js/players.js":        "./js/players.js?v=36",
+    "./js/profile.js":        "./js/profile.js?v=36",
+    "./js/ranking.js":        "./js/ranking.js?v=36",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=36",
+    "./js/rankingView.js":    "./js/rankingView.js?v=36",
+    "./js/state.js":          "./js/state.js?v=36",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=36",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=36",
+    "./js/util.js":           "./js/util.js?v=36"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=35"></script>
+<script type="module" src="js/app.js?v=36"></script>
 </body>
 </html>

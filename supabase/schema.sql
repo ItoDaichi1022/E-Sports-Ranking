@@ -92,12 +92,26 @@ create table if not exists published_rankings (
   data          jsonb not null
 );
 
+-- ホーム画面に出す運営からのお知らせ。運営だけが投稿・編集・削除できる。
+-- pinned を先頭に、あとは新しい順で並べる。
+create table if not exists announcements (
+  id          uuid primary key default gen_random_uuid(),
+  title       text not null,
+  body        text not null default '',
+  pinned      boolean not null default false,
+  created_by  uuid references players(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  constraint announcements_title_not_blank check (btrim(title) <> '')
+);
+
 create index if not exists matches_tournament_idx on matches (tournament_id);
 create index if not exists matches_winner_idx     on matches (winner_id);
 create index if not exists matches_loser_idx      on matches (loser_id);
 create index if not exists entries_player_idx     on tournament_entries (player_id);
 create index if not exists tournaments_status_idx on tournaments (status);
 create index if not exists rankings_published_idx on published_rankings (published_at desc);
+create index if not exists announcements_order_idx on announcements (pinned desc, created_at desc);
 
 -- ---------------------------------------------------------------------------
 -- 管理者判定
@@ -193,6 +207,11 @@ create trigger brackets_touch_trigger
   before update on brackets
   for each row execute function touch_bracket_updated_at();
 
+drop trigger if exists announcements_touch_trigger on announcements;
+create trigger announcements_touch_trigger
+  before update on announcements
+  for each row execute function touch_bracket_updated_at();
+
 -- ---------------------------------------------------------------------------
 -- 権限（列単位）
 --
@@ -209,7 +228,7 @@ create trigger brackets_touch_trigger
 revoke all on all tables in schema public from anon, authenticated;
 
 -- 閲覧は全員（ログアウト状態のゲストを含む）
-grant select on players, tournaments, tournament_entries, brackets, matches, published_rankings
+grant select on players, tournaments, tournament_entries, brackets, matches, published_rankings, announcements
   to anon, authenticated;
 
 -- 選手行の作成。idとroleは指定させない（roleは既定値'player'が入る）
@@ -224,7 +243,7 @@ grant update (display_name, past_names, game_account_id, bio, avatar_url,
 
 grant delete on players to authenticated;
 
-grant insert, update, delete on tournaments, tournament_entries, brackets, matches, published_rankings
+grant insert, update, delete on tournaments, tournament_entries, brackets, matches, published_rankings, announcements
   to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -237,6 +256,7 @@ alter table tournament_entries  enable row level security;
 alter table brackets            enable row level security;
 alter table matches             enable row level security;
 alter table published_rankings  enable row level security;
+alter table announcements       enable row level security;
 
 -- ---- players ----
 
@@ -344,6 +364,16 @@ create policy rankings_select on published_rankings
 
 drop policy if exists rankings_write on published_rankings;
 create policy rankings_write on published_rankings
+  for all to authenticated using (is_admin()) with check (is_admin());
+
+-- ---- announcements ----
+
+drop policy if exists announcements_select on announcements;
+create policy announcements_select on announcements
+  for select to anon, authenticated using (true);
+
+drop policy if exists announcements_write on announcements;
+create policy announcements_write on announcements
   for all to authenticated using (is_admin()) with check (is_admin());
 
 -- ---------------------------------------------------------------------------
@@ -532,5 +562,11 @@ end $$;
 do $$
 begin
   execute 'alter publication supabase_realtime add table published_rankings';
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  execute 'alter publication supabase_realtime add table announcements';
 exception when duplicate_object then null;
 end $$;
