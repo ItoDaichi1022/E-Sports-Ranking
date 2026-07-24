@@ -1,6 +1,6 @@
 import { state, newId, getPlayerName } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
-import { escapeHtml, avatarHtml, safeUrl, initialOf, setupImagePicker } from './util.js';
+import { escapeHtml, avatarHtml, safeUrl, cardThumb, setupImagePicker } from './util.js';
 import {
   createBracket, updateTournament, getChampionId, allMatchesDecided, finalStandings,
 } from './bracket.js';
@@ -295,15 +295,26 @@ function renderHome() {
     return;
   }
 
+  // カードの形は募集・大会履歴と共通（css の .card 系）。ただしお知らせは
+  // 本文を読ませるので1列にする（横に詰めると本文が細切れになる）。
+  const list = document.createElement('div');
+  list.className = 'card-list';
+
   state.announcements.forEach((a) => {
     const card = document.createElement('article');
-    card.className = `announcement${a.pinned ? ' pinned' : ''}`;
+    card.className = `card${a.pinned ? ' pinned' : ''}`;
 
-    const head = document.createElement('div');
-    head.className = 'announcement-head';
+    // 画像はカード上端に置く（募集・履歴と同じ並び）。お知らせは詳細ページを
+    // 持たず、ここが画像を見る唯一の場所なので枠を広めに取る。
+    // 画像が無いお知らせでは枠ごと省く。文章だけの告知が大半で、
+    // 頭文字の箱を出すとかえって場所を取るため。
+    if (a.imageUrl) card.appendChild(cardThumb(a.imageUrl, a.title, { tall: true }));
+
+    const body = document.createElement('div');
+    body.className = 'card-body';
 
     const title = document.createElement('h3');
-    title.className = 'announcement-title';
+    title.className = 'card-title';
     if (a.pinned) {
       const pin = document.createElement('span');
       pin.className = 'pin-badge';
@@ -311,36 +322,24 @@ function renderHome() {
       title.appendChild(pin);
     }
     title.appendChild(document.createTextNode(a.title));
-    head.appendChild(title);
+    body.appendChild(title);
 
-    const date = document.createElement('span');
-    date.className = 'announcement-date';
+    const date = document.createElement('p');
+    date.className = 'card-date';
     date.textContent = formatDateTime(a.createdAt);
-    head.appendChild(date);
-
-    card.appendChild(head);
-
-    const imageUrl = safeUrl(a.imageUrl);
-    if (imageUrl) {
-      const img = document.createElement('img');
-      img.className = 'announcement-image';
-      img.src = imageUrl;
-      img.alt = '';
-      img.loading = 'lazy';
-      card.appendChild(img);
-    }
+    body.appendChild(date);
 
     if (a.body) {
       // 本文はユーザー入力。textContentで入れ、改行はCSS(white-space:pre-wrap)で見せる
-      const body = document.createElement('p');
-      body.className = 'announcement-body';
-      body.textContent = a.body;
-      card.appendChild(body);
+      const text = document.createElement('p');
+      text.className = 'card-text';
+      text.textContent = a.body;
+      body.appendChild(text);
     }
 
     if (admin) {
       const actions = document.createElement('div');
-      actions.className = 'announcement-actions';
+      actions.className = 'card-actions';
 
       const editBtn = document.createElement('button');
       editBtn.type = 'button';
@@ -362,11 +361,14 @@ function renderHome() {
       });
 
       actions.append(editBtn, delBtn);
-      card.appendChild(actions);
+      body.appendChild(actions);
     }
 
-    announcementListEl.appendChild(card);
+    card.appendChild(body);
+    list.appendChild(card);
   });
+
+  announcementListEl.appendChild(list);
 }
 
 // ---- 選手 ----
@@ -678,38 +680,31 @@ function renderHistoryList() {
     return;
   }
 
+  // カードの形は募集・お知らせと共通（css の .card 系）
+  const list = document.createElement('div');
+  list.className = 'card-grid';
+
   [...visible].reverse().forEach((t) => {
-    const item = document.createElement('a');
-    item.className = 'history-item';
-    item.href = `#bracket/${encodeURIComponent(t.id)}`;
-
-    // 画像があればその縮小、無ければ大会名の頭文字。
-    // 常に同じ大きさの箱を置くことで、行の高さと文字の開始位置が揃う。
-    const imageUrl = safeUrl(t.imageUrl);
-    const thumb = document.createElement('span');
-    thumb.className = 'history-thumb';
-    if (imageUrl) {
-      thumb.innerHTML = `<img src="${escapeHtml(imageUrl)}" alt="" loading="lazy">`;
-    } else {
-      thumb.textContent = initialOf(t.name);
-    }
-
-    const info = document.createElement('div');
-    info.className = 'history-info';
-    info.innerHTML = `
-      <span class="history-name">${escapeHtml(t.name)}</span>
-      <span class="history-meta">${escapeHtml(t.date || '日付未設定')} ・ ${t.participantIds.length}人参加 ・ ${escapeHtml(tournamentTier(t.participantIds.length))}</span>
-    `;
+    const card = document.createElement('a');
+    card.className = 'card';
+    card.href = `#bracket/${encodeURIComponent(t.id)}`;
 
     const { label, tone, champion } = tournamentStatusInfo(t);
-    const side = document.createElement('div');
-    side.className = 'history-side';
-    side.innerHTML = `<span class="status-chip status-${tone}">${escapeHtml(label)}</span>`
-      + (champion ? `<span class="history-champion">優勝 ${escapeHtml(champion)}</span>` : '');
 
-    item.append(thumb, info, side);
-    historyListEl.appendChild(item);
+    const body = document.createElement('div');
+    body.className = 'card-body';
+    body.innerHTML = `
+      <h3 class="card-title">${escapeHtml(t.name)}</h3>
+      <p class="card-date">${escapeHtml(t.date || '日付未設定')} ・ ${t.participantIds.length}人参加</p>
+      <span class="status-chip status-${tone}">${escapeHtml(label)}</span>
+      ${champion ? `<span class="card-champion">優勝 ${escapeHtml(champion)}</span>` : ''}
+    `;
+
+    card.append(cardThumb(t.imageUrl, t.name), body);
+    list.appendChild(card);
   });
+
+  historyListEl.appendChild(list);
 }
 
 // ---- ブラケットページ ----

@@ -5,7 +5,7 @@
 // 運営が募集を締め切ると、それまでの戦績を元にシードを付けてブラケットを生成する。
 
 import { state } from './state.js';
-import { escapeHtml, safeUrl, initialOf } from './util.js';
+import { escapeHtml, cardThumb } from './util.js';
 import { auth, isLoggedIn, isAdmin } from './auth.js';
 import { computeRankings } from './ranking.js';
 import { createBracket } from './bracket.js';
@@ -230,39 +230,28 @@ export function renderRecruitPage(containerEl) {
     return;
   }
 
+  // カードの形は募集・大会履歴・お知らせで共通（css の .card 系）
   const list = document.createElement('div');
-  list.className = 'recruit-list';
+  list.className = 'card-grid';
 
   visible.forEach((t) => {
     // カードの中にボタンやリンクを置かないので、カード全体を1つのリンクにできる。
     // どこを押しても詳細へ行くため、スマートフォンでも押し外しにくい。
     const card = document.createElement('a');
-    card.className = 'recruit-card';
+    card.className = 'card';
     card.href = `#bracket/${encodeURIComponent(t.id)}`;
 
-    // 画像は切り抜かずに収める。無ければ大会名の頭文字で枠を埋め、
-    // 画像の有無でカードの高さが変わらないようにする。
-    const imageUrl = safeUrl(t.imageUrl);
-    const thumb = document.createElement('div');
-    thumb.className = 'recruit-thumb';
-    if (imageUrl) {
-      thumb.innerHTML = `<img src="${escapeHtml(imageUrl)}" alt="" loading="lazy">`;
-    } else {
-      thumb.classList.add('is-empty');
-      thumb.textContent = initialOf(t.name);
-    }
-
     const body = document.createElement('div');
-    body.className = 'recruit-card-body';
+    body.className = 'card-body';
     // 準備中はまだ公開していない大会。運営にしか見えないので、
     // 募集中のものと取り違えないよう印を付ける。
     body.innerHTML = `
-      <h3 class="recruit-name">${escapeHtml(t.name)}</h3>
-      <p class="recruit-date">${escapeHtml(t.date || '開催日未定')}</p>
+      <h3 class="card-title">${escapeHtml(t.name)}</h3>
+      <p class="card-date">${escapeHtml(t.date || '開催日未定')}</p>
       ${t.status === 'draft' ? `<span class="status-chip status-draft">${STATUS_LABELS.draft}</span>` : ''}
     `;
 
-    card.append(thumb, body);
+    card.append(cardThumb(t.imageUrl, t.name), body);
     list.appendChild(card);
   });
 

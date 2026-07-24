@@ -35,6 +35,25 @@ export function avatarHtml(player, size = 'md') {
   return `<span class="avatar avatar-${size}">${escapeHtml(initialOf(player?.currentName))}</span>`;
 }
 
+// 一覧に並ぶカード（募集・大会履歴・お知らせ）の画像枠。
+//
+// 枠の高さは固定し、中の画像は切り抜かずに全体を収める。画像が無いときは
+// 見出しの頭文字で枠を埋めるので、画像の有無でカードの高さが変わらず一覧が乱れない。
+// tall は、詳細ページを持たず一覧が画像を見る唯一の場所になる用途（お知らせ）向け。
+export function cardThumb(imageUrl, fallbackName, { tall = false } = {}) {
+  const el = document.createElement('div');
+  el.className = `card-thumb${tall ? ' is-tall' : ''}`;
+
+  const url = safeUrl(imageUrl);
+  if (url) {
+    el.innerHTML = `<img src="${escapeHtml(url)}" alt="" loading="lazy">`;
+  } else {
+    el.classList.add('is-empty');
+    el.textContent = initialOf(fallbackName);
+  }
+  return el;
+}
+
 // 大会・お知らせの画像アップロード用ピッカー。HTML側に用意した
 // ファイル入力・プレビュー用img・「画像を外す」ボタンを配線する。
 // 大会作成／編集／お知らせの3フォームで同じ配線を使い回すためのもの。
