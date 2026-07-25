@@ -3,11 +3,19 @@
 Supabaseプロジェクトの作成とOAuthの登録は、あなたのアカウントでの操作が必要です。
 上から順に進めれば動く状態になります。所要時間は30分程度、費用はかかりません。
 
-公開URLはこの手順の中で何度も使うので、先に控えておいてください。
+公開URLはこの手順の中で何度も使います。Cloudflare Pagesで配信するので、URLは
 
 ```
-https://itodaichi1022.github.io/E-Sports-Ranking/
+https://（自分で決めたプロジェクト名）.pages.dev/
 ```
+
+の形になります（アカウント名は入りません）。プロジェクト名は手順5で決めるので、
+先にサイトを公開してURLを確定させてから、手順4-4でSupabaseに登録すると迷いません。
+
+> このリポジトリ内でGitHub PagesのURL（`itodaichi1022.github.io/...`）を使っているのは
+> この説明文だけです。コードはログイン後の戻り先を「今アクセスしているURL」から自動で
+> 組み立てる（[`js/supabaseClient.js`](../js/supabaseClient.js) の `redirectUrl`）ため、
+> 配信先を変えてもコードの書き換えは不要です。
 
 ---
 
@@ -92,18 +100,42 @@ Authentication → Emails から自前のSMTP（Resend、SendGrid等の無料枠
 
 **Authentication** → **URL Configuration**
 
-- **Site URL**: `https://itodaichi1022.github.io/E-Sports-Ranking/`
+- **Site URL**: `https://（自分のプロジェクト名）.pages.dev/`
 - **Redirect URLs**: 上と同じものを追加。ローカルで動作確認するなら `http://localhost:8000/` も追加しておく
 
 ここを設定しないと、ログイン後に元のサイトへ戻れません。
 
-## 5. GitHub Pagesで公開する
+> このURLは次の手順5でCloudflareがサイトをデプロイしたときに確定します。
+> 先に手順5を済ませて実際のURLをコピーしてから、ここに貼るのが確実です。
+> あとで独自ドメインを当てたら、そのURLもここに追加してください（複数登録できます）。
 
-1. GitHubのリポジトリ → **Settings** → **Pages**
-2. **Source** を `Deploy from a branch`、ブランチを `main` / `/ (root)` にして Save
-3. 数分待つと上記のURLで公開される
+## 5. Cloudflare Pagesで公開する
 
-ビルド工程は無いので、以後は `git push` するだけで反映されます。
+アカウント名がURLに出ないよう、GitHub PagesではなくCloudflare Pagesで配信します。
+URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デプロイされる点は同じです。
+
+1. https://dash.cloudflare.com にサインアップ（無料。メールアドレスだけで作れる）
+2. 左メニュー **Compute (Workers & Pages)** → **Create** → **Pages** タブ →
+   **Connect to Git**
+3. GitHubアカウントを連携し、このリポジトリ（`E-Sports-Ranking`）を選ぶ
+4. ビルド設定は**すべて空欄のまま**にする（ビルド工程が無い静的サイトなので）
+   - **Project name**: ここで入れた名前がURLになる（例 `esports-ranking` →
+     `https://esports-ranking.pages.dev/`）。アカウント名は入らない
+   - **Production branch**: `main`
+   - **Framework preset**: `None`
+   - **Build command**: 空欄
+   - **Build output directory**: `/`（リポジトリのルートをそのまま配信する）
+5. **Save and Deploy** を押す。1〜2分で `https://プロジェクト名.pages.dev/` に公開される
+6. 公開されたURLをコピーし、**手順4-4に戻ってSupabaseのSite URL / Redirect URLsへ登録する**
+
+以後は `main` に `git push` するたびに自動でデプロイされます。
+
+> **独自ドメインを当てる場合**（任意）：プロジェクトの **Custom domains** タブから
+> 追加できます。サブドメインすら見せたくない場合の選択肢です。当てたら、そのURLも
+> 手順4-4のRedirect URLsに追加してください。
+
+> **GitHub Pagesを既に有効にしていた場合**：混乱を避けるため、リポジトリの
+> Settings → Pages で Source を `None` にして無効化しておくとよいです（必須ではありません）。
 
 ## 6. 自分を運営者にする
 
@@ -196,7 +228,8 @@ python -m http.server 8000
 | 症状 | 原因と対処 |
 |---|---|
 | 「Supabaseの接続先が未設定です」 | 手順3が済んでいない。`js/supabaseClient.js` を確認 |
-| ログイン後に真っ白なページへ飛ぶ | 手順4-4のRedirect URLsに公開URLが入っていない |
+| ログイン後に真っ白なページへ飛ぶ | 手順4-4のRedirect URLsに、公開URL（`https://…​.pages.dev/`）が入っていない。デプロイ後にURLが確定するので、手順5の後に登録したか確認 |
+| Cloudflareで404になる／ページが出ない | 手順5でBuild output directoryが `/`（ルート）になっているか確認。ビルドコマンドは空欄でよい |
 | ログインはできるが編集ボタンが出ない | 手順6のroleが`admin`になっていない。書き換え後は再読み込みが必要 |
 | 「〜の権限がありません」 | RLSが正しく効いている状態。運営操作なら手順6を、本人の編集なら別アカウントでログインしていないか確認 |
 | データが一切読めない | プロジェクトが一時停止しているかもしれない。Supabaseダッシュボードを開くと再開する |

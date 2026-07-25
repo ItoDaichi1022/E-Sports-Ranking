@@ -12,7 +12,7 @@
 
 | 役割 | 使うもの |
 |---|---|
-| ホスティング | GitHub Pages |
+| ホスティング | Cloudflare Pages |
 | データベース・認証 | Supabase (PostgreSQL + Auth + RLS) |
 | 自動更新 | Supabase Realtime |
 | フロントエンド | 素のJavaScript（ESモジュール、**ビルド工程なし**） |

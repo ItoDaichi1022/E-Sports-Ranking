@@ -39,8 +39,9 @@ export const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON
   },
 });
 
-// OAuthのリダイレクト先。GitHub Pagesのサブディレクトリ配信でも正しく戻れるよう、
-// 現在のパスから組み立てる（ハッシュは落とす）。
+// OAuthのリダイレクト先。配信先（Cloudflare Pages・独自ドメイン・ローカル等）に
+// 依存せず正しく戻れるよう、今アクセスしているURLから組み立てる（ハッシュは落とす）。
+// サブディレクトリ配信でもそのパスを保つ。
 export function redirectUrl() {
   return `${location.origin}${location.pathname}`;
 }

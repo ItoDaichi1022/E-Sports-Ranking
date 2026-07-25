@@ -25,7 +25,7 @@ export const state = {
 
 // 新しいレコードのID。DB側の主キーがuuidなので、クライアントで作るIDもuuidに揃える。
 // crypto.randomUUID はセキュアコンテキスト（HTTPS / localhost）でのみ使えるが、
-// GitHub Pagesは常にHTTPSなので問題ない。
+// Cloudflare Pagesは常にHTTPSなので問題ない。
 export function newId() {
   return crypto.randomUUID();
 }
