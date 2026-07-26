@@ -834,20 +834,6 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   vertical-align: middle;
 }
 
-.you-badge {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 0.45rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: var(--r-pill);
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.68rem;
-  font-weight: 700;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
 .account-badge {
   padding: 0.15rem 0.55rem;
   border-radius: var(--r-pill);
@@ -888,6 +874,11 @@ table {
   width: 100%;
 }
 
+/* word-break: break-word は使わない。あれは「どの1文字の間でも折り返してよい」という
+   意味になり、表の列幅を決める計算上、この列は1文字分まで狭めてよいと判断される。
+   その結果、狭い画面で名前の列が極端に潰れて数文字ごとに改行されてしまう。
+   はみ出す長い文字列は overflow-wrap だけで折り返し、それでも収まらない表は
+   .table-scroll が横スクロールで受ける。 */
 th, td {
   padding: 0.7rem 0.9rem;
   text-align: left;
@@ -895,7 +886,6 @@ th, td {
   border: none;
   border-bottom: 1px solid var(--border-soft);
   overflow-wrap: break-word;
-  word-break: break-word;
 }
 
 /* 見出し行は固定しない。ページ側の sticky ヘッダーと重なって
@@ -1239,6 +1229,8 @@ a.card:hover {
   background: var(--surface-2);
   color: var(--text-dim);
   font-size: 0.82rem;
+  /* 名前が途中で折り返して1つの丸が2行にならないようにする */
+  white-space: nowrap;
 }
 
 
@@ -1719,13 +1711,18 @@ a.card:hover {
 
 /* ---- 自分の行の強調 ----
    ランキングや選手一覧で、自分がどこにいるか一目で分かるようにする。
-   色だけに頼らず「あなた」バッジも併記する（色覚特性でも伝わるように）。 */
+   バッジの文字は置かず、色で示す。ただし色だけだと色覚特性のある人に伝わらないので、
+   行頭の縦線（色ではなく形の手がかり）と太字は残してある。 */
 tr.own-row > td {
   background: var(--accent-soft) !important;
   font-weight: 600;
 }
 
 tr.own-row > td:first-child { box-shadow: inset 3px 0 0 var(--accent-bright); }
+
+/* 名前そのものにも色を付ける。行の背景だけだと、横スクロールする表では
+   名前の欄を見ているときに強調が視界から外れることがあるため。 */
+tr.own-row .player-identity a { color: var(--accent-bright); }
 
 tr.own-row:hover > td { background: rgba(109, 81, 232, 0.24) !important; }
 
@@ -1834,10 +1831,14 @@ dialog h3 {
   gap: 0.6rem;
 }
 
+/* 名前は途中で折り返さない。日本語は単語の区切りが無く、既定では文字と文字の間で
+   いくらでも改行できてしまうため、狭い画面だと「山田\n太郎」のように数文字で切れる。
+   1行に保ち、収まらないときは表ごと横スクロールさせる（.table-scroll）。 */
 .player-identity a {
   color: var(--text);
   text-decoration: none;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .player-identity a:hover { color: var(--accent-bright); }

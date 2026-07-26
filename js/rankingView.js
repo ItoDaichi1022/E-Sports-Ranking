@@ -50,7 +50,6 @@ export function renderRankingTable(containerEl, rankings, emptyMessage, ownPlaye
         <div class="player-identity">
           ${rankingAvatar(r)}
           <a href="#player/${encodeURIComponent(r.id)}">${escapeHtml(r.name)}</a>
-          ${isOwn ? '<span class="you-badge">あなた</span>' : ''}
         </div>
       </td>
       <td>${r.score.toFixed(1)}</td>

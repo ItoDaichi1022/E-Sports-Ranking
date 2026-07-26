@@ -99,12 +99,6 @@ export function renderPlayerTable(containerEl, options = {}) {
     link.href = `#player/${encodeURIComponent(p.id)}`;
     link.textContent = p.currentName;
     nameCell.appendChild(link);
-    if (ownPlayerId && p.id === ownPlayerId) {
-      const you = document.createElement('span');
-      you.className = 'you-badge';
-      you.textContent = 'あなた';
-      nameCell.appendChild(you);
-    }
     nameTd.appendChild(nameCell);
 
     tr.append(nameTd);

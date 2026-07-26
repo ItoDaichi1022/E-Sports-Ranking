@@ -984,7 +984,6 @@ function renderResultSection(tournament) {
           <div class="player-identity">
             ${avatarHtml(player ?? { currentName: name }, 'sm')}
             <a href="#player/${encodeURIComponent(s.playerId)}">${escapeHtml(name)}</a>
-            ${isOwn ? '<span class="you-badge">あなた</span>' : ''}
           </div>
         </td>
       </tr>
