@@ -115,20 +115,26 @@ Authentication → Emails から自前のSMTP（Resend、SendGrid等の無料枠
 URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デプロイされる点は同じです。
 
 1. https://dash.cloudflare.com にサインアップ（無料。メールアドレスだけで作れる）
-2. 左メニュー **Compute (Workers & Pages)** → **Create** → **Pages** タブ →
-   **Connect to Git**
+2. 左メニュー **Compute (Workers & Pages)** → **Create** → **Import a repository**
+   （＝Gitと連携する方式）
 3. GitHubアカウントを連携し、このリポジトリ（`E-Sports-Ranking`）を選ぶ
-4. ビルド設定は**すべて空欄のまま**にする（ビルド工程が無い静的サイトなので）
+4. 設定はほぼ既定のままでよい。ポイントは2つだけ
    - **Project name**: ここで入れた名前がURLになる（例 `esports-ranking` →
      `https://esports-ranking.pages.dev/`）。アカウント名は入らない
    - **Production branch**: `main`
-   - **Framework preset**: `None`
-   - **Build command**: 空欄
-   - **Build output directory**: `/`（リポジトリのルートをそのまま配信する）
-5. **Save and Deploy** を押す。1〜2分で `https://プロジェクト名.pages.dev/` に公開される
+   - ビルドコマンド・出力ディレクトリは触らなくてよい。配信対象とアップロード除外は
+     リポジトリ直下の [`wrangler.jsonc`](../wrangler.jsonc) と
+     [`.assetsignore`](../.assetsignore) に書いてあり、Cloudflareがそれを読む
+5. **Deploy** を押す。1〜2分で `https://プロジェクト名.pages.dev/` に公開される
 6. 公開されたURLをコピーし、**手順4-4に戻ってSupabaseのSite URL / Redirect URLsへ登録する**
 
 以後は `main` に `git push` するたびに自動でデプロイされます。
+
+> **なぜ設定ファイルが要るのか**：CloudflareのGit連携は内部で `wrangler deploy` を実行し、
+> リポジトリ直下を丸ごとアップロードしようとします。素のままだとビルド環境が生成する
+> `node_modules`（100MB超のバイナリを含む）まで巻き込み、1ファイル25MiBの上限で失敗します。
+> `.assetsignore` で `node_modules` などを除外し、`wrangler.jsonc` で配信対象を固定することで、
+> 実際にサイトが使う `index.html` / `css/` / `js/` だけが上がるようにしています。
 
 > **独自ドメインを当てる場合**（任意）：プロジェクトの **Custom domains** タブから
 > 追加できます。サブドメインすら見せたくない場合の選択肢です。当てたら、そのURLも

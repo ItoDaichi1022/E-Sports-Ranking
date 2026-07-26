@@ -1,0 +1,14 @@
+{
+  // Cloudflare へのデプロイ設定。
+  //
+  // このリポジトリはビルド工程を持たない純粋な静的サイトなので、Worker のコード（main）は
+  // 持たず、静的アセットだけを配信する。これを置いておくことで、Cloudflare 側の
+  // 対話セットアップ（毎回 wrangler.jsonc を生成し直す流れ）に頼らず設定が固定される。
+  //
+  // どのファイルを上げないかは同じ階層の .assetsignore で指定している（node_modules 等）。
+  "name": "esports-ranking",
+  "compatibility_date": "2026-07-26",
+  "assets": {
+    "directory": "."
+  }
+}

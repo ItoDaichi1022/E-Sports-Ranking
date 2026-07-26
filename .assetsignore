@@ -1,0 +1,21 @@
+# Cloudflare にアップロードする静的アセットから除外するもの（.gitignore と同じ書式）。
+#
+# このサイトが配信で実際に使うのは index.html と css/ js/ だけ（index.html が読むのは
+# css/style.css・js/vendor/supabase.js・js/app.js とその import 先のみ）。
+# それ以外――特にビルド環境が生成する node_modules――を上げてしまうと、
+# workerd（100MB超）のような巨大ファイルが 25MiB 上限に引っかかりデプロイが失敗する。
+
+node_modules
+
+# サイトの表示には使わない開発・運用用のファイル
+.git
+.gitignore
+.assetsignore
+wrangler.jsonc
+package.json
+scripts
+supabase
+doc
+data
+*.md
+.env
