@@ -56,6 +56,10 @@ function toTournament(row, participantIds) {
     name: row.name,
     date: row.date,
     format: row.format,
+    // ランキング反映の条件判定に使う対戦方法（js/rankingEligibility.js）。
+    // この機能より前に作られた大会は null で、対象外として扱われる。
+    matchType: row.match_type,
+    matchTypeNote: row.match_type_note ?? '',
     rules: row.rules,
     imageUrl: row.image_url ?? '',
     weight: row.weight,
@@ -404,6 +408,8 @@ export async function createTournament(tournament) {
       name: tournament.name,
       date: tournament.date || null,
       format: tournament.format ?? 'single_elim',
+      match_type: tournament.matchType || null,
+      match_type_note: tournament.matchTypeNote || null,
       rules: tournament.rules || null,
       image_url: tournament.imageUrl || null,
       status: tournament.status ?? 'draft',
@@ -423,6 +429,8 @@ export async function saveTournament(tournament) {
     .update({
       name: tournament.name,
       date: tournament.date || null,
+      match_type: tournament.matchType || null,
+      match_type_note: tournament.matchTypeNote || null,
       rules: tournament.rules || null,
       image_url: tournament.imageUrl || null,
       status: tournament.status,

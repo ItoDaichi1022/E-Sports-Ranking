@@ -1510,6 +1510,66 @@ a.card:hover {
   word-break: break-word;
 }
 
+/* ランキングに反映される大会かどうかの印。大会情報の先頭に置き、
+   条件を満たしていない場合は理由も一緒に見せる。
+   色だけに頼らず見出しの文言でも区別できるようにしている。 */
+.ranking-mark {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0 0 0.9rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-soft);
+  border-left-width: 4px;
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.ranking-mark-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ranking-mark-title::before {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.ranking-mark-note {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.ranking-mark-on {
+  border-left-color: var(--win);
+  background: rgba(67, 217, 163, 0.1);
+}
+
+.ranking-mark-on .ranking-mark-title {
+  color: var(--win);
+}
+
+.ranking-mark-on .ranking-mark-title::before {
+  content: "★";
+}
+
+.ranking-mark-off {
+  border-left-color: var(--border);
+}
+
+.ranking-mark-off .ranking-mark-title {
+  color: var(--text-faint);
+}
+
+.ranking-mark-off .ranking-mark-title::before {
+  content: "☆";
+}
+
 .tournament-rules {
   white-space: pre-wrap;
   overflow-wrap: break-word;

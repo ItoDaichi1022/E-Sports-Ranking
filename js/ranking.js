@@ -1,4 +1,5 @@
 import { bestAchievement } from './playerStats.js';
+import { isRankedTournament } from './rankingEligibility.js';
 
 // LumiRank軽量版：相手の強さで重み付けした反復スコアリングのみを残した最小実装。
 // doc/design.md の「7. ランキング方式」に準拠する。
@@ -61,20 +62,46 @@ export function filterMatchesByPeriod(state, periodMonths) {
   });
 }
 
+// 試合一覧から「選手ID -> 出場した大会IDのSet」を作る。
+function countTournamentsByPlayer(matches) {
+  const byPlayer = new Map();
+  matches.forEach((m) => {
+    [m.winnerId, m.loserId].forEach((id) => {
+      if (!byPlayer.has(id)) byPlayer.set(id, new Set());
+      byPlayer.get(id).add(m.tournamentId);
+    });
+  });
+  return byPlayer;
+}
+
 // state（players/tournaments/matches）からランキングを計算する。
 // 戻り値: [{ id, name, score, tournamentsPlayed, rank }] （スコア降順、足切り対象は除外）
+//
+// スコアの計算に使うのは「ランキング反映の条件を満たす大会」の試合だけ
+// （条件は js/rankingEligibility.js）。ただし好成績（bestAchievement）は
+// 条件を満たさない大会からも選ぶ。優勝は優勝として讃えたいが、少人数の大会や
+// チーム戦の勝敗までレートに混ぜると個人の実力指標として成り立たなくなるため。
 export function computeRankings(state) {
   const { matches, tournaments, players } = state;
 
+  const rankedTournamentIds = new Set(
+    tournaments.filter(isRankedTournament).map((t) => t.id),
+  );
+  const rankedMatches = matches.filter((m) => rankedTournamentIds.has(m.tournamentId));
+
   const participantIds = new Set();
-  matches.forEach((m) => {
+  rankedMatches.forEach((m) => {
     participantIds.add(m.winnerId);
     participantIds.add(m.loserId);
   });
   if (participantIds.size === 0) return [];
 
+  // 重みの平均は「実際に集計する大会」だけで取る。対象外の大会を混ぜると、
+  // 各試合の相対的な重み（rawWeight / avgWeight）が実態からずれる。
   const weightByTournament = new Map();
-  tournaments.forEach((t) => weightByTournament.set(t.id, getTournamentWeight(t)));
+  tournaments.forEach((t) => {
+    if (rankedTournamentIds.has(t.id)) weightByTournament.set(t.id, getTournamentWeight(t));
+  });
   const weightValues = [...weightByTournament.values()];
   const avgWeight = weightValues.length
     ? weightValues.reduce((a, b) => a + b, 0) / weightValues.length
@@ -87,7 +114,7 @@ export function computeRankings(state) {
     const sums = new Map();
     participantIds.forEach((id) => sums.set(id, { total: 0, count: 0 }));
 
-    matches.forEach((m) => {
+    rankedMatches.forEach((m) => {
       const rawWeight = weightByTournament.get(m.tournamentId) ?? avgWeight;
       const relativeWeight = avgWeight > 0 ? rawWeight / avgWeight : 1;
       const bonus = RANKING_CONFIG.kFactor * relativeWeight;
@@ -119,13 +146,11 @@ export function computeRankings(state) {
     if (maxDelta < RANKING_CONFIG.convergenceEpsilon) break;
   }
 
-  const tournamentsPlayedByPlayer = new Map();
-  matches.forEach((m) => {
-    [m.winnerId, m.loserId].forEach((id) => {
-      if (!tournamentsPlayedByPlayer.has(id)) tournamentsPlayedByPlayer.set(id, new Set());
-      tournamentsPlayedByPlayer.get(id).add(m.tournamentId);
-    });
-  });
+  // 足切り（minTournaments）と表示に使う出場大会数は、スコアの根拠と揃えて
+  // 反映対象の大会だけを数える。
+  const tournamentsPlayedByPlayer = countTournamentsByPlayer(rankedMatches);
+  // 好成績はスコアと違い、対象外の大会も含めて集計期間内の全出場大会から選ぶ。
+  const allTournamentsByPlayer = countTournamentsByPlayer(matches);
 
   const maxScore = Math.max(...scores.values());
   const scale = maxScore > 0 ? RANKING_CONFIG.scaleTarget / maxScore : 1;
@@ -133,14 +158,13 @@ export function computeRankings(state) {
   return [...participantIds]
     .map((id) => {
       const player = players.find((p) => p.id === id);
-      const playedTournamentIds = tournamentsPlayedByPlayer.get(id);
-      const tournamentsPlayed = playedTournamentIds?.size ?? 0;
+      const tournamentsPlayed = tournamentsPlayedByPlayer.get(id)?.size ?? 0;
       return {
         id,
         name: player ? player.currentName : id,
         score: scores.get(id) * scale,
         tournamentsPlayed,
-        bestAchievement: bestAchievement(id, playedTournamentIds),
+        bestAchievement: bestAchievement(id, allTournamentsByPlayer.get(id) ?? new Set()),
       };
     })
     .filter((r) => r.tournamentsPlayed >= RANKING_CONFIG.minTournaments)

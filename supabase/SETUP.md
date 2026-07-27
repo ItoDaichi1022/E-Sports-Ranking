@@ -193,6 +193,7 @@ node scripts/verify-migration.mjs
 | [`migration-003.sql`](migration-003.sql) | ホーム画面のお知らせ（`announcements` テーブル） |
 | [`migration-004.sql`](migration-004.sql) | 大会・お知らせの画像（`image_url` 列と `images` バケット） |
 | [`migration-005.sql`](migration-005.sql) | 確定した成績の保存（`tournament_entries.placement`） |
+| [`migration-006.sql`](migration-006.sql) | 大会の対戦方法（`tournaments.match_type`）＝ランキング反映の条件 |
 
 補足:
 
@@ -204,6 +205,9 @@ node scripts/verify-migration.mjs
 - **005 の `placement`** — 優勝・準優勝・ベストNを、結果を確定した時点でエントリー行に
   書き込みます。これが無いと、選手ページを開くだけで全大会の対戦表を読むことになり、
   無料枠の転送量をいちばん食っていました。既存の確定済み大会は実行時に埋め戻されます。
+- **006 の `match_type`** — 参加24人以上かつ1v1／リレーの大会だけをランキングのスコアに
+  反映するための列です。既存の大会は対戦方法が分からないため `null`（＝反映対象外）で
+  入ります。反映させたい大会は、大会詳細の「大会情報を編集」から対戦方法を選び直してください。
 
 ## 8. 後始末
 

@@ -1,4 +1,5 @@
 import { state, newId } from './state.js';
+import { MATCH_TYPE_KEYS } from './rankingEligibility.js';
 
 // 次の2のべき乗を返す（n=1の場合も2を返す：1人トーナメントは成立しないため呼び出し側で弾く）
 export function nextPowerOfTwo(n) {
@@ -200,13 +201,24 @@ export function editMatch(tournamentId, matchId) {
   return { ok: true };
 }
 
-// 大会の基本情報（名前・日付・定員・ルール）を修正する。募集中でも変更できる。
-export function updateTournament(tournamentId, { name, date, rules, capacity }) {
+// 大会の基本情報（名前・日付・対戦方法・定員・ルール）を修正する。募集中でも変更できる。
+export function updateTournament(
+  tournamentId, { name, date, matchType, matchTypeNote, rules, capacity },
+) {
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) return { ok: false, error: '対象の大会が見つかりません。' };
 
   const newName = name.trim();
   if (!newName) return { ok: false, error: '大会名を入力してください。' };
+
+  if (matchType !== undefined) {
+    if (matchType && !MATCH_TYPE_KEYS.includes(matchType)) {
+      return { ok: false, error: '対戦方法の選択が正しくありません。' };
+    }
+    tournament.matchType = matchType || null;
+    // 説明は「その他」のときだけ意味を持つ。選び直したら残骸を残さない。
+    tournament.matchTypeNote = matchType === 'other' ? (matchTypeNote ?? '').trim() : '';
+  }
 
   if (capacity !== undefined) {
     if (capacity !== null && (!Number.isInteger(capacity) || capacity < 2)) {

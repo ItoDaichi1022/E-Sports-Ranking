@@ -10,6 +10,7 @@ import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
 import { getPlayerStats, championOfTournament } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
+import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
 import { renderProfileForm, profileSectionHtml, isProfileFormMounted } from './profile.js';
 import { renderRecruitPage, renderTournamentActions, STATUS_LABELS } from './entries.js';
 import {
@@ -48,6 +49,9 @@ const tournamentDateInput = $('tournament-date-input');
 const tournamentCapacityInput = $('tournament-capacity-input');
 const tournamentRulesInput = $('tournament-rules-input');
 const tournamentSubmitBtn = $('tournament-submit-btn');
+const tournamentMatchTypeInput = $('tournament-match-type-input');
+const tournamentMatchTypeNoteField = $('tournament-match-type-note-field');
+const tournamentMatchTypeNoteInput = $('tournament-match-type-note-input');
 
 // 大会作成・大会編集・お知らせの画像アップロード。HTML側の入力を配線する。
 const tournamentImagePicker = setupImagePicker({
@@ -79,6 +83,9 @@ const tournamentEditNameInput = $('tournament-edit-name-input');
 const tournamentEditDateInput = $('tournament-edit-date-input');
 const tournamentEditRulesInput = $('tournament-edit-rules-input');
 const tournamentEditCancelBtn = $('tournament-edit-cancel-btn');
+const tournamentEditMatchTypeInput = $('tournament-edit-match-type-input');
+const tournamentEditMatchTypeNoteField = $('tournament-edit-match-type-note-field');
+const tournamentEditMatchTypeNoteInput = $('tournament-edit-match-type-note-input');
 const tournamentInfoEl = $('tournament-info');
 const tournamentActionsEl = $('tournament-actions');
 const tournamentHeroEl = $('tournament-hero');
@@ -522,7 +529,7 @@ function shuffleSelected() {
 function seedBySelectedRanking() {
   const rankings = computeRankings(state);
   if (rankings.length === 0) {
-    alert('確定した試合がまだないため、ランキング順には並び替えられません。');
+    alert('ランキング反映対象の大会に確定した試合がまだないため、ランキング順には並び替えられません。');
     return;
   }
   const rankIndex = new Map(rankings.map((r) => [r.id, r.rank]));
@@ -742,6 +749,35 @@ function renderHero(el, imageUrl) {
   }
 }
 
+// ランキングに反映される大会かどうかの印。条件（24人以上・1v1／リレー）は
+// 大会の内容で決まるので、満たしていない場合は何が足りないかもそのまま出す。
+// 募集中の大会では人数が増えて条件を満たすことがあるため、見出しの文言を変える。
+function rankingEligibilityHtml(tournament) {
+  const { ranked, reasons } = rankingEligibility(tournament);
+  const settled = tournament.status === 'finished';
+
+  if (ranked) {
+    const title = settled ? 'ランキング反映済み' : 'ランキング反映対象';
+    return `
+      <div class="ranking-mark ranking-mark-on">
+        <span class="ranking-mark-title">${title}</span>
+        <span class="ranking-mark-note">この大会の試合はランキングのスコアに反映されます。</span>
+      </div>
+    `;
+  }
+
+  const title = settled ? 'ランキング反映なし' : 'ランキング反映対象外';
+  return `
+    <div class="ranking-mark ranking-mark-off">
+      <span class="ranking-mark-title">${title}</span>
+      <span class="ranking-mark-note">
+        条件（参加${RANKED_MIN_PARTICIPANTS}人以上・対戦方法が1v1かリレー）を満たしていません：
+        ${escapeHtml(reasons.join(' / '))}
+      </span>
+    </div>
+  `;
+}
+
 function renderTournamentInfo(tournament) {
   const formatLabel = FORMAT_LABELS[tournament.format] || tournament.format;
   const countLabel = tournament.capacity == null
@@ -750,9 +786,11 @@ function renderTournamentInfo(tournament) {
 
   let html = `
     <h3>大会情報</h3>
+    ${rankingEligibilityHtml(tournament)}
     <dl class="tournament-info-grid">
       <div><dt>${tournament.status === 'recruiting' ? 'エントリー' : '参加人数'}</dt><dd>${escapeHtml(countLabel)}</dd></div>
       <div><dt>規模</dt><dd>${tournamentTier(tournament.participantIds.length)}</dd></div>
+      <div><dt>対戦方法</dt><dd>${escapeHtml(matchTypeLabel(tournament))}</dd></div>
       <div><dt>形式</dt><dd>${escapeHtml(formatLabel)}</dd></div>
       <div><dt>開催日</dt><dd>${escapeHtml(tournament.date || '日付未設定')}</dd></div>
       <div><dt>進行状況</dt><dd>${escapeHtml(tournamentStatusLabel(tournament))}</dd></div>
@@ -1051,7 +1089,7 @@ function renderRankingPage() {
     renderRankingTable(
       rankingContainer,
       previewWithChange,
-      'この期間に確定した試合がまだないため、ランキングを計算できません。',
+      'この期間にランキング反映対象の大会の試合がないため、ランキングを計算できません。',
       auth.player?.id ?? null,
     );
   } else {
@@ -1327,12 +1365,31 @@ rankingPublishBtn.addEventListener('click', async () => {
   );
 });
 
+// 「その他」を選んだときだけ説明欄を出す。他の選択肢では書いても表示に使われない。
+function bindMatchTypeNoteToggle(select, field) {
+  const sync = () => { field.hidden = select.value !== 'other'; };
+  select.addEventListener('change', sync);
+  return sync;
+}
+const syncMatchTypeNote = bindMatchTypeNoteToggle(
+  tournamentMatchTypeInput, tournamentMatchTypeNoteField,
+);
+const syncEditMatchTypeNote = bindMatchTypeNoteToggle(
+  tournamentEditMatchTypeInput, tournamentEditMatchTypeNoteField,
+);
+
 tournamentForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const name = tournamentNameInput.value.trim();
   if (!name) {
     alert('大会名を入力してください。');
+    return;
+  }
+
+  const matchType = tournamentMatchTypeInput.value;
+  if (!matchType) {
+    alert('対戦方法を選んでください。');
     return;
   }
 
@@ -1354,6 +1411,8 @@ tournamentForm.addEventListener('submit', async (e) => {
     name,
     date: tournamentDateInput.value || null,
     format: 'single_elim',
+    matchType,
+    matchTypeNote: matchType === 'other' ? tournamentMatchTypeNoteInput.value.trim() : '',
     rules: tournamentRulesInput.value.trim() || null,
     imageUrl: '',
     weight: null,
@@ -1389,6 +1448,9 @@ tournamentForm.addEventListener('submit', async (e) => {
 
   tournamentNameInput.value = '';
   tournamentDateInput.value = '';
+  tournamentMatchTypeInput.value = '';
+  tournamentMatchTypeNoteInput.value = '';
+  syncMatchTypeNote();
   tournamentCapacityInput.value = '';
   tournamentRulesInput.value = '';
   tournamentImagePicker.setCurrent('');
@@ -1403,6 +1465,9 @@ tournamentEditBtn.addEventListener('click', () => {
   if (!tournament) return;
   tournamentEditNameInput.value = tournament.name;
   tournamentEditDateInput.value = tournament.date || '';
+  tournamentEditMatchTypeInput.value = tournament.matchType || '';
+  tournamentEditMatchTypeNoteInput.value = tournament.matchTypeNote || '';
+  syncEditMatchTypeNote();
   tournamentEditCapacityInput.value = tournament.capacity ?? '';
   tournamentEditRulesInput.value = tournament.rules || '';
   tournamentEditImagePicker.setCurrent(tournament.imageUrl || '');
@@ -1416,10 +1481,17 @@ tournamentEditCancelBtn.addEventListener('click', () => {
 tournamentEditForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
+  if (!tournamentEditMatchTypeInput.value) {
+    alert('対戦方法を選んでください。');
+    return;
+  }
+
   const capacityRaw = tournamentEditCapacityInput.value.trim();
   const result = updateTournament(currentBracketTournamentId, {
     name: tournamentEditNameInput.value,
     date: tournamentEditDateInput.value,
+    matchType: tournamentEditMatchTypeInput.value,
+    matchTypeNote: tournamentEditMatchTypeNoteInput.value,
     rules: tournamentEditRulesInput.value,
     capacity: capacityRaw === '' ? null : Number(capacityRaw),
   });

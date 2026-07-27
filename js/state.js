@@ -5,7 +5,8 @@ export const state = {
   // { id, currentName, pastNames: [], gameAccountId, bio, mainCharacters: [],
   //   snsX, snsTwitch, snsYoutube, role, userId }
   players: [],
-  // { id, name, date, format, participantIds: [], weight, rules, imageUrl, status, capacity }
+  // { id, name, date, format, matchType, matchTypeNote, participantIds: [], weight, rules,
+  //   imageUrl, status, capacity }
   tournaments: [],
   matches: [],        // { id, tournamentId, winnerId, loserId, score, round }
 

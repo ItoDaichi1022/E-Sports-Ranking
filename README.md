@@ -37,6 +37,7 @@ js/
   bracket.js           ブラケットの生成と勝敗の確定
   bracketView.js       ブラケットの描画
   ranking.js           ランキング計算（LumiRank軽量版）
+  rankingEligibility.js 大会をランキングに反映するかの条件（24人以上・1v1／リレー）
   playerStats.js       選手ごとの戦績集計
   entries.js           募集ページとエントリー
   profile.js           プロフィールの入力と表示

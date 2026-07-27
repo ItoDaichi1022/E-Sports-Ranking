@@ -43,6 +43,11 @@ create table if not exists tournaments (
   name       text not null,
   date       date,
   format     text not null default 'single_elim',
+  -- 対戦方法。'1v1' / 'relay' はランキング反映の対象、'2v2' / 'other' は対象外
+  -- （条件は js/rankingEligibility.js）。null はこの列より前に作られた大会で、対象外扱い。
+  match_type      text,
+  -- match_type = 'other' のときだけ意味を持つ、運営が書いた対戦方法の説明
+  match_type_note text,
   rules      text,
   -- 大会のバナー画像。Storageの images バケットに置いた公開URL
   image_url  text,
@@ -55,6 +60,7 @@ create table if not exists tournaments (
   created_at timestamptz not null default now(),
   constraint tournaments_status_check check (status in ('draft', 'recruiting', 'running', 'finished')),
   constraint tournaments_format_check check (format in ('single_elim', 'double_elim', 'round_robin')),
+  constraint tournaments_match_type_check check (match_type is null or match_type in ('1v1', 'relay', '2v2', 'other')),
   constraint tournaments_capacity_check check (capacity is null or capacity >= 2),
   constraint tournaments_name_not_blank check (btrim(name) <> '')
 );

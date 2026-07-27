@@ -8,7 +8,7 @@
 <title>トーナメント運営ツール</title>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=55">
+<link rel="stylesheet" href="css/style.css?v=56">
 </head>
 <body>
 <header>
@@ -173,6 +173,22 @@
         開催日
         <input type="date" id="tournament-date-input">
       </label>
+      <!-- 対戦方法はランキング反映の条件になる（24人以上 かつ 1v1／リレー）。
+           あとから変えられるが、既定を空にして運営に必ず選ばせる。 -->
+      <label>
+        対戦方法
+        <select id="tournament-match-type-input" required>
+          <option value="">選択してください</option>
+          <option value="1v1">1v1（ランキング反映対象）</option>
+          <option value="relay">リレー（ランキング反映対象）</option>
+          <option value="2v2">2v2</option>
+          <option value="other">その他</option>
+        </select>
+      </label>
+      <label id="tournament-match-type-note-field" hidden>
+        対戦方法の説明
+        <input type="text" id="tournament-match-type-note-input" placeholder="例: 3人チーム戦">
+      </label>
       <label>
         定員（任意・空欄なら無制限）
         <input type="number" id="tournament-capacity-input" min="2" placeholder="例: 32">
@@ -260,6 +276,20 @@
         <input type="date" id="tournament-edit-date-input">
       </label>
       <label>
+        対戦方法
+        <select id="tournament-edit-match-type-input" required>
+          <option value="">選択してください</option>
+          <option value="1v1">1v1（ランキング反映対象）</option>
+          <option value="relay">リレー（ランキング反映対象）</option>
+          <option value="2v2">2v2</option>
+          <option value="other">その他</option>
+        </select>
+      </label>
+      <label id="tournament-edit-match-type-note-field" hidden>
+        対戦方法の説明
+        <input type="text" id="tournament-edit-match-type-note-input" placeholder="例: 3人チーム戦">
+      </label>
+      <label>
         定員（任意・空欄なら無制限）
         <input type="number" id="tournament-edit-capacity-input" min="2" placeholder="例: 32">
       </label>
@@ -332,6 +362,10 @@
 
   <section id="view-ranking" class="view" hidden>
     <h2>ランキング</h2>
+    <p class="note">
+      スコアに反映されるのは「参加24人以上」かつ「対戦方法が1v1またはリレー」の大会の試合です。
+      対象かどうかは各大会の詳細ページに表示されます。
+    </p>
     <div id="ranking-editor" class="inline-form" hidden>
       <label>
         集計対象期間
@@ -358,7 +392,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=55"></script>
+<script src="js/vendor/supabase.js?v=56"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -370,24 +404,25 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=55",
-    "./js/bracket.js":        "./js/bracket.js?v=55",
-    "./js/bracketView.js":    "./js/bracketView.js?v=55",
-    "./js/db.js":             "./js/db.js?v=55",
-    "./js/entries.js":        "./js/entries.js?v=55",
-    "./js/playerStats.js":    "./js/playerStats.js?v=55",
-    "./js/players.js":        "./js/players.js?v=55",
-    "./js/profile.js":        "./js/profile.js?v=55",
-    "./js/ranking.js":        "./js/ranking.js?v=55",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=55",
-    "./js/rankingView.js":    "./js/rankingView.js?v=55",
-    "./js/state.js":          "./js/state.js?v=55",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=55",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=55",
-    "./js/util.js":           "./js/util.js?v=55"
+    "./js/auth.js":           "./js/auth.js?v=56",
+    "./js/bracket.js":        "./js/bracket.js?v=56",
+    "./js/bracketView.js":    "./js/bracketView.js?v=56",
+    "./js/db.js":             "./js/db.js?v=56",
+    "./js/entries.js":        "./js/entries.js?v=56",
+    "./js/playerStats.js":    "./js/playerStats.js?v=56",
+    "./js/players.js":        "./js/players.js?v=56",
+    "./js/profile.js":        "./js/profile.js?v=56",
+    "./js/ranking.js":        "./js/ranking.js?v=56",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=56",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=56",
+    "./js/rankingView.js":    "./js/rankingView.js?v=56",
+    "./js/state.js":          "./js/state.js?v=56",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=56",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=56",
+    "./js/util.js":           "./js/util.js?v=56"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=55"></script>
+<script type="module" src="js/app.js?v=56"></script>
 </body>
 </html>
