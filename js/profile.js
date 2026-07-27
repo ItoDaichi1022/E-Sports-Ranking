@@ -8,28 +8,59 @@ function parseCharacters(text) {
   return text.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
+// SNS欄に入れられるドメインの白名簿。
+//
+// どんなURLでも受けてしまうと、プロフィールが外部サイトへの誘導（ウイルスの配布や
+// フィッシング）に使われてしまう。「Xの欄にはXのURLしか入らない」と決めることで、
+// リンク先をこちらが把握しているドメインに限定する。
+const SNS_SERVICES = {
+  x: {
+    label: 'X',
+    hosts: ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com', 'mobile.twitter.com'],
+    example: 'https://x.com/yourname',
+    handleUrl: (handle) => `https://x.com/${handle}`,
+  },
+  youtube: {
+    label: 'YouTube',
+    hosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'],
+    example: 'https://youtube.com/@yourname',
+    handleUrl: (handle) => `https://youtube.com/@${handle}`,
+  },
+};
+
 // URLでもハンドル名でも受け付け、表示用のリンク先に整える。
+// そのサービスのURLでない場合は null を返し、呼び出し側でリンクを出さない。
 function socialUrl(kind, value) {
+  const service = SNS_SERVICES[kind];
   const trimmed = (value ?? '').trim();
-  if (!trimmed) return null;
-  if (/^https?:\/\//i.test(trimmed)) return safeUrl(trimmed);
+  if (!service || !trimmed) return null;
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    const href = safeUrl(trimmed); // http / https 以外はここで落ちる
+    if (!href) return null;
+
+    const { hostname, username, password } = new URL(href);
+    // user:pass@host の形は、見た目のドメインと実際の宛先が食い違うので受けない
+    // （https://x.com@example.com/ の宛先は example.com）。
+    if (username || password) return null;
+
+    // 完全一致で照合する。部分一致にすると x.com.example.com や
+    // notyoutube.com のような紛らわしいドメインを通してしまう。
+    return service.hosts.includes(hostname.toLowerCase()) ? href : null;
+  }
 
   const handle = trimmed.replace(/^@/, '');
   if (!/^[\w.-]+$/.test(handle)) return null;
-  if (kind === 'x') return `https://x.com/${handle}`;
-  if (kind === 'twitch') return `https://twitch.tv/${handle}`;
-  if (kind === 'youtube') return `https://youtube.com/@${handle}`;
-  return null;
+  return service.handleUrl(handle);
 }
 
 const FIELDS = [
   { key: 'currentName', label: '表示名', required: true, placeholder: '例: Gyu',
     note: '変更すると、以前の名前は「過去名」として選手ページに残ります。' },
   { key: 'gameAccountId', label: 'ゲームアカウントID', placeholder: '例: SW-1234-5678-9012' },
-  { key: 'mainCharacters', label: '使用キャラクター', placeholder: '例: マリオ, リンク（カンマ区切り）' },
-  { key: 'snsX', label: 'X', placeholder: '@handle または URL' },
-  { key: 'snsTwitch', label: 'Twitch', placeholder: 'handle または URL' },
-  { key: 'snsYoutube', label: 'YouTube', placeholder: '@handle または URL' },
+  { key: 'mainCharacters', label: '使用キャラクター', placeholder: '例: シビ, ソフィア（カンマ区切り）' },
+  { key: 'snsX', label: 'X', placeholder: '@handle または https://x.com/...' },
+  { key: 'snsYoutube', label: 'YouTube', placeholder: '@handle または https://youtube.com/...' },
 ];
 
 // フォームを作り直さずに、現在の入力内容だけを取り出せるようにしておく。
@@ -182,6 +213,22 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
       return;
     }
 
+    // SNSは保存する前に確かめる。表示側でも弾いているが、それだけだと
+    // 「保存できたのに選手ページに出ない」となり、原因が分からない。
+    const snsX = form.elements.snsX.value.trim();
+    const snsYoutube = form.elements.snsYoutube.value.trim();
+    const badField = [['x', snsX], ['youtube', snsYoutube]]
+      .find(([kind, value]) => value && !socialUrl(kind, value));
+    if (badField) {
+      const service = SNS_SERVICES[badField[0]];
+      setMessage(
+        `${service.label}の欄には、${service.label}のURL（例: ${service.example}）`
+        + 'か @ハンドル名 を入力してください。他のサイトのURLは登録できません。',
+        'error',
+      );
+      return;
+    }
+
     const originalLabel = submitBtn.textContent;
     submitBtn.disabled = true;
     submitBtn.textContent = '送信中...';
@@ -191,9 +238,8 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
         currentName: name,
         gameAccountId: form.elements.gameAccountId.value.trim(),
         mainCharacters: parseCharacters(form.elements.mainCharacters.value),
-        snsX: form.elements.snsX.value.trim(),
-        snsTwitch: form.elements.snsTwitch.value.trim(),
-        snsYoutube: form.elements.snsYoutube.value.trim(),
+        snsX,
+        snsYoutube,
         bio: bio.value.trim(),
         // アイコンは呼び出し側でアップロードする（DBアクセスをここに持ち込まない）
         avatarFile: pickedFile,
@@ -223,7 +269,6 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
 export function profileSectionHtml(player) {
   const links = [
     ['X', socialUrl('x', player.snsX)],
-    ['Twitch', socialUrl('twitch', player.snsTwitch)],
     ['YouTube', socialUrl('youtube', player.snsYoutube)],
   ].filter(([, url]) => url);
 

@@ -40,7 +40,6 @@
 </header>
 
 <dialog id="login-dialog">
-  <!-- ログイン。既定はこちらを出す。 -->
   <div id="login-panel">
     <h3>ログイン</h3>
     <p class="note">ログインすると自分の選手プロフィールを編集し、大会にエントリーできます。</p>
@@ -50,33 +49,7 @@
       <button type="button" id="discord-login-btn" class="btn-secondary">Discordでログイン</button>
     </div>
 
-    <p class="divider-note">またはメールアドレスで</p>
-
-    <form id="email-form">
-      <input type="email" id="email-input" placeholder="メールアドレス" autocomplete="email" required>
-      <input type="password" id="password-input" placeholder="パスワード" autocomplete="current-password" required>
-      <p id="login-error" class="status-line error"></p>
-      <div class="dialog-actions">
-        <button type="submit" id="email-login-btn">ログイン</button>
-      </div>
-    </form>
-  </div>
-
-  <!-- 新規登録。ログインを試して入れなかったときに、入力済みのメールアドレスを
-       引き継いでこちらへ切り替える。 -->
-  <div id="signup-panel" hidden>
-    <h3>新規登録</h3>
-    <p class="note" id="signup-note"></p>
-
-    <form id="signup-form">
-      <input type="email" id="signup-email-input" placeholder="メールアドレス" autocomplete="email" required>
-      <input type="password" id="signup-password-input" placeholder="パスワード（6文字以上）" autocomplete="new-password" minlength="6" required>
-      <p id="signup-error" class="status-line error"></p>
-      <div class="dialog-actions">
-        <button type="button" id="signup-back-btn" class="btn-secondary">ログインに戻る</button>
-        <button type="submit" id="signup-submit-btn">登録する</button>
-      </div>
-    </form>
+    <p id="login-error" class="status-line error"></p>
   </div>
 
   <div class="dialog-actions">
@@ -175,7 +148,6 @@
       <div class="oauth-buttons">
         <button type="button" id="profile-google-btn" class="btn-secondary">Googleでログイン</button>
         <button type="button" id="profile-discord-btn" class="btn-secondary">Discordでログイン</button>
-        <button type="button" id="profile-email-btn" class="btn-secondary">メールアドレスでログイン / 新規登録</button>
       </div>
       <p id="profile-login-error" class="status-line error"></p>
     </div>

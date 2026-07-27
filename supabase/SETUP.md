@@ -64,14 +64,10 @@ export const SUPABASE_ANON_KEY = 'eyJhbGci...';
 
 左メニューの **Authentication** → **Sign In / Providers** で設定します。
 
-### 4-1. メール＋パスワード
+ログインはGoogleとDiscordのみです。**Email** プロバイダは無効にしておいてください
+（アプリ側にメール＋パスワードの入力欄はありません）。
 
-**Email** を有効にするだけです。追加設定は要りません。
-
-確認メールは無料枠だと1時間あたり数通に制限されています。人数が増えて足りなくなったら、
-Authentication → Emails から自前のSMTP（Resend、SendGrid等の無料枠）を設定してください。
-
-### 4-2. Google
+### 4-1. Google
 
 1. https://console.cloud.google.com/apis/credentials を開く
 2. プロジェクトが無ければ作る（無料）
@@ -85,7 +81,7 @@ Authentication → Emails から自前のSMTP（Resend、SendGrid等の無料枠
    （`xxxxxxxx` は自分のプロジェクトのもの。Supabaseの Providers → Google 画面にも同じURLが表示されています）
 5. 発行された **クライアント ID** と **クライアント シークレット** を、Supabaseの Providers → Google に貼って有効化
 
-### 4-3. Discord
+### 4-2. Discord
 
 1. https://discord.com/developers/applications で「New Application」
 2. 左メニュー **OAuth2** → **Redirects** に同じコールバックURLを追加
@@ -96,7 +92,7 @@ Authentication → Emails から自前のSMTP（Resend、SendGrid等の無料枠
 
 3. **Client ID** と **Client Secret**（Reset Secret で発行）を、Supabaseの Providers → Discord に貼って有効化
 
-### 4-4. 戻り先URLを登録する
+### 4-3. 戻り先URLを登録する
 
 **Authentication** → **URL Configuration**
 

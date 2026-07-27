@@ -41,7 +41,8 @@ export function canRemovePlayer(id) {
 // options:
 //   ownPlayerId      -> ログイン中の本人の選手ID。その行を目立たせる
 //   isAdmin          -> 削除・アカウント統合などの運営操作を出すか
-//   filterQuery      -> 表示名・過去名の部分一致で絞り込む（改名しても見つかるように過去名も対象）
+//   filterQuery      -> 表示名・過去名の部分一致で絞り込む（改名しても見つかるように過去名も対象）。
+//                        空のときは一覧を出さず、検索を促す案内だけ表示する
 //   onDelete(player) -> 削除するとき
 //   onMerge(source, target) -> 代理登録された行に本人のアカウントを統合するとき
 export function renderPlayerTable(containerEl, options = {}) {
@@ -61,11 +62,14 @@ export function renderPlayerTable(containerEl, options = {}) {
   }
 
   const query = filterQuery.trim().toLowerCase();
-  const visiblePlayers = query
-    ? state.players.filter((p) =>
-        p.currentName.toLowerCase().includes(query)
-        || p.pastNames.some((n) => n.toLowerCase().includes(query)))
-    : state.players;
+  if (!query) {
+    containerEl.innerHTML = '<p class="empty-hint">選手名を入力すると検索できます。</p>';
+    return;
+  }
+
+  const visiblePlayers = state.players.filter((p) =>
+    p.currentName.toLowerCase().includes(query)
+    || p.pastNames.some((n) => n.toLowerCase().includes(query)));
 
   if (visiblePlayers.length === 0) {
     containerEl.innerHTML = '<p class="empty-hint">検索条件に一致する選手がいません。</p>';

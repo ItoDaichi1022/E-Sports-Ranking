@@ -1774,28 +1774,6 @@ dialog h3 {
 
 .oauth-buttons button { width: 100%; }
 
-.divider-note {
-  margin: 1rem 0 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-align: center;
-  color: var(--text-faint);
-}
-
-#email-form input,
-#signup-form input {
-  width: 100%;
-  margin-bottom: 0.6rem;
-}
-
-/* 新規登録は「ログインできなかった理由」の説明を読ませたいので、
-   案内文を通常のnoteより見やすくする。 */
-#signup-note {
-  margin-top: 0;
-  line-height: 1.7;
-}
-
 /* ---------------------------------------------------------------------------
    アイコン
    --------------------------------------------------------------------------- */

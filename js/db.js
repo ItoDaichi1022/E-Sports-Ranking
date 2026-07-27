@@ -26,6 +26,8 @@ function toPlayer(row) {
     avatarUrl: row.avatar_url ?? '',
     mainCharacters: row.main_characters ?? [],
     snsX: row.sns_x ?? '',
+    // snsTwitch は入力欄・表示のどちらからも外したが、既に登録されている値を
+    // 保存のたびに消してしまわないよう、読み書きだけは残している。
     snsTwitch: row.sns_twitch ?? '',
     snsYoutube: row.sns_youtube ?? '',
     role: row.role ?? 'player',

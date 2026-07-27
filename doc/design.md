@@ -20,7 +20,7 @@
 |------|----------|------|
 | ホスティング | Cloudflare Pages | 無料・帯域無制限。ビルド工程なし。URLにアカウント名が出ない |
 | データベース | Supabase (PostgreSQL) | 無料枠500MB |
-| 認証 | Supabase Auth | Google / Discord / メール＋パスワード |
+| 認証 | Supabase Auth | Google / Discord（OAuthのみ） |
 | アクセス制御 | 行レベルセキュリティ (RLS) | 閲覧は全員、書き込みは本人と運営に限定 |
 | 自動更新 | Supabase Realtime | 変更が全端末へプッシュされる |
 | ランキング計算 | ブラウザ内 JavaScript | サーバー計算不要 |
@@ -248,4 +248,3 @@ BEFORE INSERTだったが、次の2つの不具合があった。
 ## 11. 今後詰める点
 
 - 大会規模 `weight` の具体的な算出式（当面は参加人数から暫定算出）
-- 参加人数が増えた場合の確認メール送信上限（自前SMTPへの切り替え）
