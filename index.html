@@ -108,15 +108,15 @@
     この対戦は結果が確定したため、書き込みはできません。
   </p>
 
-  <!-- 当事者が自分の対戦のゲームカウントを入れる場所。
-       相手が承認して初めて確定する（中身は js/matchChat.js）。 -->
-  <div id="match-chat-result" class="chat-result" hidden></div>
-
   <form id="match-chat-form" class="chat-form">
     <input type="text" id="match-chat-input" maxlength="500"
            placeholder="メッセージを入力" autocomplete="off" aria-label="メッセージ">
     <button type="submit" id="match-chat-send-btn">送信</button>
   </form>
+
+  <!-- 当事者が自分の対戦のゲームカウントを入れる場所。
+       相手が承認して初めて確定する（中身は js/matchChat.js）。 -->
+  <div id="match-chat-result" class="chat-result" hidden></div>
 
   <!-- もめたときに運営へ知らせる。押すと一言添える欄が開く。 -->
   <form id="match-chat-report-form" class="chat-report-form" hidden>
