@@ -150,10 +150,10 @@ function playerLabel(player) {
 }
 
 // 相方を選ぶ欄。選択肢が数十人になるとドロップダウンから探すのが辛いので、
-// 大会作成画面の参加者選び（js/app.js の renderParticipantCheckboxes）と同じく
-// 「検索して絞り込み、一覧から選ぶ」形にする。
+// 名前かゲームIDで検索して選ぶ形にする。
 //
-// 選んだ相手は検索で一覧から消えても分かるよう、常に上に出しておく。
+// 検索欄が空のうちは候補を出さない。選んだ相手は一覧から消えても分かるよう、
+// 常に上に出しておく。
 function partnerPicker(candidates) {
   const wrap = document.createElement('div');
   wrap.className = 'partner-picker';
@@ -185,10 +185,16 @@ function partnerPicker(candidates) {
     list.innerHTML = '';
 
     const query = search.value.trim().toLowerCase();
-    const visible = query
-      ? candidates.filter((p) => p.currentName.toLowerCase().includes(query)
-        || (p.gameAccountId ?? '').toLowerCase().includes(query))
-      : candidates;
+
+    // 何も打っていないうちは候補を出さない。全員を並べても目当ての人は結局探せず、
+    // たまたま先頭に来た人を押し間違えるほうが起きやすいため。
+    if (!query) {
+      list.innerHTML = '<p class="empty-hint">名前かゲームIDを入力すると候補が出ます。</p>';
+      return;
+    }
+
+    const visible = candidates.filter((p) => p.currentName.toLowerCase().includes(query)
+      || (p.gameAccountId ?? '').toLowerCase().includes(query));
 
     if (visible.length === 0) {
       list.innerHTML = '<p class="empty-hint">条件に一致する選手がいません。</p>';
