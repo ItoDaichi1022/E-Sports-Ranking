@@ -49,8 +49,8 @@ function buildPlayerRow({ seed, name, members = [], isWinner }) {
   else seedBadge.classList.add('seed-badge-empty');
 
   // チーム名だけだと誰が出ているか分からないので、メンバー名を小さく添える
-  const nameSpan = document.createElement('span');
-  nameSpan.className = 'player-name';
+  const nameEl = document.createElement('div');
+  nameEl.className = 'player-name';
   if (members.length > 0) {
     const teamName = document.createElement('span');
     teamName.className = 'entrant-team-name';
@@ -60,16 +60,16 @@ function buildPlayerRow({ seed, name, members = [], isWinner }) {
     memberLine.className = 'entrant-members';
     memberLine.textContent = members.join(' / ');
 
-    nameSpan.append(teamName, memberLine);
+    nameEl.append(teamName, memberLine);
   } else {
-    nameSpan.textContent = name;
+    nameEl.textContent = name;
   }
 
   const scoreSpan = document.createElement('span');
   scoreSpan.className = 'player-score';
 
-  row.append(seedBadge, nameSpan, scoreSpan);
-  return { row, scoreSpan };
+  row.append(seedBadge, nameEl, scoreSpan);
+  return { row, scoreSpan, nameEl };
 }
 
 function makeScoreInput(label) {
@@ -116,19 +116,18 @@ function drawConnectorLines(bracket, wrapper, matchElements) {
 }
 
 // 「自分のいるところをタップすると対戦相手とチャットできる」ための仕掛け。
-// 行そのものを押せるようにするが、スコア入力や確定ボタンを押したときは開かない
-// （同じ行の中に入力欄があるため）。
-function makeRowChatTarget(row, onOpen) {
-  row.classList.add('chat-target');
-  row.title = '対戦相手とチャット';
+// 名前欄だけを押せるようにし、スコア入力や確定ボタンを押したときは開かない。
+function makeRowChatTarget(targetEl, onOpen) {
+  targetEl.classList.add('chat-target');
+  targetEl.title = '対戦相手とチャット';
 
   const icon = document.createElement('span');
   icon.className = 'chat-icon';
   icon.textContent = '💬';
   icon.setAttribute('aria-hidden', 'true');
-  row.appendChild(icon);
+  targetEl.appendChild(icon);
 
-  row.addEventListener('click', (e) => {
+  targetEl.addEventListener('click', (e) => {
     if (e.target.closest('input, button, select, label')) return;
     onOpen();
   });
@@ -274,11 +273,11 @@ function renderMatchBox(
 
   if (chatAvailable) {
     box.classList.add('has-chat');
-    // 自分がいる側の行を押せるようにする。運営が他人の試合を見ているときは
+    // 自分がいる側の名前欄だけを押せるようにする。運営が他人の試合を見ているときは
     // どちらも自分の行ではないので、下のボタンだけが入口になる。
     [[p1, r1], [p2, r2]].forEach(([entrantId, row]) => {
       if (getEntrantMemberIds(tournamentId, entrantId).includes(auth.player?.id)) {
-        makeRowChatTarget(row.row, openChat);
+        makeRowChatTarget(row.nameEl, openChat);
       }
     });
   }
