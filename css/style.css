@@ -525,7 +525,8 @@ a.btn-secondary:hover {
 }
 
 .inline-form label,
-.profile-form label {
+.profile-form label,
+.team-entry-form label {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -1193,6 +1194,36 @@ a.card:hover {
 /* 運営の操作は主導線（エントリー）から離し、右端に寄せる */
 .tournament-actions-row .row-actions { margin-left: auto; }
 
+/* チーム戦（2v2）のエントリー。チーム名と相方を決めないと登録できないので、
+   ボタン1つでは終わらず、押すとその場にフォームが開く。 */
+.team-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+/* フォームを開くと縦に伸びるので、運営のボタンが上下中央に浮かないよう上揃えにする */
+.tournament-actions-row:has(.team-entry) { align-items: flex-start; }
+
+.team-entry-status {
+  margin: 0;
+  font-weight: 600;
+}
+
+.team-entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  width: min(26rem, 100%);
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.team-entry-form .note { margin: 0; }
+
 /* エントリーはこのページの主目的。他のボタンより一回り大きくし、
    塗りに幅を持たせて視線が最初に止まるようにする。 */
 .btn-entry {
@@ -1231,6 +1262,40 @@ a.card:hover {
   font-size: 0.82rem;
   /* 名前が途中で折り返して1つの丸が2行にならないようにする */
   white-space: nowrap;
+}
+
+/* 最終順位のチーム欄：チーム名の下にメンバー全員を並べる */
+.standings-team {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.standings-team-name { font-weight: 700; }
+
+.standings-team-members {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* チーム戦（2v2）はチーム名とメンバーの2段になるので、丸ではなく角丸の札にする */
+.entrant-chip-team {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--r-sm);
+}
+
+.entrant-chip-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.entrant-chip-members {
+  font-size: 0.74rem;
+  color: var(--text-faint);
 }
 
 
@@ -1372,6 +1437,22 @@ a.card:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* チーム戦（2v2）の枠：チーム名を主に、メンバー名を下に小さく添える。
+   チーム名だけだと誰が出ているのか分からないため。 */
+.entrant-team-name,
+.entrant-members {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entrant-members {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-faint);
 }
 
 /* スコア枠：右端に固定幅で揃える。勝者スコアはアクセント色で強調 */
@@ -2026,6 +2107,9 @@ dialog h3 {
   }
 
   .tournament-actions-row > .btn-entry { min-height: 3rem; }
+
+  .tournament-actions-row > .team-entry { width: 100%; }
+  .team-entry > button { width: 100%; }
 
   .tournament-actions-row .row-actions {
     margin-left: 0;

@@ -8,7 +8,7 @@
 // Postgresは行単位で書き込むため、別々の大会・別々の選手を同時に編集しても競合しない。
 
 import { supabase } from './supabaseClient.js';
-import { state } from './state.js';
+import { state, findTournament, isTeamTournament, getEntrantMemberIds } from './state.js';
 import { downscaleImage } from './util.js';
 
 // ---------------------------------------------------------------------------
@@ -50,7 +50,58 @@ function toPlayerUpdate(player) {
   };
 }
 
-function toTournament(row, participantIds) {
+// エントリー行を「出場枠（entrant）」単位にまとめる。
+//
+// team_id があればチーム、無ければ選手そのものが1枠になる。DBの定員トリガーが
+// count(distinct coalesce(team_id, player_id)) で数えているのと同じ区切り方なので、
+// 画面に出る枠数と定員判定が必ず一致する。
+//
+// 枠の並びはシード順（未確定なら登録順）。個人戦のシードは tournament_entries.seed に、
+// チームのシードは tournament_teams.seed にある。
+function buildEntrants(teamRows, entryRows) {
+  const teamById = new Map(teamRows.map((t) => [t.id, t]));
+
+  const entrants = new Map();
+  [...entryRows]
+    .sort((a, b) => a.entered_at.localeCompare(b.entered_at))
+    .forEach((e) => {
+      const id = e.team_id ?? e.player_id;
+      if (!entrants.has(id)) {
+        const team = e.team_id ? teamById.get(e.team_id) ?? null : null;
+        entrants.set(id, {
+          id,
+          team,
+          memberIds: [],
+          seed: team ? team.seed : e.seed,
+          enteredAt: e.entered_at,
+        });
+      }
+      entrants.get(id).memberIds.push(e.player_id);
+    });
+
+  const ordered = [...entrants.values()].sort((a, b) => {
+    if (a.seed != null && b.seed != null) return a.seed - b.seed;
+    if (a.seed != null) return -1;
+    if (b.seed != null) return 1;
+    return a.enteredAt.localeCompare(b.enteredAt);
+  });
+
+  return {
+    entrantIds: ordered.map((x) => x.id),
+    participantIds: ordered.flatMap((x) => x.memberIds),
+    teams: ordered
+      .filter((x) => x.team)
+      .map((x) => ({
+        id: x.team.id,
+        name: x.team.name,
+        memberIds: x.memberIds,
+        seed: x.team.seed,
+        placement: x.team.placement,
+      })),
+  };
+}
+
+function toTournament(row, { entrantIds, participantIds, teams }) {
   return {
     id: row.id,
     name: row.name,
@@ -66,7 +117,10 @@ function toTournament(row, participantIds) {
     status: row.status,
     capacity: row.capacity,
     createdBy: row.created_by,
+    // 出場枠と出場した人。個人戦では同じ配列になる（js/state.js の説明を参照）
+    entrantIds,
     participantIds,
+    teams,
   };
 }
 
@@ -76,6 +130,8 @@ function toMatch(row) {
     tournamentId: row.tournament_id,
     winnerId: row.winner_id,
     loserId: row.loser_id,
+    winnerTeamId: row.winner_team_id ?? null,
+    loserTeamId: row.loser_team_id ?? null,
     score: row.score,
     round: row.round,
   };
@@ -85,8 +141,10 @@ function fromMatch(match) {
   return {
     id: match.id,
     tournament_id: match.tournamentId,
-    winner_id: match.winnerId,
-    loser_id: match.loserId,
+    winner_id: match.winnerId ?? null,
+    loser_id: match.loserId ?? null,
+    winner_team_id: match.winnerTeamId ?? null,
+    loser_team_id: match.loserTeamId ?? null,
     score: match.score,
     round: match.round,
   };
@@ -125,6 +183,14 @@ function check(error, what) {
   throw new Error(`${what}に失敗しました: ${error.message}${suffix}`);
 }
 
+// RPCのエラーはSQL側で日本語の文言を付けて raise してあるので、包み直さずそのまま見せる。
+// 「チームでのエントリーに失敗しました: すでに…（P0001）」より「すでに…」のほうが伝わる。
+function checkRpc(error, what) {
+  if (!error) return;
+  console.error(`[db] ${what}に失敗`, error);
+  throw new Error(error.message || `${what}に失敗しました。`);
+}
+
 // ---------------------------------------------------------------------------
 // 読み込み
 // ---------------------------------------------------------------------------
@@ -142,9 +208,10 @@ export async function loadAll() {
   // 見ている表がその場で更新されるようにするため（通常は0件か1件）。
   const openBracketIds = Object.keys(state.brackets);
 
-  const [players, tournaments, entries, bracketIds, openBrackets, matches, ranking, announcements] = await Promise.all([
+  const [players, tournaments, teams, entries, bracketIds, openBrackets, matches, ranking, announcements] = await Promise.all([
     supabase.from('players').select('*').order('display_name'),
     supabase.from('tournaments').select('*').order('date', { ascending: true, nullsFirst: false }),
+    supabase.from('tournament_teams').select('*'),
     supabase.from('tournament_entries').select('*'),
     supabase.from('brackets').select('tournament_id'),
     openBracketIds.length > 0
@@ -159,6 +226,7 @@ export async function loadAll() {
 
   check(players.error, '選手の読み込み');
   check(tournaments.error, '大会の読み込み');
+  check(teams.error, 'チームの読み込み');
   check(entries.error, 'エントリーの読み込み');
   check(bracketIds.error, 'ブラケットの読み込み');
   check(openBrackets.error, 'ブラケットの読み込み');
@@ -166,24 +234,26 @@ export async function loadAll() {
   check(ranking.error, 'ランキングの読み込み');
   check(announcements.error, 'お知らせの読み込み');
 
-  // participantIds はシード順（未確定なら登録順）。旧データの並び順の意味を引き継ぐ。
-  const participantsByTournament = new Map();
+  // 大会ごとにエントリーとチームをまとめ、出場枠の並び（シード順、未確定なら登録順）を作る。
+  // 成績はチーム戦でもメンバーの行に書き写してあるので、ここは選手IDのままでよい
+  // （選手ページはチームの存在を知らずに済む）。
+  const entriesByTournament = new Map();
+  const teamsByTournament = new Map();
   const placementsByTournament = {};
-  [...entries.data]
-    .sort((a, b) => {
-      if (a.seed != null && b.seed != null) return a.seed - b.seed;
-      if (a.seed != null) return -1;
-      if (b.seed != null) return 1;
-      return a.entered_at.localeCompare(b.entered_at);
-    })
-    .forEach((e) => {
-      if (!participantsByTournament.has(e.tournament_id)) participantsByTournament.set(e.tournament_id, []);
-      participantsByTournament.get(e.tournament_id).push(e.player_id);
 
-      if (e.placement == null) return;
-      if (!placementsByTournament[e.tournament_id]) placementsByTournament[e.tournament_id] = {};
-      placementsByTournament[e.tournament_id][e.player_id] = e.placement;
-    });
+  entries.data.forEach((e) => {
+    if (!entriesByTournament.has(e.tournament_id)) entriesByTournament.set(e.tournament_id, []);
+    entriesByTournament.get(e.tournament_id).push(e);
+
+    if (e.placement == null) return;
+    if (!placementsByTournament[e.tournament_id]) placementsByTournament[e.tournament_id] = {};
+    placementsByTournament[e.tournament_id][e.player_id] = e.placement;
+  });
+
+  teams.data.forEach((t) => {
+    if (!teamsByTournament.has(t.tournament_id)) teamsByTournament.set(t.tournament_id, []);
+    teamsByTournament.get(t.tournament_id).push(t);
+  });
 
   // 取り直した分だけをキャッシュに残す。消された大会のブラケットもここで落ちる。
   const bracketsById = {};
@@ -192,7 +262,10 @@ export async function loadAll() {
   const snapshot = ranking.data?.[0];
 
   state.players = players.data.map(toPlayer);
-  state.tournaments = tournaments.data.map((t) => toTournament(t, participantsByTournament.get(t.id) ?? []));
+  state.tournaments = tournaments.data.map((t) => toTournament(
+    t,
+    buildEntrants(teamsByTournament.get(t.id) ?? [], entriesByTournament.get(t.id) ?? []),
+  ));
   state.matches = matches.data.map(toMatch);
   state.brackets = bracketsById;
   state.bracketIds = new Set(bracketIds.data.map((b) => b.tournament_id));
@@ -476,6 +549,45 @@ export async function cancelEntry(tournamentId, playerId) {
   check(error, 'エントリーの取り消し');
 }
 
+// チーム戦（2v2）のエントリー。チーム行とメンバー2人のエントリー行を1回で作る。
+//
+// RLSの entries_insert は「自分の選手行だけ」しか挿入させないので、相方の行を
+// 入れるにはRPCを通すしかない。定員（チーム数）の検査も関数の中で行われる。
+export async function enterTournamentAsTeam(tournamentId, teamName, memberIds) {
+  const { data, error } = await supabase.rpc('enter_tournament_as_team', {
+    p_tournament_id: tournamentId,
+    p_team_name: teamName,
+    p_member_ids: memberIds,
+  });
+  checkRpc(error, 'チームでのエントリー');
+  return data;
+}
+
+// チームのエントリー取り消し。メンバーなら誰でも取り消せる（募集中のみ）。
+// メンバーのエントリー行は team_id の ON DELETE CASCADE で一緒に消える。
+export async function cancelTeamEntry(teamId) {
+  const { error } = await supabase.rpc('cancel_team_entry', { p_team_id: teamId });
+  checkRpc(error, 'チームのエントリー取り消し');
+}
+
+// 募集締切時に、確定したチームのシード順を書き込む（seededTeamIds[0] が第1シード）。
+// チームのシードは tournament_entries ではなく tournament_teams に持つ。
+//
+// upsert に name も載せるのは、not null 列を欠いた行を作れないため。既存行との衝突は
+// 主キー(id)で先に解決されるので、(tournament_id, name) の一意制約には触れない。
+export async function saveTeamSeeds(tournamentId, seededTeamIds) {
+  const tournament = findTournament(tournamentId);
+  const rows = seededTeamIds.map((teamId, index) => {
+    const team = tournament?.teams.find((tm) => tm.id === teamId);
+    if (!team) throw new Error('シードを付けるチームが見つかりません。画面を再読み込みしてください。');
+    return { id: teamId, tournament_id: tournamentId, name: team.name, seed: index + 1 };
+  });
+  const { error } = await supabase
+    .from('tournament_teams')
+    .upsert(rows, { onConflict: 'id' });
+  check(error, 'シードの保存');
+}
+
 // 募集締切時に、確定したシード順をまとめて書き込む（seededPlayerIds[0] が第1シード）。
 export async function saveSeeds(tournamentId, seededPlayerIds) {
   const rows = seededPlayerIds.map((playerId, index) => ({
@@ -489,7 +601,8 @@ export async function saveSeeds(tournamentId, seededPlayerIds) {
   check(error, 'シードの保存');
 }
 
-// 運営が参加者を直接指定する場合（募集を使わず大会を立てるとき）。
+// 運営が参加者を直接指定する場合（募集を使わず大会を立てるとき）。個人戦専用。
+// チーム戦はチーム編成が必要なため、この経路は使わない（大会作成画面で弾いている）。
 //
 // 「全部消してから入れ直す」順序にしてはいけない。挿入側が失敗すると削除だけが残り、
 // 参加者0人の大会ができてしまう（実際にこの不具合が起きた）。
@@ -579,15 +692,36 @@ export async function syncTournamentProgress(tournamentId) {
 // 書けるのは運営だけ（RLSの entries_update が is_admin() を要求する）。
 // ---------------------------------------------------------------------------
 
-// placements は [{ playerId, depth }]。depth は優勝=1、準優勝=2、ベストN=N。
-// seed 列は送らないので、既に入っているシード順はそのまま残る。
+// placements は [{ entrantId, depth }]。depth は優勝=1、準優勝=2、ベストN=N。
+// entrantId は個人戦なら選手ID、チーム戦ならチームID。
+//
+// チーム戦では、チーム行に書いたうえで同じ値をメンバー全員のエントリー行へ写す。
+// 二重に持つことになるが、こうしておくと選手ページ・ランキングカードが
+// チームの存在を一切知らずに「優勝」「ベスト4」を出せる。
+//
+// seed / team_id 列は送らないので、既に入っている値はそのまま残る。
 export async function saveEntryPlacements(tournamentId, placements) {
   if (placements.length === 0) return;
-  const rows = placements.map(({ playerId, depth }) => ({
-    tournament_id: tournamentId,
-    player_id: playerId,
-    placement: depth,
-  }));
+  const tournament = findTournament(tournamentId);
+
+  if (isTeamTournament(tournament)) {
+    const teamRows = placements.map(({ entrantId, depth }) => {
+      const team = tournament.teams.find((tm) => tm.id === entrantId);
+      if (!team) throw new Error('成績を記録するチームが見つかりません。画面を再読み込みしてください。');
+      return { id: entrantId, tournament_id: tournamentId, name: team.name, placement: depth };
+    });
+    const { error } = await supabase
+      .from('tournament_teams')
+      .upsert(teamRows, { onConflict: 'id' });
+    check(error, '最終順位の保存');
+  }
+
+  const rows = placements.flatMap(({ entrantId, depth }) =>
+    getEntrantMemberIds(tournamentId, entrantId).map((playerId) => ({
+      tournament_id: tournamentId,
+      player_id: playerId,
+      placement: depth,
+    })));
   const { error } = await supabase
     .from('tournament_entries')
     .upsert(rows, { onConflict: 'tournament_id,player_id' });
@@ -602,6 +736,12 @@ export async function clearEntryPlacements(tournamentId) {
     .update({ placement: null })
     .eq('tournament_id', tournamentId);
   check(error, '最終順位の取り消し');
+
+  const { error: teamError } = await supabase
+    .from('tournament_teams')
+    .update({ placement: null })
+    .eq('tournament_id', tournamentId);
+  check(teamError, '最終順位の取り消し');
 }
 
 // ---------------------------------------------------------------------------
@@ -689,7 +829,7 @@ export function subscribeToChanges(onChange, debounceMs = 400) {
   };
 
   channel = supabase.channel('app-data');
-  ['players', 'tournaments', 'tournament_entries', 'brackets', 'matches', 'published_rankings', 'announcements']
+  ['players', 'tournaments', 'tournament_teams', 'tournament_entries', 'brackets', 'matches', 'published_rankings', 'announcements']
     .forEach((table) => {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, notify);
     });

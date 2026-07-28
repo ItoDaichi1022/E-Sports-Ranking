@@ -180,7 +180,8 @@ export function transform(data) {
     championByTournament.set(oldTid, finalMatch?.confirmed ? finalMatch.winnerId : null);
     placementByTournament.set(
       newTid,
-      new Map(finalPlacements(rewritten).map((p) => [p.playerId, p.depth])),
+      // 旧データはすべて個人戦なので、出場枠のID＝選手ID
+      new Map(finalPlacements(rewritten).map((p) => [p.entrantId, p.depth])),
     );
   }
 

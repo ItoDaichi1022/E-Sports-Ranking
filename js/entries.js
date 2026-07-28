@@ -4,7 +4,9 @@
 // 参加希望者は募集中の大会に「エントリー」ボタン1つで登録できる。
 // 運営が募集を締め切ると、それまでの戦績を元にシードを付けてブラケットを生成する。
 
-import { state } from './state.js';
+import {
+  state, isTeamTournament, entrantIdOfPlayer, getEntrantMemberIds, getPlayerName,
+} from './state.js';
 import { escapeHtml, cardThumb } from './util.js';
 import { auth, isLoggedIn, isAdmin } from './auth.js';
 import { computeRankings } from './ranking.js';
@@ -18,25 +20,41 @@ export const STATUS_LABELS = {
   finished: '終了',
 };
 
-function isEntered(tournament) {
-  return Boolean(auth.player) && tournament.participantIds.includes(auth.player.id);
+// 出場枠の数え方の呼び名。チーム戦の定員16は「16チーム」であって16人ではない。
+export function entrantUnit(tournament) {
+  return isTeamTournament(tournament) ? 'チーム' : '人';
 }
 
+// 自分が入っている出場枠のID（個人戦なら自分の選手ID、チーム戦なら所属チームのID）。
+function myEntrantId(tournament) {
+  return auth.player ? entrantIdOfPlayer(tournament, auth.player.id) : null;
+}
+
+// 残り枠。数えるのは出場枠なので、チーム戦ではチーム数で見る
+// （DBの定員トリガーが count(distinct coalesce(team_id, player_id)) で数えるのと同じ）。
 function remainingSlots(tournament) {
   if (tournament.capacity == null) return null;
-  return Math.max(0, tournament.capacity - tournament.participantIds.length);
+  return Math.max(0, tournament.capacity - tournament.entrantIds.length);
 }
 
-// エントリー済みの選手を、現在のランキング順に並べてシード順を決める（⑤）。
-// ランキングに載っていない選手（まだ試合をしていない人）は後ろにまとめ、
-// その中では登録順を保つ。
-export function seedByRanking(playerIds) {
+// エントリー済みの出場枠を、現在のランキング順に並べてシード順を決める（⑤）。
+// チームのランクは「メンバーの中で最も上位のランク」とする。ランキングに載っていない
+// 選手・チームは後ろにまとめ、その中では登録順を保つ。
+export function seedEntrants(tournament) {
   const rankByPlayer = new Map(computeRankings(state).map((r) => [r.id, r.rank]));
-  return [...playerIds].sort((a, b) => {
-    const ra = rankByPlayer.get(a) ?? Infinity;
-    const rb = rankByPlayer.get(b) ?? Infinity;
+  const order = tournament.entrantIds;
+
+  // メンバーが1人（個人戦）ならその選手のランクそのもの。誰もランキングに
+  // 載っていなければ Infinity になり、後ろにまとまる。
+  const rankOf = (entrantId) => Math.min(
+    ...getEntrantMemberIds(tournament.id, entrantId).map((id) => rankByPlayer.get(id) ?? Infinity),
+  );
+
+  return [...order].sort((a, b) => {
+    const ra = rankOf(a);
+    const rb = rankOf(b);
     if (ra !== rb) return ra - rb;
-    return playerIds.indexOf(a) - playerIds.indexOf(b);
+    return order.indexOf(a) - order.indexOf(b);
   });
 }
 
@@ -44,12 +62,13 @@ export function seedByRanking(playerIds) {
 export async function closeRecruitmentAndStart(tournamentId) {
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) throw new Error('大会が見つかりません。');
-  if (tournament.participantIds.length < 2) {
-    throw new Error('参加者が2人以上必要です。');
+  if (tournament.entrantIds.length < 2) {
+    throw new Error(`参加${entrantUnit(tournament)}が2${entrantUnit(tournament)}以上必要です。`);
   }
 
-  const seeded = seedByRanking(tournament.participantIds);
-  await db.saveSeeds(tournamentId, seeded);
+  const seeded = seedEntrants(tournament);
+  if (isTeamTournament(tournament)) await db.saveTeamSeeds(tournamentId, seeded);
+  else await db.saveSeeds(tournamentId, seeded);
 
   // BYEはブラケット生成時に自動確定するが、対戦相手がいないので試合としては記録しない
   // （旧実装と同じ扱い。matchesに入るのは confirmMatch を通った実際の対戦だけ）。
@@ -59,49 +78,35 @@ export async function closeRecruitmentAndStart(tournamentId) {
 
   state.brackets[tournamentId] = bracket;
   state.bracketIds.add(tournamentId);
-  tournament.participantIds = seeded;
+  tournament.entrantIds = seeded;
+  tournament.participantIds = seeded.flatMap((id) => getEntrantMemberIds(tournamentId, id));
   tournament.status = 'running';
   return bracket;
 }
 
 // ---- 描画 ----
 
-function entryButton(tournament, onChanged) {
+function fullSlotsButton() {
   const btn = document.createElement('button');
-  const entered = isEntered(tournament);
-  const left = remainingSlots(tournament);
-
-  // エントリーはこのページの主目的なので、その入口になるボタンは目立たせる
-  // （ログイン・選手登録もエントリーへ向かう導線なので同じ扱いにする）。
-  if (!isLoggedIn()) {
-    btn.type = 'button';
-    btn.className = 'btn-entry';
-    btn.textContent = 'ログインしてエントリー';
-    // ページ遷移せずダイアログだけ開く（見ていた大会を失わないように）
-    btn.addEventListener('click', () => {
-      document.dispatchEvent(new CustomEvent('request-login'));
-    });
-    return btn;
-  }
-
-  if (!auth.player) {
-    btn.type = 'button';
-    btn.className = 'btn-entry';
-    btn.textContent = '選手登録してエントリー';
-    btn.addEventListener('click', () => { location.hash = '#profile'; });
-    return btn;
-  }
-
   btn.type = 'button';
+  btn.className = 'btn-secondary';
+  btn.textContent = '定員に達しました';
+  btn.disabled = true;
+  return btn;
+}
+
+// 個人戦（1v1・リレー）のエントリー。ボタン1つで登録・取り消しができる。
+function soloEntryButton(tournament, onChanged) {
+  const entered = Boolean(myEntrantId(tournament));
+  const btn = document.createElement('button');
+  btn.type = 'button';
+
   if (entered) {
     // 取り消しは主導線ではないので、目立たせない
     btn.className = 'btn-secondary';
     btn.textContent = 'エントリーを取り消す';
-  } else if (left === 0) {
-    btn.className = 'btn-secondary';
-    btn.textContent = '定員に達しました';
-    btn.disabled = true;
-    return btn;
+  } else if (remainingSlots(tournament) === 0) {
+    return fullSlotsButton();
   } else {
     btn.className = 'btn-entry';
     btn.textContent = 'エントリーする';
@@ -131,6 +136,203 @@ function entryButton(tournament, onChanged) {
   return btn;
 }
 
+// 開いているチームエントリーのフォームと、入力途中の値。
+//
+// 募集中の大会は、他の人のエントリーがRealtimeで届くたびに画面が描き直される。
+// 覚えておかないと、チーム名を打っている最中に入力が消えてしまう。
+let openTeamForm = null; // { tournamentId, teamName, partnerId } | null
+
+// チーム戦のエントリーフォーム。チーム名と相方を決めないと登録できないので、
+// ボタン1つでは終わらない。送信するとチーム行とメンバー2人のエントリー行が
+// DBのRPCで1回にまとめて作られる（片方だけ登録された状態が起きない）。
+function teamEntryForm(tournament, onChanged, onCancel) {
+  const form = document.createElement('form');
+  form.className = 'team-entry-form';
+
+  const nameLabel = document.createElement('label');
+  nameLabel.textContent = 'チーム名';
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.required = true;
+  nameInput.maxLength = 24;
+  nameInput.placeholder = '例: チームぐんぐん';
+  nameInput.value = openTeamForm?.teamName ?? '';
+  nameInput.addEventListener('input', () => { openTeamForm.teamName = nameInput.value; });
+  nameLabel.appendChild(nameInput);
+
+  const partnerLabel = document.createElement('label');
+  partnerLabel.textContent = '相方';
+  const partnerSelect = document.createElement('select');
+  partnerSelect.required = true;
+  partnerSelect.appendChild(new Option('選手を選択', ''));
+
+  // 自分と、既にこの大会に出ている選手は選べない（DB側でも弾かれるが、
+  // 選べてしまうと送信して初めてエラーになり分かりにくい）
+  const taken = new Set(tournament.participantIds);
+  const candidates = state.players.filter((p) => p.id !== auth.player.id && !taken.has(p.id));
+  candidates.forEach((p) => partnerSelect.appendChild(new Option(p.currentName, p.id)));
+  // 選んでいた相手が先に他のチームで埋まっていたら、選択は空に戻る
+  partnerSelect.value = openTeamForm?.partnerId ?? '';
+  partnerSelect.addEventListener('change', () => { openTeamForm.partnerId = partnerSelect.value; });
+  partnerLabel.appendChild(partnerSelect);
+
+  form.append(nameLabel, partnerLabel);
+
+  if (candidates.length === 0) {
+    const note = document.createElement('p');
+    note.className = 'note';
+    note.textContent = '組める相手がいません。相方がまだ選手登録していない場合は、運営に連絡してください。';
+    form.appendChild(note);
+    partnerSelect.disabled = true;
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'row-actions';
+
+  const submitBtn = document.createElement('button');
+  submitBtn.type = 'submit';
+  submitBtn.className = 'btn-entry';
+  submitBtn.textContent = 'エントリーする';
+  submitBtn.disabled = candidates.length === 0;
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'btn-secondary';
+  cancelBtn.textContent = 'やめる';
+  cancelBtn.addEventListener('click', onCancel);
+
+  actions.append(submitBtn, cancelBtn);
+  form.appendChild(actions);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const teamName = nameInput.value.trim();
+    if (!teamName) {
+      alert('チーム名を入力してください。');
+      return;
+    }
+    if (!partnerSelect.value) {
+      alert('相方を選んでください。');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    try {
+      await db.enterTournamentAsTeam(
+        tournament.id, teamName, [auth.player.id, partnerSelect.value],
+      );
+      openTeamForm = null;
+      await onChanged();
+    } catch (err) {
+      alert(err.message);
+      submitBtn.disabled = false;
+    }
+  });
+
+  return form;
+}
+
+function teamEntryControls(tournament, onChanged) {
+  const wrap = document.createElement('div');
+  wrap.className = 'team-entry';
+
+  const myTeamId = myEntrantId(tournament);
+  const myTeam = tournament.teams.find((tm) => tm.id === myTeamId);
+
+  if (myTeam) {
+    const status = document.createElement('p');
+    status.className = 'team-entry-status';
+    const members = myTeam.memberIds.map((id) => getPlayerName(id)).join(' / ');
+    status.textContent = `「${myTeam.name}」でエントリー済み（${members}）`;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn-secondary';
+    cancelBtn.textContent = 'エントリーを取り消す';
+    cancelBtn.addEventListener('click', async () => {
+      // 2人組は片方が抜けたら成立しないので、取り消すとチームごと消える。
+      // 相方の参加も消えることを必ず伝えてから実行する。
+      const partners = myTeam.memberIds
+        .filter((id) => id !== auth.player.id)
+        .map((id) => getPlayerName(id))
+        .join('・');
+      const note = partners ? `${partners}さんの参加も取り消しになります。` : '';
+      if (!confirm(`「${myTeam.name}」のエントリーを取り消しますか？${note}`)) return;
+
+      cancelBtn.disabled = true;
+      try {
+        await db.cancelTeamEntry(myTeam.id);
+        await onChanged();
+      } catch (err) {
+        alert(err.message);
+        cancelBtn.disabled = false;
+      }
+    });
+
+    wrap.append(status, cancelBtn);
+    return wrap;
+  }
+
+  if (remainingSlots(tournament) === 0) {
+    wrap.appendChild(fullSlotsButton());
+    return wrap;
+  }
+
+  const openBtn = document.createElement('button');
+  openBtn.type = 'button';
+  openBtn.className = 'btn-entry';
+  openBtn.textContent = 'チームでエントリー';
+
+  const showForm = () => {
+    openBtn.hidden = true;
+    wrap.appendChild(teamEntryForm(tournament, onChanged, () => {
+      openTeamForm = null;
+      wrap.querySelector('.team-entry-form')?.remove();
+      openBtn.hidden = false;
+    }));
+  };
+
+  openBtn.addEventListener('click', () => {
+    openTeamForm = { tournamentId: tournament.id, teamName: '', partnerId: '' };
+    showForm();
+  });
+
+  wrap.appendChild(openBtn);
+  // 描き直される前に開いていたなら、入力途中の値ごと開き直す
+  if (openTeamForm?.tournamentId === tournament.id) showForm();
+  return wrap;
+}
+
+function entryControls(tournament, onChanged) {
+  // エントリーはこのページの主目的なので、その入口になるボタンは目立たせる
+  // （ログイン・選手登録もエントリーへ向かう導線なので同じ扱いにする）。
+  if (!isLoggedIn()) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-entry';
+    btn.textContent = 'ログインしてエントリー';
+    // ページ遷移せずダイアログだけ開く（見ていた大会を失わないように）
+    btn.addEventListener('click', () => {
+      document.dispatchEvent(new CustomEvent('request-login'));
+    });
+    return btn;
+  }
+
+  if (!auth.player) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-entry';
+    btn.textContent = '選手登録してエントリー';
+    btn.addEventListener('click', () => { location.hash = '#profile'; });
+    return btn;
+  }
+
+  return isTeamTournament(tournament)
+    ? teamEntryControls(tournament, onChanged)
+    : soloEntryButton(tournament, onChanged);
+}
+
 function adminControls(tournament, onChanged) {
   const wrap = document.createElement('div');
   wrap.className = 'row-actions';
@@ -157,7 +359,8 @@ function adminControls(tournament, onChanged) {
     closeBtn.type = 'button';
     closeBtn.textContent = '締め切ってブラケット生成';
     closeBtn.addEventListener('click', async () => {
-      if (!confirm(`「${tournament.name}」の募集を締め切り、現在の${tournament.participantIds.length}人でブラケットを生成します。よろしいですか？`)) return;
+      const count = `${tournament.entrantIds.length}${entrantUnit(tournament)}`;
+      if (!confirm(`「${tournament.name}」の募集を締め切り、現在の${count}でブラケットを生成します。よろしいですか？`)) return;
       closeBtn.disabled = true;
       try {
         await closeRecruitmentAndStart(tournament.id);
@@ -205,7 +408,7 @@ export function renderTournamentActions(containerEl, tournament, onChanged) {
   row.className = 'tournament-actions-row';
 
   if (tournament.status === 'recruiting') {
-    row.appendChild(entryButton(tournament, onChanged));
+    row.appendChild(entryControls(tournament, onChanged));
   }
   if (isAdmin()) {
     const admin = adminControls(tournament, onChanged);

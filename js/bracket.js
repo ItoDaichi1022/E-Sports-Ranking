@@ -1,5 +1,10 @@
-import { state, newId } from './state.js';
+import { state, newId, findTournament, isTeamTournament } from './state.js';
 import { MATCH_TYPE_KEYS } from './rankingEligibility.js';
+
+// このファイルが扱う「出場枠（entrant）」は、個人戦なら選手、チーム戦（2v2）ならチーム。
+// ブラケットのJSONに入るIDはどちらもuuidで形が同じなので、生成・進行のロジックは
+// どちらの大会でもそのまま動く。名前の解決だけが js/bracketView.js で分岐する。
+// フィールド名（player1Id / player2Id）は保存済みのJSONと合わせるため変えていない。
 
 // 次の2のべき乗を返す（n=1の場合も2を返す：1人トーナメントは成立しないため呼び出し側で弾く）
 export function nextPowerOfTwo(n) {
@@ -80,15 +85,15 @@ function resolveIfBye(bracket, match) {
   else if (player2Id && !player1Id) applyWinner(bracket, match, player2Id, null, true);
 }
 
-// シード順（seededParticipantIds[0] = 1位シード）でシングルエリミネーションのブラケットを生成する。
-// 参加人数が2のべき乗でない場合は上位シードにBYE（不戦勝）を割り当てる。
-export function createBracket(tournamentId, seededParticipantIds) {
-  const k = seededParticipantIds.length;
-  if (k < 2) throw new Error('参加者は2人以上必要です。');
+// シード順（seededEntrantIds[0] = 1位シード）でシングルエリミネーションのブラケットを生成する。
+// 出場枠が2のべき乗でない場合は上位シードにBYE（不戦勝）を割り当てる。
+export function createBracket(tournamentId, seededEntrantIds) {
+  const k = seededEntrantIds.length;
+  if (k < 2) throw new Error('出場枠が2つ以上必要です。');
 
   const bracketSize = nextPowerOfTwo(k);
   const order = seedOrder(bracketSize);
-  const slots = order.map((seedNum) => (seedNum <= k ? seededParticipantIds[seedNum - 1] : null));
+  const slots = order.map((seedNum) => (seedNum <= k ? seededEntrantIds[seedNum - 1] : null));
   const totalRounds = Math.log2(bracketSize);
 
   const rounds = [];
@@ -137,16 +142,21 @@ export function confirmMatch(tournamentId, matchId, winnerId, score, options = {
     return { ok: false, error: '両者が確定していないため結果を入力できません。' };
   }
   if (winnerId !== match.player1Id && winnerId !== match.player2Id) {
-    return { ok: false, error: '勝者は対戦カードの選手から選んでください。' };
+    return { ok: false, error: '勝者は対戦カードから選んでください。' };
   }
 
   applyWinner(bracket, match, winnerId, options.isWalkover ? null : (score || null), false, options.isWalkover);
 
+  // チーム戦の試合はチーム列に記録する。選手列を空にしておくことで、
+  // 個人の通算成績（js/playerStats.js）にチーム戦の勝敗が混ざらない。
+  const team = isTeamTournament(findTournament(tournamentId));
   state.matches.push({
     id: match.id,
     tournamentId,
-    winnerId: match.winnerId,
-    loserId: match.loserId,
+    winnerId: team ? null : match.winnerId,
+    loserId: team ? null : match.loserId,
+    winnerTeamId: team ? match.winnerId : null,
+    loserTeamId: team ? match.loserId : null,
     score: match.score,
     round: match.round,
   });
@@ -215,6 +225,18 @@ export function updateTournament(
     if (matchType && !MATCH_TYPE_KEYS.includes(matchType)) {
       return { ok: false, error: '対戦方法の選択が正しくありません。' };
     }
+    // チーム戦と個人戦では、ブラケットの枠に入るものがチームか選手かで変わる。
+    // 既に誰かがエントリーしている状態で切り替えると、保存済みの枠の意味が変わって
+    // 対戦表と成績が壊れるため、参加者を空にしてからでないと変更させない。
+    const wasTeam = tournament.matchType === '2v2';
+    const willBeTeam = matchType === '2v2';
+    if (wasTeam !== willBeTeam && tournament.participantIds.length > 0) {
+      return {
+        ok: false,
+        error: 'すでに参加者がいるため、チーム戦（2v2）と個人戦の間で対戦方法を変更できません。'
+          + 'エントリーを取り消してから変更してください。',
+      };
+    }
     tournament.matchType = matchType || null;
     // 説明は「その他」のときだけ意味を持つ。選び直したら残骸を残さない。
     tournament.matchTypeNote = matchType === 'other' ? (matchTypeNote ?? '').trim() : '';
@@ -224,11 +246,14 @@ export function updateTournament(
     if (capacity !== null && (!Number.isInteger(capacity) || capacity < 2)) {
       return { ok: false, error: '定員は2以上の整数で入力してください。' };
     }
-    // 既にエントリーしている人を追い出すことになる定員は受け付けない
-    if (capacity !== null && capacity < tournament.participantIds.length) {
+    // 既にエントリーしている枠を追い出すことになる定員は受け付けない。
+    // 数えるのは出場枠（チーム戦ではチーム数）で、DBの定員トリガーと揃える。
+    const entered = tournament.entrantIds.length;
+    if (capacity !== null && capacity < entered) {
+      const unit = isTeamTournament(tournament) ? 'チーム' : '人';
       return {
         ok: false,
-        error: `既に${tournament.participantIds.length}人がエントリーしているため、定員を${capacity}人にはできません。`,
+        error: `既に${entered}${unit}がエントリーしているため、定員を${capacity}${unit}にはできません。`,
       };
     }
     tournament.capacity = capacity;
@@ -254,8 +279,8 @@ export function allMatchesDecided(bracket) {
   return bracket.rounds.every((round) => round.matches.every((m) => m.confirmed));
 }
 
-// 各選手の「勝ち上がりの深さ」を求める。優勝=1、準優勝=2、ベスト4=4 …。
-// 第Rラウンド（0始まり）で負けた人の深さは bracketSize / 2^R になる。
+// 各出場枠の「勝ち上がりの深さ」を求める。優勝=1、準優勝=2、ベスト4=4 …。
+// 第Rラウンド（0始まり）で負けた枠の深さは bracketSize / 2^R になる。
 //
 // 運営が結果を確定したときにDBへ書き込むためのもの。これを保存しておけば、
 // 選手ページやランキングは対戦表そのものを読まなくても順位を出せる。
@@ -265,13 +290,13 @@ export function finalPlacements(bracket) {
 
   const placements = [];
   const champion = getChampionId(bracket);
-  if (champion) placements.push({ playerId: champion, depth: 1 });
+  if (champion) placements.push({ entrantId: champion, depth: 1 });
 
   bracket.rounds.forEach((round, roundIndex) => {
     const depth = bracket.bracketSize / 2 ** roundIndex;
     round.matches.forEach((m) => {
       if (!m.confirmed || !m.loserId) return;
-      placements.push({ playerId: m.loserId, depth });
+      placements.push({ entrantId: m.loserId, depth });
     });
   });
 
@@ -284,13 +309,14 @@ export function finalPlacements(bracket) {
 // 準々決勝で負けた4人は同率5位…と、負けたラウンドが1つ前になるごとに枠が倍になる。
 // 実際に何人参加したかではなく、BYEを含めた表の大きさ(bracketSize)を基準にする。
 //
-// 戻り値: [{ playerId, rank }] を順位の昇順で。limit位までに収まるものだけ返す。
+// 戻り値: [{ entrantId, rank }] を順位の昇順で。limit位までに収まるものだけ返す。
+// entrantId は個人戦なら選手ID、チーム戦ならチームID。
 export function finalStandings(bracket, limit = 16) {
   if (!bracket) return [];
 
   const standings = [];
   const champion = getChampionId(bracket);
-  if (champion) standings.push({ playerId: champion, rank: 1 });
+  if (champion) standings.push({ entrantId: champion, rank: 1 });
 
   bracket.rounds.forEach((round, roundIndex) => {
     // そのラウンドで敗退した人の順位。決勝(最終ラウンド)の敗者が2位になる。
@@ -300,7 +326,7 @@ export function finalStandings(bracket, limit = 16) {
     round.matches.forEach((m) => {
       // BYEは対戦が成立していないので敗者がいない
       if (!m.confirmed || !m.loserId) return;
-      standings.push({ playerId: m.loserId, rank });
+      standings.push({ entrantId: m.loserId, rank });
     });
   });
 

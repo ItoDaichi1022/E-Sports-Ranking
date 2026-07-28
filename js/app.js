@@ -1,4 +1,6 @@
-import { state, newId, getPlayerName } from './state.js';
+import {
+  state, newId, getPlayerName, isTeamTournament, getEntrantName, getEntrantMemberIds,
+} from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
 import { escapeHtml, avatarHtml, safeUrl, cardThumb, setupImagePicker } from './util.js';
 import {
@@ -8,11 +10,13 @@ import { renderBracket } from './bracketView.js';
 import { computeRankings, computeRankingsForPeriod, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
-import { getPlayerStats, championOfTournament } from './playerStats.js';
+import { getPlayerStats, championLabel } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
 import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
 import { renderProfileForm, profileSectionHtml, isProfileFormMounted } from './profile.js';
-import { renderRecruitPage, renderTournamentActions, STATUS_LABELS } from './entries.js';
+import {
+  renderRecruitPage, renderTournamentActions, STATUS_LABELS, entrantUnit,
+} from './entries.js';
 import {
   auth, initAuth, isAdmin, isLoggedIn, needsOnboarding, accountLabel,
   signInWithProvider, signOut, reloadOwnPlayer,
@@ -657,6 +661,13 @@ function renderProfilePage() {
 
 // ---- 大会履歴 ----
 
+// 大会の規模の表示。ブラケットの枠になるのはチーム戦ではチームなので、
+// 「16チーム」を主にしつつ、実際に出た人数も添える。
+function entrantCountLabel(t) {
+  const count = `${t.entrantIds.length}${entrantUnit(t)}`;
+  return isTeamTournament(t) ? `${count}（${t.participantIds.length}人）` : count;
+}
+
 // 優勝者を名指しするのは、運営が結果を確定させた大会だけ。
 // 表が埋まっただけの段階では「結果待ち」に留める。
 //
@@ -668,12 +679,8 @@ function tournamentStatusInfo(t) {
   }
 
   if (t.status === 'finished') {
-    const championId = championOfTournament(t.id);
-    return {
-      label: '終了',
-      tone: 'finished',
-      champion: championId ? getPlayerName(championId) : null,
-    };
+    // チーム戦ではチーム名が返る（優勝者は2人いるので選手名では出せない）
+    return { label: '終了', tone: 'finished', champion: championLabel(t.id) };
   }
 
   // 「結果待ち（表は埋まったが運営が確定していない）」は対戦表を見ないと分からない。
@@ -716,7 +723,7 @@ function renderHistoryList() {
     body.className = 'card-body';
     body.innerHTML = `
       <h3 class="card-title">${escapeHtml(t.name)}</h3>
-      <p class="card-date">${escapeHtml(t.date || '日付未設定')} ・ ${t.participantIds.length}人参加</p>
+      <p class="card-date">${escapeHtml(t.date || '日付未設定')} ・ ${escapeHtml(entrantCountLabel(t))}参加</p>
       <span class="status-chip status-${tone}">${escapeHtml(label)}</span>
       ${champion ? `<span class="card-champion">優勝 ${escapeHtml(champion)}</span>` : ''}
     `;
@@ -780,16 +787,21 @@ function rankingEligibilityHtml(tournament) {
 
 function renderTournamentInfo(tournament) {
   const formatLabel = FORMAT_LABELS[tournament.format] || tournament.format;
+  const unit = entrantUnit(tournament);
+  // 定員もチーム戦ではチーム数（DBの定員トリガーと同じ数え方）
   const countLabel = tournament.capacity == null
-    ? `${tournament.participantIds.length}人`
-    : `${tournament.participantIds.length} / ${tournament.capacity}人`;
+    ? entrantCountLabel(tournament)
+    : `${tournament.entrantIds.length} / ${tournament.capacity}${unit}`;
+  const countHeading = tournament.status === 'recruiting'
+    ? 'エントリー'
+    : `参加${unit === 'チーム' ? 'チーム数' : '人数'}`;
 
   let html = `
     <h3>大会情報</h3>
     ${rankingEligibilityHtml(tournament)}
     <dl class="tournament-info-grid">
-      <div><dt>${tournament.status === 'recruiting' ? 'エントリー' : '参加人数'}</dt><dd>${escapeHtml(countLabel)}</dd></div>
-      <div><dt>規模</dt><dd>${tournamentTier(tournament.participantIds.length)}</dd></div>
+      <div><dt>${countHeading}</dt><dd>${escapeHtml(countLabel)}</dd></div>
+      <div><dt>規模</dt><dd>${tournamentTier(tournament.entrantIds.length)}</dd></div>
       <div><dt>対戦方法</dt><dd>${escapeHtml(matchTypeLabel(tournament))}</dd></div>
       <div><dt>形式</dt><dd>${escapeHtml(formatLabel)}</dd></div>
       <div><dt>開催日</dt><dd>${escapeHtml(tournament.date || '日付未設定')}</dd></div>
@@ -805,12 +817,25 @@ function renderTournamentInfo(tournament) {
 
   // ブラケットが出来る前は対戦表が無いので、代わりに顔ぶれを見せる。
   // 募集中の大会の詳細を選手が確認できるようにするための表示。
-  if (!state.bracketIds.has(tournament.id) && tournament.participantIds.length > 0) {
-    const names = tournament.participantIds.map((id) => {
-      const player = state.players.find((p) => p.id === id);
-      return `<span class="entrant-chip">${escapeHtml(player ? player.currentName : id)}</span>`;
-    }).join('');
-    html += `<h4>エントリー中の選手</h4><div class="entrant-list">${names}</div>`;
+  if (!state.bracketIds.has(tournament.id) && tournament.entrantIds.length > 0) {
+    if (isTeamTournament(tournament)) {
+      // チーム戦はチーム名を主に、メンバーを添える。誰と誰が組んでいるかが
+      // 分からないと、これから申し込む人が相手を選べない。
+      const chips = tournament.teams.map((team) => {
+        const members = team.memberIds.map((id) => getPlayerName(id)).join(' / ');
+        return `<span class="entrant-chip entrant-chip-team">
+            <span class="entrant-chip-name">${escapeHtml(team.name)}</span>
+            <span class="entrant-chip-members">${escapeHtml(members)}</span>
+          </span>`;
+      }).join('');
+      html += `<h4>エントリー中のチーム</h4><div class="entrant-list">${chips}</div>`;
+    } else {
+      const names = tournament.entrantIds.map((id) => {
+        const player = state.players.find((p) => p.id === id);
+        return `<span class="entrant-chip">${escapeHtml(player ? player.currentName : id)}</span>`;
+      }).join('');
+      html += `<h4>エントリー中の選手</h4><div class="entrant-list">${names}</div>`;
+    }
   }
 
   tournamentInfoEl.innerHTML = html;
@@ -844,7 +869,7 @@ function renderTournamentDetail(tournamentId) {
 
   renderHero(tournamentHeroEl, tournament.imageUrl);
   tournamentTitleEl.textContent = tournament.name;
-  tournamentMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${tournament.participantIds.length}人参加 ・ ${tournamentStatusLabel(tournament)}`;
+  tournamentMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
 
   const back = backToListLink(tournament);
   tournamentBackLink.href = back.href;
@@ -886,7 +911,7 @@ async function renderBracketPage(tournamentId) {
   }
 
   bracketTitleEl.textContent = tournament.name;
-  bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${tournament.participantIds.length}人参加 ・ ${tournamentStatusLabel(tournament)}`;
+  bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
 
   // 戻り先は大会詳細。ここへは詳細から来るため。
   bracketBackLink.href = `#tournament/${encodeURIComponent(tournamentId)}`;
@@ -973,9 +998,18 @@ function renderResultSection(tournament) {
           await db.saveEntryPlacements(tournament.id, placements);
           await db.setTournamentStatus(tournament.id, 'finished');
 
+          // state.placements は選手ID単位。チーム戦ではチームの成績を
+          // メンバー全員に配る（DBへ書き込む saveEntryPlacements と同じ扱い）。
           state.placements[tournament.id] = Object.fromEntries(
-            placements.map((p) => [p.playerId, p.depth]),
+            placements.flatMap((p) => getEntrantMemberIds(tournament.id, p.entrantId)
+              .map((playerId) => [playerId, p.depth])),
           );
+          // 優勝チーム名の表示（championLabel）はチーム行の placement を見るので、
+          // 再読み込みを待たずにここでも反映しておく。
+          if (isTeamTournament(tournament)) {
+            const depthByTeam = new Map(placements.map((p) => [p.entrantId, p.depth]));
+            tournament.teams.forEach((tm) => { tm.placement = depthByTeam.get(tm.id) ?? null; });
+          }
           tournament.status = 'finished';
         }, '結果の確定');
         if (ok) await renderBracketPage(tournament.id);
@@ -996,19 +1030,37 @@ function renderResultSection(tournament) {
   heading.textContent = '最終順位';
   resultSectionEl.appendChild(heading);
 
+  // チーム戦はチーム名を主に、メンバー全員へのリンクを添える
+  // （優勝者が2人いるので、1人を代表として出すわけにいかない）。
+  const team = isTeamTournament(tournament);
+
   const rows = standings.map((s) => {
-    const player = state.players.find((p) => p.id === s.playerId);
-    const name = player ? player.currentName : s.playerId;
-    const isOwn = auth.player?.id === s.playerId;
+    const memberIds = getEntrantMemberIds(tournament.id, s.entrantId);
+    const isOwn = Boolean(auth.player) && memberIds.includes(auth.player.id);
+    const rowClass = `${s.rank <= 3 ? `rank-${s.rank}` : ''}${isOwn ? ' own-row' : ''}`;
+
+    const memberLinks = memberIds.map((id) => {
+      const player = state.players.find((p) => p.id === id);
+      const name = player ? player.currentName : id;
+      return `
+        <div class="player-identity">
+          ${avatarHtml(player ?? { currentName: name }, 'sm')}
+          <a href="#player/${encodeURIComponent(id)}">${escapeHtml(name)}</a>
+        </div>
+      `;
+    }).join('');
+
+    const cell = team
+      ? `<div class="standings-team">
+           <span class="standings-team-name">${escapeHtml(getEntrantName(tournament.id, s.entrantId) ?? '')}</span>
+           <div class="standings-team-members">${memberLinks}</div>
+         </div>`
+      : memberLinks;
+
     return `
-      <tr class="${s.rank <= 3 ? `rank-${s.rank}` : ''}${isOwn ? ' own-row' : ''}">
+      <tr class="${rowClass}">
         <td class="rank-cell">${s.rank}</td>
-        <td>
-          <div class="player-identity">
-            ${avatarHtml(player ?? { currentName: name }, 'sm')}
-            <a href="#player/${encodeURIComponent(s.playerId)}">${escapeHtml(name)}</a>
-          </div>
-        </td>
+        <td>${cell}</td>
       </tr>
     `;
   }).join('');
@@ -1017,7 +1069,7 @@ function renderResultSection(tournament) {
   wrap.className = 'table-scroll';
   wrap.innerHTML = `
     <table class="standings-table">
-      <thead><tr><th>順位</th><th>選手</th></tr></thead>
+      <thead><tr><th>順位</th><th>${team ? 'チーム' : '選手'}</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
@@ -1037,6 +1089,7 @@ function renderResultSection(tournament) {
         await db.setTournamentStatus(tournament.id, 'running');
         await db.clearEntryPlacements(tournament.id);
         delete state.placements[tournament.id];
+        tournament.teams.forEach((tm) => { tm.placement = null; });
         tournament.status = 'running';
       }, '確定の取り消し');
       if (ok) await renderBracketPage(tournament.id);
@@ -1166,7 +1219,10 @@ function renderPlayerDetail(playerId) {
           <tbody>
             ${entries.map((entry, i) => `
               <tr${!expanded && i >= VISIBLE_TOURNAMENTS ? ' class="extra-row" hidden' : ''}>
-                <td><a href="#tournament/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a></td>
+                <td>
+                  <a href="#tournament/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a>
+                  ${entry.teamName ? `<div class="meta-line">${escapeHtml(entry.teamName)}</div>` : ''}
+                </td>
                 <td>${escapeHtml(entry.tournament.date || '—')}</td>
                 <td>${escapeHtml(entry.placement || '—')}</td>
               </tr>
@@ -1378,6 +1434,23 @@ const syncEditMatchTypeNote = bindMatchTypeNoteToggle(
   tournamentEditMatchTypeInput, tournamentEditMatchTypeNoteField,
 );
 
+// 2v2は「運営が参加者を直接選ぶ」経路を使えない。この画面には選手を並べる欄しかなく、
+// チーム名と組み合わせを決められないため。選べたまま送信させてエラーを出すより、
+// 選択肢そのものを閉じておく。
+function syncEntryModeForMatchType() {
+  const isTeam = tournamentMatchTypeInput.value === '2v2';
+  const modes = [...tournamentForm.elements['entry-mode']];
+  const manualRadio = modes.find((r) => r.value === 'manual');
+
+  manualRadio.disabled = isTeam;
+  if (isTeam && manualRadio.checked) {
+    modes.find((r) => r.value === 'recruit').checked = true;
+    manualParticipantsEl.hidden = true;
+    tournamentSubmitBtn.textContent = '大会を作成';
+  }
+}
+tournamentMatchTypeInput.addEventListener('change', syncEntryModeForMatchType);
+
 tournamentForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -1394,6 +1467,10 @@ tournamentForm.addEventListener('submit', async (e) => {
   }
 
   const manual = tournamentForm.elements['entry-mode'].value === 'manual';
+  if (manual && matchType === '2v2') {
+    alert('2v2はチーム編成が必要なため、「エントリーを募集する」で作成してください。');
+    return;
+  }
   if (manual && selectedParticipantIds.length < 2) {
     alert('参加者を2人以上選択してください。');
     return;
@@ -1421,7 +1498,10 @@ tournamentForm.addEventListener('submit', async (e) => {
     capacity: manual ? null : capacity,
     status: manual ? 'running' : 'recruiting',
     createdBy: auth.player?.id ?? null,
+    // この経路は個人戦専用（2v2は上で弾いている）なので、出場枠＝選手で同じ配列になる
+    entrantIds: manual ? [...selectedParticipantIds] : [],
     participantIds: manual ? [...selectedParticipantIds] : [],
+    teams: [],
   };
 
   tournamentSubmitBtn.disabled = true;
@@ -1435,8 +1515,8 @@ tournamentForm.addEventListener('submit', async (e) => {
     // 大会を先に作らないと参加者を紐づけられない（外部キー）ので、
     // 失敗時に取り消す形で埋め合わせる。
     try {
-      await db.replaceEntries(tournament.id, tournament.participantIds);
-      const bracket = createBracket(tournament.id, tournament.participantIds);
+      await db.replaceEntries(tournament.id, tournament.entrantIds);
+      const bracket = createBracket(tournament.id, tournament.entrantIds);
       await db.saveBracket(tournament.id, bracket);
     } catch (err) {
       await db.deleteTournament(tournament.id).catch(() => {});
@@ -1451,6 +1531,7 @@ tournamentForm.addEventListener('submit', async (e) => {
   tournamentMatchTypeInput.value = '';
   tournamentMatchTypeNoteInput.value = '';
   syncMatchTypeNote();
+  syncEntryModeForMatchType();
   tournamentCapacityInput.value = '';
   tournamentRulesInput.value = '';
   tournamentImagePicker.setCurrent('');

@@ -1,4 +1,4 @@
-import { state, getPlayerName } from './state.js';
+import { state, getEntrantName, getEntrantMemberNames } from './state.js';
 import { confirmMatch, editMatch } from './bracket.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
@@ -31,8 +31,9 @@ function playerScores(match) {
   return [parts[0].trim(), parts[1].trim()];
 }
 
-// Challonge風の1選手行（シード番号・名前・スコア枠）を作る。
-function buildPlayerRow({ seed, name, isWinner }) {
+// Challonge風の1行（シード番号・名前・スコア枠）を作る。
+// チーム戦では name にチーム名が入り、members にメンバー名が並ぶ。
+function buildPlayerRow({ seed, name, members = [], isWinner }) {
   const row = document.createElement('div');
   row.className = 'match-player' + (isWinner ? ' winner' : '');
 
@@ -41,9 +42,22 @@ function buildPlayerRow({ seed, name, isWinner }) {
   if (seed != null) seedBadge.textContent = seed;
   else seedBadge.classList.add('seed-badge-empty');
 
+  // チーム名だけだと誰が出ているか分からないので、メンバー名を小さく添える
   const nameSpan = document.createElement('span');
   nameSpan.className = 'player-name';
-  nameSpan.textContent = name;
+  if (members.length > 0) {
+    const teamName = document.createElement('span');
+    teamName.className = 'entrant-team-name';
+    teamName.textContent = name;
+
+    const memberLine = document.createElement('span');
+    memberLine.className = 'entrant-members';
+    memberLine.textContent = members.join(' / ');
+
+    nameSpan.append(teamName, memberLine);
+  } else {
+    nameSpan.textContent = name;
+  }
 
   const scoreSpan = document.createElement('span');
   scoreSpan.className = 'player-score';
@@ -102,30 +116,35 @@ function renderMatchBox(tournamentId, match, onChanged, readOnly, seedOf) {
   if (match.isBye) box.classList.add('bye');
   if (match.isWalkover) box.classList.add('walkover');
 
-  // BYE（不戦勝）はラベルを出さず、進出した選手名だけをそのまま表示する。
+  // BYE（不戦勝）はラベルを出さず、進出した選手・チームの名前だけをそのまま表示する。
   if (match.isBye) {
     const { row } = buildPlayerRow({
       seed: seedOf(match.winnerId),
-      name: getPlayerName(match.winnerId),
+      name: getEntrantName(tournamentId, match.winnerId),
+      members: getEntrantMemberNames(tournamentId, match.winnerId),
       isWinner: true,
     });
     box.appendChild(row);
     return box;
   }
 
+  // player1Id / player2Id に入っているのは「出場枠」のID。チーム戦ではチームのIDになる
+  // （フィールド名は保存済みのブラケットJSONと合わせるため変えていない）。
   const p1 = match.player1Id;
   const p2 = match.player2Id;
-  const name1 = p1 ? getPlayerName(p1) : 'TBD';
-  const name2 = p2 ? getPlayerName(p2) : 'TBD';
+  const name1 = p1 ? getEntrantName(tournamentId, p1) : 'TBD';
+  const name2 = p2 ? getEntrantName(tournamentId, p2) : 'TBD';
 
   const r1 = buildPlayerRow({
     seed: p1 ? seedOf(p1) : null,
     name: name1,
+    members: getEntrantMemberNames(tournamentId, p1),
     isWinner: match.winnerId && match.winnerId === p1,
   });
   const r2 = buildPlayerRow({
     seed: p2 ? seedOf(p2) : null,
     name: name2,
+    members: getEntrantMemberNames(tournamentId, p2),
     isWinner: match.winnerId && match.winnerId === p2,
   });
 
@@ -276,11 +295,11 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
     return;
   }
 
-  // 参加者IDはシード順（index 0 = シード1位）で保存されているので、そこから番号を引く。
+  // 出場枠のIDはシード順（index 0 = シード1位）で並んでいるので、そこから番号を引く。
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
-  const seedByPlayer = new Map();
-  if (tournament) tournament.participantIds.forEach((id, i) => seedByPlayer.set(id, i + 1));
-  const seedOf = (id) => (id != null && seedByPlayer.has(id) ? seedByPlayer.get(id) : null);
+  const seedByEntrant = new Map();
+  if (tournament) tournament.entrantIds.forEach((id, i) => seedByEntrant.set(id, i + 1));
+  const seedOf = (id) => (id != null && seedByEntrant.has(id) ? seedByEntrant.get(id) : null);
 
   const wrapper = document.createElement('div');
   wrapper.className = 'bracket';

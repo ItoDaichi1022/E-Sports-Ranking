@@ -1,4 +1,4 @@
-import { state } from './state.js';
+import { state, findTournament, isTeamTournament, getPlayerName } from './state.js';
 import { tournamentTier } from './tournamentTier.js';
 
 // 「勝ち上がりの深さ」を表示用のラベルにする。優勝=1、準優勝=2、ベストN=N。
@@ -25,11 +25,20 @@ export function placementLabel(tournamentId, playerId) {
   return depth == null ? '進行中' : depthLabel(depth);
 }
 
-// 大会の優勝者。結果が確定していなければ null。
-export function championOfTournament(tournamentId) {
+// 大会の優勝者の表示名。結果が確定していなければ null。
+//
+// チーム戦ではチーム名を返す。メンバー全員のエントリー行に優勝の記録が入っているので、
+// 選手名で返すと片方だけが優勝者として出てしまう。
+export function championLabel(tournamentId) {
+  const tournament = findTournament(tournamentId);
+  if (isTeamTournament(tournament)) {
+    return tournament.teams.find((tm) => tm.placement === 1)?.name ?? null;
+  }
+
   const byPlayer = state.placements[tournamentId];
   if (!byPlayer) return null;
-  return Object.keys(byPlayer).find((playerId) => byPlayer[playerId] === 1) ?? null;
+  const championId = Object.keys(byPlayer).find((playerId) => byPlayer[playerId] === 1);
+  return championId ? getPlayerName(championId) : null;
 }
 
 // 選手の「好成績」＝出場大会の中から、参加人数で重み付けして最も価値の高い成績を1つ選ぶ。
@@ -46,7 +55,9 @@ export function bestAchievement(playerId, tournamentIds = null) {
   targets.forEach((t) => {
     const depth = state.placements[t.id]?.[playerId];
     if (depth == null) return;
-    const participantCount = t.participantIds.length;
+    // 規模は出場枠の数で測る。チーム戦の「16チーム大会」を32人大会として扱うと、
+    // 表の大きさ（＝勝ち上がりの重み）と釣り合わなくなる。
+    const participantCount = t.entrantIds.length;
     const value = participantCount / depth;
     if (!best || value > best.value) {
       best = {
@@ -63,6 +74,11 @@ export function bestAchievement(playerId, tournamentIds = null) {
 }
 
 // 選手個人の戦績サマリー（通算・大会別・試合一覧）を state から集計する。
+//
+// 対象になるのは選手として記録された試合だけ。チーム戦（2v2）の試合は
+// チーム列に記録されていて winnerId が null なので、ここには入らない
+// （個人の通算成績にチーム戦の勝敗を混ぜない、という方針）。
+// 出場した大会そのものは participantIds から拾うので、2v2も一覧には並ぶ。
 export function getPlayerStats(playerId) {
   const playerMatches = state.matches.filter(
     (m) => m.winnerId === playerId || m.loserId === playerId,
@@ -84,6 +100,8 @@ export function getPlayerStats(playerId) {
         wins: tm.filter((m) => m.winnerId === playerId).length,
         losses: tm.filter((m) => m.loserId === playerId).length,
         placement: placementLabel(t.id, playerId),
+        // チーム戦のときだけ、どのチームで出たか
+        teamName: t.teams?.find((team) => team.memberIds.includes(playerId))?.name ?? null,
       };
     });
 

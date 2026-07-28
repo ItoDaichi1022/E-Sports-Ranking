@@ -65,11 +65,37 @@ create table if not exists tournaments (
   constraint tournaments_name_not_blank check (btrim(name) <> '')
 );
 
+-- 2v2（チーム戦）の大会でブラケットの枠に入る単位。
+--
+-- 個人戦では「出場枠＝選手」だが、チーム戦では「出場枠＝チーム」になる。
+-- チームIDもuuidなので、brackets のJSON構造（player1Id / player2Id）は変えなくてよい。
+-- 入っているIDが選手かチームかは、大会の match_type で決まる。
+create table if not exists tournament_teams (
+  id            uuid primary key default gen_random_uuid(),
+  tournament_id uuid not null references tournaments(id) on delete cascade,
+  name          text not null,
+  -- 募集締切後に確定するシード順（1 = 第1シード）。tournament_entries.seed の
+  -- チーム版で、チーム大会ではこちらだけを使う
+  seed          int,
+  -- 確定した成績（勝ち上がりの深さ。優勝=1）。メンバーの entries 行にも同じ値を
+  -- 書き写すので、選手ページはチームの存在を知らなくても成績を出せる
+  placement     int,
+  created_at    timestamptz not null default now(),
+  constraint teams_name_not_blank check (btrim(name) <> ''),
+  -- 対戦表でどちらのチームか分からなくなるため、同じ大会に同名は作らせない
+  constraint teams_name_unique unique (tournament_id, name)
+);
+
 -- 大会へのエントリー（募集ページの「エントリー」ボタン）
 create table if not exists tournament_entries (
   tournament_id uuid not null references tournaments(id) on delete cascade,
   player_id     uuid not null references players(id) on delete cascade,
-  -- 募集締切後に確定するシード順（1 = 第1シード）。締切前は null
+  -- チーム戦のとき、この選手が属するチーム。個人戦では null。
+  -- 同じチームの2人が同じ team_id を共有する。主キー (tournament_id, player_id) が
+  -- 「1人が同じ大会で2チームに入る」を自動的に防ぐ。
+  team_id       uuid references tournament_teams(id) on delete cascade,
+  -- 募集締切後に確定するシード順（1 = 第1シード）。締切前は null。
+  -- チーム大会では tournament_teams.seed を使うのでこちらは null のまま
   seed          int,
   -- 確定した成績を「勝ち上がりの深さ」で持つ。優勝=1、準優勝=2、ベスト4=4 …
   -- 小さいほど上位。null は未確定（進行中、または結果を確定していない大会）。
@@ -87,14 +113,35 @@ create table if not exists brackets (
   updated_at    timestamptz not null default now()
 );
 
+-- 確定した試合。個人戦は winner_id / loser_id、チーム戦は winner_team_id /
+-- loser_team_id が入り、制約でどちらか一方だけを許す。
+--
+-- 別テーブルに分けると「1大会の試合は matches を見れば分かる」性質が崩れ、
+-- js/db.js の syncTournamentProgress の照合が二重になるので、同じテーブルに置く。
+--
+-- チーム戦の行は winner_id が null になるため、js/playerStats.js の
+-- 「自分が勝者か敗者か」の絞り込みに引っかからない。これで2v2の勝敗は個人の
+-- 通算成績（W-L）に混ざらない（個人ランキングが2v2を除外しているのと揃える）。
 create table if not exists matches (
-  id            uuid primary key default gen_random_uuid(),
-  tournament_id uuid not null references tournaments(id) on delete cascade,
-  winner_id     uuid not null references players(id) on delete restrict,
-  loser_id      uuid not null references players(id) on delete restrict,
-  score         text,
-  round         text not null,
-  constraint matches_distinct_players check (winner_id <> loser_id)
+  id             uuid primary key default gen_random_uuid(),
+  tournament_id  uuid not null references tournaments(id) on delete cascade,
+  winner_id      uuid references players(id) on delete restrict,
+  loser_id       uuid references players(id) on delete restrict,
+  winner_team_id uuid references tournament_teams(id) on delete cascade,
+  loser_team_id  uuid references tournament_teams(id) on delete cascade,
+  score          text,
+  round          text not null,
+  -- 列がnullのとき check は NULL（＝通過）になるので、使っていない側の組は素通りする。
+  -- ここを `is distinct from` にすると null 同士がfalseと評価され、全行が弾かれる。
+  constraint matches_distinct_players check (winner_id <> loser_id),
+  constraint matches_distinct_teams check (winner_team_id <> loser_team_id),
+  constraint matches_entrant_check check (
+    (winner_id is not null and loser_id is not null
+     and winner_team_id is null and loser_team_id is null)
+    or
+    (winner_team_id is not null and loser_team_id is not null
+     and winner_id is null and loser_id is null)
+  )
 );
 
 -- 運営が「公開する」を押した瞬間のランキングのスナップショット。
@@ -124,7 +171,11 @@ create table if not exists announcements (
 create index if not exists matches_tournament_idx on matches (tournament_id);
 create index if not exists matches_winner_idx     on matches (winner_id);
 create index if not exists matches_loser_idx      on matches (loser_id);
+create index if not exists matches_winner_team_idx on matches (winner_team_id);
+create index if not exists matches_loser_team_idx  on matches (loser_team_id);
 create index if not exists entries_player_idx     on tournament_entries (player_id);
+create index if not exists entries_team_idx       on tournament_entries (team_id);
+create index if not exists teams_tournament_idx   on tournament_teams (tournament_id);
 create index if not exists tournaments_status_idx on tournaments (status);
 create index if not exists rankings_published_idx on published_rankings (published_at desc);
 create index if not exists announcements_order_idx on announcements (pinned desc, created_at desc);
@@ -176,6 +227,10 @@ $$;
 --   2. 行単位トリガーから見た count(*) には、同じINSERT文で挿入中の行が含まれない。
 --      そのため一括挿入では全行が「まだ0人」と判定され、定員が素通りしていた。
 -- AFTER INSERT の遷移テーブルなら、何行まとめて入っても最終状態だけを1回検査できる。
+--
+-- チーム大会の定員は「チーム数」で数える。行をそのまま数えると16チーム32人が
+-- 定員16に対して32と判定され、正しいエントリーが弾かれてしまう。
+-- coalesce(team_id, player_id) なら、個人戦は人数・チーム戦はチーム数になる。
 -- ---------------------------------------------------------------------------
 
 create or replace function enforce_entry_capacity() returns trigger
@@ -192,9 +247,10 @@ begin
     -- 同じ大会への同時エントリーを直列化する（ロックしてから数える）
     select capacity into cap from tournaments where id = rec.tournament_id for update;
     if cap is not null then
-      select count(*) into cnt from tournament_entries where tournament_id = rec.tournament_id;
+      select count(distinct coalesce(team_id, player_id)) into cnt
+        from tournament_entries where tournament_id = rec.tournament_id;
       if cnt > cap then
-        raise exception 'この大会は定員（%人）に達しています。', cap using errcode = 'check_violation';
+        raise exception 'この大会は定員（%）に達しています。', cap using errcode = 'check_violation';
       end if;
     end if;
   end loop;
@@ -244,7 +300,7 @@ create trigger announcements_touch_trigger
 revoke all on all tables in schema public from anon, authenticated;
 
 -- 閲覧は全員（ログアウト状態のゲストを含む）
-grant select on players, tournaments, tournament_entries, brackets, matches, published_rankings, announcements
+grant select on players, tournaments, tournament_teams, tournament_entries, brackets, matches, published_rankings, announcements
   to anon, authenticated;
 
 -- 選手行の作成。idとroleは指定させない（roleは既定値'player'が入る）
@@ -259,7 +315,7 @@ grant update (display_name, past_names, game_account_id, bio, avatar_url,
 
 grant delete on players to authenticated;
 
-grant insert, update, delete on tournaments, tournament_entries, brackets, matches, published_rankings, announcements
+grant insert, update, delete on tournaments, tournament_teams, tournament_entries, brackets, matches, published_rankings, announcements
   to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -268,6 +324,7 @@ grant insert, update, delete on tournaments, tournament_entries, brackets, match
 
 alter table players             enable row level security;
 alter table tournaments         enable row level security;
+alter table tournament_teams    enable row level security;
 alter table tournament_entries  enable row level security;
 alter table brackets            enable row level security;
 alter table matches             enable row level security;
@@ -312,6 +369,21 @@ create policy tournaments_write on tournaments
   using (is_admin())
   with check (is_admin());
 
+-- ---- tournament_teams ----
+
+drop policy if exists teams_select on tournament_teams;
+create policy teams_select on tournament_teams
+  for select to anon, authenticated
+  using (true);
+
+-- 一般ユーザーの経路は下のRPC（enter_tournament_as_team / cancel_team_entry）に
+-- 限定する。RPCは security definer なのでRLSを通らない。直接の書き込みは運営だけ。
+drop policy if exists teams_write on tournament_teams;
+create policy teams_write on tournament_teams
+  for all to authenticated
+  using (is_admin())
+  with check (is_admin());
+
 -- ---- tournament_entries ----
 
 drop policy if exists entries_select on tournament_entries;
@@ -319,7 +391,9 @@ create policy entries_select on tournament_entries
   for select to anon, authenticated
   using (true);
 
--- 自分の選手行で、募集中の大会にだけエントリーできる
+-- 自分の選手行で、募集中の大会にだけエントリーできる。
+-- チーム戦は申し込んだ人が相方の行も入れる必要があるので、このポリシーでは通らない。
+-- 代わりに enter_tournament_as_team（security definer）を通す。
 drop policy if exists entries_insert on tournament_entries;
 create policy entries_insert on tournament_entries
   for insert to authenticated
@@ -492,6 +566,149 @@ grant execute on function admin_link_player_account(uuid, uuid) to authenticated
 grant execute on function admin_merge_players(uuid, uuid)     to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- チームでのエントリー（RPC）
+--
+-- entries_insert ポリシーは「自分の選手行だけ」しか挿入させない。チーム戦では
+-- 申し込んだ人が相方の行も入れる必要があるので、security definer の関数を通す。
+-- 大会行を FOR UPDATE でロックしてから定員を数えるので、同時に申し込まれても
+-- 定員を超えない（個人エントリーのトリガーと同じ考え方）。
+-- ---------------------------------------------------------------------------
+
+create or replace function enter_tournament_as_team(
+  p_tournament_id uuid,
+  p_team_name     text,
+  p_member_ids    uuid[]
+) returns uuid
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+declare
+  v_me      uuid;
+  v_name    text;
+  v_members uuid[];
+  v_status  text;
+  v_type    text;
+  v_cap     int;
+  v_count   int;
+  v_team_id uuid;
+begin
+  v_me := current_player_id();
+  if v_me is null then
+    raise exception '選手登録がまだのためエントリーできません。' using errcode = 'insufficient_privilege';
+  end if;
+
+  v_name := btrim(coalesce(p_team_name, ''));
+  if v_name = '' then
+    raise exception 'チーム名を入力してください。' using errcode = 'check_violation';
+  end if;
+  if char_length(v_name) > 24 then
+    raise exception 'チーム名は24文字までにしてください。' using errcode = 'check_violation';
+  end if;
+
+  select array_agg(distinct m) into v_members
+    from unnest(coalesce(p_member_ids, '{}'::uuid[])) as m;
+  if v_members is null or array_length(v_members, 1) <> 2 then
+    raise exception 'チームはちょうど2人で登録してください。' using errcode = 'check_violation';
+  end if;
+  if not (v_me = any(v_members)) then
+    raise exception '自分が入っていないチームは登録できません。' using errcode = 'insufficient_privilege';
+  end if;
+  if (select count(*) from players where id = any(v_members)) <> 2 then
+    raise exception '選択された選手が見つかりません。' using errcode = 'no_data_found';
+  end if;
+
+  -- 同じ大会への同時エントリーを直列化する
+  select status, match_type, capacity into v_status, v_type, v_cap
+    from tournaments where id = p_tournament_id for update;
+  if not found then
+    raise exception '大会が見つかりません。' using errcode = 'no_data_found';
+  end if;
+  if v_status <> 'recruiting' then
+    raise exception 'この大会は募集中ではありません。' using errcode = 'check_violation';
+  end if;
+  if v_type is distinct from '2v2' then
+    raise exception 'この大会はチーム戦ではありません。' using errcode = 'check_violation';
+  end if;
+
+  if exists (
+    select 1 from tournament_entries
+    where tournament_id = p_tournament_id and player_id = any(v_members)
+  ) then
+    raise exception 'すでにこの大会にエントリーしている選手が含まれています。' using errcode = 'unique_violation';
+  end if;
+
+  if exists (
+    select 1 from tournament_teams
+    where tournament_id = p_tournament_id and name = v_name
+  ) then
+    raise exception 'このチーム名はすでに使われています。' using errcode = 'unique_violation';
+  end if;
+
+  -- 定員はチーム数で数える。挿入前に数えるので +1 して比べる
+  if v_cap is not null then
+    select count(distinct coalesce(team_id, player_id)) into v_count
+      from tournament_entries where tournament_id = p_tournament_id;
+    if v_count + 1 > v_cap then
+      raise exception 'この大会は定員（%チーム）に達しています。', v_cap using errcode = 'check_violation';
+    end if;
+  end if;
+
+  insert into tournament_teams (tournament_id, name)
+    values (p_tournament_id, v_name)
+    returning id into v_team_id;
+
+  insert into tournament_entries (tournament_id, player_id, team_id)
+    select p_tournament_id, m, v_team_id from unnest(v_members) as m;
+
+  return v_team_id;
+end;
+$$;
+
+-- チームのエントリー取り消し。メンバーなら誰でも取り消せる。
+-- 2人組は片方が抜けた時点で成立しないので、「申し込んだ人だけ」に絞ると
+-- その人が離脱したときに相方がチームを畳めなくなる。
+create or replace function cancel_team_entry(p_team_id uuid)
+  returns void
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+declare
+  v_me     uuid;
+  v_tid    uuid;
+  v_status text;
+begin
+  select tournament_id into v_tid from tournament_teams where id = p_team_id;
+  if not found then
+    raise exception 'チームが見つかりません。' using errcode = 'no_data_found';
+  end if;
+
+  select status into v_status from tournaments where id = v_tid for update;
+
+  if not is_admin() then
+    v_me := current_player_id();
+    if v_status <> 'recruiting' then
+      raise exception '募集が締め切られているため取り消せません。' using errcode = 'check_violation';
+    end if;
+    if not exists (
+      select 1 from tournament_entries where team_id = p_team_id and player_id = v_me
+    ) then
+      raise exception '自分が入っているチームではありません。' using errcode = 'insufficient_privilege';
+    end if;
+  end if;
+
+  -- メンバーの entries 行は team_id の ON DELETE CASCADE で一緒に消える
+  delete from tournament_teams where id = p_team_id;
+end;
+$$;
+
+revoke all on function enter_tournament_as_team(uuid, text, uuid[]) from anon, public;
+revoke all on function cancel_team_entry(uuid)                      from anon, public;
+grant execute on function enter_tournament_as_team(uuid, text, uuid[]) to authenticated;
+grant execute on function cancel_team_entry(uuid)                      to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- アイコン画像の保管場所（Storage）
 --
 -- 誰でも見られる（公開バケット）が、書き込めるのは自分のフォルダだけ。
@@ -604,6 +821,12 @@ end $$;
 do $$
 begin
   execute 'alter publication supabase_realtime add table tournament_entries';
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  execute 'alter publication supabase_realtime add table tournament_teams';
 exception when duplicate_object then null;
 end $$;
 

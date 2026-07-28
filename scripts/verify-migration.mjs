@@ -33,7 +33,14 @@ function legacyState(data) {
   };
   return {
     players: data.players.map((p) => ({ ...p })),
-    tournaments: data.tournaments.map((t) => ({ ...t, status: statusOf(t) })),
+    // 旧データはすべて個人戦。出場枠＝選手なので entrantIds は participantIds と同じ
+    tournaments: data.tournaments.map((t) => ({
+      ...t,
+      status: statusOf(t),
+      matchType: t.matchType ?? null,
+      entrantIds: [...(t.participantIds ?? [])],
+      teams: [],
+    })),
     matches,
     brackets,
   };
@@ -66,7 +73,11 @@ function migratedState(rows) {
       weight: t.weight,
       rules: t.rules,
       status: t.status,
+      matchType: t.match_type ?? null,
+      // 旧データはすべて個人戦なので、出場枠＝選手で同じ配列になる
+      entrantIds: participantsByTournament.get(t.id) ?? [],
       participantIds: participantsByTournament.get(t.id) ?? [],
+      teams: [],
     })),
     matches: rows.matchRows.map((m) => ({
       id: m.id,
@@ -94,7 +105,7 @@ function withState(snapshot, fn) {
   state.placements = {};
   Object.entries(snapshot.brackets).forEach(([tid, bracket]) => {
     state.placements[tid] = Object.fromEntries(
-      finalPlacements(bracket).map((p) => [p.playerId, p.depth]),
+      finalPlacements(bracket).map((p) => [p.entrantId, p.depth]),
     );
   });
 

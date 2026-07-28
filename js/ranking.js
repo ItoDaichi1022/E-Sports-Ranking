@@ -1,5 +1,6 @@
 import { bestAchievement } from './playerStats.js';
 import { isRankedTournament } from './rankingEligibility.js';
+import { getEntrantMemberIds } from './state.js';
 
 // LumiRank軽量版：相手の強さで重み付けした反復スコアリングのみを残した最小実装。
 // doc/design.md の「7. ランキング方式」に準拠する。
@@ -12,10 +13,11 @@ export const RANKING_CONFIG = {
   minTournaments: 1,    // 足切り大会数（design.md 10章で確定）
 };
 
-// 大会規模による重み。tournament.weight が未設定(null)の場合は参加人数から暫定算出する。
+// 大会規模による重み。tournament.weight が未設定(null)の場合は出場枠の数から暫定算出する。
+// （ここに来るのは1v1・リレーの大会だけなので、出場枠＝参加人数）
 function getTournamentWeight(tournament) {
   if (tournament.weight != null) return tournament.weight;
-  return tournament.participantIds.length;
+  return tournament.entrantIds.length;
 }
 
 // 各ランキングエントリに、前回公開時点の順位（previousRank）を付与する。
@@ -63,10 +65,23 @@ export function filterMatchesByPeriod(state, periodMonths) {
 }
 
 // 試合一覧から「選手ID -> 出場した大会IDのSet」を作る。
+//
+// チーム戦の試合は選手列が空なので、チームのメンバー全員に出場を数える。
+// これは「その大会に出たか」を集めるだけで、勝敗のスコアには影響しない
+// （スコアに使う rankedMatches にチーム戦の試合は含まれない）。数えておかないと
+// 2v2で優勝しても、ランキングカードの「好成績」に選ばれなくなる。
 function countTournamentsByPlayer(matches) {
   const byPlayer = new Map();
   matches.forEach((m) => {
-    [m.winnerId, m.loserId].forEach((id) => {
+    const ids = m.winnerTeamId
+      ? [
+        ...getEntrantMemberIds(m.tournamentId, m.winnerTeamId),
+        ...getEntrantMemberIds(m.tournamentId, m.loserTeamId),
+      ]
+      : [m.winnerId, m.loserId];
+
+    ids.forEach((id) => {
+      if (!id) return;
       if (!byPlayer.has(id)) byPlayer.set(id, new Set());
       byPlayer.get(id).add(m.tournamentId);
     });

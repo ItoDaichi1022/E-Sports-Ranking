@@ -194,6 +194,7 @@ node scripts/verify-migration.mjs
 | [`migration-004.sql`](migration-004.sql) | 大会・お知らせの画像（`image_url` 列と `images` バケット） |
 | [`migration-005.sql`](migration-005.sql) | 確定した成績の保存（`tournament_entries.placement`） |
 | [`migration-006.sql`](migration-006.sql) | 大会の対戦方法（`tournaments.match_type`）＝ランキング反映の条件 |
+| [`migration-007.sql`](migration-007.sql) | 2v2（チーム戦）対応（`tournament_teams` テーブルとチームでのエントリー） |
 
 補足:
 
@@ -208,6 +209,11 @@ node scripts/verify-migration.mjs
 - **006 の `match_type`** — 参加24人以上かつ1v1／リレーの大会だけをランキングのスコアに
   反映するための列です。既存の大会は対戦方法が分からないため `null`（＝反映対象外）で
   入ります。反映させたい大会は、大会詳細の「大会情報を編集」から対戦方法を選び直してください。
+- **007 の 2v2 対応** — チーム戦ではブラケットの枠に入るのがチームになるため、
+  `tournament_teams` テーブルと、チーム単位でエントリーするRPCを追加します。
+  `matches` の選手列を `null` 許容にし、チーム用の列を足します（どちらか一方だけが
+  入ることを制約で保証）。既存の大会は `team_id` が `null` のままなので挙動は変わりません。
+  定員の数え方も「チーム大会ならチーム数」に変わります。
 
 ## 8. 後始末
 
