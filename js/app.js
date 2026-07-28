@@ -1340,9 +1340,35 @@ async function refreshFromDb({ silent = false } = {}) {
 // フォーム入力中は再描画で入力内容が消えるため、更新の反映を見送る。
 function isUserTyping() {
   const el = document.activeElement;
-  if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return true;
+  if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
+    // 対戦チャットのメッセージ入力と報告文は例外。ダイアログは routeFromHash の
+    // 再描画対象外で、syncOpenChat もこの2つには触らないので、入力が消えることはない。
+    // ここで真を返すと、チャットで会話している間じゅう更新が届かなくなってしまう
+    // （送信のたびにフォーカスが入力欄へ戻るため、開いている間はほぼ常に入力中になる）。
+    const exempt = el.id === 'match-chat-input' || el.id === 'match-chat-report-input';
+    if (!exempt) return true;
+  }
   return [...document.querySelectorAll('.score-num-input')].some((i) => i.value !== '');
 }
+
+// 入力中に届いた更新通知の持ち越し。捨ててしまうと、次の保険の全件取得
+// （Realtime接続中は15分に1回）まで画面が古いまま残る。相手のゲームカウント報告が
+// 「リロードしないと出ない」ように見えていたのはこれが原因。
+let refreshHeldByTyping = false;
+
+function flushHeldRefresh() {
+  if (!refreshHeldByTyping || document.hidden || isUserTyping()) return;
+  refreshHeldByTyping = false;
+  refreshFromDb({ silent: true });
+}
+
+// 入力欄からフォーカスが外れた直後に反映する。focusout の時点では次のフォーカス先が
+// まだ定まっていない（activeElement が body になっている）ので、一拍置いてから判定する。
+document.addEventListener('focusout', () => setTimeout(flushHeldRefresh, 100));
+
+// スコア入力欄は、空にするか送信するまで isUserTyping が真のままなので、
+// focusout だけでは拾えない。保険として数秒ごとにも見る（フラグ確認だけなので軽い）。
+setInterval(flushHeldRefresh, 5000);
 
 // ---- イベント配線 ----
 
@@ -1786,7 +1812,12 @@ window.addEventListener('hashchange', () => {
 
 // タブを開き直したときは最新を取り込む（Realtimeが届かない間に進んでいることがある）
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && !isUserTyping()) refreshFromDb({ silent: true });
+  if (document.hidden) return;
+  if (isUserTyping()) {
+    refreshHeldByTyping = true;
+    return;
+  }
+  refreshFromDb({ silent: true });
 });
 
 // チャットから報告が出された／対応済みになった。大会カードと対戦表の印を出し直す。
@@ -1817,8 +1848,12 @@ async function start() {
   await refreshFromDb();
 
   // 10秒ポーリングの置き換え。誰かが勝敗を入力した瞬間に全員の画面へ届く。
+  // 入力中は捨てずに持ち越し、手が空いた時点で flushHeldRefresh が反映する。
   db.subscribeToChanges(() => {
-    if (isUserTyping()) return;
+    if (isUserTyping()) {
+      refreshHeldByTyping = true;
+      return;
+    }
     refreshFromDb({ silent: true });
   });
 

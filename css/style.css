@@ -631,6 +631,23 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   color: var(--text-faint);
 }
 
+/* ラベル文字列と「任意」の印を同じ行に並べる */
+.field-label-text {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.optional-tag {
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-faint);
+  background: var(--surface-3);
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+}
+
 /* フォーム内のメッセージ。flexコンテナの中で幅を指定しないと、
    他の項目の間に押し込まれて潰れ、エラーが出ていても読めなくなる。 */
 .form-message {

@@ -70,6 +70,20 @@ export function isProfileFormMounted(containerEl) {
   return Boolean(containerEl.querySelector('form.profile-form'));
 }
 
+// ラベル文字列と、未入力でもよい項目には「任意」の印を並べて1行に収める。
+function buildLabelHeading(text, { required = false } = {}) {
+  const heading = document.createElement('span');
+  heading.className = 'field-label-text';
+  heading.appendChild(document.createTextNode(text));
+  if (!required) {
+    const tag = document.createElement('span');
+    tag.className = 'optional-tag';
+    tag.textContent = '任意';
+    heading.appendChild(tag);
+  }
+  return heading;
+}
+
 // プロフィール編集フォームを描画する。
 // onSubmit(profile) は入力内容をまとめたオブジェクトを受け取る。
 export function renderProfileForm(containerEl, player, { onSubmit, submitLabel = '保存', onCancel = null }) {
@@ -80,7 +94,7 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
 
   FIELDS.forEach((field) => {
     const label = document.createElement('label');
-    label.appendChild(document.createTextNode(field.label));
+    label.appendChild(buildLabelHeading(field.label, { required: field.required }));
 
     const input = document.createElement('input');
     input.type = 'text';
@@ -108,7 +122,7 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
 
   const avatarLabel = document.createElement('label');
   avatarLabel.className = 'avatar-field';
-  avatarLabel.appendChild(document.createTextNode('アイコン'));
+  avatarLabel.appendChild(buildLabelHeading('アイコン'));
 
   const avatarRow = document.createElement('div');
   avatarRow.className = 'avatar-row';
@@ -167,7 +181,7 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
 
   const bioLabel = document.createElement('label');
   bioLabel.className = 'rules-field';
-  bioLabel.appendChild(document.createTextNode('自己紹介'));
+  bioLabel.appendChild(buildLabelHeading('自己紹介'));
   const bio = document.createElement('textarea');
   bio.name = 'bio';
   bio.rows = 4;

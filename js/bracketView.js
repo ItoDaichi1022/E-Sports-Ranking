@@ -423,6 +423,15 @@ function roundControls(tournamentId, roundIndex, round, readOnly, onRefresh) {
 export function renderBracket(tournamentId, containerEl, onChanged, options = {}) {
   const readOnly = !!options.readOnly;
   const onRefresh = options.onRefresh ?? (async () => {});
+
+  // 同じ大会の描き直しでは、横スクロール位置を引き継ぐ。
+  // 対戦表は Realtime の更新（他の画面の変更でも飛んでくる）のたびに丸ごと
+  // 作り直されるので、これが無いと見ている最中に先頭へ戻ってしまう。
+  // 別の大会を初めて描くときは引き継がない（前の大会の位置は無関係）。
+  const prevWrapper = containerEl.querySelector('.bracket');
+  const keepScroll = prevWrapper && lastRenderArgs?.tournamentId === tournamentId;
+  const prevScrollLeft = keepScroll ? prevWrapper.scrollLeft : 0;
+
   lastRenderArgs = { tournamentId, containerEl, onChanged, options };
 
   const bracket = state.brackets[tournamentId];
@@ -481,4 +490,8 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
 
   containerEl.appendChild(wrapper);
   drawConnectorLines(bracket, wrapper, matchElements);
+
+  // スクロールの復元は接続線を描いた後に行う。線の座標は getBoundingClientRect で
+  // 測っていて、先にスクロールさせると測り取る位置がその分ずれてしまう。
+  if (prevScrollLeft > 0) wrapper.scrollLeft = prevScrollLeft;
 }
