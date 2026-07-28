@@ -1650,8 +1650,9 @@ a.card:hover {
   font-weight: 700;
 }
 
-/* 運営が見たときの「選手からの報告」行 */
-.match-status.pending-note { color: var(--info); }
+/* 運営が見たときの「選手からの報告」行（対戦表・対戦チャット両方） */
+.match-status.pending-note,
+.chat-result-note.pending-note { color: var(--info); }
 
 /* チャットの中の入力欄 */
 .chat-result {

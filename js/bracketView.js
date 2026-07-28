@@ -2,7 +2,7 @@ import {
   state, getEntrantName, getEntrantMemberNames, getEntrantMemberIds, openChatReports,
   pendingResultReport, entrantIdOfPlayer, roundState, isRoundStarted, isStreamedMatch,
 } from './state.js';
-import { confirmMatch, editMatch } from './bracket.js';
+import { editMatch } from './bracket.js';
 import { auth, isAdmin } from './auth.js';
 import { canUseMatchChat, openMatchChat } from './matchChat.js';
 import * as db from './db.js';
@@ -70,15 +70,6 @@ function buildPlayerRow({ seed, name, members = [], isWinner }) {
 
   row.append(seedBadge, nameEl, scoreSpan);
   return { row, scoreSpan, nameEl };
-}
-
-function makeScoreInput(label) {
-  const input = document.createElement('input');
-  input.type = 'number';
-  input.min = '0';
-  input.className = 'score-num-input';
-  input.setAttribute('aria-label', `${label}のスコア`);
-  return input;
 }
 
 function drawConnectorLines(bracket, wrapper, matchElements) {
@@ -164,8 +155,7 @@ function resultStatusLine(tournamentId, roundIndex, match, myEntrant, name1, nam
 
   const pending = pendingResultReport(tournamentId, match.id);
   if (!pending) {
-    line.textContent = 'チャットから結果を報告できます';
-    return line;
+    return null;
   }
 
   line.classList.add('awaiting');
@@ -253,12 +243,12 @@ function renderMatchBox(
     isWinner: match.winnerId && match.winnerId === p2,
   });
 
-  const editable = !readOnly && !match.confirmed && p1 && p2;
-
   // 対戦カードごとのチャット。入れるのは当事者と運営だけ（判定はDBのポリシーが持ち、
   // ここでの出し分けは押せないものを見せないための便宜）。
+  // 勝敗の入力・確定もここ（対戦チャットのダイアログ）で行う。運営は直接確定、
+  // 選手は報告して相手の承認を待つ（js/matchChat.js）。
   const chatAvailable = canUseMatchChat(tournament, match);
-  const openChat = () => openMatchChat(tournament, match, roundIndex, onRefresh);
+  const openChat = () => openMatchChat(tournament, match, roundIndex, onRefresh, onChanged);
 
   // 未対応の報告がある試合は、運営の画面で枠ごと目立たせる。
   // 報告した本人にも見えるが、印は運営を探させるためのものなので運営にだけ出す。
@@ -271,26 +261,28 @@ function renderMatchBox(
     box.appendChild(flag);
   }
 
-  // 自分の試合では名前欄が入口になるので、下のボタンは出さない（入口は1つでいい）。
+  // 自分の試合、または運営が見ているときは名前欄が入口になるので、下のボタンは出さない
+  // （入口は1つでいい）。運営はどちらの名前を押しても同じ画面（確定・チャット）を開ける。
   let ownRowIsChatEntry = false;
   if (chatAvailable) {
     box.classList.add('has-chat');
-    // 自分がいる側の名前欄だけを押せるようにする。運営が他人の試合を見ているときは
-    // どちらも自分の行ではないので、下のボタンだけが入口になる。
-    [[p1, r1], [p2, r2]].forEach(([entrantId, row]) => {
-      if (getEntrantMemberIds(tournamentId, entrantId).includes(auth.player?.id)) {
-        makeRowChatTarget(row.nameEl, openChat);
-        ownRowIsChatEntry = true;
-      }
-    });
+    if (!readOnly) {
+      [r1, r2].forEach((row) => makeRowChatTarget(row.nameEl, openChat));
+      ownRowIsChatEntry = true;
+    } else {
+      // 自分がいる側の名前欄だけを押せるようにする。
+      [[p1, r1], [p2, r2]].forEach(([entrantId, row]) => {
+        if (getEntrantMemberIds(tournamentId, entrantId).includes(auth.player?.id)) {
+          makeRowChatTarget(row.nameEl, openChat);
+          ownRowIsChatEntry = true;
+        }
+      });
+    }
   }
   const showChatButton = chatAvailable && !ownRowIsChatEntry;
 
-  // 勝敗入力中はフォームで行をまとめ、Enterでも確定できるようにする。
-  const rowsHost = editable ? document.createElement('form') : box;
-  if (editable) rowsHost.className = 'match-edit';
-  rowsHost.appendChild(r1.row);
-  rowsHost.appendChild(r2.row);
+  box.appendChild(r1.row);
+  box.appendChild(r2.row);
 
   if (match.confirmed) {
     if (match.isWalkover) {
@@ -326,125 +318,40 @@ function renderMatchBox(
     return box;
   }
 
-  if (!editable) {
+  if (!p1 || !p2) {
     const status = document.createElement('div');
     status.className = 'match-status';
-    status.textContent = p1 && p2 ? '未実施' : '対戦カード未確定';
+    status.textContent = '対戦カード未確定';
     box.appendChild(status);
-
-    // 自分が戦っている対戦なら、ゲームカウントを入れられる。
-    // 運営はこの分岐に来ない（上の勝敗入力フォームでその場で確定できる）。
-    // 自分が戦っている対戦なら、いま何を待っているのかを1行で出す。
-    // 入力はチャットの中（js/matchChat.js）。
-    const myEntrant = entrantIdOfPlayer(tournament, auth.player?.id);
-    if (p1 && p2 && myEntrant && (myEntrant === p1 || myEntrant === p2)) {
-      box.appendChild(resultStatusLine(
-        tournamentId, roundIndex, match, myEntrant, name1, name2,
-      ));
-    }
-
-    if (showChatButton) box.appendChild(chatButton(match, openChat));
     return box;
   }
 
-  // 運営が見ている未確定の試合に、選手からの承認待ちが出ていたら知らせる。
-  // 運営はそれを見たうえで、自分でその場で確定させられる。
-  const pending = pendingResultReport(tournamentId, match.id);
-  if (pending) {
-    const note = document.createElement('div');
-    note.className = 'match-status pending-note';
-    note.textContent = `選手からの報告: ${scoreSentence(name1, name2, pending.score)}（承認待ち）`;
-    box.appendChild(note);
+  if (!readOnly) {
+    // 運営向け。承認待ちの報告があれば一言だけ添える。入力・確定は名前欄から開く画面で行う。
+    const pending = pendingResultReport(tournamentId, match.id);
+    if (pending) {
+      const note = document.createElement('div');
+      note.className = 'match-status pending-note';
+      note.textContent = `選手からの報告: ${scoreSentence(name1, name2, pending.score)}（承認待ち）`;
+      box.appendChild(note);
+    }
+
+    // 運営は開始前に配信台を決める。開始後は組み替えさせない
+    // （選手には「配信台」と伝わっているので、始まってから動かすと混乱する）。
+    if (!isRoundStarted(tournamentId, roundIndex)) {
+      box.appendChild(streamToggle(tournamentId, roundIndex, match, onRefresh));
+    }
+    return box;
   }
 
-  // --- ここから勝敗入力フォーム ---
-  const score1Input = makeScoreInput(name1);
-  const score2Input = makeScoreInput(name2);
-  r1.scoreSpan.appendChild(score1Input);
-  r2.scoreSpan.appendChild(score2Input);
-
-  const controls = document.createElement('div');
-  controls.className = 'match-controls';
-
-  const walkoverLabel = document.createElement('label');
-  walkoverLabel.className = 'walkover-toggle';
-  const walkoverCheckbox = document.createElement('input');
-  walkoverCheckbox.type = 'checkbox';
-  walkoverLabel.appendChild(walkoverCheckbox);
-  walkoverLabel.appendChild(document.createTextNode(' 不戦勝で確定（スコアなし）'));
-
-  const walkoverWinnerWrap = document.createElement('div');
-  walkoverWinnerWrap.className = 'walkover-winner';
-  walkoverWinnerWrap.hidden = true;
-  const walkoverSelect = document.createElement('select');
-  const optDefault = new Option('勝者を選択', '');
-  const opt1 = new Option(name1, p1);
-  const opt2 = new Option(name2, p2);
-  walkoverSelect.append(optDefault, opt1, opt2);
-  walkoverWinnerWrap.appendChild(walkoverSelect);
-
-  walkoverCheckbox.addEventListener('change', () => {
-    const isWalkover = walkoverCheckbox.checked;
-    score1Input.disabled = isWalkover;
-    score2Input.disabled = isWalkover;
-    walkoverWinnerWrap.hidden = !isWalkover;
-  });
-
-  const submitBtn = document.createElement('button');
-  submitBtn.type = 'submit';
-  submitBtn.textContent = '確定';
-
-  controls.append(walkoverLabel, walkoverWinnerWrap, submitBtn);
-  rowsHost.appendChild(controls);
-
-  rowsHost.addEventListener('submit', (e) => {
-    e.preventDefault();
-
-    if (walkoverCheckbox.checked) {
-      if (!walkoverSelect.value) {
-        alert('不戦勝の勝者を選択してください。');
-        return;
-      }
-      const result = confirmMatch(tournamentId, match.id, walkoverSelect.value, null, { isWalkover: true });
-      if (!result.ok) {
-        alert(result.error);
-        return;
-      }
-      onChanged();
-      return;
-    }
-
-    const raw1 = score1Input.value.trim();
-    const raw2 = score2Input.value.trim();
-    if (raw1 === '' || raw2 === '') {
-      alert('両者のスコアを入力してください。');
-      return;
-    }
-    const s1 = Number(raw1);
-    const s2 = Number(raw2);
-    if (!Number.isFinite(s1) || !Number.isFinite(s2) || s1 < 0 || s2 < 0) {
-      alert('スコアは0以上の数値で入力してください。');
-      return;
-    }
-    if (s1 === s2) {
-      alert('スコアが同点のため勝者を判定できません。');
-      return;
-    }
-    const winnerId = s1 > s2 ? p1 : p2;
-    const result = confirmMatch(tournamentId, match.id, winnerId, `${s1}-${s2}`);
-    if (!result.ok) {
-      alert(result.error);
-      return;
-    }
-    onChanged();
-  });
-
-  box.appendChild(rowsHost);
-
-  // 運営は開始前に配信台を決める。開始後は組み替えさせない
-  // （選手には「配信台」と伝わっているので、始まってから動かすと混乱する）。
-  if (!isRoundStarted(tournamentId, roundIndex)) {
-    box.appendChild(streamToggle(tournamentId, roundIndex, match, onRefresh));
+  // 選手・観戦者向け。自分が戦っている対戦なら、いま何を待っているのかを1行で出す
+  // （入力はチャットの中）。
+  const myEntrant = entrantIdOfPlayer(tournament, auth.player?.id);
+  if (myEntrant && (myEntrant === p1 || myEntrant === p2)) {
+    const statusLine = resultStatusLine(
+      tournamentId, roundIndex, match, myEntrant, name1, name2,
+    );
+    if (statusLine) box.appendChild(statusLine);
   }
 
   if (showChatButton) box.appendChild(chatButton(match, openChat));

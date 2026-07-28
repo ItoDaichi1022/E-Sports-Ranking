@@ -18,6 +18,7 @@ import {
   findTournament, pendingResultReport, isRoundStarted,
 } from './state.js';
 import { auth, isAdmin } from './auth.js';
+import { confirmMatch } from './bracket.js';
 import { escapeHtml } from './util.js';
 import * as db from './db.js';
 
@@ -42,7 +43,7 @@ const reportCancelBtn = document.getElementById('match-chat-report-cancel-btn');
 const resultEl = document.getElementById('match-chat-result');
 
 // 開いている部屋。閉じている間は null。
-let room = null; // { tournamentId, matchId, roundIndex, messages: [], lastAt, onRefresh }
+let room = null; // { tournamentId, matchId, roundIndex, messages: [], lastAt, onRefresh, onChanged }
 let pollTimer = null;
 
 // 開いている部屋の試合を state から引き直す。
@@ -219,8 +220,101 @@ function resultForm(match, name1, name2) {
   return form;
 }
 
-// 当事者だけに出す欄。運営が他人の対戦を覗いているときは出ない
-// （運営は対戦表の勝敗入力からその場で確定できる）。
+// 運営だけに出す欄。選手の報告と違い、承認を待たずその場で確定させる
+// （対戦表の勝敗入力が持っていた権限をそのままここへ移した）。
+function adminConfirmForm(match, name1, name2) {
+  const form = document.createElement('form');
+  form.className = 'chat-result-form';
+
+  const input1 = scoreInput(name1);
+  const input2 = scoreInput(name2);
+
+  [[name1, input1], [name2, input2]].forEach(([name, input]) => {
+    const row = document.createElement('label');
+    row.className = 'chat-result-row';
+    row.append(document.createTextNode(name), input);
+    form.appendChild(row);
+  });
+
+  const walkoverLabel = document.createElement('label');
+  walkoverLabel.className = 'walkover-toggle';
+  const walkoverCheckbox = document.createElement('input');
+  walkoverCheckbox.type = 'checkbox';
+  walkoverLabel.append(walkoverCheckbox, document.createTextNode(' 不戦勝で確定（スコアなし）'));
+
+  const walkoverWinnerWrap = document.createElement('div');
+  walkoverWinnerWrap.className = 'walkover-winner';
+  walkoverWinnerWrap.hidden = true;
+  const walkoverSelect = document.createElement('select');
+  walkoverSelect.append(
+    new Option('勝者を選択', ''),
+    new Option(name1, match.player1Id),
+    new Option(name2, match.player2Id),
+  );
+  walkoverWinnerWrap.appendChild(walkoverSelect);
+
+  walkoverCheckbox.addEventListener('change', () => {
+    const isWalkover = walkoverCheckbox.checked;
+    input1.disabled = isWalkover;
+    input2.disabled = isWalkover;
+    walkoverWinnerWrap.hidden = !isWalkover;
+  });
+
+  const submitBtn = document.createElement('button');
+  submitBtn.type = 'submit';
+  submitBtn.textContent = '確定';
+
+  form.append(walkoverLabel, walkoverWinnerWrap, submitBtn);
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    if (walkoverCheckbox.checked) {
+      if (!walkoverSelect.value) {
+        alert('不戦勝の勝者を選択してください。');
+        return;
+      }
+      const result = confirmMatch(room.tournamentId, room.matchId, walkoverSelect.value, null, { isWalkover: true });
+      if (!result.ok) {
+        alert(result.error);
+        return;
+      }
+      room.onChanged?.();
+      closeMatchChat();
+      return;
+    }
+
+    const raw1 = input1.value.trim();
+    const raw2 = input2.value.trim();
+    if (raw1 === '' || raw2 === '') {
+      alert('両者のスコアを入力してください。');
+      return;
+    }
+    const s1 = Number(raw1);
+    const s2 = Number(raw2);
+    if (!Number.isFinite(s1) || !Number.isFinite(s2) || s1 < 0 || s2 < 0) {
+      alert('スコアは0以上の数値で入力してください。');
+      return;
+    }
+    if (s1 === s2) {
+      alert('スコアが同点のため勝者を判定できません。');
+      return;
+    }
+    const winnerId = s1 > s2 ? match.player1Id : match.player2Id;
+    const result = confirmMatch(room.tournamentId, room.matchId, winnerId, `${s1}-${s2}`);
+    if (!result.ok) {
+      alert(result.error);
+      return;
+    }
+    room.onChanged?.();
+    closeMatchChat();
+  });
+
+  return form;
+}
+
+// 当事者には自分の対戦の報告欄、運営にはその場で確定できる欄を出す
+// （スペクテーターや無関係の選手には何も出さない）。
 function renderResultPanel() {
   resultEl.innerHTML = '';
 
@@ -232,7 +326,7 @@ function renderResultPanel() {
   }
 
   const mySide = myEntrantIdIn(tournament, match);
-  if (!mySide) {
+  if (!mySide && !isAdmin()) {
     resultEl.hidden = true;
     return;
   }
@@ -254,6 +348,20 @@ function renderResultPanel() {
       ? '不戦勝で確定しました。'
       : `${scoreSentence(name1, name2, match.score ?? '')} で確定しました。`;
     resultEl.appendChild(note);
+    return;
+  }
+
+  // 運営はラウンド開始前でも、承認待ちであっても、その場で直接確定できる
+  // （対戦表の勝敗入力が持っていた権限をそのまま引き継ぐ）。
+  if (isAdmin()) {
+    const pending = pendingResultReport(room.tournamentId, room.matchId);
+    if (pending) {
+      const pendingNote = document.createElement('p');
+      pendingNote.className = 'chat-result-note pending-note';
+      pendingNote.textContent = `選手からの報告: ${scoreSentence(name1, name2, pending.score)}（承認待ち）`;
+      resultEl.appendChild(pendingNote);
+    }
+    resultEl.appendChild(adminConfirmForm(match, name1, name2));
     return;
   }
 
@@ -460,8 +568,9 @@ function syncWriteState() {
 // 対戦カードのチャットを開く。
 //
 // roundIndex は「その回戦が開始されたか」の判定に、onRefresh はゲームカウントを
-// 報告・承認したあとの取り直しに使う（対戦表側と同じもの）。
-export async function openMatchChat(tournament, match, roundIndex, onRefresh) {
+// 報告・承認したあとの取り直しに使う（対戦表側と同じもの）。onChanged は運営が
+// その場で勝敗を確定させたあと、対戦表をDBへ書き戻すためのもの。
+export async function openMatchChat(tournament, match, roundIndex, onRefresh, onChanged) {
   if (!canUseMatchChat(tournament, match)) return;
 
   const name1 = getEntrantName(tournament.id, match.player1Id);
@@ -478,6 +587,7 @@ export async function openMatchChat(tournament, match, roundIndex, onRefresh) {
     messages: [],
     lastAt: null,
     onRefresh: onRefresh ?? (async () => {}),
+    onChanged,
   };
 
   titleEl.textContent = `${name1} vs ${name2}`;
