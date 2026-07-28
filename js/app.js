@@ -8,7 +8,7 @@ import {
   createBracket, updateTournament, allMatchesDecided, finalStandings, finalPlacements,
 } from './bracket.js';
 import { renderBracket } from './bracketView.js';
-import { reportChipHtml } from './matchChat.js';
+import { reportChipHtml, syncOpenChat } from './matchChat.js';
 import { computeRankings, computeRankingsForPeriod, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
@@ -1322,6 +1322,9 @@ async function refreshFromDb({ silent = false } = {}) {
     await db.loadAll();
     lastLoadedAt = Date.now();
     routeFromHash();
+    // 開きっぱなしのチャットは画面の外にあるので、routeFromHash では更新されない。
+    // 相手の報告や回戦の開始に追従させる。
+    syncOpenChat();
     if (!silent) setStatus('');
   } catch (err) {
     setStatus(err.message, 'error');

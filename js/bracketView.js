@@ -152,136 +152,28 @@ function scoreSentence(name1, name2, score) {
   return `${name1} ${s1} - ${s2} ${name2}`;
 }
 
-// 選手が自分の対戦のゲームカウントを入れる欄。
-// 送信しても確定はせず、相手の承認待ちになる（一方的な入力で勝ち上がれないため）。
-function resultReportForm(tournamentId, match, name1, name2, onRefresh) {
-  const form = document.createElement('form');
-  form.className = 'result-report-form';
-
-  const input1 = makeScoreInput(name1);
-  const input2 = makeScoreInput(name2);
-
-  [[name1, input1], [name2, input2]].forEach(([name, input]) => {
-    const row = document.createElement('label');
-    row.className = 'result-report-row';
-    row.append(document.createTextNode(name), input);
-    form.appendChild(row);
-  });
-
-  const submitBtn = document.createElement('button');
-  submitBtn.type = 'submit';
-  submitBtn.textContent = '報告する';
-  form.appendChild(submitBtn);
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const raw1 = input1.value.trim();
-    const raw2 = input2.value.trim();
-    if (raw1 === '' || raw2 === '') {
-      alert('両者のゲームカウントを入力してください。');
-      return;
-    }
-    const s1 = Number(raw1);
-    const s2 = Number(raw2);
-    if (!Number.isInteger(s1) || !Number.isInteger(s2) || s1 < 0 || s2 < 0) {
-      alert('ゲームカウントは0以上の整数で入力してください。');
-      return;
-    }
-    if (s1 === s2) {
-      alert('ゲームカウントが同点のため勝者を判定できません。');
-      return;
-    }
-
-    submitBtn.disabled = true;
-    try {
-      const winnerId = s1 > s2 ? match.player1Id : match.player2Id;
-      await db.reportMatchResult(tournamentId, match.id, `${s1}-${s2}`, winnerId);
-      await onRefresh();
-    } catch (err) {
-      alert(err.message);
-      submitBtn.disabled = false;
-    }
-  });
-
-  return form;
-}
-
-// 当事者に出す欄。報告がまだなら入力欄、出ていれば承認待ちの表示になる。
-// 運営がその回戦を開始するまでは入力させない（DB側の関数でも同じ判定をする）。
-function resultReportPanel(tournamentId, roundIndex, match, myEntrant, name1, name2, onRefresh) {
-  const wrap = document.createElement('div');
-  wrap.className = 'result-report';
+// 当事者に出す1行。入力そのものはチャットの中で行うので、ここは今どうなっているかを
+// 伝えて、チャットへ送り出すだけにする（対戦表の枠は狭く、入力欄には向かない）。
+function resultStatusLine(tournamentId, roundIndex, match, myEntrant, name1, name2) {
+  const line = document.createElement('div');
+  line.className = 'match-status result-status';
 
   if (!isRoundStarted(tournamentId, roundIndex)) {
-    const waiting = document.createElement('p');
-    waiting.className = 'result-report-note';
-    waiting.textContent = '運営がこの回戦を開始すると、ゲームカウントを入力できます。';
-    wrap.appendChild(waiting);
-    return wrap;
+    line.textContent = '運営の開始待ち';
+    return line;
   }
 
   const pending = pendingResultReport(tournamentId, match.id);
   if (!pending) {
-    wrap.appendChild(resultReportForm(tournamentId, match, name1, name2, onRefresh));
-    return wrap;
+    line.textContent = 'チャットから結果を報告できます';
+    return line;
   }
 
-  const mine = pending.reportedBy === myEntrant;
-  const note = document.createElement('p');
-  note.className = 'result-report-note';
-  note.textContent = mine
-    ? `${scoreSentence(name1, name2, pending.score)} で報告しました。相手の承認待ちです。`
-    : `相手が ${scoreSentence(name1, name2, pending.score)} と報告しました。`;
-  wrap.appendChild(note);
-
-  const actions = document.createElement('div');
-  actions.className = 'row-actions';
-
-  const run = async (btn, fn) => {
-    btn.disabled = true;
-    try {
-      await fn();
-      await onRefresh();
-    } catch (err) {
-      alert(err.message);
-      btn.disabled = false;
-    }
-  };
-
-  if (mine) {
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.className = 'btn-secondary';
-    cancelBtn.textContent = '取り消す';
-    cancelBtn.addEventListener('click', () =>
-      run(cancelBtn, () => db.withdrawMatchResult(tournamentId, match.id)));
-    actions.appendChild(cancelBtn);
-  } else {
-    const approveBtn = document.createElement('button');
-    approveBtn.type = 'button';
-    approveBtn.textContent = '承認して確定';
-    approveBtn.addEventListener('click', () => {
-      if (!confirm(`${scoreSentence(name1, name2, pending.score)} で確定します。よろしいですか？`)) return;
-      run(approveBtn, () => db.approveMatchResult(tournamentId, match.id));
-    });
-
-    // 承認しない場合は「拒否」ではなく、自分のカウントを出し直してもらう。
-    // 上書きされるので、相手に取り消してもらう往復が要らない。
-    const differBtn = document.createElement('button');
-    differBtn.type = 'button';
-    differBtn.className = 'btn-secondary';
-    differBtn.textContent = '違うカウントを出す';
-    differBtn.addEventListener('click', () => {
-      differBtn.disabled = true;
-      wrap.appendChild(resultReportForm(tournamentId, match, name1, name2, onRefresh));
-    });
-
-    actions.append(approveBtn, differBtn);
-  }
-
-  wrap.appendChild(actions);
-  return wrap;
+  line.classList.add('awaiting');
+  line.textContent = pending.reportedBy === myEntrant
+    ? `${scoreSentence(name1, name2, pending.score)}／相手の承認待ち`
+    : `${scoreSentence(name1, name2, pending.score)}／承認してください`;
+  return line;
 }
 
 // 配信台に乗せる試合を選ぶトグル（運営・開始前だけ）。
@@ -367,7 +259,7 @@ function renderMatchBox(
   // 対戦カードごとのチャット。入れるのは当事者と運営だけ（判定はDBのポリシーが持ち、
   // ここでの出し分けは押せないものを見せないための便宜）。
   const chatAvailable = canUseMatchChat(tournament, match);
-  const openChat = () => openMatchChat(tournament, match);
+  const openChat = () => openMatchChat(tournament, match, roundIndex, onRefresh);
 
   // 未対応の報告がある試合は、運営の画面で枠ごと目立たせる。
   // 報告した本人にも見えるが、印は運営を探させるためのものなので運営にだけ出す。
@@ -439,10 +331,12 @@ function renderMatchBox(
 
     // 自分が戦っている対戦なら、ゲームカウントを入れられる。
     // 運営はこの分岐に来ない（上の勝敗入力フォームでその場で確定できる）。
+    // 自分が戦っている対戦なら、いま何を待っているのかを1行で出す。
+    // 入力はチャットの中（js/matchChat.js）。
     const myEntrant = entrantIdOfPlayer(tournament, auth.player?.id);
     if (p1 && p2 && myEntrant && (myEntrant === p1 || myEntrant === p2)) {
-      box.appendChild(resultReportPanel(
-        tournamentId, roundIndex, match, myEntrant, name1, name2, onRefresh,
+      box.appendChild(resultStatusLine(
+        tournamentId, roundIndex, match, myEntrant, name1, name2,
       ));
     }
 

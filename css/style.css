@@ -1637,50 +1637,63 @@ a.card:hover {
 
 /* ---- 選手が入れるゲームカウント ---- */
 
-.result-report {
-  padding: 0.5rem 0.55rem;
-  border-top: 1px solid var(--border-soft);
-  background: var(--surface-3);
-}
+/* 対戦表側は状態を伝えるだけ（入力はチャットの中） */
+.match-status.result-status { color: var(--text-dim); }
 
-.result-report-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.result-report-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.78rem;
-  color: var(--text-dim);
-}
-
-/* 名前が長くても入力欄を押し出さない */
-.result-report-row { min-width: 0; }
-
-.result-report-form button {
-  min-height: 0;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.78rem;
-}
-
-.result-report-note {
-  margin: 0 0 0.4rem;
-  font-size: 0.76rem;
-  color: var(--text-dim);
-}
-
-.result-report .row-actions button {
-  min-height: 0;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.78rem;
+/* 相手の承認待ち／自分が承認する番。放置されると進まないので目に付かせる */
+.match-status.result-status.awaiting {
+  color: var(--accent-bright);
+  font-weight: 700;
 }
 
 /* 運営が見たときの「選手からの報告」行 */
 .match-status.pending-note { color: var(--info); }
+
+/* チャットの中の入力欄 */
+.chat-result {
+  margin: 0 0 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.chat-result-heading {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.chat-result-note {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+}
+
+.chat-result-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.chat-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.chat-result-form button,
+.chat-result .row-actions button {
+  min-height: 0;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+.chat-result-form button { align-self: flex-start; }
 
 /* ---- 対戦カードごとのチャット ---- */
 
