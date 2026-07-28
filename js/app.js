@@ -81,6 +81,7 @@ const historyListEl = $('history-list');
 
 const bracketTitleEl = $('bracket-title');
 const bracketMetaEl = $('bracket-meta');
+const bracketOwnHintEl = $('bracket-own-hint');
 const bracketContainer = $('bracket-container');
 const tournamentEditBtn = $('tournament-edit-btn');
 const tournamentDeleteBtn = $('tournament-delete-btn');
@@ -918,6 +919,7 @@ async function renderBracketPage(tournamentId) {
   if (!tournament) {
     bracketTitleEl.textContent = '大会が見つかりません';
     bracketMetaEl.textContent = '';
+    bracketOwnHintEl.hidden = true;
     bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
     resultSectionEl.innerHTML = '';
     bracketBackLink.href = '#history';
@@ -927,6 +929,16 @@ async function renderBracketPage(tournamentId) {
 
   bracketTitleEl.textContent = tournament.name;
   bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
+
+  // 出場している選手にだけ、対戦表の使い方を1行で示す。
+  // 「自分の名前を押す」が唯一の入口なのに、初めての人はそこに気づけない。
+  const isParticipant = Boolean(auth.player)
+    && tournament.participantIds.includes(auth.player.id)
+    && tournament.status !== 'finished';
+  bracketOwnHintEl.hidden = !isParticipant || isAdmin();
+  if (!bracketOwnHintEl.hidden) {
+    bracketOwnHintEl.textContent = '色の付いた自分の名前をタップすると、ルームコードの確認・対戦相手とのチャット・ゲームカウントの報告ができます。';
+  }
 
   // 戻り先は大会詳細。ここへは詳細から来るため。
   bracketBackLink.href = `#tournament/${encodeURIComponent(tournamentId)}`;

@@ -204,6 +204,25 @@ create table if not exists match_result_reports (
   primary key (tournament_id, match_id)
 );
 
+-- 対戦カードごとのルームコード。
+--
+-- チャットの発言として伝えると会話に埋もれてしまうので、専用の欄を1つ持たせて
+-- 対戦チャットの上部と対戦表のカードに常に見えるようにする。
+-- 記入できるのはその試合の当事者と運営。運営が回戦の開始前に配信台のコードを
+-- 入れておけば、選手は開始と同時にコードを確認できる。
+create table if not exists match_room_codes (
+  tournament_id uuid not null references tournaments(id) on delete cascade,
+  match_id      uuid not null,
+  code          text not null,
+  -- 誰が記入したか（表示用。消えた選手は null になるだけで、コードは残る）
+  set_by        uuid references players(id) on delete set null,
+  updated_at    timestamptz not null default now(),
+  -- 1試合につき1つ。書き直すと上書きされる
+  primary key (tournament_id, match_id),
+  constraint room_code_not_blank check (btrim(code) <> ''),
+  constraint room_code_length check (char_length(code) <= 50)
+);
+
 -- チャットでもめたときに、当事者が運営へ知らせるための報告。
 -- 未対応（resolved_at is null）のものがある大会は、運営の画面で大会カードと
 -- 対戦表の該当試合に印が出る。
@@ -520,6 +539,11 @@ grant select on match_chat_reports to anon, authenticated;
 grant select on match_result_reports to anon, authenticated;
 grant delete on match_result_reports to authenticated;
 
+-- ルームコード。anon への select はゲストの読み込みを止めないため
+-- （ポリシーが偽なので返るのは常に0件）。書き込みは当事者と運営（ポリシーで絞る）。
+grant select on match_room_codes to anon, authenticated;
+grant insert, update, delete on match_room_codes to authenticated;
+
 -- 選手行の作成。idとroleは指定させない（roleは既定値'player'が入る）
 grant insert (user_id, display_name, past_names, game_account_id, bio, avatar_url,
               main_characters, sns_x, sns_twitch, sns_youtube)
@@ -559,6 +583,7 @@ alter table announcements       enable row level security;
 alter table match_chat_messages enable row level security;
 alter table match_chat_reports  enable row level security;
 alter table match_result_reports enable row level security;
+alter table match_room_codes    enable row level security;
 
 -- ---- players ----
 
@@ -750,6 +775,32 @@ drop policy if exists result_reports_delete on match_result_reports;
 create policy result_reports_delete on match_result_reports
   for delete to authenticated
   using (is_admin() or reporter_player_id = current_player_id());
+
+-- ---- match_room_codes ----
+--
+-- 部屋のコードは当事者と運営だけが見る。観戦者に見せると、無関係の人が
+-- 部屋に入って来られてしまう。
+
+drop policy if exists room_codes_select on match_room_codes;
+create policy room_codes_select on match_room_codes
+  for select to anon, authenticated
+  using (is_match_participant(tournament_id, match_id));
+
+drop policy if exists room_codes_insert on match_room_codes;
+create policy room_codes_insert on match_room_codes
+  for insert to authenticated
+  with check (is_match_participant(tournament_id, match_id));
+
+drop policy if exists room_codes_update on match_room_codes;
+create policy room_codes_update on match_room_codes
+  for update to authenticated
+  using (is_match_participant(tournament_id, match_id))
+  with check (is_match_participant(tournament_id, match_id));
+
+drop policy if exists room_codes_delete on match_room_codes;
+create policy room_codes_delete on match_room_codes
+  for delete to authenticated
+  using (is_match_participant(tournament_id, match_id));
 
 -- ---- match_chat_reports ----
 --
@@ -1415,6 +1466,14 @@ end $$;
 do $$
 begin
   execute 'alter publication supabase_realtime add table match_result_reports';
+exception when duplicate_object then null;
+end $$;
+
+-- 相手が入れたコードを待っている場面で使うものなので、届いた瞬間に出したい。
+-- Realtimeの配信にもRLSが効くため、当事者と運営以外には流れない。
+do $$
+begin
+  execute 'alter publication supabase_realtime add table match_room_codes';
 exception when duplicate_object then null;
 end $$;
 

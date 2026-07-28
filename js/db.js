@@ -172,6 +172,16 @@ function toResultReport(row) {
   };
 }
 
+function toRoomCode(row) {
+  return {
+    tournamentId: row.tournament_id,
+    matchId: row.match_id,
+    code: row.code,
+    setBy: row.set_by,
+    updatedAt: row.updated_at,
+  };
+}
+
 function toChatReport(row) {
   return {
     id: row.id,
@@ -244,7 +254,7 @@ export async function loadAll() {
   const openBracketIds = Object.keys(state.brackets);
 
   const [players, tournaments, teams, entries, bracketIds, openBrackets, matches, ranking,
-    announcements, reports, resultReports, rounds] = await Promise.all([
+    announcements, reports, resultReports, rounds, roomCodes] = await Promise.all([
     supabase.from('players').select('*').order('display_name'),
     supabase.from('tournaments').select('*').order('date', { ascending: true, nullsFirst: false }),
     supabase.from('tournament_teams').select('*'),
@@ -264,6 +274,8 @@ export async function loadAll() {
     supabase.from('match_result_reports').select('*'),
     // 回戦ごとの開始と配信台。誰でも見られる
     supabase.from('tournament_rounds').select('*'),
+    // 対戦ごとのルームコード。当事者と運営にしか返らない
+    supabase.from('match_room_codes').select('*'),
   ]);
 
   check(players.error, '選手の読み込み');
@@ -278,6 +290,7 @@ export async function loadAll() {
   check(reports.error, '報告の読み込み');
   check(resultReports.error, '承認待ちの結果の読み込み');
   check(rounds.error, '回戦の読み込み');
+  check(roomCodes.error, 'ルームコードの読み込み');
 
   // 大会ごとにエントリーとチームをまとめ、出場枠の並び（シード順、未確定なら登録順）を作る。
   // 成績はチーム戦でもメンバーの行に書き写してあるので、ここは選手IDのままでよい
@@ -330,6 +343,7 @@ export async function loadAll() {
   state.chatReports = reports.data.map(toChatReport);
   state.resultReports = resultReports.data.map(toResultReport);
   state.rounds = rounds.data.map(toRound);
+  state.roomCodes = roomCodes.data.map(toRoomCode);
 }
 
 // ---------------------------------------------------------------------------
@@ -869,6 +883,33 @@ export async function saveRoundStream(tournamentId, roundIndex, matchIds) {
   check(error, '配信台の保存');
 }
 
+// ルームコードの記入・書き直し。書けるのは当事者と運営（RLSが判定を持つ）。
+export async function saveMatchRoomCode(tournamentId, matchId, code, playerId) {
+  const { error } = await supabase
+    .from('match_room_codes')
+    .upsert(
+      {
+        tournament_id: tournamentId,
+        match_id: matchId,
+        code,
+        set_by: playerId ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tournament_id,match_id' },
+    );
+  check(error, 'ルームコードの保存');
+}
+
+// ルームコードを消す（空欄で保存したとき）。
+export async function clearMatchRoomCode(tournamentId, matchId) {
+  const { error } = await supabase
+    .from('match_room_codes')
+    .delete()
+    .eq('tournament_id', tournamentId)
+    .eq('match_id', matchId);
+  check(error, 'ルームコードの削除');
+}
+
 // 回戦を開始する。配信台が未定のままだとCHECK制約に弾かれるので、
 // クライアント側の出し分けを抜けても開始できない。
 export async function startRound(tournamentId, roundIndex, adminPlayerId) {
@@ -1135,7 +1176,8 @@ export function subscribeToChanges(onChange, debounceMs = 400) {
 
   channel = supabase.channel('app-data');
   ['players', 'tournaments', 'tournament_teams', 'tournament_entries', 'brackets', 'matches',
-    'tournament_rounds', 'match_result_reports', 'published_rankings', 'announcements']
+    'tournament_rounds', 'match_result_reports', 'match_room_codes', 'published_rankings',
+    'announcements']
     .forEach((table) => {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, notify);
     });

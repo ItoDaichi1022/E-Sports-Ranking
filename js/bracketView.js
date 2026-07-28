@@ -1,6 +1,7 @@
 import {
   state, getEntrantName, getEntrantMemberNames, getEntrantMemberIds, openChatReports,
   pendingResultReport, entrantIdOfPlayer, roundState, isRoundStarted, isStreamedMatch,
+  matchRoomCode,
 } from './state.js';
 import { editMatch } from './bracket.js';
 import { auth, isAdmin } from './auth.js';
@@ -112,7 +113,15 @@ function drawConnectorLines(bracket, wrapper, matchElements) {
 // 場合は own を付けない。目立たせるのは本人の行だけにするため）。
 function makeRowChatTarget(targetEl, onOpen, { own = false } = {}) {
   targetEl.classList.add('chat-target');
-  if (own) targetEl.classList.add('own-chat-row');
+  if (own) {
+    targetEl.classList.add('own-chat-row');
+    // 「押せる」ことが見た目だけでは伝わらなかったので、文字で示す。
+    // ここが唯一の入口なのに、新規の人は名前を押せると思わない。
+    const hint = document.createElement('span');
+    hint.className = 'own-row-hint';
+    hint.textContent = 'タップで開く';
+    targetEl.appendChild(hint);
+  }
   targetEl.title = own ? '対戦相手とチャット' : 'この対戦を開く';
 
   targetEl.addEventListener('click', (e) => {
@@ -280,6 +289,19 @@ function renderMatchBox(
 
   box.appendChild(r1.row);
   box.appendChild(r2.row);
+
+  // ルームコードが入っていれば、当事者と運営には対戦カードにも常に見せる
+  // （チャットを開いてさかのぼらなくても、表を見れば分かるように）。
+  // RLSにより state.roomCodes には当事者と運営の分しか入っていない。
+  if (!match.confirmed && chatAvailable) {
+    const roomCode = matchRoomCode(tournamentId, match.id);
+    if (roomCode) {
+      const codeLine = document.createElement('div');
+      codeLine.className = 'match-room-code';
+      codeLine.textContent = `ルーム: ${roomCode.code}`;
+      box.appendChild(codeLine);
+    }
+  }
 
   if (match.confirmed) {
     if (match.isWalkover) {

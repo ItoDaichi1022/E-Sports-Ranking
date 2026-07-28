@@ -42,6 +42,9 @@ export const state = {
 
   // 回戦ごとの開始と配信台。行が無い回戦は「未開始・配信台未定」と同じ。
   rounds: [],         // { tournamentId, roundIndex, streamedMatchIds: [], startedAt, startedBy }
+
+  // 対戦ごとのルームコード。RLSにより当事者と運営にしか入らない（ゲスト・観戦者は空）。
+  roomCodes: [],      // { tournamentId, matchId, code, setBy, updatedAt }
 };
 
 // 回戦の状態。まだ触られていない回戦は行が無いので、既定の形を返す。
@@ -64,6 +67,13 @@ export function isStreamedMatch(tournamentId, roundIndex, matchId) {
 // この試合に出ている承認待ちのゲームカウント（無ければ null）。
 export function pendingResultReport(tournamentId, matchId) {
   return state.resultReports.find(
+    (r) => r.tournamentId === tournamentId && r.matchId === matchId,
+  ) ?? null;
+}
+
+// この試合のルームコード（無ければ null）。当事者と運営以外は常に null。
+export function matchRoomCode(tournamentId, matchId) {
+  return state.roomCodes.find(
     (r) => r.tournamentId === tournamentId && r.matchId === matchId,
   ) ?? null;
 }

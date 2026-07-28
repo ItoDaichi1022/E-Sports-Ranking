@@ -15,7 +15,7 @@
 
 import {
   state, getEntrantName, getEntrantMemberIds, openChatReports,
-  findTournament, pendingResultReport, isRoundStarted,
+  findTournament, pendingResultReport, isRoundStarted, matchRoomCode,
 } from './state.js';
 import { auth, isAdmin } from './auth.js';
 import { confirmMatch } from './bracket.js';
@@ -41,6 +41,7 @@ const reportInputEl = document.getElementById('match-chat-report-input');
 const reportSendBtn = document.getElementById('match-chat-report-send-btn');
 const reportCancelBtn = document.getElementById('match-chat-report-cancel-btn');
 const resultEl = document.getElementById('match-chat-result');
+const roomEl = document.getElementById('match-chat-room');
 
 // 開いている部屋。閉じている間は null。
 let room = null; // { tournamentId, matchId, roundIndex, messages: [], lastAt, onRefresh, onChanged }
@@ -131,6 +132,107 @@ function renderLog(tournament, match) {
 function showError(message) {
   errorEl.textContent = message ?? '';
   errorEl.hidden = !message;
+}
+
+// ---- ルームコード ----
+//
+// 部屋のコードをチャットの発言で伝えると会話に埋もれ、さかのぼって探す羽目になる。
+// 専用の欄としてダイアログの一番上に常に見せる。記入・書き直しは当事者と運営の
+// 誰でもできる（判定はDBのポリシーが持つ）。運営が回戦の開始前に配信台のコードを
+// 入れておけば、選手は開始と同時に確認できる。
+
+// 編集中はRealtimeの再描画で入力欄を消さない（syncOpenChat が見る）。
+let roomCodeEditing = false;
+
+function renderRoomCode() {
+  const match = currentMatch();
+  const tournament = findTournament(room?.tournamentId);
+  if (!match || !tournament) {
+    roomEl.hidden = true;
+    roomEl.innerHTML = '';
+    return;
+  }
+
+  roomCodeEditing = false;
+  roomEl.innerHTML = '';
+
+  const current = matchRoomCode(room.tournamentId, room.matchId);
+
+  // 確定した試合ではもう部屋に入らない。残っていれば参考に見せるだけにする。
+  if (match.confirmed && !current) {
+    roomEl.hidden = true;
+    return;
+  }
+
+  roomEl.hidden = false;
+
+  const label = document.createElement('span');
+  label.className = 'room-code-label';
+  label.textContent = 'ルームコード';
+
+  const value = document.createElement('span');
+  value.className = 'room-code-value' + (current ? '' : ' empty');
+  value.textContent = current ? current.code : 'まだ記入されていません';
+
+  roomEl.append(label, value);
+
+  if (match.confirmed) return;
+
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'btn-secondary room-code-edit-btn';
+  editBtn.textContent = current ? '変更' : '記入する';
+  roomEl.appendChild(editBtn);
+
+  editBtn.addEventListener('click', () => {
+    roomCodeEditing = true;
+    roomEl.innerHTML = '';
+
+    const editLabel = document.createElement('span');
+    editLabel.className = 'room-code-label';
+    editLabel.textContent = 'ルームコード';
+
+    const form = document.createElement('form');
+    form.className = 'room-code-form';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 50;
+    input.value = current?.code ?? '';
+    input.placeholder = '例: ABC123';
+    input.setAttribute('aria-label', 'ルームコード');
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'submit';
+    saveBtn.textContent = '保存';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn-secondary';
+    cancelBtn.textContent = 'やめる';
+    cancelBtn.addEventListener('click', () => renderRoomCode());
+
+    form.append(input, saveBtn, cancelBtn);
+    roomEl.append(editLabel, form);
+    input.focus();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const code = input.value.trim();
+      saveBtn.disabled = true;
+      showError(null);
+      try {
+        // 空欄で保存したら「消す」。書き間違いをまっさらに戻せるように。
+        if (code) await db.saveMatchRoomCode(room.tournamentId, room.matchId, code, auth.player.id);
+        else await db.clearMatchRoomCode(room.tournamentId, room.matchId);
+        await room.onRefresh();
+        renderRoomCode();
+      } catch (err) {
+        showError(err.message);
+        saveBtn.disabled = false;
+      }
+    });
+  });
 }
 
 // ---- ゲームカウントの入力 ----
@@ -337,7 +439,7 @@ function renderResultPanel() {
 
   const heading = document.createElement('h4');
   heading.className = 'chat-result-heading';
-  heading.textContent = 'ゲームカウント';
+  heading.textContent = isAdmin() ? '結果の確定（運営）' : 'ゲームカウントの報告';
   resultEl.appendChild(heading);
 
   const note = document.createElement('p');
@@ -544,15 +646,20 @@ export function syncOpenChat() {
   if (!room) return;
   syncWriteState();
   renderResultPanel();
+  // 編集中に描き直すと入力欄ごと消えてしまうので、そのときだけ見送る
+  if (!roomCodeEditing) renderRoomCode();
 }
 
 export function closeMatchChat() {
   stopPolling();
   room = null;
+  roomCodeEditing = false;
   reportFormEl.hidden = true;
   reportInputEl.value = '';
   resultEl.hidden = true;
   resultEl.innerHTML = '';
+  roomEl.hidden = true;
+  roomEl.innerHTML = '';
   if (dialog.open) dialog.close();
 }
 
@@ -594,6 +701,7 @@ export async function openMatchChat(tournament, match, roundIndex, onRefresh, on
   metaEl.textContent = `${tournament.name} ・ ${match.round}`;
   syncWriteState();
   renderResultPanel();
+  renderRoomCode();
   inputEl.value = '';
   logEl.innerHTML = '<p class="empty-hint">読み込んでいます…</p>';
   showError(null);
