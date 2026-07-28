@@ -1,7 +1,11 @@
-import { state, getEntrantName, getEntrantMemberNames, getEntrantMemberIds } from './state.js';
+import {
+  state, getEntrantName, getEntrantMemberNames, getEntrantMemberIds, openChatReports,
+  pendingResultReport, entrantIdOfPlayer, roundState, isRoundStarted, isStreamedMatch,
+} from './state.js';
 import { confirmMatch, editMatch } from './bracket.js';
-import { auth } from './auth.js';
+import { auth, isAdmin } from './auth.js';
 import { canUseMatchChat, openMatchChat } from './matchChat.js';
+import * as db from './db.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
 // 実際のトーナメント表のように中央揃えで配置される。
@@ -141,12 +145,190 @@ function chatButton(match, onOpen) {
   return btn;
 }
 
-function renderMatchBox(tournament, tournamentId, match, onChanged, readOnly, seedOf) {
+// 承認待ちのゲームカウントを、どちら側の数字か分かる形の文にする
+// （"3-1" だけでは、上の行と下の行のどちらが3なのか読み取れない）。
+function scoreSentence(name1, name2, score) {
+  const [s1, s2] = score.split('-');
+  return `${name1} ${s1} - ${s2} ${name2}`;
+}
+
+// 選手が自分の対戦のゲームカウントを入れる欄。
+// 送信しても確定はせず、相手の承認待ちになる（一方的な入力で勝ち上がれないため）。
+function resultReportForm(tournamentId, match, name1, name2, onRefresh) {
+  const form = document.createElement('form');
+  form.className = 'result-report-form';
+
+  const input1 = makeScoreInput(name1);
+  const input2 = makeScoreInput(name2);
+
+  [[name1, input1], [name2, input2]].forEach(([name, input]) => {
+    const row = document.createElement('label');
+    row.className = 'result-report-row';
+    row.append(document.createTextNode(name), input);
+    form.appendChild(row);
+  });
+
+  const submitBtn = document.createElement('button');
+  submitBtn.type = 'submit';
+  submitBtn.textContent = '報告する';
+  form.appendChild(submitBtn);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const raw1 = input1.value.trim();
+    const raw2 = input2.value.trim();
+    if (raw1 === '' || raw2 === '') {
+      alert('両者のゲームカウントを入力してください。');
+      return;
+    }
+    const s1 = Number(raw1);
+    const s2 = Number(raw2);
+    if (!Number.isInteger(s1) || !Number.isInteger(s2) || s1 < 0 || s2 < 0) {
+      alert('ゲームカウントは0以上の整数で入力してください。');
+      return;
+    }
+    if (s1 === s2) {
+      alert('ゲームカウントが同点のため勝者を判定できません。');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    try {
+      const winnerId = s1 > s2 ? match.player1Id : match.player2Id;
+      await db.reportMatchResult(tournamentId, match.id, `${s1}-${s2}`, winnerId);
+      await onRefresh();
+    } catch (err) {
+      alert(err.message);
+      submitBtn.disabled = false;
+    }
+  });
+
+  return form;
+}
+
+// 当事者に出す欄。報告がまだなら入力欄、出ていれば承認待ちの表示になる。
+// 運営がその回戦を開始するまでは入力させない（DB側の関数でも同じ判定をする）。
+function resultReportPanel(tournamentId, roundIndex, match, myEntrant, name1, name2, onRefresh) {
+  const wrap = document.createElement('div');
+  wrap.className = 'result-report';
+
+  if (!isRoundStarted(tournamentId, roundIndex)) {
+    const waiting = document.createElement('p');
+    waiting.className = 'result-report-note';
+    waiting.textContent = '運営がこの回戦を開始すると、ゲームカウントを入力できます。';
+    wrap.appendChild(waiting);
+    return wrap;
+  }
+
+  const pending = pendingResultReport(tournamentId, match.id);
+  if (!pending) {
+    wrap.appendChild(resultReportForm(tournamentId, match, name1, name2, onRefresh));
+    return wrap;
+  }
+
+  const mine = pending.reportedBy === myEntrant;
+  const note = document.createElement('p');
+  note.className = 'result-report-note';
+  note.textContent = mine
+    ? `${scoreSentence(name1, name2, pending.score)} で報告しました。相手の承認待ちです。`
+    : `相手が ${scoreSentence(name1, name2, pending.score)} と報告しました。`;
+  wrap.appendChild(note);
+
+  const actions = document.createElement('div');
+  actions.className = 'row-actions';
+
+  const run = async (btn, fn) => {
+    btn.disabled = true;
+    try {
+      await fn();
+      await onRefresh();
+    } catch (err) {
+      alert(err.message);
+      btn.disabled = false;
+    }
+  };
+
+  if (mine) {
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn-secondary';
+    cancelBtn.textContent = '取り消す';
+    cancelBtn.addEventListener('click', () =>
+      run(cancelBtn, () => db.withdrawMatchResult(tournamentId, match.id)));
+    actions.appendChild(cancelBtn);
+  } else {
+    const approveBtn = document.createElement('button');
+    approveBtn.type = 'button';
+    approveBtn.textContent = '承認して確定';
+    approveBtn.addEventListener('click', () => {
+      if (!confirm(`${scoreSentence(name1, name2, pending.score)} で確定します。よろしいですか？`)) return;
+      run(approveBtn, () => db.approveMatchResult(tournamentId, match.id));
+    });
+
+    // 承認しない場合は「拒否」ではなく、自分のカウントを出し直してもらう。
+    // 上書きされるので、相手に取り消してもらう往復が要らない。
+    const differBtn = document.createElement('button');
+    differBtn.type = 'button';
+    differBtn.className = 'btn-secondary';
+    differBtn.textContent = '違うカウントを出す';
+    differBtn.addEventListener('click', () => {
+      differBtn.disabled = true;
+      wrap.appendChild(resultReportForm(tournamentId, match, name1, name2, onRefresh));
+    });
+
+    actions.append(approveBtn, differBtn);
+  }
+
+  wrap.appendChild(actions);
+  return wrap;
+}
+
+// 配信台に乗せる試合を選ぶトグル（運営・開始前だけ）。
+// 一覧から選ばせるのではなく、対戦表そのものを押させる。どのカードを配信するかは
+// 表を見ながら決めるものなので、そのほうが迷わない。
+function streamToggle(tournamentId, roundIndex, match, onRefresh) {
+  const on = isStreamedMatch(tournamentId, roundIndex, match.id);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'stream-toggle-btn' + (on ? ' on' : '');
+  btn.textContent = on ? '📺 配信台にする（解除）' : '📺 配信台にする';
+
+  btn.addEventListener('click', async () => {
+    const current = roundState(tournamentId, roundIndex).streamedMatchIds;
+    const next = on ? current.filter((id) => id !== match.id) : [...current, match.id];
+
+    btn.disabled = true;
+    try {
+      await db.saveRoundStream(tournamentId, roundIndex, next);
+      await onRefresh();
+    } catch (err) {
+      alert(err.message);
+      btn.disabled = false;
+    }
+  });
+
+  return btn;
+}
+
+function renderMatchBox(
+  tournament, tournamentId, roundIndex, match, onChanged, readOnly, seedOf, onRefresh,
+) {
   const box = document.createElement('div');
   box.className = 'match-box';
   if (match.confirmed) box.classList.add('confirmed');
   if (match.isBye) box.classList.add('bye');
   if (match.isWalkover) box.classList.add('walkover');
+
+  const streamed = isStreamedMatch(tournamentId, roundIndex, match.id);
+  if (streamed) {
+    box.classList.add('streamed');
+    const tag = document.createElement('div');
+    tag.className = 'stream-tag';
+    tag.textContent = '📺 配信台';
+    box.appendChild(tag);
+  }
 
   // BYE（不戦勝）はラベルを出さず、進出した選手・チームの名前だけをそのまま表示する。
   if (match.isBye) {
@@ -186,6 +368,18 @@ function renderMatchBox(tournament, tournamentId, match, onChanged, readOnly, se
   // ここでの出し分けは押せないものを見せないための便宜）。
   const chatAvailable = canUseMatchChat(tournament, match);
   const openChat = () => openMatchChat(tournament, match);
+
+  // 未対応の報告がある試合は、運営の画面で枠ごと目立たせる。
+  // 報告した本人にも見えるが、印は運営を探させるためのものなので運営にだけ出す。
+  const reportCount = isAdmin() ? openChatReports(tournamentId, match.id).length : 0;
+  if (reportCount > 0) {
+    box.classList.add('reported');
+    const flag = document.createElement('div');
+    flag.className = 'match-report-flag';
+    flag.textContent = reportCount > 1 ? `⚠ 報告 ${reportCount}件` : '⚠ 報告あり';
+    box.appendChild(flag);
+  }
+
   if (chatAvailable) {
     box.classList.add('has-chat');
     // 自分がいる側の行を押せるようにする。運営が他人の試合を見ているときは
@@ -242,8 +436,28 @@ function renderMatchBox(tournament, tournamentId, match, onChanged, readOnly, se
     status.className = 'match-status';
     status.textContent = p1 && p2 ? '未実施' : '対戦カード未確定';
     box.appendChild(status);
+
+    // 自分が戦っている対戦なら、ゲームカウントを入れられる。
+    // 運営はこの分岐に来ない（上の勝敗入力フォームでその場で確定できる）。
+    const myEntrant = entrantIdOfPlayer(tournament, auth.player?.id);
+    if (p1 && p2 && myEntrant && (myEntrant === p1 || myEntrant === p2)) {
+      box.appendChild(resultReportPanel(
+        tournamentId, roundIndex, match, myEntrant, name1, name2, onRefresh,
+      ));
+    }
+
     if (chatAvailable) box.appendChild(chatButton(match, openChat));
     return box;
+  }
+
+  // 運営が見ている未確定の試合に、選手からの承認待ちが出ていたら知らせる。
+  // 運営はそれを見たうえで、自分でその場で確定させられる。
+  const pending = pendingResultReport(tournamentId, match.id);
+  if (pending) {
+    const note = document.createElement('div');
+    note.className = 'match-status pending-note';
+    note.textContent = `選手からの報告: ${scoreSentence(name1, name2, pending.score)}（承認待ち）`;
+    box.appendChild(note);
   }
 
   // --- ここから勝敗入力フォーム ---
@@ -329,12 +543,85 @@ function renderMatchBox(tournament, tournamentId, match, onChanged, readOnly, se
   });
 
   box.appendChild(rowsHost);
+
+  // 運営は開始前に配信台を決める。開始後は組み替えさせない
+  // （選手には「配信台」と伝わっているので、始まってから動かすと混乱する）。
+  if (!isRoundStarted(tournamentId, roundIndex)) {
+    box.appendChild(streamToggle(tournamentId, roundIndex, match, onRefresh));
+  }
+
   if (chatAvailable) box.appendChild(chatButton(match, openChat));
   return box;
 }
 
+// 回戦ごとの開始と配信台。ラウンドの見出しの下に置く。
+//
+// 運営には「配信台がいくつ選ばれているか」と開始／取り消しのボタン、
+// 選手と観戦者には開始したかどうかだけを出す。
+function roundControls(tournamentId, roundIndex, round, readOnly, onRefresh) {
+  const wrap = document.createElement('div');
+  wrap.className = 'round-controls';
+
+  const started = isRoundStarted(tournamentId, roundIndex);
+  const streamCount = roundState(tournamentId, roundIndex).streamedMatchIds.length;
+
+  const status = document.createElement('span');
+  status.className = 'round-status' + (started ? ' started' : '');
+  status.textContent = started ? '進行中' : '開始待ち';
+  wrap.appendChild(status);
+
+  if (readOnly) {
+    // 選手・観戦者にも配信台の数だけは見せる（どこが配信に乗るか分かるように）
+    if (streamCount > 0) {
+      const note = document.createElement('span');
+      note.className = 'round-stream-note';
+      note.textContent = `📺 ${streamCount}試合`;
+      wrap.appendChild(note);
+    }
+    return wrap;
+  }
+
+  const note = document.createElement('span');
+  note.className = 'round-stream-note';
+  note.textContent = streamCount > 0 ? `📺 配信台 ${streamCount}試合` : '配信台が未定';
+  wrap.appendChild(note);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = started ? 'btn-secondary' : '';
+  btn.textContent = started ? '開始を取り消す' : `${round.name} を開始`;
+  // 配信台を決めるまで開始できない（DB側のCHECK制約でも同じ条件を持っている）
+  btn.disabled = !started && streamCount === 0;
+  if (btn.disabled) btn.title = '先に配信台にする試合を選んでください。';
+
+  btn.addEventListener('click', async () => {
+    const matchIds = round.matches.map((m) => m.id);
+    const message = started
+      ? `${round.name} の開始を取り消します。まだ確定していない対戦の入力欄が閉じ、承認待ちの報告も取り消されます。よろしいですか？`
+      : `${round.name} を開始します。選手がゲームカウントを入力できるようになります。よろしいですか？`;
+    if (!confirm(message)) return;
+
+    btn.disabled = true;
+    try {
+      if (started) await db.stopRound(tournamentId, roundIndex, matchIds);
+      else await db.startRound(tournamentId, roundIndex, auth.player.id);
+      await onRefresh();
+    } catch (err) {
+      alert(err.message);
+      btn.disabled = false;
+    }
+  });
+
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+// options.onRefresh: 選手の操作（ゲームカウントの報告・承認）のあとに呼ぶ再読み込み。
+// onChanged（運営の勝敗入力）とは別にしてある。onChanged は対戦表そのものをDBへ
+// 書き戻すので、選手が呼ぶとRLSで弾かれる。
 export function renderBracket(tournamentId, containerEl, onChanged, options = {}) {
   const readOnly = !!options.readOnly;
+  const onRefresh = options.onRefresh ?? (async () => {});
   lastRenderArgs = { tournamentId, containerEl, onChanged, options };
 
   const bracket = state.brackets[tournamentId];
@@ -366,6 +653,8 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
     header.textContent = round.name;
     col.appendChild(header);
 
+    col.appendChild(roundControls(tournamentId, roundIndex, round, readOnly, onRefresh));
+
     const body = document.createElement('div');
     body.className = 'round-body';
     body.style.height = `${bodyHeight}px`;
@@ -377,7 +666,9 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
       slot.className = 'match-slot';
       slot.style.gridRow = `${rowStart} / span ${rowSpan}`;
 
-      const box = renderMatchBox(tournament, tournamentId, match, onChanged, readOnly, seedOf);
+      const box = renderMatchBox(
+        tournament, tournamentId, roundIndex, match, onChanged, readOnly, seedOf, onRefresh,
+      );
       matchElements.set(match.id, box);
       slot.appendChild(box);
       body.appendChild(slot);

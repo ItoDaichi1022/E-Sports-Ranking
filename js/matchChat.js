@@ -13,7 +13,7 @@
 //      設定ミスがそのまま漏洩になる。SELECTで取りに行けば必ずポリシーを通る
 // 取りに行くのはダイアログを開いている間だけなので、常時ポーリングにはならない。
 
-import { state, getEntrantName, getEntrantMemberIds } from './state.js';
+import { state, getEntrantName, getEntrantMemberIds, openChatReports } from './state.js';
 import { auth, isAdmin } from './auth.js';
 import { escapeHtml } from './util.js';
 import * as db from './db.js';
@@ -30,10 +30,26 @@ const sendBtn = document.getElementById('match-chat-send-btn');
 const closedNoteEl = document.getElementById('match-chat-closed-note');
 const errorEl = document.getElementById('match-chat-error');
 const closeBtn = document.getElementById('match-chat-close-btn');
+const reportsEl = document.getElementById('match-chat-reports');
+const reportBtn = document.getElementById('match-chat-report-btn');
+const reportFormEl = document.getElementById('match-chat-report-form');
+const reportInputEl = document.getElementById('match-chat-report-input');
+const reportSendBtn = document.getElementById('match-chat-report-send-btn');
+const reportCancelBtn = document.getElementById('match-chat-report-cancel-btn');
 
 // 開いている部屋。閉じている間は null。
 let room = null; // { tournamentId, matchId, canWrite, messages: [], lastAt: string|null }
 let pollTimer = null;
+
+// 未対応の報告がある大会に付ける印。運営にだけ出す（運営に見つけさせるためのもので、
+// 報告した本人には チャットの中に「報告済み」の控えが出る）。
+export function reportChipHtml(tournamentId) {
+  if (!isAdmin()) return '';
+  const count = openChatReports(tournamentId).length;
+  return count > 0
+    ? `<span class="status-chip status-reported">⚠ 未対応の報告 ${count}件</span>`
+    : '';
+}
 
 // この人がこの試合のチャットを使えるか。当事者（＝どちらかの枠のメンバー）か運営。
 // 対戦カードが揃っていない試合とBYEには相手がいないので、部屋を作らない。
@@ -96,6 +112,74 @@ function showError(message) {
   errorEl.hidden = !message;
 }
 
+// 大会カードと対戦表の印を出し直してもらう。
+//
+// ここから app.js の再描画を直接呼ぶと、対戦表の onChanged（勝敗の保存を伴う）に
+// 引きずられる。イベントで「報告が変わった」とだけ伝え、描き直し方は受け手に任せる。
+function notifyReportsChanged() {
+  document.dispatchEvent(new CustomEvent('chat-reports-changed'));
+}
+
+// この対戦に届いている報告。運営には全件、当事者には自分が出した分だけが
+// state に入っている（RLSがそう返す）ので、ここでは絞り込まずそのまま出す。
+function renderReports(tournament, match) {
+  const reports = state.chatReports
+    .filter((r) => r.tournamentId === tournament.id && r.matchId === match.id);
+
+  if (reports.length === 0) {
+    reportsEl.hidden = true;
+    reportsEl.innerHTML = '';
+    return;
+  }
+
+  reportsEl.hidden = false;
+  reportsEl.innerHTML = reports.map((r) => {
+    const reporter = state.players.find((p) => p.id === r.reporterId);
+    const name = reporter ? reporter.currentName : '退会した選手';
+    const done = Boolean(r.resolvedAt);
+    return `
+      <div class="chat-report${done ? ' resolved' : ''}" data-id="${escapeHtml(r.id)}">
+        <div class="chat-report-head">
+          <span class="chat-report-badge">${done ? '対応済み' : '運営に報告'}</span>
+          <span class="chat-report-who">${escapeHtml(name)}</span>
+        </div>
+        <p class="chat-report-body">${escapeHtml(r.body)}</p>
+        ${!done && isAdmin() ? '<button type="button" class="chat-resolve-btn">対応済みにする</button>' : ''}
+      </div>
+    `;
+  }).join('');
+
+  reportsEl.onclick = async (e) => {
+    const btn = e.target.closest('.chat-resolve-btn');
+    if (!btn) return;
+    const id = btn.closest('.chat-report')?.dataset.id;
+    if (!id) return;
+
+    btn.disabled = true;
+    try {
+      await db.resolveChatReport(id, auth.player.id);
+      await db.refreshChatReports();
+      renderReports(tournament, match);
+      // 大会カードや対戦表の印を消すため、開いている画面も描き直してもらう
+      notifyReportsChanged();
+    } catch (err) {
+      showError(err.message);
+      btn.disabled = false;
+    }
+  };
+}
+
+// 報告の入口を出すかどうか。運営は報告する側ではないので出さない。
+function syncReportControls(tournament, match) {
+  const alreadyOpen = openChatReports(tournament.id, match.id)
+    .some((r) => r.reporterId === auth.player?.id);
+
+  reportFormEl.hidden = true;
+  reportInputEl.value = '';
+  reportBtn.hidden = isAdmin() || alreadyOpen;
+  reportBtn.disabled = false;
+}
+
 // 差分だけ取りに行く。開いている部屋が入れ替わっていたら結果を捨てる
 // （通信の途中で別の試合を開いたときに、前の部屋の発言を混ぜないため）。
 async function fetchNew(tournament, match) {
@@ -126,6 +210,8 @@ function stopPolling() {
 export function closeMatchChat() {
   stopPolling();
   room = null;
+  reportFormEl.hidden = true;
+  reportInputEl.value = '';
   if (dialog.open) dialog.close();
 }
 
@@ -153,6 +239,45 @@ export async function openMatchChat(tournament, match) {
   showError(null);
 
   if (!dialog.open) dialog.showModal();
+
+  renderReports(tournament, match);
+  syncReportControls(tournament, match);
+
+  reportBtn.onclick = () => {
+    reportFormEl.hidden = false;
+    reportBtn.hidden = true;
+    reportInputEl.focus();
+  };
+
+  reportCancelBtn.onclick = () => {
+    reportFormEl.hidden = true;
+    reportInputEl.value = '';
+    reportBtn.hidden = false;
+  };
+
+  reportFormEl.onsubmit = async (e) => {
+    e.preventDefault();
+    const body = reportInputEl.value.trim();
+    if (!body) {
+      alert('運営に伝えることを書いてください。');
+      return;
+    }
+
+    reportSendBtn.disabled = true;
+    try {
+      await db.reportMatchChat(tournament.id, match.id, auth.player.id, body);
+      await db.refreshChatReports();
+      showError(null);
+      renderReports(tournament, match);
+      // 送信済みの状態に戻す（同じ試合に何度も出させない）
+      syncReportControls(tournament, match);
+      notifyReportsChanged();
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      reportSendBtn.disabled = false;
+    }
+  };
 
   // ハンドラは最初の取得より先に付ける。フォームの submit を捕まえる前にEnterを
   // 押されると、ダイアログ内のフォームがそのまま送信されてページが再読み込みされる。

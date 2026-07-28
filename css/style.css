@@ -1392,8 +1392,75 @@ a.card:hover {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  margin-bottom: 1rem;
+  margin-bottom: 0.4rem;
   color: var(--text-faint);
+}
+
+/* 回戦ごとの開始と配信台。列の高さが揃わないと隣の列と対戦表がずれるので、
+   中身が増えても行の高さは固定にする。 */
+.round-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 4.5rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.7rem;
+}
+
+.round-status {
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+}
+
+.round-status.started {
+  border-color: var(--accent-bright);
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  font-weight: 700;
+}
+
+.round-stream-note { color: var(--text-faint); }
+
+.round-controls button {
+  min-height: 0;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.72rem;
+}
+
+/* 配信台に乗る試合 */
+.match-box.streamed { border-color: var(--info); }
+
+.stream-tag {
+  padding: 0.15rem 0.5rem;
+  background: var(--info);
+  color: #06121f;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.stream-toggle-btn {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  border: none;
+  border-top: 1px solid var(--border-soft);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-faint);
+  box-shadow: none;
+}
+
+.stream-toggle-btn.on { color: var(--info); }
+
+.stream-toggle-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .round-body {
@@ -1568,6 +1635,53 @@ a.card:hover {
   border-top: 1px solid var(--border-soft);
 }
 
+/* ---- 選手が入れるゲームカウント ---- */
+
+.result-report {
+  padding: 0.5rem 0.55rem;
+  border-top: 1px solid var(--border-soft);
+  background: var(--surface-3);
+}
+
+.result-report-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.result-report-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+/* 名前が長くても入力欄を押し出さない */
+.result-report-row { min-width: 0; }
+
+.result-report-form button {
+  min-height: 0;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.result-report-note {
+  margin: 0 0 0.4rem;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+
+.result-report .row-actions button {
+  min-height: 0;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+/* 運営が見たときの「選手からの報告」行 */
+.match-status.pending-note { color: var(--info); }
+
 /* ---- 対戦カードごとのチャット ---- */
 
 /* 自分がいる側の行。押せることが分かるよう、カーソルと薄い下地で示す */
@@ -1677,6 +1791,138 @@ a.card:hover {
 }
 
 .chat-form input { flex: 1; min-width: 0; }
+
+/* ---- 運営への報告 ---- */
+
+/* 主導線ではないが、もめている最中に見つけられないと意味がないので、
+   目立たない灰色ではなく警告色の縁で置く。 */
+.btn-report {
+  margin-right: auto;
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  box-shadow: none;
+}
+
+.btn-report:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+}
+
+.chat-report-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+  padding: 0.9rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.chat-report-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.chat-reports {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.chat-report {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+/* 対応済みは記録として残すだけなので、色を落として未対応と見分けやすくする */
+.chat-report.resolved {
+  border-color: var(--border);
+  opacity: 0.65;
+}
+
+.chat-report-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+}
+
+.chat-report-badge {
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--r-pill);
+  background: var(--danger);
+  color: #fff;
+  font-weight: 700;
+}
+
+.chat-report.resolved .chat-report-badge {
+  background: var(--surface-3);
+  color: var(--text-faint);
+}
+
+.chat-report-who { color: var(--text-faint); }
+
+.chat-report-body {
+  margin: 0 0 0.4rem;
+  font-size: 0.88rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-resolve-btn {
+  min-height: 0;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.75rem;
+}
+
+/* 大会カードに付く印（運営にだけ出る） */
+.status-chip.status-reported {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* 大会情報のいちばん上に出す帯 */
+.report-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--r);
+  background: rgba(226, 68, 92, 0.12);
+}
+
+.report-notice-title {
+  font-weight: 700;
+  color: var(--danger);
+}
+
+.report-notice-note {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+/* 対戦表で報告のあった試合。枠ごと赤くして探しやすくする */
+.match-box.reported { border-color: var(--danger); }
+
+.match-report-flag {
+  padding: 0.25rem 0.55rem;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
 
 /* ---------------------------------------------------------------------------
    大会情報（ブラケットの下）

@@ -196,6 +196,9 @@ node scripts/verify-migration.mjs
 | [`migration-006.sql`](migration-006.sql) | 大会の対戦方法（`tournaments.match_type`）＝ランキング反映の条件 |
 | [`migration-007.sql`](migration-007.sql) | 2v2（チーム戦）対応（`tournament_teams` テーブルとチームでのエントリー） |
 | [`migration-008.sql`](migration-008.sql) | 対戦カードごとのチャット（`match_chat_messages` テーブル） |
+| [`migration-009.sql`](migration-009.sql) | チャットからの運営への報告（`match_chat_reports` テーブル） |
+| [`migration-010.sql`](migration-010.sql) | 選手によるゲームカウントの入力（`match_result_reports` テーブル） |
+| [`migration-011.sql`](migration-011.sql) | 回戦ごとの開始と配信台（`tournament_rounds` テーブル） |
 
 補足:
 
@@ -219,6 +222,19 @@ node scripts/verify-migration.mjs
   読み書きできるのは その試合の当事者と運営だけで、判定はブラケットのJSONを読む関数
   （`can_use_match_chat`）が行います。Realtimeのパブリケーションにも意図的に入れて
   いません（理由は `doc/design.md`）。
+- **009 の報告** — チャットからの報告を受け、未対応のものがある大会に運営だけ見える印を
+  出します。報告は**誰にも削除させません**（`delete` のGRANTを与えていない）。
+  中身も書き換えられず、更新できるのは「対応済みにする」の2列だけです。
+  008 の `can_use_match_chat` を使うので、**必ず 008 のあとに実行**してください。
+- **010 の選手入力** — 選手が自分の対戦のゲームカウントを入れられるようにします。
+  入れただけでは確定せず、相手が承認して初めて対戦表が進みます。**選手に
+  `brackets` への書き込み権限は与えません**。確定の処理は `approve_match_result`
+  （`security definer`）の中だけで行われ、「その1試合の結果を入れて勝者を次の枠へ送る」
+  以外のことはできません。008 の `bracket_match` を使うので、**008 のあとに実行**してください。
+- **011 の回戦の開始** — 運営が配信台（配信に乗せる試合）を決めて回戦を開始するまで、
+  選手はゲームカウントを報告できなくなります。「配信台を決めずに開始できない」は
+  テーブルのCHECK制約が保証します。010 の関数を条件付きで置き換えるので、
+  **必ず 010 のあとに実行**してください。
 
 ## 8. 後始末
 

@@ -150,6 +150,41 @@ function fromMatch(match) {
   };
 }
 
+function toRound(row) {
+  return {
+    tournamentId: row.tournament_id,
+    roundIndex: row.round_index,
+    streamedMatchIds: row.streamed_match_ids ?? [],
+    startedAt: row.started_at,
+    startedBy: row.started_by,
+  };
+}
+
+function toResultReport(row) {
+  return {
+    tournamentId: row.tournament_id,
+    matchId: row.match_id,
+    reportedBy: row.reported_by,
+    reporterPlayerId: row.reporter_player_id,
+    score: row.score,
+    winnerEntrantId: row.winner_entrant_id,
+    createdAt: row.created_at,
+  };
+}
+
+function toChatReport(row) {
+  return {
+    id: row.id,
+    tournamentId: row.tournament_id,
+    matchId: row.match_id,
+    reporterId: row.reporter_id,
+    body: row.body,
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at,
+    resolvedBy: row.resolved_by,
+  };
+}
+
 function toAnnouncement(row) {
   return {
     id: row.id,
@@ -208,20 +243,27 @@ export async function loadAll() {
   // 見ている表がその場で更新されるようにするため（通常は0件か1件）。
   const openBracketIds = Object.keys(state.brackets);
 
-  const [players, tournaments, teams, entries, bracketIds, openBrackets, matches, ranking, announcements] = await Promise.all([
+  const [players, tournaments, teams, entries, bracketIds, openBrackets, matches, ranking,
+    announcements, reports, resultReports, rounds] = await Promise.all([
     supabase.from('players').select('*').order('display_name'),
     supabase.from('tournaments').select('*').order('date', { ascending: true, nullsFirst: false }),
     supabase.from('tournament_teams').select('*'),
     supabase.from('tournament_entries').select('*'),
     supabase.from('brackets').select('tournament_id'),
     openBracketIds.length > 0
-      ? supabase.from('brackets').select('tournament_id, data').in('tournament_id', openBracketIds)
+      ? supabase.from('brackets').select('tournament_id, data, updated_at').in('tournament_id', openBracketIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from('matches').select('*'),
     // スナップショットは最新の1件だけ使う（過去の公開履歴は残しておく）
     supabase.from('published_rankings').select('*').order('published_at', { ascending: false }).limit(1),
     // 固定を先頭に、あとは新しい順
     supabase.from('announcements').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
+    // RLSにより、運営には全件・一般の選手には自分の分だけ・ゲストには0件が返る
+    supabase.from('match_chat_reports').select('*').order('created_at', { ascending: false }),
+    // 承認待ちのゲームカウント。当事者と運営にしか返らない
+    supabase.from('match_result_reports').select('*'),
+    // 回戦ごとの開始と配信台。誰でも見られる
+    supabase.from('tournament_rounds').select('*'),
   ]);
 
   check(players.error, '選手の読み込み');
@@ -233,6 +275,9 @@ export async function loadAll() {
   check(matches.error, '試合結果の読み込み');
   check(ranking.error, 'ランキングの読み込み');
   check(announcements.error, 'お知らせの読み込み');
+  check(reports.error, '報告の読み込み');
+  check(resultReports.error, '承認待ちの結果の読み込み');
+  check(rounds.error, '回戦の読み込み');
 
   // 大会ごとにエントリーとチームをまとめ、出場枠の並び（シード順、未確定なら登録順）を作る。
   // 成績はチーム戦でもメンバーの行に書き写してあるので、ここは選手IDのままでよい
@@ -256,8 +301,12 @@ export async function loadAll() {
   });
 
   // 取り直した分だけをキャッシュに残す。消された大会のブラケットもここで落ちる。
+  // 版数も一緒に更新しておかないと、次の保存が「DB側が進んでいる」と誤検知する。
   const bracketsById = {};
-  openBrackets.data.forEach((b) => { bracketsById[b.tournament_id] = b.data; });
+  openBrackets.data.forEach((b) => {
+    bracketsById[b.tournament_id] = b.data;
+    bracketVersions[b.tournament_id] = b.updated_at;
+  });
 
   const snapshot = ranking.data?.[0];
 
@@ -278,6 +327,9 @@ export async function loadAll() {
       }
     : null;
   state.announcements = announcements.data.map(toAnnouncement);
+  state.chatReports = reports.data.map(toChatReport);
+  state.resultReports = resultReports.data.map(toResultReport);
+  state.rounds = rounds.data.map(toRound);
 }
 
 // ---------------------------------------------------------------------------
@@ -624,6 +676,14 @@ export async function replaceEntries(tournamentId, seededPlayerIds) {
 // ブラケットと試合
 // ---------------------------------------------------------------------------
 
+// 読み込んだ時点の brackets.updated_at。
+//
+// 対戦表は運営が手元のコピーを丸ごと書き戻す作りなので、その間に選手が結果を
+// 確定させていると（approve_match_result はDB側で直接反映する）、気づかずに
+// 上書きして消してしまう。書き戻す直前にこの版数を突き合わせて、DB側が進んで
+// いれば保存を中断する。
+const bracketVersions = {};   // tournamentId -> updated_at
+
 // 1大会分の対戦表を取りに行き、state のキャッシュに載せる。
 // loadAll は中身を持ってこないので、対戦表を開くときはここを通す。
 //
@@ -635,21 +695,50 @@ export async function loadBracket(tournamentId) {
 
   const { data, error } = await supabase
     .from('brackets')
-    .select('data')
+    .select('data, updated_at')
     .eq('tournament_id', tournamentId)
     .maybeSingle();
   check(error, 'ブラケットの読み込み');
 
   if (!data) return null;
   state.brackets[tournamentId] = data.data;
+  bracketVersions[tournamentId] = data.updated_at;
   return data.data;
 }
 
 export async function saveBracket(tournamentId, bracket) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('brackets')
-    .upsert({ tournament_id: tournamentId, data: bracket }, { onConflict: 'tournament_id' });
+    .upsert({ tournament_id: tournamentId, data: bracket }, { onConflict: 'tournament_id' })
+    .select('updated_at')
+    .single();
   check(error, 'ブラケットの保存');
+  // 自分の保存で版数が進むので、次の保存のために覚え直す
+  bracketVersions[tournamentId] = data.updated_at;
+}
+
+// 手元のコピーが最新かを確かめる。DB側が先に進んでいたら保存させない。
+//
+// 「確定済みの試合が増えているか」で判定してはいけない。運営が結果の確定を
+// 取り消す操作（editMatch）でも、手元だけ未確定に戻った状態になるため、
+// 正しい操作を誤検知してしまう。版数で見れば操作の向きに依らない。
+async function assertBracketUnchanged(tournamentId) {
+  const known = bracketVersions[tournamentId];
+  if (!known) return;   // まだ一度も読んでいない（生成直後など）
+
+  const { data, error } = await supabase
+    .from('brackets')
+    .select('updated_at')
+    .eq('tournament_id', tournamentId)
+    .maybeSingle();
+  check(error, '対戦表の照合');
+
+  if (data && data.updated_at !== known) {
+    throw new Error(
+      '対戦表が別の場所で更新されています（選手が結果を確定させた可能性があります）。'
+      + '画面を再読み込みして、最新の状態から操作してください。',
+    );
+  }
 }
 
 // ブラケットの操作（勝敗の確定・取り消し）を1回で保存する。
@@ -659,6 +748,7 @@ export async function saveBracket(tournamentId, bracket) {
 // あるため、差分を追いかけるより、その大会の試合をDBと突き合わせて揃えるほうが確実。
 // 1大会の試合は多くても数十件なので、毎回の照合でも十分に軽い。
 export async function syncTournamentProgress(tournamentId) {
+  await assertBracketUnchanged(tournamentId);
   await saveBracket(tournamentId, state.brackets[tournamentId]);
 
   const { data, error } = await supabase
@@ -681,6 +771,22 @@ export async function syncTournamentProgress(tournamentId) {
   if (toDelete.length) {
     const { error: deleteError } = await supabase.from('matches').delete().in('id', toDelete);
     check(deleteError, '試合結果の取り消し');
+  }
+
+  // 運営が自分で結果を入れた試合に、選手からの承認待ちが残っていたら片付ける。
+  // 残しておくと、確定済みの試合に「承認しますか？」が出続ける。
+  const confirmedIds = state.brackets[tournamentId].rounds
+    .flatMap((r) => r.matches)
+    .filter((m) => m.confirmed)
+    .map((m) => m.id);
+
+  if (confirmedIds.length) {
+    const { error: pendingError } = await supabase
+      .from('match_result_reports')
+      .delete()
+      .eq('tournament_id', tournamentId)
+      .in('match_id', confirmedIds);
+    check(pendingError, '承認待ちの片付け');
   }
 }
 
@@ -745,6 +851,104 @@ export async function clearEntryPlacements(tournamentId) {
 }
 
 // ---------------------------------------------------------------------------
+// 回戦の開始と配信台
+//
+// 選手がゲームカウントを入力できるのは、運営がその回戦を開始してから。
+// 開始の前に配信台を決めなければならないという条件は、テーブルのCHECK制約
+// （rounds_stream_before_start）が持っている。ここで作れるのは運営だけ（RLS）。
+// ---------------------------------------------------------------------------
+
+// 配信台に乗せる試合を決める。基本は1つだが、全試合を配信する大会もあるので配列。
+export async function saveRoundStream(tournamentId, roundIndex, matchIds) {
+  const { error } = await supabase
+    .from('tournament_rounds')
+    .upsert(
+      { tournament_id: tournamentId, round_index: roundIndex, streamed_match_ids: matchIds },
+      { onConflict: 'tournament_id,round_index' },
+    );
+  check(error, '配信台の保存');
+}
+
+// 回戦を開始する。配信台が未定のままだとCHECK制約に弾かれるので、
+// クライアント側の出し分けを抜けても開始できない。
+export async function startRound(tournamentId, roundIndex, adminPlayerId) {
+  const { data, error } = await supabase
+    .from('tournament_rounds')
+    .update({ started_at: new Date().toISOString(), started_by: adminPlayerId })
+    .eq('tournament_id', tournamentId)
+    .eq('round_index', roundIndex)
+    .select('started_at');
+
+  if (error?.code === '23514') {
+    throw new Error('先に配信台（配信する試合）を決めてください。');
+  }
+  check(error, '回戦の開始');
+
+  // 配信台を一度も決めていない回戦には行が無く、UPDATEは0行で「成功」する。
+  // そのまま開始した扱いにすると、選手の画面が開かないまま運営だけが開始したつもりになる。
+  if (!data || data.length === 0) {
+    throw new Error('先に配信台（配信する試合）を決めてください。');
+  }
+}
+
+// 開始を取り消す。押し間違い用。
+// 残っている承認待ちも消す（開始前に出された報告が生き残らないように）。
+export async function stopRound(tournamentId, roundIndex, matchIds) {
+  const { error } = await supabase
+    .from('tournament_rounds')
+    .update({ started_at: null, started_by: null })
+    .eq('tournament_id', tournamentId)
+    .eq('round_index', roundIndex);
+  check(error, '開始の取り消し');
+
+  if (matchIds.length === 0) return;
+  const { error: pendingError } = await supabase
+    .from('match_result_reports')
+    .delete()
+    .eq('tournament_id', tournamentId)
+    .in('match_id', matchIds);
+  check(pendingError, '承認待ちの片付け');
+}
+
+// ---------------------------------------------------------------------------
+// 選手が入力するゲームカウント
+//
+// 選手は brackets に直接書けない（brackets_write は運営限定）。ここを緩めると
+// 対戦表を丸ごと書き換えられてしまうので、確定の処理はDB側の関数に閉じ込めてある。
+// 片方が報告し、相手が承認して初めて確定する。
+// ---------------------------------------------------------------------------
+
+// score は "3-1" 形式で、左が player1Id 側（対戦表の上の行）。
+export async function reportMatchResult(tournamentId, matchId, score, winnerEntrantId) {
+  const { error } = await supabase.rpc('report_match_result', {
+    p_tournament_id: tournamentId,
+    p_match_id: matchId,
+    p_score: score,
+    p_winner_entrant_id: winnerEntrantId,
+  });
+  checkRpc(error, 'ゲームカウントの報告');
+}
+
+// 相手の報告を承認して確定させる。対戦表への反映と matches への記録もここで行われる。
+export async function approveMatchResult(tournamentId, matchId) {
+  const { error } = await supabase.rpc('approve_match_result', {
+    p_tournament_id: tournamentId,
+    p_match_id: matchId,
+  });
+  checkRpc(error, '結果の承認');
+}
+
+// 自分が出した報告の取り消し（運営は誰の分でも消せる）。RLSのポリシーが判定する。
+export async function withdrawMatchResult(tournamentId, matchId) {
+  const { error } = await supabase
+    .from('match_result_reports')
+    .delete()
+    .eq('tournament_id', tournamentId)
+    .eq('match_id', matchId);
+  check(error, '報告の取り消し');
+}
+
+// ---------------------------------------------------------------------------
 // 対戦カードごとのチャット
 //
 // 読み書きできるのは その試合の当事者と運営だけ。判定はすべてDB側のポリシー
@@ -798,6 +1002,51 @@ export async function sendMatchChatMessage(tournamentId, matchId, playerId, body
 export async function deleteMatchChatMessage(messageId) {
   const { error } = await supabase.from('match_chat_messages').delete().eq('id', messageId);
   check(error, 'メッセージの削除');
+}
+
+// ---------------------------------------------------------------------------
+// チャットからの運営への報告
+// ---------------------------------------------------------------------------
+
+export async function reportMatchChat(tournamentId, matchId, reporterId, body) {
+  const { error } = await supabase.from('match_chat_reports').insert({
+    tournament_id: tournamentId,
+    match_id: matchId,
+    reporter_id: reporterId,
+    body,
+  });
+  check(error, '運営への報告');
+}
+
+export async function resolveChatReport(reportId, adminPlayerId) {
+  const { error } = await supabase
+    .from('match_chat_reports')
+    .update({ resolved_at: new Date().toISOString(), resolved_by: adminPlayerId })
+    .eq('id', reportId);
+  check(error, '報告の対応済み');
+}
+
+// 報告だけを取り直す。
+//
+// 全件取得（loadAll）の保険は15分間隔なので、それ待ちでは運営に報告が届くのが遅い。
+// かといってチャットと同じ理由でRealtimeには載せられないため、報告だけを短い間隔で
+// 見に行く。行数はごく少なく、RLSで運営と本人以外には0件しか返らない。
+//
+// 戻り値: 未対応の顔ぶれが前回から変わったか（変わったときだけ画面を描き直す）。
+export async function refreshChatReports() {
+  const { data, error } = await supabase
+    .from('match_chat_reports')
+    .select('*')
+    .order('created_at', { ascending: false });
+  check(error, '報告の読み込み');
+
+  const signature = (list) => list
+    .map((r) => `${r.id}:${r.resolvedAt ? 1 : 0}`)
+    .join(',');
+
+  const before = signature(state.chatReports);
+  state.chatReports = data.map(toChatReport);
+  return signature(state.chatReports) !== before;
 }
 
 // ---------------------------------------------------------------------------
@@ -885,7 +1134,8 @@ export function subscribeToChanges(onChange, debounceMs = 400) {
   };
 
   channel = supabase.channel('app-data');
-  ['players', 'tournaments', 'tournament_teams', 'tournament_entries', 'brackets', 'matches', 'published_rankings', 'announcements']
+  ['players', 'tournaments', 'tournament_teams', 'tournament_entries', 'brackets', 'matches',
+    'tournament_rounds', 'match_result_reports', 'published_rankings', 'announcements']
     .forEach((table) => {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, notify);
     });

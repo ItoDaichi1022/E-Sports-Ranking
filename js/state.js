@@ -31,7 +31,50 @@ export const state = {
   publishedRanking: null, // { publishedAt, periodMonths, rankings: [...] } | null（未公開）
   // ホーム画面の運営からのお知らせ。pinned優先＋新しい順で並べて持つ。
   announcements: [],  // { id, title, body, imageUrl, pinned, createdAt, updatedAt }
+
+  // チャットからの運営への報告。RLSにより、運営には全件・一般の選手には
+  // 自分が出したものだけが入る（ゲストは空）。新しい順。
+  chatReports: [],    // { id, tournamentId, matchId, reporterId, body, createdAt, resolvedAt, resolvedBy }
+
+  // 選手が入力し、相手の承認を待っているゲームカウント。1試合につき1件。
+  // RLSにより、当事者と運営にしか入らない。承認されると消える。
+  resultReports: [],  // { tournamentId, matchId, reportedBy, reporterPlayerId, score, winnerEntrantId, createdAt }
+
+  // 回戦ごとの開始と配信台。行が無い回戦は「未開始・配信台未定」と同じ。
+  rounds: [],         // { tournamentId, roundIndex, streamedMatchIds: [], startedAt, startedBy }
 };
+
+// 回戦の状態。まだ触られていない回戦は行が無いので、既定の形を返す。
+export function roundState(tournamentId, roundIndex) {
+  return state.rounds.find(
+    (r) => r.tournamentId === tournamentId && r.roundIndex === roundIndex,
+  ) ?? { tournamentId, roundIndex, streamedMatchIds: [], startedAt: null, startedBy: null };
+}
+
+// 選手がゲームカウントを入力できるのは、運営がその回戦を開始してから。
+export function isRoundStarted(tournamentId, roundIndex) {
+  return Boolean(roundState(tournamentId, roundIndex).startedAt);
+}
+
+// この試合が配信台に乗っているか。
+export function isStreamedMatch(tournamentId, roundIndex, matchId) {
+  return roundState(tournamentId, roundIndex).streamedMatchIds.includes(matchId);
+}
+
+// この試合に出ている承認待ちのゲームカウント（無ければ null）。
+export function pendingResultReport(tournamentId, matchId) {
+  return state.resultReports.find(
+    (r) => r.tournamentId === tournamentId && r.matchId === matchId,
+  ) ?? null;
+}
+
+// 未対応の報告。大会だけ・特定の試合だけに絞れる。
+// 印を出すかどうかの判定はすべてこれを通す。
+export function openChatReports(tournamentId = null, matchId = null) {
+  return state.chatReports.filter((r) => !r.resolvedAt
+    && (tournamentId == null || r.tournamentId === tournamentId)
+    && (matchId == null || r.matchId === matchId));
+}
 
 // 新しいレコードのID。DB側の主キーがuuidなので、クライアントで作るIDもuuidに揃える。
 // crypto.randomUUID はセキュアコンテキスト（HTTPS / localhost）でのみ使えるが、

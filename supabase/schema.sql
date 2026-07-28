@@ -113,6 +113,27 @@ create table if not exists brackets (
   updated_at    timestamptz not null default now()
 );
 
+-- 回戦ごとの開始と配信台。
+--
+-- 選手がゲームカウントを入力できるのは、運営がその回戦を開始してから。
+-- 開始の前に配信台（＝配信に乗せる試合）を決めなければならず、そこは制約で保証する。
+-- 基本は1回戦につき1試合だが、全試合を配信する大会もあるので複数選べる。
+create table if not exists tournament_rounds (
+  tournament_id      uuid not null references tournaments(id) on delete cascade,
+  -- ブラケットの rounds 配列の位置（0始まり）。ラウンド名（R1/QF/SF/F）は
+  -- 表の大きさで変わるので、位置で持つほうが崩れない
+  round_index        int not null,
+  streamed_match_ids uuid[] not null default '{}',
+  -- 開始通知を出した時刻。null なら未開始（選手は報告できない）
+  started_at         timestamptz,
+  started_by         uuid references players(id) on delete set null,
+  primary key (tournament_id, round_index),
+  -- 配信台を決めずに開始通知は出せない
+  constraint rounds_stream_before_start check (
+    started_at is null or coalesce(array_length(streamed_match_ids, 1), 0) >= 1
+  )
+);
+
 -- 確定した試合。個人戦は winner_id / loser_id、チーム戦は winner_team_id /
 -- loser_team_id が入り、制約でどちらか一方だけを許す。
 --
@@ -164,6 +185,42 @@ create table if not exists match_chat_messages (
   constraint chat_body_length check (char_length(body) <= 500)
 );
 
+-- 選手が入力したゲームカウントのうち、相手の承認を待っているもの。
+--
+-- 片方が報告し、相手が承認して初めて確定する（一方的な入力で勝ち上がれないため）。
+-- 確定すると行は消え、結果は brackets と matches に入る。
+-- 1試合につき1件で、出し直すと上書きされる（相手からの対案もこれで入る）。
+create table if not exists match_result_reports (
+  tournament_id      uuid not null references tournaments(id) on delete cascade,
+  match_id           uuid not null,
+  -- 報告した側の出場枠（個人戦は選手ID、チーム戦はチームID）
+  reported_by        uuid not null,
+  -- 実際に操作した選手。チーム戦で誰が出したのかを残す
+  reporter_player_id uuid not null references players(id) on delete cascade,
+  -- "3-1" 形式。左が player1Id 側で、brackets / matches の score と同じ向き
+  score              text not null,
+  winner_entrant_id  uuid not null,
+  created_at         timestamptz not null default now(),
+  primary key (tournament_id, match_id)
+);
+
+-- チャットでもめたときに、当事者が運営へ知らせるための報告。
+-- 未対応（resolved_at is null）のものがある大会は、運営の画面で大会カードと
+-- 対戦表の該当試合に印が出る。
+create table if not exists match_chat_reports (
+  id            uuid primary key default gen_random_uuid(),
+  tournament_id uuid not null references tournaments(id) on delete cascade,
+  match_id      uuid not null,
+  reporter_id   uuid not null references players(id) on delete cascade,
+  body          text not null,
+  created_at    timestamptz not null default now(),
+  -- 対応済みにした時刻と運営。null なら未対応（＝印を出す）
+  resolved_at   timestamptz,
+  resolved_by   uuid references players(id) on delete set null,
+  constraint report_body_not_blank check (btrim(body) <> ''),
+  constraint report_body_length check (char_length(body) <= 500)
+);
+
 -- 運営が「公開する」を押した瞬間のランキングのスナップショット。
 -- 常時計算するスコアは保存しないという設計原則（doc/design.md 6章）を維持する。
 create table if not exists published_rankings (
@@ -197,6 +254,8 @@ create index if not exists entries_player_idx     on tournament_entries (player_
 create index if not exists entries_team_idx       on tournament_entries (team_id);
 create index if not exists teams_tournament_idx   on tournament_teams (tournament_id);
 create index if not exists chat_room_idx          on match_chat_messages (tournament_id, match_id, created_at);
+-- 画面が見るのはほぼ「未対応の報告」だけなので、そこに絞る
+create index if not exists reports_open_idx       on match_chat_reports (tournament_id) where resolved_at is null;
 create index if not exists tournaments_status_idx on tournaments (status);
 create index if not exists rankings_published_idx on published_rankings (published_at desc);
 create index if not exists announcements_order_idx on announcements (pinned desc, created_at desc);
@@ -256,15 +315,16 @@ as $$
   limit 1;
 $$;
 
--- その試合のチャットに入れるか。当事者か運営なら true。
+-- その試合の当事者（どちらかの枠のメンバー）か運営なら true。
+-- チャットに入れるか、ゲームカウントを報告できるか、の両方の判定に使う。
 --
 -- 当事者の判定は「出場枠」で行う。tournament_entries の coalesce(team_id, player_id) が
 -- ブラケットのスロットに入っているIDなので、個人戦でもチーム戦でも同じ式で済む
--- （チーム戦ではメンバー全員が同じ部屋に入る）。
+-- （チーム戦ではメンバー全員が同じ扱いになる）。
 --
 -- 両方の枠が埋まっていることを運営にも求めるのは、相手のいない部屋を作らせないため。
 -- BYE・対戦カード未確定の試合、そして存在しない match_id はこの条件で落ちる。
-create or replace function can_use_match_chat(p_tournament_id uuid, p_match_id uuid)
+create or replace function is_match_participant(p_tournament_id uuid, p_match_id uuid)
   returns boolean
   language sql
   security definer
@@ -287,6 +347,64 @@ as $$
           )
       )
     );
+$$;
+
+-- チャットのポリシーから使う別名（意味を読みやすくするためだけのもの）。
+create or replace function can_use_match_chat(p_tournament_id uuid, p_match_id uuid)
+  returns boolean
+  language sql
+  security definer
+  stable
+  set search_path = public
+as $$
+  select is_match_participant(p_tournament_id, p_match_id);
+$$;
+
+-- 呼び出し元がこの大会で入る「出場枠」（個人戦は選手ID、チーム戦はチームID）。
+create or replace function my_entrant_id(p_tournament_id uuid)
+  returns uuid
+  language sql
+  security definer
+  stable
+  set search_path = public
+as $$
+  select coalesce(e.team_id, e.player_id)
+  from tournament_entries e
+  where e.tournament_id = p_tournament_id
+    and e.player_id = current_player_id();
+$$;
+
+-- その試合がブラケットの何番目の回戦にあるか（0始まり）。
+create or replace function bracket_round_index(p_tournament_id uuid, p_match_id uuid)
+  returns int
+  language sql
+  security definer
+  stable
+  set search_path = public
+as $$
+  select (r.ord - 1)::int
+  from brackets b,
+       jsonb_array_elements(b.data->'rounds') with ordinality as r(j, ord),
+       jsonb_array_elements(r.j->'matches') as m
+  where b.tournament_id = p_tournament_id
+    and m->>'id' = p_match_id::text
+  limit 1;
+$$;
+
+-- その試合の回戦が開始されているか。運営の合図が出るまで選手は報告できない。
+create or replace function round_is_started(p_tournament_id uuid, p_match_id uuid)
+  returns boolean
+  language sql
+  security definer
+  stable
+  set search_path = public
+as $$
+  select exists (
+    select 1 from tournament_rounds
+    where tournament_id = p_tournament_id
+      and round_index = bracket_round_index(p_tournament_id, p_match_id)
+      and started_at is not null
+  );
 $$;
 
 -- 書き込みを受け付ける状態か。勝敗が確定した試合は読むだけにする
@@ -389,8 +507,18 @@ create trigger announcements_touch_trigger
 revoke all on all tables in schema public from anon, authenticated;
 
 -- 閲覧は全員（ログアウト状態のゲストを含む）
-grant select on players, tournaments, tournament_teams, tournament_entries, brackets, matches, published_rankings, announcements
+grant select on players, tournaments, tournament_teams, tournament_entries, brackets, matches, tournament_rounds, published_rankings, announcements
   to anon, authenticated;
+
+-- 報告はポリシー側で運営と本人に絞る。anon にも select を与えるのは、
+-- ゲストの読み込み（js/db.js の loadAll）が権限エラーで止まらないようにするため
+-- （ポリシーのどちらの条件も満たさないので、返るのは常に0件）。
+grant select on match_chat_reports to anon, authenticated;
+
+-- 承認待ちのゲームカウント。登録と更新は下のRPC経由だけなので、
+-- テーブルに与えるのは select と（出した本人の取り消し用の）delete だけ。
+grant select on match_result_reports to anon, authenticated;
+grant delete on match_result_reports to authenticated;
 
 -- 選手行の作成。idとroleは指定させない（roleは既定値'player'が入る）
 grant insert (user_id, display_name, past_names, game_account_id, bio, avatar_url,
@@ -404,11 +532,16 @@ grant update (display_name, past_names, game_account_id, bio, avatar_url,
 
 grant delete on players to authenticated;
 
-grant insert, update, delete on tournaments, tournament_teams, tournament_entries, brackets, matches, published_rankings, announcements
+grant insert, update, delete on tournaments, tournament_teams, tournament_entries, brackets, matches, tournament_rounds, published_rankings, announcements
   to authenticated;
 
 -- 対戦カードのチャットだけは anon に何も与えない（当事者と運営に閉じる）
 grant select, insert, delete on match_chat_messages to authenticated;
+
+-- 報告は消せない（deleteを与えない）。もめごとの経緯そのものが失われるため。
+-- 更新できる列も「対応済みにする」の2列だけに絞る（RLSは行しか制御できない）。
+grant insert on match_chat_reports to authenticated;
+grant update (resolved_at, resolved_by) on match_chat_reports to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 行レベルセキュリティ
@@ -419,10 +552,13 @@ alter table tournaments         enable row level security;
 alter table tournament_teams    enable row level security;
 alter table tournament_entries  enable row level security;
 alter table brackets            enable row level security;
+alter table tournament_rounds   enable row level security;
 alter table matches             enable row level security;
 alter table published_rankings  enable row level security;
 alter table announcements       enable row level security;
 alter table match_chat_messages enable row level security;
+alter table match_chat_reports  enable row level security;
+alter table match_result_reports enable row level security;
 
 -- ---- players ----
 
@@ -584,6 +720,62 @@ drop policy if exists chat_delete on match_chat_messages;
 create policy chat_delete on match_chat_messages
   for delete to authenticated
   using (is_admin());
+
+-- ---- tournament_rounds ----
+--
+-- 配信台と開始状態は誰が見てもよい（選手も観戦者も、どこで何が始まったか知りたい）。
+-- 決められるのは運営だけ。
+
+drop policy if exists rounds_select on tournament_rounds;
+create policy rounds_select on tournament_rounds
+  for select to anon, authenticated
+  using (true);
+
+drop policy if exists rounds_write on tournament_rounds;
+create policy rounds_write on tournament_rounds
+  for all to authenticated
+  using (is_admin())
+  with check (is_admin());
+
+-- ---- match_result_reports ----
+
+drop policy if exists result_reports_select on match_result_reports;
+create policy result_reports_select on match_result_reports
+  for select to anon, authenticated
+  using (is_match_participant(tournament_id, match_id));
+
+-- 取り消せるのは出した本人と運営。相手が違うと思ったときは、取り消してもらうのではなく
+-- 自分のゲームカウントを出し直す（上書きされる）。
+drop policy if exists result_reports_delete on match_result_reports;
+create policy result_reports_delete on match_result_reports
+  for delete to authenticated
+  using (is_admin() or reporter_player_id = current_player_id());
+
+-- ---- match_chat_reports ----
+--
+-- 読めるのは運営と、自分が出した報告の本人だけ。本人にも見せるのは
+-- 「報告が届いているか」を画面で確かめられるようにするため。
+
+drop policy if exists reports_select on match_chat_reports;
+create policy reports_select on match_chat_reports
+  for select to anon, authenticated
+  using (is_admin() or reporter_id = current_player_id());
+
+-- 報告できるのは その試合のチャットを使える人（＝当事者）だけ。自分の名前でのみ。
+drop policy if exists reports_insert on match_chat_reports;
+create policy reports_insert on match_chat_reports
+  for insert to authenticated
+  with check (
+    reporter_id = current_player_id()
+    and can_use_match_chat(tournament_id, match_id)
+  );
+
+-- 対応済みにできるのは運営だけ。書き換えられる列は上のGRANTで絞ってある
+drop policy if exists reports_update on match_chat_reports;
+create policy reports_update on match_chat_reports
+  for update to authenticated
+  using (is_admin())
+  with check (is_admin());
 
 -- ---------------------------------------------------------------------------
 -- 運営専用の操作（RPC）
@@ -827,12 +1019,248 @@ revoke all on function cancel_team_entry(uuid)                      from anon, p
 grant execute on function enter_tournament_as_team(uuid, text, uuid[]) to authenticated;
 grant execute on function cancel_team_entry(uuid)                      to authenticated;
 
-revoke all on function bracket_match(uuid, uuid)      from anon, public;
-revoke all on function can_use_match_chat(uuid, uuid) from anon, public;
-revoke all on function match_chat_is_open(uuid, uuid) from anon, public;
-grant execute on function bracket_match(uuid, uuid)      to authenticated;
-grant execute on function can_use_match_chat(uuid, uuid) to authenticated;
-grant execute on function match_chat_is_open(uuid, uuid) to authenticated;
+-- ---------------------------------------------------------------------------
+-- 対戦表への結果の反映
+--
+-- ブラケットのJSONを組み直す。触るのは「その試合の結果欄」と「勝者を送る先の枠」
+-- だけで、それ以外はそのまま写す。js/bracket.js の applyWinner と同じ内容。
+-- ---------------------------------------------------------------------------
+
+create or replace function apply_match_result_json(
+  p_data     jsonb,
+  p_match_id uuid,
+  p_winner   uuid,
+  p_loser    uuid,
+  p_score    text
+) returns jsonb
+  language plpgsql
+  immutable
+as $$
+declare
+  v_rounds    jsonb := '[]'::jsonb;
+  v_round     jsonb;
+  v_matches   jsonb;
+  v_match     jsonb;
+  v_next_id   text;
+  v_next_slot int;
+begin
+  -- 勝者をどの枠へ送るかを先に調べる（決勝なら送り先は無い）
+  select m->>'nextMatchId', (m->>'nextSlot')::int
+    into v_next_id, v_next_slot
+  from jsonb_array_elements(p_data->'rounds') r,
+       jsonb_array_elements(r->'matches') m
+  where m->>'id' = p_match_id::text;
+
+  for v_round in select * from jsonb_array_elements(p_data->'rounds') loop
+    v_matches := '[]'::jsonb;
+
+    for v_match in select * from jsonb_array_elements(v_round->'matches') loop
+      if v_match->>'id' = p_match_id::text then
+        v_match := v_match || jsonb_build_object(
+          'winnerId',   p_winner,
+          'loserId',    p_loser,
+          'score',      p_score,
+          'confirmed',  true,
+          'isBye',      false,
+          'isWalkover', false
+        );
+      elsif v_next_id is not null and v_match->>'id' = v_next_id then
+        v_match := v_match || jsonb_build_object(
+          case when v_next_slot = 1 then 'player1Id' else 'player2Id' end, p_winner
+        );
+      end if;
+
+      v_matches := v_matches || jsonb_build_array(v_match);
+    end loop;
+
+    v_rounds := v_rounds || jsonb_build_array(jsonb_set(v_round, '{matches}', v_matches));
+  end loop;
+
+  return jsonb_set(p_data, '{rounds}', v_rounds);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 報告と承認（RPC）
+-- ---------------------------------------------------------------------------
+
+create or replace function report_match_result(
+  p_tournament_id     uuid,
+  p_match_id          uuid,
+  p_score             text,
+  p_winner_entrant_id uuid
+) returns void
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+declare
+  v_me         uuid;
+  v_my_entrant uuid;
+  v_m          jsonb;
+  v_p1         uuid;
+  v_p2         uuid;
+  v_s1         int;
+  v_s2         int;
+begin
+  v_me := current_player_id();
+  if v_me is null then
+    raise exception '選手登録がまだのため報告できません。' using errcode = 'insufficient_privilege';
+  end if;
+
+  v_m := bracket_match(p_tournament_id, p_match_id);
+  if v_m is null then
+    raise exception '対象の試合が見つかりません。' using errcode = 'no_data_found';
+  end if;
+  if coalesce((v_m->>'confirmed')::boolean, false) then
+    raise exception 'この試合は既に確定済みです。' using errcode = 'check_violation';
+  end if;
+
+  if not round_is_started(p_tournament_id, p_match_id) then
+    raise exception 'この回戦はまだ開始されていません。運営の開始をお待ちください。'
+      using errcode = 'check_violation';
+  end if;
+
+  v_p1 := (v_m->>'player1Id')::uuid;
+  v_p2 := (v_m->>'player2Id')::uuid;
+  if v_p1 is null or v_p2 is null then
+    raise exception '対戦カードが確定していないため報告できません。' using errcode = 'check_violation';
+  end if;
+
+  v_my_entrant := my_entrant_id(p_tournament_id);
+  if v_my_entrant is null or v_my_entrant not in (v_p1, v_p2) then
+    raise exception 'この対戦の当事者ではありません。' using errcode = 'insufficient_privilege';
+  end if;
+  if p_winner_entrant_id not in (v_p1, v_p2) then
+    raise exception '勝者は対戦カードから選んでください。' using errcode = 'check_violation';
+  end if;
+
+  if p_score !~ '^[0-9]{1,3}-[0-9]{1,3}$' then
+    raise exception 'ゲームカウントの形式が正しくありません。' using errcode = 'check_violation';
+  end if;
+  v_s1 := split_part(p_score, '-', 1)::int;
+  v_s2 := split_part(p_score, '-', 2)::int;
+  if v_s1 = v_s2 then
+    raise exception 'ゲームカウントが同点のため勝者を判定できません。' using errcode = 'check_violation';
+  end if;
+  -- スコアの左が player1 側。勝者の指定と向きが食い違っていたら受け付けない
+  if (v_s1 > v_s2) <> (p_winner_entrant_id = v_p1) then
+    raise exception 'ゲームカウントと勝者が食い違っています。' using errcode = 'check_violation';
+  end if;
+
+  insert into match_result_reports (
+    tournament_id, match_id, reported_by, reporter_player_id, score, winner_entrant_id
+  ) values (
+    p_tournament_id, p_match_id, v_my_entrant, v_me, p_score, p_winner_entrant_id
+  )
+  on conflict (tournament_id, match_id) do update set
+    reported_by        = excluded.reported_by,
+    reporter_player_id = excluded.reporter_player_id,
+    score              = excluded.score,
+    winner_entrant_id  = excluded.winner_entrant_id,
+    created_at         = now();
+end;
+$$;
+
+-- 相手の報告を承認して確定させる。自分が出した報告は自分では承認できない。
+create or replace function approve_match_result(p_tournament_id uuid, p_match_id uuid)
+  returns void
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+declare
+  v_me         uuid;
+  v_my_entrant uuid;
+  v_rep        match_result_reports%rowtype;
+  v_m          jsonb;
+  v_p1         uuid;
+  v_p2         uuid;
+  v_loser      uuid;
+  v_round      text;
+  v_is_team    boolean;
+begin
+  v_me := current_player_id();
+  if v_me is null then
+    raise exception '選手登録がまだのため承認できません。' using errcode = 'insufficient_privilege';
+  end if;
+
+  -- 同じ試合を2人が同時に承認しても、二重に確定させない
+  select * into v_rep from match_result_reports
+    where tournament_id = p_tournament_id and match_id = p_match_id
+    for update;
+  if not found then
+    raise exception 'この対戦にはまだ報告がありません。' using errcode = 'no_data_found';
+  end if;
+
+  v_m := bracket_match(p_tournament_id, p_match_id);
+  if v_m is null then
+    raise exception '対象の試合が見つかりません。' using errcode = 'no_data_found';
+  end if;
+  if coalesce((v_m->>'confirmed')::boolean, false) then
+    raise exception 'この試合は既に確定済みです。' using errcode = 'check_violation';
+  end if;
+
+  if not round_is_started(p_tournament_id, p_match_id) then
+    raise exception 'この回戦はまだ開始されていません。運営の開始をお待ちください。'
+      using errcode = 'check_violation';
+  end if;
+
+  v_p1 := (v_m->>'player1Id')::uuid;
+  v_p2 := (v_m->>'player2Id')::uuid;
+
+  v_my_entrant := my_entrant_id(p_tournament_id);
+  if v_my_entrant is null or v_my_entrant not in (v_p1, v_p2) then
+    raise exception 'この対戦の当事者ではありません。' using errcode = 'insufficient_privilege';
+  end if;
+  if v_my_entrant = v_rep.reported_by then
+    raise exception '自分が出した報告は自分では承認できません。相手の承認を待ってください。'
+      using errcode = 'check_violation';
+  end if;
+
+  v_loser := case when v_rep.winner_entrant_id = v_p1 then v_p2 else v_p1 end;
+  v_round := v_m->>'round';
+
+  update brackets
+     set data = apply_match_result_json(
+           data, p_match_id, v_rep.winner_entrant_id, v_loser, v_rep.score)
+   where tournament_id = p_tournament_id;
+
+  -- 試合の記録。チーム戦はチーム列に入れる（個人の通算成績に混ぜないため）
+  select match_type = '2v2' into v_is_team from tournaments where id = p_tournament_id;
+
+  if v_is_team then
+    insert into matches (id, tournament_id, winner_team_id, loser_team_id, score, round)
+      values (p_match_id, p_tournament_id, v_rep.winner_entrant_id, v_loser, v_rep.score, v_round);
+  else
+    insert into matches (id, tournament_id, winner_id, loser_id, score, round)
+      values (p_match_id, p_tournament_id, v_rep.winner_entrant_id, v_loser, v_rep.score, v_round);
+  end if;
+
+  delete from match_result_reports
+    where tournament_id = p_tournament_id and match_id = p_match_id;
+end;
+$$;
+
+
+revoke all on function bracket_match(uuid, uuid)       from anon, public;
+revoke all on function is_match_participant(uuid, uuid) from anon, public;
+revoke all on function can_use_match_chat(uuid, uuid)  from anon, public;
+revoke all on function match_chat_is_open(uuid, uuid)  from anon, public;
+revoke all on function my_entrant_id(uuid)             from anon, public;
+revoke all on function bracket_round_index(uuid, uuid) from anon, public;
+revoke all on function round_is_started(uuid, uuid)    from anon, public;
+revoke all on function report_match_result(uuid, uuid, text, uuid) from anon, public;
+revoke all on function approve_match_result(uuid, uuid)            from anon, public;
+grant execute on function bracket_match(uuid, uuid)       to authenticated;
+grant execute on function is_match_participant(uuid, uuid) to authenticated;
+grant execute on function can_use_match_chat(uuid, uuid)  to authenticated;
+grant execute on function match_chat_is_open(uuid, uuid)  to authenticated;
+grant execute on function my_entrant_id(uuid)             to authenticated;
+grant execute on function bracket_round_index(uuid, uuid) to authenticated;
+grant execute on function round_is_started(uuid, uuid)    to authenticated;
+grant execute on function report_match_result(uuid, uuid, text, uuid) to authenticated;
+grant execute on function approve_match_result(uuid, uuid)            to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- アイコン画像の保管場所（Storage）
@@ -938,6 +1366,13 @@ begin
 exception when duplicate_object then null;
 end $$;
 
+-- 回戦の開始は選手も観戦者も待っているので、変わった瞬間に届けたい
+do $$
+begin
+  execute 'alter publication supabase_realtime add table tournament_rounds';
+exception when duplicate_object then null;
+end $$;
+
 do $$
 begin
   execute 'alter publication supabase_realtime add table tournaments';
@@ -974,7 +1409,16 @@ begin
 exception when duplicate_object then null;
 end $$;
 
--- match_chat_messages は意図的に入れていない。
+-- 承認待ちのゲームカウントは、相手が対戦表を見ながら待つものなので届いた瞬間に出したい。
+-- 中身はゲームカウントと出場枠のIDだけで、確定すればどのみち全員に見えるもの
+-- （チャットや報告の本文とは性質が違う）。
+do $$
+begin
+  execute 'alter publication supabase_realtime add table match_result_reports';
+exception when duplicate_object then null;
+end $$;
+
+-- match_chat_messages と match_chat_reports は意図的に入れていない。
 --
 -- 既存の購読は「どれかのテーブルが変わったら全データを取り直す」作りなので、
 -- チャット1通ごとに全員が全件取得することになる。加えて、当事者にしか見せない

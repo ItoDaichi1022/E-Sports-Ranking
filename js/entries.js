@@ -11,6 +11,7 @@ import { escapeHtml, cardThumb } from './util.js';
 import { auth, isLoggedIn, isAdmin } from './auth.js';
 import { computeRankings } from './ranking.js';
 import { createBracket } from './bracket.js';
+import { reportChipHtml } from './matchChat.js';
 import * as db from './db.js';
 
 export const STATUS_LABELS = {
@@ -545,6 +546,7 @@ export function renderRecruitPage(containerEl) {
       <h3 class="card-title">${escapeHtml(t.name)}</h3>
       <p class="card-date">${escapeHtml(t.date || '開催日未定')}</p>
       ${t.status === 'draft' ? `<span class="status-chip status-draft">${STATUS_LABELS.draft}</span>` : ''}
+      ${reportChipHtml(t.id)}
     `;
 
     card.append(cardThumb(t.imageUrl, t.name), body);

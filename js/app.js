@@ -1,5 +1,6 @@
 import {
   state, newId, getPlayerName, isTeamTournament, getEntrantName, getEntrantMemberIds,
+  openChatReports,
 } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
 import { escapeHtml, avatarHtml, safeUrl, cardThumb, setupImagePicker } from './util.js';
@@ -7,6 +8,7 @@ import {
   createBracket, updateTournament, allMatchesDecided, finalStandings, finalPlacements,
 } from './bracket.js';
 import { renderBracket } from './bracketView.js';
+import { reportChipHtml } from './matchChat.js';
 import { computeRankings, computeRankingsForPeriod, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
@@ -725,6 +727,7 @@ function renderHistoryList() {
       <h3 class="card-title">${escapeHtml(t.name)}</h3>
       <p class="card-date">${escapeHtml(t.date || '日付未設定')} ・ ${escapeHtml(entrantCountLabel(t))}参加</p>
       <span class="status-chip status-${tone}">${escapeHtml(label)}</span>
+      ${reportChipHtml(t.id)}
       ${champion ? `<span class="card-champion">優勝 ${escapeHtml(champion)}</span>` : ''}
     `;
 
@@ -796,8 +799,20 @@ function renderTournamentInfo(tournament) {
     ? 'エントリー'
     : `参加${unit === 'チーム' ? 'チーム数' : '人数'}`;
 
+  // 未対応の報告は大会情報のいちばん上に出す。運営が対戦表まで下りなくても
+  // 「この大会で何か起きている」と気づけるようにするため。
+  const openReports = isAdmin() ? openChatReports(tournament.id) : [];
+
   let html = `
     <h3>大会情報</h3>
+    ${openReports.length > 0 ? `
+      <div class="report-notice">
+        <span class="report-notice-title">⚠ 未対応の報告が${openReports.length}件あります</span>
+        <span class="report-notice-note">
+          対戦表を開き、印の付いた対戦のチャットから内容を確認して「対応済みにする」を押してください。
+        </span>
+      </div>
+    ` : ''}
     ${rankingEligibilityHtml(tournament)}
     <dl class="tournament-info-grid">
       <div><dt>${countHeading}</dt><dd>${escapeHtml(countLabel)}</dd></div>
@@ -947,7 +962,12 @@ async function renderBracketPage(tournamentId) {
         await renderBracketPage(tournamentId);
       }
     }, '試合結果の保存');
-  }, { readOnly: !isAdmin() });
+  }, {
+    readOnly: !isAdmin(),
+    // 選手がゲームカウントを報告・承認したあと。DBの関数側で書き込みが済んでいるので、
+    // ここは取り直して描き直すだけでよい（onChanged と違い、書き戻しはしない）。
+    onRefresh: async () => { await refreshFromDb(); },
+  });
 
   renderResultSection(tournament);
 }
@@ -1287,6 +1307,7 @@ let refreshQueued = false;
 const POLL_TICK_MS = 60 * 1000;              // 判定そのものは1分ごと
 const POLL_CONNECTED_MS = 15 * 60 * 1000;    // 届いている間は15分に1回だけ照合
 const POLL_DISCONNECTED_MS = 60 * 1000;      // 届いていないときは1分ごとに取りに行く
+const REPORT_POLL_MS = 60 * 1000;            // 運営への報告だけは常に1分ごとに見る
 
 let lastLoadedAt = 0;
 
@@ -1765,6 +1786,9 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && !isUserTyping()) refreshFromDb({ silent: true });
 });
 
+// チャットから報告が出された／対応済みになった。大会カードと対戦表の印を出し直す。
+document.addEventListener('chat-reports-changed', () => routeFromHash());
+
 // ---- 起動 ----
 
 async function start() {
@@ -1810,6 +1834,29 @@ async function start() {
 
     refreshFromDb({ silent: true });
   }, POLL_TICK_MS);
+
+  // 報告だけは別に、短い間隔で見に行く。
+  //
+  // 上の保険は届いている間は15分に1回で、トラブルの報告が運営に伝わるには遅すぎる。
+  // かといってチャットと同じ理由でRealtimeには載せられない。行数はごく少なく、
+  // RLSで運営と本人以外には0件しか返らないので、この頻度でも軽い。
+  let reportsRenderPending = false;
+  setInterval(async () => {
+    if (document.hidden || !auth.player) return;
+    try {
+      // 未対応の顔ぶれが変わったときだけ描き直す（毎分の再描画は入力を邪魔する）
+      if (await db.refreshChatReports()) reportsRenderPending = true;
+    } catch (err) {
+      // 一時的な失敗は次の周期で取り直す。画面には出さない
+      console.error('[app] 報告の取得に失敗', err);
+    }
+
+    // 入力中は描き直しを持ち越す。routeFromHash は編集中のフォームを閉じてしまうため。
+    if (reportsRenderPending && !isUserTyping()) {
+      reportsRenderPending = false;
+      routeFromHash();
+    }
+  }, REPORT_POLL_MS);
 }
 
 start();
