@@ -1224,6 +1224,44 @@ a.card:hover {
 
 .team-entry-form .note { margin: 0; }
 
+/* 相方選び。選手が数十人になるとドロップダウンから探すのが辛いので、
+   大会作成画面の参加者選びと同じ「検索＋一覧」にしている。 */
+.partner-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* label ではないので、フォームの見出しの見た目を手で揃える */
+.partner-heading {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+}
+
+.partner-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* 選んだ相手は、検索で一覧から消えても分かるように常に出しておく */
+.partner-chosen {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-bright);
+}
+
+.partner-chosen.is-empty {
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+.partner-picker .scroll-box { max-height: 200px; }
+.partner-picker .empty-hint { margin: 0.2rem 0; }
+
 /* エントリーはこのページの主目的。他のボタンより一回り大きくし、
    塗りに幅を持たせて視線が最初に止まるようにする。 */
 .btn-entry {

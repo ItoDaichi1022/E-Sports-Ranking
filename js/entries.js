@@ -140,7 +140,91 @@ function soloEntryButton(tournament, onChanged) {
 //
 // 募集中の大会は、他の人のエントリーがRealtimeで届くたびに画面が描き直される。
 // 覚えておかないと、チーム名を打っている最中に入力が消えてしまう。
-let openTeamForm = null; // { tournamentId, teamName, partnerId } | null
+let openTeamForm = null; // { tournamentId, teamName, partnerId, partnerQuery } | null
+
+// 選手の表示名。同姓同名や表記ゆれで取り違えないよう、あればゲームIDも添える。
+function playerLabel(player) {
+  return player.gameAccountId
+    ? `${player.currentName}（${player.gameAccountId}）`
+    : player.currentName;
+}
+
+// 相方を選ぶ欄。選択肢が数十人になるとドロップダウンから探すのが辛いので、
+// 大会作成画面の参加者選び（js/app.js の renderParticipantCheckboxes）と同じく
+// 「検索して絞り込み、一覧から選ぶ」形にする。
+//
+// 選んだ相手は検索で一覧から消えても分かるよう、常に上に出しておく。
+function partnerPicker(candidates) {
+  const wrap = document.createElement('div');
+  wrap.className = 'partner-picker';
+
+  const chosen = document.createElement('p');
+  chosen.className = 'partner-chosen';
+
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'partner-search';
+  search.placeholder = '選手を検索（名前・ゲームID）';
+  search.value = openTeamForm.partnerQuery ?? '';
+  search.setAttribute('aria-label', '相方を検索');
+  // 検索欄でEnterを押しただけでエントリーが確定してしまわないようにする
+  search.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') e.preventDefault();
+  });
+
+  const list = document.createElement('div');
+  list.className = 'scroll-box';
+
+  const syncChosen = () => {
+    const picked = candidates.find((p) => p.id === openTeamForm.partnerId);
+    chosen.textContent = picked ? `相方: ${playerLabel(picked)}` : '相方が選ばれていません';
+    chosen.classList.toggle('is-empty', !picked);
+  };
+
+  const renderList = () => {
+    list.innerHTML = '';
+
+    const query = search.value.trim().toLowerCase();
+    const visible = query
+      ? candidates.filter((p) => p.currentName.toLowerCase().includes(query)
+        || (p.gameAccountId ?? '').toLowerCase().includes(query))
+      : candidates;
+
+    if (visible.length === 0) {
+      list.innerHTML = '<p class="empty-hint">条件に一致する選手がいません。</p>';
+      return;
+    }
+
+    visible.forEach((p) => {
+      const label = document.createElement('label');
+      label.className = 'checkbox-item';
+
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'team-partner';
+      radio.value = p.id;
+      radio.checked = openTeamForm.partnerId === p.id;
+      radio.addEventListener('change', () => {
+        openTeamForm.partnerId = p.id;
+        syncChosen();
+      });
+
+      label.append(radio, document.createTextNode(` ${playerLabel(p)}`));
+      list.appendChild(label);
+    });
+  };
+
+  search.addEventListener('input', () => {
+    openTeamForm.partnerQuery = search.value;
+    renderList();
+  });
+
+  renderList();
+  syncChosen();
+
+  wrap.append(chosen, search, list);
+  return wrap;
+}
 
 // チーム戦のエントリーフォーム。チーム名と相方を決めないと登録できないので、
 // ボタン1つでは終わらない。送信するとチーム行とメンバー2人のエントリー行が
@@ -156,34 +240,34 @@ function teamEntryForm(tournament, onChanged, onCancel) {
   nameInput.required = true;
   nameInput.maxLength = 24;
   nameInput.placeholder = '例: チームぐんぐん';
-  nameInput.value = openTeamForm?.teamName ?? '';
+  nameInput.value = openTeamForm.teamName;
   nameInput.addEventListener('input', () => { openTeamForm.teamName = nameInput.value; });
   nameLabel.appendChild(nameInput);
-
-  const partnerLabel = document.createElement('label');
-  partnerLabel.textContent = '相方';
-  const partnerSelect = document.createElement('select');
-  partnerSelect.required = true;
-  partnerSelect.appendChild(new Option('選手を選択', ''));
 
   // 自分と、既にこの大会に出ている選手は選べない（DB側でも弾かれるが、
   // 選べてしまうと送信して初めてエラーになり分かりにくい）
   const taken = new Set(tournament.participantIds);
   const candidates = state.players.filter((p) => p.id !== auth.player.id && !taken.has(p.id));
-  candidates.forEach((p) => partnerSelect.appendChild(new Option(p.currentName, p.id)));
-  // 選んでいた相手が先に他のチームで埋まっていたら、選択は空に戻る
-  partnerSelect.value = openTeamForm?.partnerId ?? '';
-  partnerSelect.addEventListener('change', () => { openTeamForm.partnerId = partnerSelect.value; });
-  partnerLabel.appendChild(partnerSelect);
 
-  form.append(nameLabel, partnerLabel);
+  // 選んでいた相手が先に他のチームで埋まっていたら、選択を空に戻す
+  if (openTeamForm.partnerId && !candidates.some((p) => p.id === openTeamForm.partnerId)) {
+    openTeamForm.partnerId = '';
+  }
+
+  const partnerField = document.createElement('div');
+  partnerField.className = 'partner-field';
+  const partnerHeading = document.createElement('span');
+  partnerHeading.className = 'partner-heading';
+  partnerHeading.textContent = '相方';
+  partnerField.append(partnerHeading, partnerPicker(candidates));
+
+  form.append(nameLabel, partnerField);
 
   if (candidates.length === 0) {
     const note = document.createElement('p');
     note.className = 'note';
     note.textContent = '組める相手がいません。相方がまだ選手登録していない場合は、運営に連絡してください。';
     form.appendChild(note);
-    partnerSelect.disabled = true;
   }
 
   const actions = document.createElement('div');
@@ -212,7 +296,7 @@ function teamEntryForm(tournament, onChanged, onCancel) {
       alert('チーム名を入力してください。');
       return;
     }
-    if (!partnerSelect.value) {
+    if (!openTeamForm.partnerId) {
       alert('相方を選んでください。');
       return;
     }
@@ -220,7 +304,7 @@ function teamEntryForm(tournament, onChanged, onCancel) {
     submitBtn.disabled = true;
     try {
       await db.enterTournamentAsTeam(
-        tournament.id, teamName, [auth.player.id, partnerSelect.value],
+        tournament.id, teamName, [auth.player.id, openTeamForm.partnerId],
       );
       openTeamForm = null;
       await onChanged();
@@ -294,7 +378,9 @@ function teamEntryControls(tournament, onChanged) {
   };
 
   openBtn.addEventListener('click', () => {
-    openTeamForm = { tournamentId: tournament.id, teamName: '', partnerId: '' };
+    openTeamForm = {
+      tournamentId: tournament.id, teamName: '', partnerId: '', partnerQuery: '',
+    };
     showForm();
   });
 
