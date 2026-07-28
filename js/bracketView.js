@@ -271,6 +271,8 @@ function renderMatchBox(
     box.appendChild(flag);
   }
 
+  // 自分の試合では名前欄が入口になるので、下のボタンは出さない（入口は1つでいい）。
+  let ownRowIsChatEntry = false;
   if (chatAvailable) {
     box.classList.add('has-chat');
     // 自分がいる側の名前欄だけを押せるようにする。運営が他人の試合を見ているときは
@@ -278,9 +280,11 @@ function renderMatchBox(
     [[p1, r1], [p2, r2]].forEach(([entrantId, row]) => {
       if (getEntrantMemberIds(tournamentId, entrantId).includes(auth.player?.id)) {
         makeRowChatTarget(row.nameEl, openChat);
+        ownRowIsChatEntry = true;
       }
     });
   }
+  const showChatButton = chatAvailable && !ownRowIsChatEntry;
 
   // 勝敗入力中はフォームで行をまとめ、Enterでも確定できるようにする。
   const rowsHost = editable ? document.createElement('form') : box;
@@ -318,7 +322,7 @@ function renderMatchBox(
       });
       box.appendChild(editBtn);
     }
-    if (chatAvailable) box.appendChild(chatButton(match, openChat));
+    if (showChatButton) box.appendChild(chatButton(match, openChat));
     return box;
   }
 
@@ -339,7 +343,7 @@ function renderMatchBox(
       ));
     }
 
-    if (chatAvailable) box.appendChild(chatButton(match, openChat));
+    if (showChatButton) box.appendChild(chatButton(match, openChat));
     return box;
   }
 
@@ -443,7 +447,7 @@ function renderMatchBox(
     box.appendChild(streamToggle(tournamentId, roundIndex, match, onRefresh));
   }
 
-  if (chatAvailable) box.appendChild(chatButton(match, openChat));
+  if (showChatButton) box.appendChild(chatButton(match, openChat));
   return box;
 }
 
