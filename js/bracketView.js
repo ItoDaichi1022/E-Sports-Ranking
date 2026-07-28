@@ -108,15 +108,12 @@ function drawConnectorLines(bracket, wrapper, matchElements) {
 
 // 「自分のいるところをタップすると対戦相手とチャットできる」ための仕掛け。
 // 名前欄だけを押せるようにし、スコア入力や確定ボタンを押したときは開かない。
-function makeRowChatTarget(targetEl, onOpen) {
+// own: 自分の対戦であることを示す行かどうか（運営がどちらの名前を押しても開ける
+// 場合は own を付けない。目立たせるのは本人の行だけにするため）。
+function makeRowChatTarget(targetEl, onOpen, { own = false } = {}) {
   targetEl.classList.add('chat-target');
-  targetEl.title = '対戦相手とチャット';
-
-  const icon = document.createElement('span');
-  icon.className = 'chat-icon';
-  icon.textContent = '💬';
-  icon.setAttribute('aria-hidden', 'true');
-  targetEl.appendChild(icon);
+  if (own) targetEl.classList.add('own-chat-row');
+  targetEl.title = own ? '対戦相手とチャット' : 'この対戦を開く';
 
   targetEl.addEventListener('click', (e) => {
     if (e.target.closest('input, button, select, label')) return;
@@ -130,7 +127,7 @@ function chatButton(match, onOpen) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'match-chat-btn';
-  btn.textContent = match.confirmed ? '💬 チャットを見る' : '💬 チャット';
+  btn.textContent = match.confirmed ? 'チャットを見る' : 'チャット';
   btn.addEventListener('click', onOpen);
   return btn;
 }
@@ -174,7 +171,7 @@ function streamToggle(tournamentId, roundIndex, match, onRefresh) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'stream-toggle-btn' + (on ? ' on' : '');
-  btn.textContent = on ? '📺 配信台にする（解除）' : '📺 配信台にする';
+  btn.textContent = on ? '配信台にする（解除）' : '配信台にする';
 
   btn.addEventListener('click', async () => {
     const current = roundState(tournamentId, roundIndex).streamedMatchIds;
@@ -207,7 +204,7 @@ function renderMatchBox(
     box.classList.add('streamed');
     const tag = document.createElement('div');
     tag.className = 'stream-tag';
-    tag.textContent = '📺 配信台';
+    tag.textContent = '配信台';
     box.appendChild(tag);
   }
 
@@ -273,7 +270,7 @@ function renderMatchBox(
       // 自分がいる側の名前欄だけを押せるようにする。
       [[p1, r1], [p2, r2]].forEach(([entrantId, row]) => {
         if (getEntrantMemberIds(tournamentId, entrantId).includes(auth.player?.id)) {
-          makeRowChatTarget(row.nameEl, openChat);
+          makeRowChatTarget(row.nameEl, openChat, { own: true });
           ownRowIsChatEntry = true;
         }
       });
@@ -379,7 +376,7 @@ function roundControls(tournamentId, roundIndex, round, readOnly, onRefresh) {
     if (streamCount > 0) {
       const note = document.createElement('span');
       note.className = 'round-stream-note';
-      note.textContent = `📺 ${streamCount}試合`;
+      note.textContent = `${streamCount}試合`;
       wrap.appendChild(note);
     }
     return wrap;
@@ -387,7 +384,7 @@ function roundControls(tournamentId, roundIndex, round, readOnly, onRefresh) {
 
   const note = document.createElement('span');
   note.className = 'round-stream-note';
-  note.textContent = streamCount > 0 ? `📺 配信台 ${streamCount}試合` : '配信台が未定';
+  note.textContent = streamCount > 0 ? `配信台 ${streamCount}試合` : '配信台が未定';
   wrap.appendChild(note);
 
   const btn = document.createElement('button');

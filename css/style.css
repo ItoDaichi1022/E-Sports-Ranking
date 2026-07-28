@@ -1702,23 +1702,25 @@ a.card:hover {
 
 /* ---- 対戦カードごとのチャット ---- */
 
-/* 自分がいる側の行。押せることが分かるよう、カーソルと薄い下地で示す */
+/* 押せる名前欄。カーソルと薄いホバーだけで示す（運営はどちらの名前も対象なので控えめに） */
 .player-name.chat-target {
   cursor: pointer;
-  box-shadow: inset 2px 0 0 var(--info);
 }
 
 .player-name.chat-target:hover { background: var(--surface-3); }
 
-/* 勝者の帯（inset 3px）が消えないよう、勝者側では2本を重ねる */
-.match-player.winner .player-name.chat-target {
-  box-shadow: inset 3px 0 0 var(--accent-bright), inset 6px 0 0 var(--info);
+/* 自分がいる側の行だけ、地色と左の帯で少し目立たせる */
+.player-name.own-chat-row {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent-bright);
+  border-radius: 4px;
 }
 
-.chat-icon {
-  flex-shrink: 0;
-  font-size: 0.75rem;
-  opacity: 0.65;
+.player-name.own-chat-row:hover { background: var(--surface-3); }
+
+/* 勝者の帯（inset 3px）が消えないよう、勝者側では2本を重ねる */
+.match-player.winner .player-name.own-chat-row {
+  box-shadow: inset 3px 0 0 var(--accent-bright), inset 6px 0 0 var(--info);
 }
 
 /* 入口は対戦表の枠の下端に敷く（編集ボタンと同じ形） */
