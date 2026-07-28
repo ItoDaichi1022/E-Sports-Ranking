@@ -1,5 +1,7 @@
-import { state, getEntrantName, getEntrantMemberNames } from './state.js';
+import { state, getEntrantName, getEntrantMemberNames, getEntrantMemberIds } from './state.js';
 import { confirmMatch, editMatch } from './bracket.js';
+import { auth } from './auth.js';
+import { canUseMatchChat, openMatchChat } from './matchChat.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
 // 実際のトーナメント表のように中央揃えで配置される。
@@ -109,7 +111,37 @@ function drawConnectorLines(bracket, wrapper, matchElements) {
   wrapper.appendChild(svg);
 }
 
-function renderMatchBox(tournamentId, match, onChanged, readOnly, seedOf) {
+// 「自分のいるところをタップすると対戦相手とチャットできる」ための仕掛け。
+// 行そのものを押せるようにするが、スコア入力や確定ボタンを押したときは開かない
+// （同じ行の中に入力欄があるため）。
+function makeRowChatTarget(row, onOpen) {
+  row.classList.add('chat-target');
+  row.title = '対戦相手とチャット';
+
+  const icon = document.createElement('span');
+  icon.className = 'chat-icon';
+  icon.textContent = '💬';
+  icon.setAttribute('aria-hidden', 'true');
+  row.appendChild(icon);
+
+  row.addEventListener('click', (e) => {
+    if (e.target.closest('input, button, select, label')) return;
+    onOpen();
+  });
+}
+
+// 対戦表の下端に付けるチャットの入口。自分の行を押す導線に気づかない人と、
+// どの試合にも入れる運営のための、もう1つの入口。
+function chatButton(match, onOpen) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'match-chat-btn';
+  btn.textContent = match.confirmed ? '💬 チャットを見る' : '💬 チャット';
+  btn.addEventListener('click', onOpen);
+  return btn;
+}
+
+function renderMatchBox(tournament, tournamentId, match, onChanged, readOnly, seedOf) {
   const box = document.createElement('div');
   box.className = 'match-box';
   if (match.confirmed) box.classList.add('confirmed');
@@ -150,6 +182,21 @@ function renderMatchBox(tournamentId, match, onChanged, readOnly, seedOf) {
 
   const editable = !readOnly && !match.confirmed && p1 && p2;
 
+  // 対戦カードごとのチャット。入れるのは当事者と運営だけ（判定はDBのポリシーが持ち、
+  // ここでの出し分けは押せないものを見せないための便宜）。
+  const chatAvailable = canUseMatchChat(tournament, match);
+  const openChat = () => openMatchChat(tournament, match);
+  if (chatAvailable) {
+    box.classList.add('has-chat');
+    // 自分がいる側の行を押せるようにする。運営が他人の試合を見ているときは
+    // どちらも自分の行ではないので、下のボタンだけが入口になる。
+    [[p1, r1], [p2, r2]].forEach(([entrantId, row]) => {
+      if (getEntrantMemberIds(tournamentId, entrantId).includes(auth.player?.id)) {
+        makeRowChatTarget(row.row, openChat);
+      }
+    });
+  }
+
   // 勝敗入力中はフォームで行をまとめ、Enterでも確定できるようにする。
   const rowsHost = editable ? document.createElement('form') : box;
   if (editable) rowsHost.className = 'match-edit';
@@ -186,6 +233,7 @@ function renderMatchBox(tournamentId, match, onChanged, readOnly, seedOf) {
       });
       box.appendChild(editBtn);
     }
+    if (chatAvailable) box.appendChild(chatButton(match, openChat));
     return box;
   }
 
@@ -194,6 +242,7 @@ function renderMatchBox(tournamentId, match, onChanged, readOnly, seedOf) {
     status.className = 'match-status';
     status.textContent = p1 && p2 ? '未実施' : '対戦カード未確定';
     box.appendChild(status);
+    if (chatAvailable) box.appendChild(chatButton(match, openChat));
     return box;
   }
 
@@ -280,6 +329,7 @@ function renderMatchBox(tournamentId, match, onChanged, readOnly, seedOf) {
   });
 
   box.appendChild(rowsHost);
+  if (chatAvailable) box.appendChild(chatButton(match, openChat));
   return box;
 }
 
@@ -327,7 +377,7 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
       slot.className = 'match-slot';
       slot.style.gridRow = `${rowStart} / span ${rowSpan}`;
 
-      const box = renderMatchBox(tournamentId, match, onChanged, readOnly, seedOf);
+      const box = renderMatchBox(tournament, tournamentId, match, onChanged, readOnly, seedOf);
       matchElements.set(match.id, box);
       slot.appendChild(box);
       body.appendChild(slot);

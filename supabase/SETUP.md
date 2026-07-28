@@ -195,6 +195,7 @@ node scripts/verify-migration.mjs
 | [`migration-005.sql`](migration-005.sql) | 確定した成績の保存（`tournament_entries.placement`） |
 | [`migration-006.sql`](migration-006.sql) | 大会の対戦方法（`tournaments.match_type`）＝ランキング反映の条件 |
 | [`migration-007.sql`](migration-007.sql) | 2v2（チーム戦）対応（`tournament_teams` テーブルとチームでのエントリー） |
+| [`migration-008.sql`](migration-008.sql) | 対戦カードごとのチャット（`match_chat_messages` テーブル） |
 
 補足:
 
@@ -214,6 +215,10 @@ node scripts/verify-migration.mjs
   `matches` の選手列を `null` 許容にし、チーム用の列を足します（どちらか一方だけが
   入ることを制約で保証）。既存の大会は `team_id` が `null` のままなので挙動は変わりません。
   定員の数え方も「チーム大会ならチーム数」に変わります。
+- **008 の対戦カードチャット** — このテーブルだけは**ゲスト（anon）に権限を与えません**。
+  読み書きできるのは その試合の当事者と運営だけで、判定はブラケットのJSONを読む関数
+  （`can_use_match_chat`）が行います。Realtimeのパブリケーションにも意図的に入れて
+  いません（理由は `doc/design.md`）。
 
 ## 8. 後始末
 

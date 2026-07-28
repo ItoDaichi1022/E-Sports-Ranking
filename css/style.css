@@ -1568,6 +1568,116 @@ a.card:hover {
   border-top: 1px solid var(--border-soft);
 }
 
+/* ---- 対戦カードごとのチャット ---- */
+
+/* 自分がいる側の行。押せることが分かるよう、カーソルと薄い下地で示す */
+.match-player.chat-target {
+  cursor: pointer;
+  box-shadow: inset 2px 0 0 var(--info);
+}
+
+.match-player.chat-target:hover { background: var(--surface-3); }
+
+/* 勝者の帯（inset 3px）が消えないよう、勝者側では2本を重ねる */
+.match-player.chat-target.winner {
+  box-shadow: inset 3px 0 0 var(--accent-bright), inset 6px 0 0 var(--info);
+}
+
+.chat-icon {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  opacity: 0.65;
+}
+
+/* 入口は対戦表の枠の下端に敷く（編集ボタンと同じ形） */
+.match-chat-btn {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: none;
+  border-top: 1px solid var(--border-soft);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-faint);
+  box-shadow: none;
+}
+
+.match-chat-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  height: min(50vh, 22rem);
+  overflow-y: auto;
+  margin: 0.75rem 0;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.chat-message {
+  max-width: 85%;
+  align-self: flex-start;
+}
+
+/* 自分の側（チーム戦なら相方も含む）の発言は右に寄せる */
+.chat-message.own { align-self: flex-end; }
+
+.chat-message-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.chat-message.own .chat-message-head { justify-content: flex-end; }
+
+.chat-message-name { font-weight: 600; }
+
+.chat-message-body {
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--r);
+  background: var(--surface-3);
+  font-size: 0.9rem;
+  /* 改行と長い連続文字で枠を突き破らせない */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-message.own .chat-message-body {
+  background: var(--accent-soft);
+}
+
+.chat-delete-btn {
+  min-height: 0;
+  padding: 0 0.3rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+}
+
+.chat-delete-btn:hover:not(:disabled) { color: var(--danger); }
+
+.chat-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chat-form input { flex: 1; min-width: 0; }
+
 /* ---------------------------------------------------------------------------
    大会情報（ブラケットの下）
    --------------------------------------------------------------------------- */

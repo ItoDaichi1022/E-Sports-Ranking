@@ -91,6 +91,30 @@
   </form>
 </dialog>
 
+<!-- 対戦カードごとのチャット。対戦表のどこからでも開くので、画面には属さない
+     ダイアログにしている。中身の出し入れは js/matchChat.js。 -->
+<dialog id="match-chat-dialog" class="dialog-wide">
+  <h3 id="match-chat-title"></h3>
+  <p id="match-chat-meta" class="meta-line"></p>
+
+  <div id="match-chat-log" class="chat-log"></div>
+
+  <p id="match-chat-error" class="status-line error" hidden></p>
+  <p id="match-chat-closed-note" class="note" hidden>
+    この対戦は結果が確定したため、書き込みはできません。
+  </p>
+
+  <form id="match-chat-form" class="chat-form">
+    <input type="text" id="match-chat-input" maxlength="500"
+           placeholder="メッセージを入力" autocomplete="off" aria-label="メッセージ">
+    <button type="submit" id="match-chat-send-btn">送信</button>
+  </form>
+
+  <div class="dialog-actions">
+    <button type="button" id="match-chat-close-btn" class="btn-secondary">閉じる</button>
+  </div>
+</dialog>
+
 <main>
   <section id="view-home" class="view">
     <div class="hero">
@@ -412,6 +436,7 @@
     "./js/bracketView.js":    "./js/bracketView.js?v=57",
     "./js/db.js":             "./js/db.js?v=57",
     "./js/entries.js":        "./js/entries.js?v=57",
+    "./js/matchChat.js":      "./js/matchChat.js?v=57",
     "./js/playerStats.js":    "./js/playerStats.js?v=57",
     "./js/players.js":        "./js/players.js?v=57",
     "./js/profile.js":        "./js/profile.js?v=57",

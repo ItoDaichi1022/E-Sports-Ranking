@@ -745,6 +745,62 @@ export async function clearEntryPlacements(tournamentId) {
 }
 
 // ---------------------------------------------------------------------------
+// 対戦カードごとのチャット
+//
+// 読み書きできるのは その試合の当事者と運営だけ。判定はすべてDB側のポリシー
+// （can_use_match_chat）が行うので、ここでは普通に問い合わせるだけでよい。
+// 権限が無ければ 0件が返るか、書き込みが弾かれる。
+//
+// state には載せない。全データを持ち回る他のものと違い、チャットは開いている
+// 1部屋しか要らず、他人の部屋は取得できてもいけないため。
+// ---------------------------------------------------------------------------
+
+// 1部屋分のメッセージを古い順に取る。sinceId を渡すと、それ以降の分だけを取る
+// （開いている間の差分取得。毎回全件を取り直さないため）。
+export async function loadMatchChat(tournamentId, matchId, since = null) {
+  let query = supabase
+    .from('match_chat_messages')
+    .select('*')
+    .eq('tournament_id', tournamentId)
+    .eq('match_id', matchId)
+    .order('created_at', { ascending: true });
+
+  if (since) query = query.gt('created_at', since);
+
+  const { data, error } = await query;
+  check(error, 'チャットの読み込み');
+
+  return data.map((row) => ({
+    id: row.id,
+    playerId: row.player_id,
+    body: row.body,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function sendMatchChatMessage(tournamentId, matchId, playerId, body) {
+  const { error } = await supabase.from('match_chat_messages').insert({
+    tournament_id: tournamentId,
+    match_id: matchId,
+    player_id: playerId,
+    body,
+  });
+
+  // ポリシーで弾かれた場合、RLSは「権限が無い」としか言わない。ここで届く経路は
+  // ほぼ「試合が確定して書けなくなった」なので、その旨を出す。
+  if (error?.code === '42501') {
+    throw new Error('この対戦はすでに結果が確定しているため、書き込めません。');
+  }
+  check(error, 'メッセージの送信');
+}
+
+// 不適切な発言の取り消し。運営だけが通る（RLSの chat_delete）。
+export async function deleteMatchChatMessage(messageId) {
+  const { error } = await supabase.from('match_chat_messages').delete().eq('id', messageId);
+  check(error, 'メッセージの削除');
+}
+
+// ---------------------------------------------------------------------------
 // ランキングの公開
 // ---------------------------------------------------------------------------
 
