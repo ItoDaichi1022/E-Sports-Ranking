@@ -1709,19 +1709,13 @@ a.card:hover {
 
 .player-name.chat-target:hover { background: var(--surface-3); }
 
-/* 自分がいる側の行だけ、地色と左の帯で少し目立たせる */
+/* 自分がいる側の行だけ、薄い地色で少し目立たせる */
 .player-name.own-chat-row {
   background: var(--accent-soft);
-  box-shadow: inset 3px 0 0 var(--accent-bright);
   border-radius: 4px;
 }
 
 .player-name.own-chat-row:hover { background: var(--surface-3); }
-
-/* 勝者の帯（inset 3px）が消えないよう、勝者側では2本を重ねる */
-.match-player.winner .player-name.own-chat-row {
-  box-shadow: inset 3px 0 0 var(--accent-bright), inset 6px 0 0 var(--info);
-}
 
 /* 入口は対戦表の枠の下端に敷く（編集ボタンと同じ形） */
 .match-chat-btn {
