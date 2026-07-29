@@ -96,49 +96,55 @@
 
 <!-- 対戦カードごとのチャット。対戦表のどこからでも開くので、画面には属さない
      ダイアログにしている。中身の出し入れは js/matchChat.js。 -->
-<dialog id="match-chat-dialog" class="dialog-wide">
+<dialog id="match-chat-dialog" class="dialog-wide dialog-chat">
   <h3 id="match-chat-title"></h3>
   <p id="match-chat-meta" class="meta-line"></p>
-
-  <!-- 運営が見たときは、この対戦に届いている報告がここに並ぶ。
-       当事者には「報告済み」の控えだけが出る。 -->
-  <div id="match-chat-reports" class="chat-reports" hidden></div>
-
-  <!-- ルームコード。チャットの発言に書くと会話に埋もれてさかのぼる羽目になるので、
-       専用の欄として常に一番上に見せる（中身は js/matchChat.js）。 -->
-  <div id="match-chat-room" class="chat-room-code" hidden></div>
-
-  <!-- 当事者が自分の対戦のゲームカウントを入れる場所。
-       相手が承認して初めて確定する（中身は js/matchChat.js）。
-       チャットログより上に置くのは、これがこのダイアログの主目的で、
-       ログの下だと小さくて気づかれないため。 -->
-  <div id="match-chat-result" class="chat-result" hidden></div>
-
-  <div id="match-chat-log" class="chat-log"></div>
-
   <p id="match-chat-error" class="status-line error" hidden></p>
-  <p id="match-chat-closed-note" class="note" hidden>
-    この対戦は結果が確定したため、書き込みはできません。
-  </p>
 
-  <form id="match-chat-form" class="chat-form">
-    <input type="text" id="match-chat-input" maxlength="500"
-           placeholder="メッセージを入力" autocomplete="off" aria-label="メッセージ">
-    <button type="submit" id="match-chat-send-btn">送信</button>
-  </form>
+  <!-- 左は「話す」、右は「試合を進める」で分ける。狭い画面では1列に積み、
+       先に見せたい右側（ルームコードとゲームカウント）を上に回す。 -->
+  <div class="chat-columns">
+    <div class="chat-col-talk">
+      <div id="match-chat-log" class="chat-log"></div>
 
-  <!-- もめたときに運営へ知らせる。押すと一言添える欄が開く。 -->
-  <form id="match-chat-report-form" class="chat-report-form" hidden>
-    <label>
-      運営に伝えること
-      <textarea id="match-chat-report-input" rows="3" maxlength="500"
-                placeholder="例: 相手と連絡がつかず、対戦を始められません"></textarea>
-    </label>
-    <div class="row-actions">
-      <button type="submit" id="match-chat-report-send-btn">運営に送る</button>
-      <button type="button" id="match-chat-report-cancel-btn" class="btn-secondary">やめる</button>
+      <p id="match-chat-closed-note" class="note" hidden>
+        この対戦は結果が確定したため、書き込みはできません。
+      </p>
+
+      <form id="match-chat-form" class="chat-form">
+        <input type="text" id="match-chat-input" maxlength="500"
+               placeholder="メッセージを入力" autocomplete="off" aria-label="メッセージ">
+        <button type="submit" id="match-chat-send-btn">送信</button>
+      </form>
     </div>
-  </form>
+
+    <div class="chat-col-match">
+      <!-- ルームコード。チャットの発言に書くと会話に埋もれてさかのぼる羽目になるので、
+           専用の欄として常に見せる（中身は js/matchChat.js）。 -->
+      <div id="match-chat-room" class="chat-room-code" hidden></div>
+
+      <!-- 当事者が自分の対戦のゲームカウントを入れる場所。
+           相手が承認して初めて確定する（中身は js/matchChat.js）。 -->
+      <div id="match-chat-result" class="chat-result" hidden></div>
+
+      <!-- 運営が見たときは、この対戦に届いている報告がここに並ぶ。
+           当事者には「報告済み」の控えだけが出る。 -->
+      <div id="match-chat-reports" class="chat-reports" hidden></div>
+
+      <!-- もめたときに運営へ知らせる。押すと一言添える欄が開く。 -->
+      <form id="match-chat-report-form" class="chat-report-form" hidden>
+        <label>
+          運営に伝えること
+          <textarea id="match-chat-report-input" rows="3" maxlength="500"
+                    placeholder="例: 相手と連絡がつかず、対戦を始められません"></textarea>
+        </label>
+        <div class="row-actions">
+          <button type="submit" id="match-chat-report-send-btn">運営に送る</button>
+          <button type="button" id="match-chat-report-cancel-btn" class="btn-secondary">やめる</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <div class="dialog-actions">
     <button type="button" id="match-chat-report-btn" class="btn-report">運営に報告</button>

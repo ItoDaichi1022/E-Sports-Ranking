@@ -1898,13 +1898,55 @@ a.card:hover {
   color: var(--text);
 }
 
+/* 対戦チャットのダイアログは2列。左で話し、右で試合を進める。
+   縦に全部積むと、ルームコードやゲームカウントを見るのにスクロールが要った。 */
+dialog.dialog-chat {
+  max-width: 900px;
+  /* 積み上がっても画面からはみ出して操作できなくならないように。
+     dvh はスマホでアドレスバーやキーボードが出ている分を除いてくれる（非対応なら vh） */
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
+.chat-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+  gap: 1rem;
+  align-items: start;
+}
+
+.chat-col-talk,
+.chat-col-match { min-width: 0; }
+
+.chat-col-match > *:last-child { margin-bottom: 0; }
+
+/* 右に出すものが何も無いとき（確定済みでコードも報告も無い試合）は、
+   空の列を残さず会話を横いっぱいに広げる */
+.chat-columns:not(:has(.chat-col-match > *:not([hidden]))) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 狭い画面では1列に積む。先に要るのはルームコードとゲームカウントなので上に回し、
+   その分ログの高さを抑えて、入力欄まで指が届く範囲に収める。 */
+@media (max-width: 860px) {
+  .chat-columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.9rem;
+  }
+
+  .chat-col-match { order: -1; }
+
+  .chat-log { height: min(38vh, 16rem); }
+}
+
 .chat-log {
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
   height: min(50vh, 22rem);
   overflow-y: auto;
-  margin: 0.75rem 0;
+  margin: 0 0 0.6rem;
   padding: 0.8rem;
   border: 1px solid var(--border);
   border-radius: var(--r);
