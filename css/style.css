@@ -1810,7 +1810,8 @@ a.card:hover {
   letter-spacing: 0;
 }
 
-.room-code-save-btn {
+.room-code-save-btn,
+.room-code-copy-btn {
   flex-shrink: 0;
   min-height: 2.5rem;
 }
@@ -1898,10 +1899,10 @@ a.card:hover {
   color: var(--text);
 }
 
-/* 対戦チャットのダイアログは2列。左で話し、右で試合を進める。
-   縦に全部積むと、ルームコードやゲームカウントを見るのにスクロールが要った。 */
+/* 対戦チャットのダイアログはタブ2枚（話す／結果を入れる）。
+   全部を縦に積むと、狭い画面でどれも小さくなって見つけられなかった。 */
 dialog.dialog-chat {
-  max-width: 900px;
+  max-width: 620px;
   /* 積み上がっても画面からはみ出して操作できなくならないように。
      dvh はスマホでアドレスバーやキーボードが出ている分を除いてくれる（非対応なら vh） */
   max-height: calc(100vh - 2rem);
@@ -1909,42 +1910,58 @@ dialog.dialog-chat {
   overflow-y: auto;
 }
 
-.chat-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
-  gap: 1rem;
-  align-items: start;
+.chat-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.chat-col-talk,
-.chat-col-match { min-width: 0; }
-
-.chat-col-match > *:last-child { margin-bottom: 0; }
-
-/* 右に出すものが何も無いとき（確定済みでコードも報告も無い試合）は、
-   空の列を残さず会話を横いっぱいに広げる */
-.chat-columns:not(:has(.chat-col-match > *:not([hidden]))) {
-  grid-template-columns: minmax(0, 1fr);
+/* タブは押す場所なので、指の幅と高さで等分する */
+.chat-tab {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.4rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  box-shadow: none;
 }
 
-/* 狭い画面では1列に積む。先に要るのはルームコードとゲームカウントなので上に回し、
-   その分ログの高さを抑えて、入力欄まで指が届く範囲に収める。 */
-@media (max-width: 860px) {
-  .chat-columns {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.9rem;
-  }
-
-  .chat-col-match { order: -1; }
-
-  .chat-log { height: min(38vh, 16rem); }
+.chat-tab:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
 }
+
+.chat-tab.is-active {
+  border-bottom-color: var(--accent);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* 承認待ちなど、開かないと気づけない用があるときの印 */
+.chat-tab-dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-left: 0.35rem;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+.chat-panel { min-width: 0; }
+
+.chat-panel > *:last-child { margin-bottom: 0; }
 
 .chat-log {
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
-  height: min(50vh, 22rem);
+  height: min(44vh, 20rem);
   overflow-y: auto;
   margin: 0 0 0.6rem;
   padding: 0.8rem;
@@ -2743,13 +2760,17 @@ dialog h3 {
   .inline-form > label { flex: 1 1 100%; }
   .inline-form > button { width: 100%; min-height: 2.75rem; }
 
-  /* ルームコードはラベルの下の行に落とし、入力欄を横いっぱいに使う */
+  /* ルームコードはラベルの下の行に落とし、入力欄を横いっぱいに使う。
+     コピーと保存はその下に半分ずつ並ぶ。 */
   .room-code-form { flex-basis: 100%; }
-  .room-code-input {
-    flex: 1 1 8rem;
+  .room-code-input { flex: 1 1 100%; }
+  .room-code-save-btn,
+  .room-code-copy-btn {
+    flex: 1;
     min-height: 2.75rem;
   }
-  .room-code-save-btn { min-height: 2.75rem; }
+
+  .chat-tab { font-size: 0.82rem; }
 }
 
 /* 動きを減らす設定を尊重する */

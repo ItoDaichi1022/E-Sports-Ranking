@@ -42,6 +42,12 @@ const reportSendBtn = document.getElementById('match-chat-report-send-btn');
 const reportCancelBtn = document.getElementById('match-chat-report-cancel-btn');
 const resultEl = document.getElementById('match-chat-result');
 const roomEl = document.getElementById('match-chat-room');
+const tabsEl = document.getElementById('match-chat-tabs');
+const tabTalkBtn = document.getElementById('match-chat-tab-talk');
+const tabResultBtn = document.getElementById('match-chat-tab-result');
+const tabDotEl = document.getElementById('match-chat-tab-dot');
+const panelTalkEl = document.getElementById('match-chat-panel-talk');
+const panelResultEl = document.getElementById('match-chat-panel-result');
 
 // 開いている部屋。閉じている間は null。
 let room = null; // { tournamentId, matchId, roundIndex, messages: [], lastAt, onRefresh, onChanged }
@@ -134,6 +140,56 @@ function showError(message) {
   errorEl.hidden = !message;
 }
 
+// ---- タブ ----
+//
+// 「待ち合わせて話す」と「ゲームカウントを入れる」は使う場面が違う。1画面に積むと、
+// どちらも小さくなって、どこで何をするのか分からなくなる（新規の人がつまずいた点）。
+// ゲームカウント欄が出ない相手（観戦者など）にはタブ自体を出さない。
+
+let activeTab = 'talk';
+
+function setChatTab(name) {
+  activeTab = name;
+  const talk = name === 'talk';
+
+  tabTalkBtn.classList.toggle('is-active', talk);
+  tabResultBtn.classList.toggle('is-active', !talk);
+  tabTalkBtn.setAttribute('aria-selected', String(talk));
+  tabResultBtn.setAttribute('aria-selected', String(!talk));
+  panelTalkEl.hidden = !talk;
+  panelResultEl.hidden = talk;
+
+  // 隠れている間は高さが0で、いちばん下に寄せたつもりが先頭に戻っている。
+  // 表示に戻した時点で寄せ直す。
+  if (talk) logEl.scrollTop = logEl.scrollHeight;
+}
+
+tabTalkBtn.addEventListener('click', () => setChatTab('talk'));
+tabResultBtn.addEventListener('click', () => setChatTab('result'));
+
+// ゲームカウント側に用があるか。タブを開くまで気づけないので、印を出す。
+function resultTabNeedsAttention() {
+  const match = currentMatch();
+  const tournament = findTournament(room?.tournamentId);
+  if (!match || !tournament || match.confirmed) return false;
+
+  const pending = pendingResultReport(room.tournamentId, room.matchId);
+  if (!pending) return false;
+  if (isAdmin()) return true;
+
+  // 自分が承認する番のときだけ。自分が出した報告の待ちでは急かさない。
+  const mySide = myEntrantIdIn(tournament, match);
+  return !!mySide && pending.reportedBy !== mySide;
+}
+
+// 結果欄の出し分けに合わせてタブを整える。renderResultPanel のあとに呼ぶ。
+function syncTabs() {
+  const available = !resultEl.hidden;
+  tabsEl.hidden = !available; // タブが1枚しか無いなら見せない
+  tabDotEl.hidden = !(available && resultTabNeedsAttention());
+  if (!available && activeTab !== 'talk') setChatTab('talk');
+}
+
 // ---- ルームコード ----
 //
 // 部屋のコードをチャットの発言で伝えると会話に埋もれ、さかのぼって探す羽目になる。
@@ -193,13 +249,21 @@ function renderRoomCode() {
   input.placeholder = '例: ABC123';
   input.setAttribute('aria-label', 'ルームコード');
 
+  // 書き写すのではなく貼り付けて入室したいので、コピーを1タップで済ませる
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'btn-secondary room-code-copy-btn';
+  copyBtn.textContent = 'コピー';
+  copyBtn.disabled = !input.value.trim();
+  copyBtn.addEventListener('click', () => copyRoomCode(input, copyBtn));
+
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
   saveBtn.className = 'room-code-save-btn';
   saveBtn.textContent = '保存';
   saveBtn.disabled = true;
 
-  form.append(input, saveBtn);
+  form.append(input, copyBtn, saveBtn);
   roomEl.appendChild(form);
 
   const saved = () => current?.code ?? '';
@@ -208,6 +272,7 @@ function renderRoomCode() {
   input.addEventListener('input', () => {
     roomCodeEditing = changed();
     saveBtn.disabled = !roomCodeEditing;
+    copyBtn.disabled = !input.value.trim();
   });
   // 触っている間は書き換えない。中身が同じでもカーソルが飛ぶ。
   input.addEventListener('focus', () => { roomCodeEditing = true; });
@@ -231,6 +296,30 @@ function renderRoomCode() {
       saveBtn.disabled = false;
     }
   });
+}
+
+let roomCodeCopyTimer = null;
+
+// クリップボードに入れる。API が使えない環境（http接続や許可されていない場合）は、
+// 入力欄を選択状態にして、手のコピーがすぐできるところまでやる。
+async function copyRoomCode(input, btn) {
+  const text = input.value.trim();
+  if (!text) return;
+
+  let copied = false;
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+    await navigator.clipboard.writeText(text);
+    copied = true;
+  } catch {
+    input.focus();
+    input.select();
+    try { copied = document.execCommand('copy'); } catch { copied = false; }
+  }
+
+  btn.textContent = copied ? 'コピーしました' : '選択しました';
+  clearTimeout(roomCodeCopyTimer);
+  roomCodeCopyTimer = setTimeout(() => { btn.textContent = 'コピー'; }, 1800);
 }
 
 // 保存ボタンは押すと押せなくなるだけなので、通ったことを一言添えて見せる。
@@ -270,6 +359,7 @@ async function afterResultChange(btn) {
   try {
     await room.onRefresh();
     renderResultPanel();
+    syncTabs();
     syncWriteState();
   } catch (err) {
     showError(err.message);
@@ -656,6 +746,7 @@ export function syncOpenChat() {
   if (!room) return;
   syncWriteState();
   renderResultPanel();
+  syncTabs();
   // 編集中に描き直すと入力欄ごと消えてしまうので、そのときだけ見送る
   if (!roomCodeEditing) renderRoomCode();
 }
@@ -664,6 +755,7 @@ export function closeMatchChat() {
   stopPolling();
   room = null;
   roomCodeEditing = false;
+  setChatTab('talk');
   reportFormEl.hidden = true;
   reportInputEl.value = '';
   resultEl.hidden = true;
@@ -712,6 +804,9 @@ export async function openMatchChat(tournament, match, roundIndex, onRefresh, on
   syncWriteState();
   renderResultPanel();
   renderRoomCode();
+  // 承認を待たせている相手を待たせ続けないよう、用があるときだけ結果側から開く
+  setChatTab(!resultEl.hidden && resultTabNeedsAttention() ? 'result' : 'talk');
+  syncTabs();
   inputEl.value = '';
   logEl.innerHTML = '<p class="empty-hint">読み込んでいます…</p>';
   showError(null);
