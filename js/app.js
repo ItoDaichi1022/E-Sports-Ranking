@@ -1353,11 +1353,14 @@ async function refreshFromDb({ silent = false } = {}) {
 function isUserTyping() {
   const el = document.activeElement;
   if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
-    // 対戦チャットのメッセージ入力と報告文は例外。ダイアログは routeFromHash の
-    // 再描画対象外で、syncOpenChat もこの2つには触らないので、入力が消えることはない。
+    // 対戦チャットのメッセージ入力・報告文・ルームコードは例外。ダイアログは
+    // routeFromHash の再描画対象外で、syncOpenChat もこれらには触らない
+    // （ルームコードは書きかけの間だけ描き直しを見送る）ので、入力が消えることはない。
     // ここで真を返すと、チャットで会話している間じゅう更新が届かなくなってしまう
     // （送信のたびにフォーカスが入力欄へ戻るため、開いている間はほぼ常に入力中になる）。
-    const exempt = el.id === 'match-chat-input' || el.id === 'match-chat-report-input';
+    const exempt = el.id === 'match-chat-input'
+      || el.id === 'match-chat-report-input'
+      || el.id === 'match-chat-room-input';
     if (!exempt) return true;
   }
   return [...document.querySelectorAll('.score-num-input')].some((i) => i.value !== '');

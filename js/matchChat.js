@@ -141,7 +141,7 @@ function showError(message) {
 // 誰でもできる（判定はDBのポリシーが持つ）。運営が回戦の開始前に配信台のコードを
 // 入れておけば、選手は開始と同時に確認できる。
 
-// 編集中はRealtimeの再描画で入力欄を消さない（syncOpenChat が見る）。
+// 書きかけの間はRealtimeの再描画で入力欄を書き換えない（syncOpenChat が見る）。
 let roomCodeEditing = false;
 
 function renderRoomCode() {
@@ -169,70 +169,80 @@ function renderRoomCode() {
   const label = document.createElement('span');
   label.className = 'room-code-label';
   label.textContent = 'ルームコード';
+  roomEl.appendChild(label);
 
-  const value = document.createElement('span');
-  value.className = 'room-code-value' + (current ? '' : ' empty');
-  value.textContent = current ? current.code : 'まだ記入されていません';
+  if (match.confirmed) {
+    const value = document.createElement('span');
+    value.className = 'room-code-value';
+    value.textContent = current.code;
+    roomEl.appendChild(value);
+    return;
+  }
 
-  roomEl.append(label, value);
+  // 入力欄そのものを表示にも使う。「記入する」を押させると、書ける欄があること自体が
+  // 伝わらないうえ、狭い画面では一手増えるだけになる。
+  const form = document.createElement('form');
+  form.className = 'room-code-form';
 
-  if (match.confirmed) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.id = 'match-chat-room-input';
+  input.className = 'room-code-input';
+  input.maxLength = 50;
+  input.value = current?.code ?? '';
+  input.placeholder = '例: ABC123';
+  input.setAttribute('aria-label', 'ルームコード');
 
-  const editBtn = document.createElement('button');
-  editBtn.type = 'button';
-  editBtn.className = 'btn-secondary room-code-edit-btn';
-  editBtn.textContent = current ? '変更' : '記入する';
-  roomEl.appendChild(editBtn);
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'submit';
+  saveBtn.className = 'room-code-save-btn';
+  saveBtn.textContent = '保存';
+  saveBtn.disabled = true;
 
-  editBtn.addEventListener('click', () => {
-    roomCodeEditing = true;
-    roomEl.innerHTML = '';
+  form.append(input, saveBtn);
+  roomEl.appendChild(form);
 
-    const editLabel = document.createElement('span');
-    editLabel.className = 'room-code-label';
-    editLabel.textContent = 'ルームコード';
+  const saved = () => current?.code ?? '';
+  const changed = () => input.value.trim() !== saved();
 
-    const form = document.createElement('form');
-    form.className = 'room-code-form';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.maxLength = 50;
-    input.value = current?.code ?? '';
-    input.placeholder = '例: ABC123';
-    input.setAttribute('aria-label', 'ルームコード');
-
-    const saveBtn = document.createElement('button');
-    saveBtn.type = 'submit';
-    saveBtn.textContent = '保存';
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.className = 'btn-secondary';
-    cancelBtn.textContent = 'やめる';
-    cancelBtn.addEventListener('click', () => renderRoomCode());
-
-    form.append(input, saveBtn, cancelBtn);
-    roomEl.append(editLabel, form);
-    input.focus();
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const code = input.value.trim();
-      saveBtn.disabled = true;
-      showError(null);
-      try {
-        // 空欄で保存したら「消す」。書き間違いをまっさらに戻せるように。
-        if (code) await db.saveMatchRoomCode(room.tournamentId, room.matchId, code, auth.player.id);
-        else await db.clearMatchRoomCode(room.tournamentId, room.matchId);
-        await room.onRefresh();
-        renderRoomCode();
-      } catch (err) {
-        showError(err.message);
-        saveBtn.disabled = false;
-      }
-    });
+  input.addEventListener('input', () => {
+    roomCodeEditing = changed();
+    saveBtn.disabled = !roomCodeEditing;
   });
+  // 触っている間は書き換えない。中身が同じでもカーソルが飛ぶ。
+  input.addEventListener('focus', () => { roomCodeEditing = true; });
+  input.addEventListener('blur', () => { roomCodeEditing = changed(); });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const code = input.value.trim();
+    saveBtn.disabled = true;
+    showError(null);
+    try {
+      // 空欄で保存したら「消す」。書き間違いをまっさらに戻せるように。
+      if (code) await db.saveMatchRoomCode(room.tournamentId, room.matchId, code, auth.player.id);
+      else await db.clearMatchRoomCode(room.tournamentId, room.matchId);
+      await room.onRefresh();
+      input.blur();
+      renderRoomCode();
+      flashRoomCodeSaved();
+    } catch (err) {
+      showError(err.message);
+      saveBtn.disabled = false;
+    }
+  });
+}
+
+// 保存ボタンは押すと押せなくなるだけなので、通ったことを一言添えて見せる。
+let roomCodeSavedTimer = null;
+
+function flashRoomCodeSaved() {
+  clearTimeout(roomCodeSavedTimer);
+  const note = document.createElement('span');
+  note.className = 'room-code-saved';
+  note.textContent = '保存しました';
+  roomEl.appendChild(note);
+  roomCodeSavedTimer = setTimeout(() => note.remove(), 2500);
 }
 
 // ---- ゲームカウントの入力 ----

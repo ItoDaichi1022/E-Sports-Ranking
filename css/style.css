@@ -1783,21 +1783,6 @@ a.card:hover {
   overflow-wrap: anywhere;
 }
 
-.room-code-value.empty {
-  font-family: inherit;
-  font-size: 0.88rem;
-  font-weight: 400;
-  letter-spacing: 0;
-  color: var(--text-faint);
-}
-
-.room-code-edit-btn {
-  margin-left: auto;
-  min-height: 0;
-  padding: 0.35rem 0.9rem;
-  font-size: 0.85rem;
-}
-
 .room-code-form {
   display: flex;
   align-items: center;
@@ -1807,15 +1792,34 @@ a.card:hover {
   min-width: 0;
 }
 
-/* 16px未満だとiOSがフォーカス時に画面ごとズームしてしまう */
-.room-code-form input {
+/* 入力欄がそのまま表示欄でもある。読み書きどちらもここでするので、
+   コードは大きく等幅で見せる。16px未満だとiOSがフォーカス時に画面ごとズームする。 */
+.room-code-input {
   flex: 1 1 9rem;
   min-width: 0;
+  min-height: 2.5rem;
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 1rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
-.room-code-form button { flex-shrink: 0; }
+.room-code-input::placeholder {
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.room-code-save-btn {
+  flex-shrink: 0;
+  min-height: 2.5rem;
+}
+
+.room-code-saved {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--win);
+}
 
 /* 対戦表のカードに出す1行。試合前に確認するものなので目に付く色にする */
 .match-room-code {
@@ -2697,13 +2701,13 @@ dialog h3 {
   .inline-form > label { flex: 1 1 100%; }
   .inline-form > button { width: 100%; min-height: 2.75rem; }
 
-  /* ルームコードの記入はラベルの下の行に落とし、入力欄を横いっぱいに使う */
+  /* ルームコードはラベルの下の行に落とし、入力欄を横いっぱいに使う */
   .room-code-form { flex-basis: 100%; }
-  .room-code-form input { flex: 1 1 100%; }
-  .room-code-form button {
-    flex: 1;
+  .room-code-input {
+    flex: 1 1 8rem;
     min-height: 2.75rem;
   }
+  .room-code-save-btn { min-height: 2.75rem; }
 }
 
 /* 動きを減らす設定を尊重する */
