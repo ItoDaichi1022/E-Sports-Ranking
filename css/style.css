@@ -1862,30 +1862,6 @@ a.card:hover {
 
 .player-name.own-chat-row:hover { background: var(--surface-3); }
 
-/* 記入できる行の右端に置く鉛筆。見た目だけでは押せると伝わらないので印を出す。
-   枠が狭いので、文字ではなくアイコン1つで示す。 */
-.row-edit-btn {
-  flex: none;
-  min-height: 0;
-  margin-left: 0.15rem;
-  padding: 0.25rem;
-  border: none;
-  border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--accent-bright);
-  box-shadow: none;
-}
-
-.row-edit-btn svg {
-  width: 0.95rem;
-  height: 0.95rem;
-}
-
-.row-edit-btn:hover:not(:disabled) {
-  background: var(--accent-soft);
-  color: var(--accent-bright);
-}
-
 /* 対戦表の上に出す、出場者向けの1行案内 */
 .bracket-own-hint {
   margin: 0 0 0.75rem;

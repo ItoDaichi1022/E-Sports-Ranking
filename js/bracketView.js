@@ -6,7 +6,7 @@ import {
 import { editMatch } from './bracket.js';
 import { auth, isAdmin } from './auth.js';
 import { canUseMatchChat, openMatchChat } from './matchChat.js';
-import { iconSvg, makeIconButton } from './icons.js';
+import { makeIconButton } from './icons.js';
 import * as db from './db.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
@@ -110,8 +110,6 @@ function drawConnectorLines(bracket, wrapper, matchElements) {
 
 // 「自分のいるところを押すと、その対戦の記入と相手とのチャットができる」ための仕掛け。
 // 名前欄だけを押せるようにし、スコア入力や確定ボタンを押したときは開かない。
-// あわせて行の右端に鉛筆アイコンを置く。見た目だけでは押せると伝わらず、ここが
-// 唯一の入口なのに、新規の人は名前を押せると思わない。
 // own: 自分の対戦であることを示す行かどうか（運営がどちらの名前を押しても開ける
 // 場合は own を付けない。地色で目立たせるのは本人の行だけにするため）。
 function makeRowChatTarget(row, onOpen, { own = false } = {}) {
@@ -124,10 +122,14 @@ function makeRowChatTarget(row, onOpen, { own = false } = {}) {
     if (e.target.closest('input, button, select, label')) return;
     onOpen();
   });
+}
 
-  const editBtn = makeIconButton('pencil', nameEl.title, { className: 'row-edit-btn' });
-  editBtn.addEventListener('click', onOpen);
-  row.row.appendChild(editBtn);
+// 対戦カードの下端に1つだけ置く鉛筆。見た目だけでは名前を押せると伝わらないので
+// 印を出すが、行ごとに付けると（特に両方の行が入口になる運営には）うるさい。
+function cardEditButton(onOpen, label) {
+  const btn = makeIconButton('pencil', label, { className: 'edit-match-btn' });
+  btn.addEventListener('click', onOpen);
+  return btn;
 }
 
 // 対戦表の下端に付けるチャットの入口。自分の行を押す導線に気づかない人と、
@@ -317,12 +319,7 @@ function renderMatchBox(
     }
 
     if (!readOnly) {
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'edit-match-btn icon-btn';
-      editBtn.title = '結果を編集';
-      editBtn.setAttribute('aria-label', '結果を編集');
-      editBtn.innerHTML = iconSvg('pencil');
+      const editBtn = makeIconButton('pencil', '結果を編集', { className: 'edit-match-btn' });
       editBtn.addEventListener('click', () => {
         const ok = confirm('この試合の結果を編集しますか？以降のラウンドに既に反映・確定している結果があれば、それらも未確定に戻ります。');
         if (!ok) return;
@@ -362,6 +359,7 @@ function renderMatchBox(
     if (!isRoundStarted(tournamentId, roundIndex)) {
       box.appendChild(streamToggle(tournamentId, roundIndex, match, onRefresh));
     }
+    if (ownRowIsChatEntry) box.appendChild(cardEditButton(openChat, 'この対戦を開く'));
     return box;
   }
 
@@ -375,6 +373,7 @@ function renderMatchBox(
     if (statusLine) box.appendChild(statusLine);
   }
 
+  if (ownRowIsChatEntry) box.appendChild(cardEditButton(openChat, '開いて記入する'));
   if (showChatButton) box.appendChild(chatButton(match, openChat));
   return box;
 }
