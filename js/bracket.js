@@ -281,7 +281,7 @@ export function editMatch(tournamentId, matchId) {
 
 // 大会の基本情報（名前・日付・対戦方法・定員・ルール）を修正する。募集中でも変更できる。
 export function updateTournament(
-  tournamentId, { name, date, matchType, matchTypeNote, rules, capacity },
+  tournamentId, { name, date, matchType, matchTypeNote, rules, streamUrl, capacity },
 ) {
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) return { ok: false, error: '対象の大会が見つかりません。' };
@@ -330,6 +330,8 @@ export function updateTournament(
   tournament.name = newName;
   tournament.date = date || null;
   tournament.rules = (rules ?? '').trim() || null;
+  // 配信元は呼び出し側でURLとして検証済み（空文字なら未設定）
+  if (streamUrl !== undefined) tournament.streamUrl = streamUrl;
   return { ok: true };
 }
 

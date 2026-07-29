@@ -52,6 +52,7 @@ const tournamentNameInput = $('tournament-name-input');
 const tournamentDateInput = $('tournament-date-input');
 const tournamentCapacityInput = $('tournament-capacity-input');
 const tournamentRulesInput = $('tournament-rules-input');
+const tournamentStreamInput = $('tournament-stream-input');
 const tournamentSubmitBtn = $('tournament-submit-btn');
 const tournamentMatchTypeInput = $('tournament-match-type-input');
 const tournamentMatchTypeNoteField = $('tournament-match-type-note-field');
@@ -88,6 +89,7 @@ const tournamentEditForm = $('tournament-edit-form');
 const tournamentEditNameInput = $('tournament-edit-name-input');
 const tournamentEditDateInput = $('tournament-edit-date-input');
 const tournamentEditRulesInput = $('tournament-edit-rules-input');
+const tournamentEditStreamInput = $('tournament-edit-stream-input');
 const tournamentEditCancelBtn = $('tournament-edit-cancel-btn');
 const tournamentEditMatchTypeInput = $('tournament-edit-match-type-input');
 const tournamentEditMatchTypeNoteField = $('tournament-edit-match-type-note-field');
@@ -750,6 +752,24 @@ const FORMAT_LABELS = {
   round_robin: '総当たり',
 };
 
+// 配信元の入力欄を読む。空欄はそのまま空、書式が違えば知らせて止める。
+//
+// javascript: のようなURLを弾くのは表示側（safeUrl）でもやっているが、
+// 保存する前に気づけないと、運営は「書いたのにリンクが出ない」としか分からない。
+const INVALID_URL = Symbol('invalid-url');
+
+function readStreamUrl(input) {
+  const raw = input.value.trim();
+  if (!raw) return '';
+  const url = safeUrl(raw);
+  if (!url) {
+    alert('配信元は http:// または https:// から始まるURLで入力してください。');
+    input.focus();
+    return INVALID_URL;
+  }
+  return url;
+}
+
 // 詳細ページ（大会・お知らせ）の画像ヘッダー。
 // 画像が無いときは枠ごと隠し、余白だけが残らないようにする。
 function renderHero(el, imageUrl) {
@@ -827,6 +847,19 @@ function renderTournamentInfo(tournament) {
       <div><dt>進行状況</dt><dd>${escapeHtml(tournamentStatusLabel(tournament))}</dd></div>
     </dl>
   `;
+  // 配信元。試合を見に行く導線なので、ルールより先に、押せる形で出す。
+  // URLはDBから来るので、表示のたびに safeUrl を通してから href に入れる。
+  const streamUrl = safeUrl(tournament.streamUrl);
+  if (streamUrl) {
+    html += `
+      <h4>配信元</h4>
+      <a class="stream-link" href="${escapeHtml(streamUrl)}" target="_blank" rel="noopener noreferrer">
+        <span class="stream-link-label">配信を見る</span>
+        <span class="stream-link-host">${escapeHtml(new URL(streamUrl).hostname)}</span>
+      </a>
+    `;
+  }
+
   if (tournament.rules) {
     html += `
       <h4>ルール</h4>
@@ -1694,6 +1727,9 @@ tournamentForm.addEventListener('submit', async (e) => {
     return;
   }
 
+  const streamUrl = readStreamUrl(tournamentStreamInput);
+  if (streamUrl === INVALID_URL) return;
+
   const tournament = {
     id: newId(),
     name,
@@ -1702,6 +1738,7 @@ tournamentForm.addEventListener('submit', async (e) => {
     matchType,
     matchTypeNote: matchType === 'other' ? tournamentMatchTypeNoteInput.value.trim() : '',
     rules: tournamentRulesInput.value.trim() || null,
+    streamUrl,
     imageUrl: '',
     weight: null,
     // 定員はエントリー募集を制御するためのもの。運営が参加者を直接選ぶ場合は
@@ -1745,6 +1782,7 @@ tournamentForm.addEventListener('submit', async (e) => {
   syncEntryModeForMatchType();
   tournamentCapacityInput.value = '';
   tournamentRulesInput.value = '';
+  tournamentStreamInput.value = '';
   tournamentImagePicker.setCurrent('');
   selectedParticipantIds = [];
 
@@ -1762,6 +1800,7 @@ tournamentEditBtn.addEventListener('click', () => {
   syncEditMatchTypeNote();
   tournamentEditCapacityInput.value = tournament.capacity ?? '';
   tournamentEditRulesInput.value = tournament.rules || '';
+  tournamentEditStreamInput.value = tournament.streamUrl || '';
   tournamentEditImagePicker.setCurrent(tournament.imageUrl || '');
   tournamentEditForm.hidden = !tournamentEditForm.hidden;
 });
@@ -1778,6 +1817,9 @@ tournamentEditForm.addEventListener('submit', async (e) => {
     return;
   }
 
+  const streamUrl = readStreamUrl(tournamentEditStreamInput);
+  if (streamUrl === INVALID_URL) return;
+
   const capacityRaw = tournamentEditCapacityInput.value.trim();
   const result = updateTournament(currentBracketTournamentId, {
     name: tournamentEditNameInput.value,
@@ -1785,6 +1827,7 @@ tournamentEditForm.addEventListener('submit', async (e) => {
     matchType: tournamentEditMatchTypeInput.value,
     matchTypeNote: tournamentEditMatchTypeNoteInput.value,
     rules: tournamentEditRulesInput.value,
+    streamUrl,
     capacity: capacityRaw === '' ? null : Number(capacityRaw),
   });
   if (!result.ok) {

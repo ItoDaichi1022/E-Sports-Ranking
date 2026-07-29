@@ -711,6 +711,7 @@ input[type="file"]::file-selector-button {
 input[type="file"]::file-selector-button:hover { border-color: var(--border-strong); }
 
 .inline-form .rules-field,
+.inline-form .stream-field,
 .inline-form .image-field {
   flex: 1 1 100%;
 }
@@ -2618,6 +2619,40 @@ dialog.dialog-chat {
   color: var(--text-dim);
   line-height: 1.75;
   font-size: 0.9rem;
+}
+
+/* 配信元。外部サイトへ出る導線なので、行き先のドメインを必ず添える
+   （押す前にどこへ飛ぶか分かるようにするため） */
+.stream-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  max-width: 100%;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stream-link:hover {
+  background: var(--surface-3);
+  box-shadow: 0 0 16px -6px var(--glow);
+  color: var(--text);
+}
+
+.stream-link-label {
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+.stream-link-host {
+  font-size: 0.85rem;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
 }
 
 /* ---------------------------------------------------------------------------

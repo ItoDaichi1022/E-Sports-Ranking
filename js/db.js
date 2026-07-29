@@ -113,6 +113,8 @@ function toTournament(row, { entrantIds, participantIds, teams }) {
     matchTypeNote: row.match_type_note ?? '',
     rules: row.rules,
     imageUrl: row.image_url ?? '',
+    // 配信元のURL。未設定は空文字（入力欄の value にそのまま渡せる形に揃える）
+    streamUrl: row.stream_url ?? '',
     weight: row.weight,
     status: row.status,
     capacity: row.capacity,
@@ -543,6 +545,7 @@ export async function createTournament(tournament) {
       match_type_note: tournament.matchTypeNote || null,
       rules: tournament.rules || null,
       image_url: tournament.imageUrl || null,
+      stream_url: tournament.streamUrl || null,
       status: tournament.status ?? 'draft',
       capacity: tournament.capacity ?? null,
       weight: tournament.weight ?? null,
@@ -564,6 +567,7 @@ export async function saveTournament(tournament) {
       match_type_note: tournament.matchTypeNote || null,
       rules: tournament.rules || null,
       image_url: tournament.imageUrl || null,
+      stream_url: tournament.streamUrl || null,
       status: tournament.status,
       capacity: tournament.capacity ?? null,
     })

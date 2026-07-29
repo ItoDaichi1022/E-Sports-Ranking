@@ -10,7 +10,7 @@
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=63">
+<link rel="stylesheet" href="css/style.css?v=64">
 </head>
 <body>
 <header>
@@ -427,6 +427,10 @@
         定員（任意・空欄なら無制限）
         <input type="number" id="tournament-capacity-input" min="2" placeholder="例: 32">
       </label>
+      <label class="stream-field">
+        配信元（任意・URL）
+        <input type="url" id="tournament-stream-input" placeholder="例: https://www.twitch.tv/yourchannel">
+      </label>
       <label class="rules-field">
         ルール（任意）
         <textarea id="tournament-rules-input" rows="4" placeholder="例: 3本先取、キャラ1人縛りなし、持ちキャラ変更は大会中1回まで"></textarea>
@@ -530,6 +534,10 @@
         定員（任意・空欄なら無制限）
         <input type="number" id="tournament-edit-capacity-input" min="2" placeholder="例: 32">
       </label>
+      <label class="stream-field">
+        配信元（任意・URL）
+        <input type="url" id="tournament-edit-stream-input" placeholder="例: https://www.twitch.tv/yourchannel">
+      </label>
       <label class="rules-field">
         ルール（任意）
         <textarea id="tournament-edit-rules-input" rows="4"></textarea>
@@ -630,7 +638,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=63"></script>
+<script src="js/vendor/supabase.js?v=64"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -642,27 +650,27 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=63",
-    "./js/bracket.js":        "./js/bracket.js?v=63",
-    "./js/bracketView.js":    "./js/bracketView.js?v=63",
-    "./js/db.js":             "./js/db.js?v=63",
-    "./js/entries.js":        "./js/entries.js?v=63",
-    "./js/icons.js":          "./js/icons.js?v=63",
-    "./js/matchChat.js":      "./js/matchChat.js?v=63",
-    "./js/playerStats.js":    "./js/playerStats.js?v=63",
-    "./js/players.js":        "./js/players.js?v=63",
-    "./js/profile.js":        "./js/profile.js?v=63",
-    "./js/ranking.js":        "./js/ranking.js?v=63",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=63",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=63",
-    "./js/rankingView.js":    "./js/rankingView.js?v=63",
-    "./js/state.js":          "./js/state.js?v=63",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=63",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=63",
-    "./js/util.js":           "./js/util.js?v=63"
+    "./js/auth.js":           "./js/auth.js?v=64",
+    "./js/bracket.js":        "./js/bracket.js?v=64",
+    "./js/bracketView.js":    "./js/bracketView.js?v=64",
+    "./js/db.js":             "./js/db.js?v=64",
+    "./js/entries.js":        "./js/entries.js?v=64",
+    "./js/icons.js":          "./js/icons.js?v=64",
+    "./js/matchChat.js":      "./js/matchChat.js?v=64",
+    "./js/playerStats.js":    "./js/playerStats.js?v=64",
+    "./js/players.js":        "./js/players.js?v=64",
+    "./js/profile.js":        "./js/profile.js?v=64",
+    "./js/ranking.js":        "./js/ranking.js?v=64",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=64",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=64",
+    "./js/rankingView.js":    "./js/rankingView.js?v=64",
+    "./js/state.js":          "./js/state.js?v=64",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=64",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=64",
+    "./js/util.js":           "./js/util.js?v=64"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=63"></script>
+<script type="module" src="js/app.js?v=64"></script>
 </body>
 </html>

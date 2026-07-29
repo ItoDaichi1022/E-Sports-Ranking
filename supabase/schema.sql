@@ -51,6 +51,8 @@ create table if not exists tournaments (
   rules      text,
   -- 大会のバナー画像。Storageの images バケットに置いた公開URL
   image_url  text,
+  -- 配信元。この大会の配信を見に行くURL（TwitchやYouTubeのチャンネル等）
+  stream_url text,
   -- draft(準備中) → recruiting(募集中) → running(進行中) → finished(終了)
   status     text not null default 'draft',
   capacity   int,
