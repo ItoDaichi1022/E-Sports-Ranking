@@ -38,9 +38,28 @@ function playerScores(match) {
   return [parts[0].trim(), parts[1].trim()];
 }
 
+// 選手名からその人のプロフィールへ。対戦相手がどんな選手なのかは、対戦表を見て
+// いちばん気になるところなので、名前をそのまま入口にする。
+// 誰が入るか決まっていない枠（TBD）は押せない文字のままにする。
+function playerNameLink(playerId, name) {
+  if (!playerId) {
+    const span = document.createElement('span');
+    span.textContent = name;
+    return span;
+  }
+
+  const link = document.createElement('a');
+  link.className = 'player-name-link';
+  link.href = `#player/${encodeURIComponent(playerId)}`;
+  link.textContent = name;
+  link.title = `${name} のプロフィール`;
+  return link;
+}
+
 // Challonge風の1行（シード番号・名前・スコア枠）を作る。
 // チーム戦では name にチーム名が入り、members にメンバー名が並ぶ。
-function buildPlayerRow({ seed, name, members = [], isWinner }) {
+// memberIds は members と同じ並び（個人戦はその選手1人）。
+function buildPlayerRow({ seed, name, members = [], memberIds = [], isWinner }) {
   const row = document.createElement('div');
   row.className = 'match-player' + (isWinner ? ' winner' : '');
 
@@ -53,17 +72,21 @@ function buildPlayerRow({ seed, name, members = [], isWinner }) {
   const nameEl = document.createElement('div');
   nameEl.className = 'player-name';
   if (members.length > 0) {
+    // チーム名は選手ではないので押せない。プロフィールへ行けるのはメンバーの名前
     const teamName = document.createElement('span');
     teamName.className = 'entrant-team-name';
     teamName.textContent = name;
 
     const memberLine = document.createElement('span');
     memberLine.className = 'entrant-members';
-    memberLine.textContent = members.join(' / ');
+    members.forEach((memberName, i) => {
+      if (i > 0) memberLine.append(document.createTextNode(' / '));
+      memberLine.appendChild(playerNameLink(memberIds[i], memberName));
+    });
 
     nameEl.append(teamName, memberLine);
   } else {
-    nameEl.textContent = name;
+    nameEl.appendChild(playerNameLink(memberIds[0], name));
   }
 
   const scoreSpan = document.createElement('span');
@@ -107,24 +130,8 @@ function drawConnectorLines(bracket, wrapper, matchElements) {
   wrapper.appendChild(svg);
 }
 
-// 「自分のいるところを押すと、その対戦の記入と相手とのチャットができる」ための仕掛け。
-// 名前欄だけを押せるようにし、スコア入力や確定ボタンを押したときは開かない。
-// own: 自分の対戦であることを示す行かどうか（運営がどちらの名前を押しても開ける
-// 場合は own を付けない。地色で目立たせるのは本人の行だけにするため）。
-function makeRowChatTarget(row, onOpen, { own = false } = {}) {
-  const { nameEl } = row;
-  nameEl.classList.add('chat-target');
-  if (own) nameEl.classList.add('own-chat-row');
-  nameEl.title = own ? '開いて記入する' : 'この対戦を開く';
-
-  nameEl.addEventListener('click', (e) => {
-    if (e.target.closest('input, button, select, label')) return;
-    onOpen();
-  });
-}
-
-// 対戦カードの下端に1つだけ置く鉛筆。見た目だけでは名前を押せると伝わらないので
-// 印を出すが、行ごとに付けると（特に両方の行が入口になる運営には）うるさい。
+// 対戦カードの右端に1つだけ置く鉛筆。ルームコード・チャット・ゲームカウントの入口。
+// 名前はプロフィールへ行く入口なので、対戦を開く操作はこのアイコンに集約する。
 function cardEditButton(onOpen, label) {
   const btn = makeIconButton('pencil', label, { className: 'edit-match-btn' });
   btn.addEventListener('click', onOpen);
@@ -235,6 +242,7 @@ function renderMatchBox(
       seed: seedOf(match.winnerId),
       name: getEntrantName(tournamentId, match.winnerId),
       members: getEntrantMemberNames(tournamentId, match.winnerId),
+      memberIds: getEntrantMemberIds(tournamentId, match.winnerId),
       isWinner: true,
     });
     box.appendChild(row);
@@ -252,12 +260,14 @@ function renderMatchBox(
     seed: p1 ? seedOf(p1) : null,
     name: name1,
     members: getEntrantMemberNames(tournamentId, p1),
+    memberIds: getEntrantMemberIds(tournamentId, p1),
     isWinner: match.winnerId && match.winnerId === p1,
   });
   const r2 = buildPlayerRow({
     seed: p2 ? seedOf(p2) : null,
     name: name2,
     members: getEntrantMemberNames(tournamentId, p2),
+    memberIds: getEntrantMemberIds(tournamentId, p2),
     isWinner: match.winnerId && match.winnerId === p2,
   });
 
@@ -279,25 +289,17 @@ function renderMatchBox(
     box.appendChild(flag);
   }
 
-  // 自分の試合、または運営が見ているときは名前欄が入口になるので、下のボタンは出さない
-  // （入口は1つでいい）。運営はどちらの名前を押しても同じ画面（確定・チャット）を開ける。
-  let ownRowIsChatEntry = false;
+  // 自分がいる側の行に薄い地色を敷いて、対戦表の中の自分を見つけやすくする。
+  // 押す操作は名前（プロフィール）と鉛筆（対戦を開く）に分かれているので、
+  // ここでは目印を付けるだけ。
   if (chatAvailable) {
     box.classList.add('has-chat');
-    if (!readOnly) {
-      [r1, r2].forEach((row) => makeRowChatTarget(row, openChat));
-      ownRowIsChatEntry = true;
-    } else {
-      // 自分がいる側の名前欄だけを押せるようにする。
-      [[p1, r1], [p2, r2]].forEach(([entrantId, row]) => {
-        if (getEntrantMemberIds(tournamentId, entrantId).includes(auth.player?.id)) {
-          makeRowChatTarget(row, openChat, { own: true });
-          ownRowIsChatEntry = true;
-        }
-      });
-    }
+    [[p1, r1], [p2, r2]].forEach(([entrantId, row]) => {
+      if (getEntrantMemberIds(tournamentId, entrantId).includes(auth.player?.id)) {
+        row.nameEl.classList.add('own-chat-row');
+      }
+    });
   }
-  const showChatButton = chatAvailable && !ownRowIsChatEntry;
 
   box.appendChild(r1.row);
   box.appendChild(r2.row);
@@ -329,7 +331,8 @@ function renderMatchBox(
       });
       box.appendChild(editBtn);
     }
-    if (showChatButton) box.appendChild(chatButton(match, openChat));
+    // 確定した試合は鉛筆が「結果を編集」に変わるので、チャットは下のボタンから開く
+    if (chatAvailable) box.appendChild(chatButton(match, openChat));
     return box;
   }
 
@@ -342,7 +345,7 @@ function renderMatchBox(
   }
 
   if (!readOnly) {
-    // 運営向け。承認待ちの報告があれば一言だけ添える。入力・確定は名前欄から開く画面で行う。
+    // 運営向け。承認待ちの報告があれば一言だけ添える。入力・確定は鉛筆から開く画面で行う。
     const pending = pendingResultReport(tournamentId, match.id);
     if (pending) {
       const note = document.createElement('div');
@@ -356,7 +359,7 @@ function renderMatchBox(
     if (!isRoundStarted(tournamentId, roundIndex)) {
       box.appendChild(streamToggle(tournamentId, roundIndex, match, onRefresh));
     }
-    if (ownRowIsChatEntry) box.appendChild(cardEditButton(openChat, 'この対戦を開く'));
+    if (chatAvailable) box.appendChild(cardEditButton(openChat, 'この対戦を開く'));
     return box;
   }
 
@@ -370,8 +373,7 @@ function renderMatchBox(
     if (statusLine) box.appendChild(statusLine);
   }
 
-  if (ownRowIsChatEntry) box.appendChild(cardEditButton(openChat, '開いて記入する'));
-  if (showChatButton) box.appendChild(chatButton(match, openChat));
+  if (chatAvailable) box.appendChild(cardEditButton(openChat, '開いて記入する'));
   return box;
 }
 

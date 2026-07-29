@@ -415,24 +415,6 @@
 
   <section id="view-players" class="view" hidden>
     <h2>選手</h2>
-    <!-- 代理登録は運営がたまにしか使わない操作なので、普段は畳んでおく
-         （常に入力欄が出ていると、選手一覧を見に来た運営の邪魔になる）。 -->
-    <button type="button" id="player-proxy-btn" class="btn-secondary" hidden>代理登録をする</button>
-    <form id="player-form" class="inline-form" hidden>
-      <label>
-        ゲームアカウントID
-        <input type="text" id="player-id-input" placeholder="例: SW-1234-5678-9012">
-      </label>
-      <label>
-        表示名
-        <input type="text" id="player-name-input" placeholder="例: Gyu" required>
-      </label>
-      <button type="submit">登録する</button>
-      <button type="button" id="player-form-cancel-btn" class="btn-secondary">やめる</button>
-    </form>
-    <p class="note" id="player-form-note" hidden>
-      アカウントを持たない選手を運営が代理で登録します。本人がログインしたら、選手一覧から本人のアカウントに対応付けてください。
-    </p>
     <p class="note">表示名をクリックすると個人戦績が見られます。</p>
     <input type="text" id="player-search-input" placeholder="選手を名前で検索">
     <div id="player-list"></div>

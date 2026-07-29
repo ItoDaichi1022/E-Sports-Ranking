@@ -1609,6 +1609,19 @@ a.card:hover {
   white-space: nowrap;
 }
 
+/* 名前はその選手のプロフィールへの入口。対戦表の中で青くしたくないので、
+   色は周りに合わせ、押せることはホバーの下線で示す。 */
+.player-name-link {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+
+.player-name-link:hover { text-decoration: underline; }
+
 /* チーム戦（2v2）の枠：チーム名を主に、メンバー名を下に小さく添える。
    チーム名だけだと誰が出ているのか分からないため。 */
 .entrant-team-name,
@@ -1853,20 +1866,11 @@ a.card:hover {
 
 /* ---- 対戦カードごとのチャット ---- */
 
-/* 押せる名前欄。カーソルと薄いホバーだけで示す（運営はどちらの名前も対象なので控えめに） */
-.player-name.chat-target {
-  cursor: pointer;
-}
-
-.player-name.chat-target:hover { background: var(--surface-3); }
-
-/* 自分がいる側の行だけ、薄い地色で少し目立たせる */
+/* 自分がいる側の行だけ、薄い地色で少し目立たせる（対戦表の中で自分を探せるように） */
 .player-name.own-chat-row {
   background: var(--accent-soft);
   border-radius: 4px;
 }
-
-.player-name.own-chat-row:hover { background: var(--surface-3); }
 
 /* 対戦表の上に出す、出場者向けの1行案内 */
 .bracket-own-hint {

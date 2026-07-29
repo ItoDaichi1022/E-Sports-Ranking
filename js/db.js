@@ -361,17 +361,6 @@ export async function createOwnPlayer(userId, profile) {
   return toPlayer(data);
 }
 
-// 運営が代理登録する選手（本人のアカウントはまだ無い）。
-export async function createProxyPlayer(profile) {
-  const { data, error } = await supabase
-    .from('players')
-    .insert({ user_id: null, ...toPlayerUpdate(profile) })
-    .select()
-    .single();
-  check(error, '選手登録');
-  return toPlayer(data);
-}
-
 // プロフィールの更新。本人か運営でなければRLSに弾かれる。
 // role と user_id は列単位のGRANTで更新不可なので、ここから触れることはない。
 //

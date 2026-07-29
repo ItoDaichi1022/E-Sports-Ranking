@@ -35,12 +35,6 @@ let currentBracketTournamentId = null;
 
 const $ = (id) => document.getElementById(id);
 
-const playerForm = $('player-form');
-const playerProxyBtn = $('player-proxy-btn');
-const playerFormCancelBtn = $('player-form-cancel-btn');
-const playerIdInput = $('player-id-input');
-const playerNameInput = $('player-name-input');
-const playerFormNote = $('player-form-note');
 const playerListEl = $('player-list');
 const playerSearchInput = $('player-search-input');
 
@@ -199,9 +193,6 @@ function applyAuthUI() {
   rankingEditorNoteEl.hidden = !admin;
   tournamentEditBtn.hidden = !admin;
   tournamentDeleteBtn.hidden = !admin;
-  playerProxyBtn.hidden = !admin;
-  // 運営でなくなったら開いていた代理登録の欄も畳む
-  if (!admin) closeProxyPlayerForm();
   if (!admin) tournamentEditForm.hidden = true;
   // 運営でなくなったら投稿フォームも畳む
   if (!admin) closeAnnouncementForm();
@@ -395,22 +386,6 @@ function renderNewsPage(id) {
 }
 
 // ---- 選手 ----
-
-// 代理登録の入力欄。ボタンを押したときだけ開く（普段は一覧の邪魔になるので畳んでおく）。
-function openProxyPlayerForm() {
-  playerForm.hidden = false;
-  playerFormNote.hidden = false;
-  playerProxyBtn.hidden = true;
-  playerNameInput.focus();
-}
-
-function closeProxyPlayerForm() {
-  playerForm.hidden = true;
-  playerFormNote.hidden = true;
-  playerProxyBtn.hidden = !isAdmin();
-  playerIdInput.value = '';
-  playerNameInput.value = '';
-}
 
 function refreshPlayerUI() {
   renderPlayerTable(playerListEl, {
@@ -942,7 +917,7 @@ async function renderBracketPage(tournamentId) {
     && tournament.status !== 'finished';
   bracketOwnHintEl.hidden = !isParticipant || isAdmin();
   if (!bracketOwnHintEl.hidden) {
-    bracketOwnHintEl.textContent = '色の付いた自分の名前、または対戦カード右の鉛筆アイコンを押すと、ルームコードの確認・対戦相手とのチャット・ゲームカウントの報告ができます。';
+    bracketOwnHintEl.textContent = '色の付いた行が自分の対戦です。対戦カード右の鉛筆アイコンを押すと、ルームコードの確認・対戦相手とのチャット・ゲームカウントの報告ができます。選手名を押すと、その選手のプロフィールが見られます。';
   }
 
   // 戻り先は大会詳細。ここへは詳細から来るため。
@@ -1391,31 +1366,6 @@ document.addEventListener('focusout', () => setTimeout(flushHeldRefresh, 100));
 setInterval(flushHeldRefresh, 5000);
 
 // ---- イベント配線 ----
-
-// 運営による代理登録（アカウントを持たない選手を先に作っておく）
-playerProxyBtn.addEventListener('click', openProxyPlayerForm);
-playerFormCancelBtn.addEventListener('click', closeProxyPlayerForm);
-
-playerForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const name = playerNameInput.value.trim();
-  if (!name) {
-    alert('表示名を入力してください。');
-    return;
-  }
-  const ok = await persist(async () => {
-    await db.createProxyPlayer({
-      currentName: name,
-      pastNames: [],
-      gameAccountId: playerIdInput.value.trim(),
-      mainCharacters: [],
-    });
-  }, '選手の登録');
-  if (!ok) return;
-  // 続けて何人も登録することは少ないので、登録できたら畳んで一覧に戻す
-  closeProxyPlayerForm();
-  await refreshFromDb();
-});
 
 participantSearchInput.addEventListener('input', () => {
   participantSearchQuery = participantSearchInput.value;
