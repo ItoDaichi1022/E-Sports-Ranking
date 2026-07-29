@@ -238,6 +238,10 @@ function parseHash() {
   return { page: page || 'home', param: param ? decodeURIComponent(param) : null };
 }
 
+// 直前に表示していた画面。ページが変わったときだけスクロールを先頭へ戻すために覚えておく
+// （Realtimeの更新でも routeFromHash は呼ばれるので、毎回戻すと読んでいる途中で飛んでしまう）。
+let lastRouteKey = null;
+
 function routeFromHash() {
   const { page, param } = parseHash();
 
@@ -260,6 +264,13 @@ function routeFromHash() {
     $(id).hidden = name !== target;
   });
 
+  // 別の画面へ移ったときは先頭から見せる。ハッシュだけを書き換える作りなので、
+  // 何もしないとブラウザは前の画面のスクロール位置をそのまま引き継いでしまい、
+  // 長いページから移ると途中や一番下から始まったように見える。
+  const routeKey = `${target}/${param ?? ''}`;
+  const routeChanged = routeKey !== lastRouteKey;
+  lastRouteKey = routeKey;
+
   const navPage = NAV_PAGE_OF[target] || target;
   mainNav.querySelectorAll('a').forEach((a) => {
     a.classList.toggle('active', a.dataset.page === navPage);
@@ -276,6 +287,9 @@ function routeFromHash() {
   else if (target === 'player') renderPlayerDetail(param);
   else if (target === 'ranking') renderRankingPage();
   else if (target === 'profile') renderProfilePage();
+
+  // 中身を入れ替えたあとに戻す。先に戻しても、描画で高さが変わると位置がずれる。
+  if (routeChanged) window.scrollTo(0, 0);
 }
 
 // ---- ホーム（お知らせ） ----
@@ -292,6 +306,8 @@ function openAnnouncementForm(announcement) {
   announcementDialogTitle.textContent = announcement ? 'お知らせを編集' : '新しいお知らせ';
   announcementSubmitBtn.textContent = announcement ? '更新する' : '投稿する';
   announcementDialog.showModal();
+  // ダイアログは閉じても要素が残るので、前に開いたときのスクロール位置を持っている
+  announcementDialog.scrollTop = 0;
   announcementTitleInput.focus();
 }
 
@@ -1690,6 +1706,7 @@ announcementForm.addEventListener('submit', async (e) => {
 function openLoginDialog() {
   loginErrorEl.textContent = '';
   loginDialog.showModal();
+  loginDialog.scrollTop = 0;
 }
 
 loginBtn.addEventListener('click', openLoginDialog);

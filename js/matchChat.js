@@ -163,6 +163,9 @@ function setChatTab(name) {
   panelTalkEl.hidden = !talk;
   panelResultEl.hidden = talk;
 
+  // タブを切り替えたら、その中身は上から読ませる（前のタブで下まで見ていた位置が残る）
+  dialog.scrollTop = 0;
+
   // 隠れている間は高さが0で、いちばん下に寄せたつもりが先頭に戻っている。
   // 表示に戻した時点で寄せ直す。
   if (talk) logEl.scrollTop = logEl.scrollHeight;
@@ -814,6 +817,9 @@ export async function openMatchChat(tournament, match, roundIndex, onRefresh, on
   showError(null);
 
   if (!dialog.open) dialog.showModal();
+  // ダイアログ自体もスクロールするので、前に開いたときの位置が残っている。
+  // 閉じても要素は消えないため、開くたびに先頭へ戻す。
+  dialog.scrollTop = 0;
 
   renderReports(tournament, match);
   syncReportControls(tournament, match);
