@@ -98,7 +98,23 @@
 
 html { -webkit-text-size-adjust: 100%; }
 
+/* ---- 折り返しの方針（端末幅によらず読める形にする）----
+   狭い画面でいちばん見苦しいのは、次の3つ。
+     1. 「遊べ。」が「遊 / べ。」のように語の途中で割れる
+     2. 最後の行に1文字だけ残る（見出しの「ラ / ンキング」など）
+     3. 幅の足りない箱に入って、1〜2文字ずつの細長い柱になる
+   1 は word-break: auto-phrase（文節で折る）、2 は text-wrap: balance / pretty、
+   3 は各コンポーネント側で最小幅を確保して防ぐ。
+   auto-phrase と balance / pretty は未対応のブラウザでは単に無視されるだけで、
+   従来どおりの折り返しに戻る（見た目が壊れることはない）。 */
 body {
+  /* 日本語を文節の切れ目で折る。lang="ja" のときだけ働く */
+  word-break: auto-phrase;
+  /* 行頭に「、」「。」「ゃ」などを置かない（禁則を厳しめに） */
+  line-break: strict;
+  /* 折る場所が無いほど長い英数字（URLなど）は、はみ出させずに折る */
+  overflow-wrap: break-word;
+
   font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
                "Noto Sans JP", sans-serif;
   margin: 0;
@@ -113,7 +129,7 @@ body {
   background-attachment: fixed;
 }
 
-/* 会場の照明。青とシアンの光のかたまり2つが、ゆっくり漂う。
+/* 会場の照明。緑の光のかたまり2つが、ゆっくり漂う。
    本文の後ろに固定で敷き、transform だけを動かしてGPUに任せる。 */
 body::before {
   content: '';
@@ -168,6 +184,14 @@ body::before {
 h1, h2, h3, h4 {
   line-height: 1.35;
   letter-spacing: 0.06em;
+  /* 2行以上になるとき、各行の長さを揃える。放っておくと1行目が目一杯まで伸び、
+     最後の行に1〜2文字だけ取り残される（「大会エントリー方 / 法」のような形）。 */
+  text-wrap: balance;
+}
+
+/* 本文は最後の行に1語だけ落ちるのを避ける。balance と違い、行数が多くても効く。 */
+p, li, dd, dt, figcaption, caption, blockquote {
+  text-wrap: pretty;
 }
 
 h2 {
@@ -444,13 +468,60 @@ header h1 a::before {
 }
 
 /* 狭い画面では縦に折り返す。区切りの「/」は隙間で表現するので、
-   折り返しても行末に記号が残らない。 */
+   折り返しても行末に記号が残らない。
+   各リンクは中身より縮めない（縮むと「プライバシーポ / リシー」のように割れる）。 */
 .footer-links {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 0.5rem 1.25rem;
+}
+
+.footer-links > a { white-space: nowrap; }
+
+/* ---- 上へ戻る（長いページで下まで来たときだけ出る） ----
+   本文の上に浮くので、塗りつぶさず暗い面＋緑の枠にする。読んでいる最中に
+   明るいボタンが視界の端で光り続けると、文章から目が離れてしまう。 */
+/* セレクタに button を足して .icon-btn（このファイルの後方で padding と
+   アイコンの大きさを決めている）より強くする。setButtonIcon が付ける共通クラスを、
+   この丸ボタンだけは上書きしたい。 */
+button.scroll-top-btn {
+  position: fixed;
+  right: 1.25rem;
+  /* iPhoneのホームバーやAndroidのジェスチャーバーに重ならないよう、
+     端末が申告する下端の余白ぶんだけ持ち上げる */
+  bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  /* 本文より手前、開いたメニュー（z-index:30）より奥。
+     ダイアログは top layer なので、そちらは常にこの上に出る。 */
+  z-index: 25;
+  width: 2.9rem;
+  height: 2.9rem;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--accent-bright);
+  box-shadow: var(--shadow), 0 0 18px -5px var(--glow);
+  animation: scroll-top-in 0.18s ease-out;
+}
+
+button.scroll-top-btn svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+button.scroll-top-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+  filter: none;
+}
+
+@keyframes scroll-top-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .site-footer a { color: var(--text-faint); }
@@ -1123,14 +1194,17 @@ td code { font-size: 0.85em; }
 
 .hero > * { position: relative; z-index: 1; }
 
-/* 英字の小見出しはグラデーション文字で。表示用フォントの見せ場 */
+/* 英字の小見出しはグラデーション文字で。表示用フォントの見せ場。
+   字間を広く取っているぶん実寸が長い。画面幅に応じて字間ごと縮め、
+   細い端末で「TOURNAMENT & / RANKING」と2行に割れないようにする。 */
 .hero-eyebrow {
   margin: 0 0 0.9rem;
   font-family: var(--font-display);
-  font-size: 0.78rem;
+  font-size: clamp(0.62rem, 2.6vw, 0.78rem);
   font-weight: 700;
-  letter-spacing: 0.32em;
+  letter-spacing: clamp(0.16em, 0.9vw, 0.32em);
   text-transform: uppercase;
+  white-space: nowrap;
   background: var(--accent-grad);
   -webkit-background-clip: text;
   background-clip: text;
@@ -1138,23 +1212,30 @@ td code { font-size: 0.85em; }
 }
 
 /* サイト名。ラテン文字だけなので表示用フォントの見せ場。
-   下線はサブタイトルの下（.hero-tagline::after）に置くので、ここには敷かない。 */
+   下線はサブタイトルの下（.hero-tagline::after）に置くので、ここには敷かない。
+
+   1語なので折り返す場所が無く、幅が足りないと枠からはみ出す。段階的に切り替える
+   （PCは2.6rem、スマホは1.9rem）のではなく画面幅に連動させて、どの幅でも
+   「1行に収まる最大の大きさ」になるようにしている。 */
 .hero-title {
   margin: 0 0 0.5rem;
   font-family: var(--font-display);
-  font-size: 2.6rem;
+  font-size: clamp(1.6rem, 8.5vw, 2.6rem);
   font-weight: 800;
   letter-spacing: 0.06em;
   line-height: 1.15;
+  white-space: nowrap;
 }
 
-/* サブタイトル。名前とひと続きに読ませたいので間を詰め、下線でここまでを1つにまとめる */
+/* サブタイトル。名前とひと続きに読ませたいので間を詰め、下線でここまでを1つにまとめる。
+   11文字と短いので、どの幅でも1行に収める（「遊 / べ。」と割れると締まらない）。 */
 .hero-tagline {
   margin: 0 0 1.1rem;
   color: var(--accent-bright);
-  font-size: 1.05rem;
+  font-size: clamp(0.9rem, 3.6vw, 1.05rem);
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: clamp(0.06em, 0.5vw, 0.12em);
+  white-space: nowrap;
 }
 
 .hero-tagline::after {
@@ -1168,13 +1249,6 @@ td code { font-size: 0.85em; }
   box-shadow: 0 0 14px var(--glow);
 }
 
-/* 読み方と通称。名乗りの締めなので、下線の下に小さく置く */
-.hero-alias {
-  margin: 0;
-  color: var(--text-faint);
-  font-size: 0.88rem;
-}
-
 .hero-actions {
   display: flex;
   justify-content: center;
@@ -1182,6 +1256,19 @@ td code { font-size: 0.85em; }
   flex-wrap: wrap;
   margin-top: 1.75rem;
 }
+
+/* flexの中のボタンは、既定では「中身の最小幅（min-content）まで縮めてよい」と
+   判断される。日本語は文字単位で折れるため、その最小幅が実質1文字ぶんになり、
+   幅が足りないとボタンが1文字ずつの細長い柱になってしまう。
+   中身より狭くしないことで、収まらないときは縮まずに次の行へ送られる。 */
+.hero-actions > *,
+.row-actions > *,
+.dialog-actions > * {
+  min-width: max-content;
+}
+
+/* 送り先の行が無いと上のルールが横はみ出しになるので、折り返せるようにしておく */
+.dialog-actions { flex-wrap: wrap; }
 
 /* ---------------------------------------------------------------------------
    はじめに（使い方ガイド）
@@ -3633,13 +3720,8 @@ dialog h3 {
     border-radius: var(--r);
   }
 
-  /* サイト名は狭い画面でも顔として見せたいので、他の見出しほどは縮めない */
-  .hero-title { font-size: 1.9rem; }
-  .hero-tagline { font-size: 0.95rem; letter-spacing: 0.08em; }
-  .hero-alias { font-size: 0.8rem; }
-
+  /* ヒーローの文字は clamp() で画面幅に連動させてあるので、ここでの上書きは不要 */
   .hero-actions { gap: 0.5rem; }
-  .hero-actions > * { flex: 1 1 auto; }
 
   .card-body { padding: 0.9rem 1rem 1rem; }
   .card-thumb.is-tall { height: 200px; }

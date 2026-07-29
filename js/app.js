@@ -25,7 +25,7 @@ import {
   signInWithProvider, signOut, reloadOwnPlayer,
 } from './auth.js';
 import { isConfigured } from './supabaseClient.js';
-import { iconSvg, makeIconButton } from './icons.js';
+import { iconSvg, makeIconButton, setButtonIcon } from './icons.js';
 import * as db from './db.js';
 
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
@@ -357,6 +357,10 @@ function routeFromHash() {
 
   // 中身を入れ替えたあとに戻す。先に戻しても、描画で高さが変わると位置がずれる。
   if (routeChanged) window.scrollTo(0, 0);
+
+  // 先頭に戻ったので「上へ戻る」も引っ込める。scroll イベント待ちにすると、
+  // 既に先頭にいた場合はイベントが起きず、ボタンが出たまま残る。
+  syncScrollTopBtn();
 }
 
 // ---- ホーム（お知らせ） ----
@@ -2111,6 +2115,41 @@ logoutBtn.addEventListener('click', async () => {
   } finally {
     logoutBtn.disabled = false;
   }
+});
+
+// ---- 上へ戻る ----
+//
+// 「はじめに」や規約、参加者の多い対戦表は画面何枚ぶんもある。下まで読んだあとに
+// 指でスクロールして戻るのは骨が折れるので、下へ行ったときだけ右下に出す。
+
+const scrollTopBtn = $('scroll-top-btn');
+setButtonIcon(scrollTopBtn, 'arrowUp', 'ページの先頭へ戻る');
+
+// この高さより下にいるときだけ出す。1画面ぶんに満たない移動で出てしまうと、
+// 短いページでも現れたり消えたりして、かえって目障りになる。
+const SCROLL_TOP_SHOW_AT = 600;
+
+function syncScrollTopBtn() {
+  scrollTopBtn.hidden = window.scrollY < SCROLL_TOP_SHOW_AT;
+}
+
+// スクロール中は毎フレーム飛んでくるので、描画1回ぶんにまとめてから見る。
+// passive を付けて、この処理がスクロール自体を待たせないようにする。
+let scrollTickQueued = false;
+window.addEventListener('scroll', () => {
+  if (scrollTickQueued) return;
+  scrollTickQueued = true;
+  requestAnimationFrame(() => {
+    scrollTickQueued = false;
+    syncScrollTopBtn();
+  });
+}, { passive: true });
+
+scrollTopBtn.addEventListener('click', () => {
+  // 動きを減らす設定のときは滑らせない（CSSの prefers-reduced-motion では
+  // JSのスクロールまでは止められないので、ここで見て切り替える）
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
 });
 
 // ---- 狭い画面のメニュー ----
