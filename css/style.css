@@ -1,49 +1,63 @@
 /* ============================================================================
-   トーナメント運営＆ランキングサイト スタイル
+   トーナメント運営＆ランキングサイト スタイル 「ネオンアリーナ」
 
    設計方針:
-     * ダークテーマ専用。eスポーツの画面に馴染ませ、明暗の切り替えは持たない
-       （両対応にすると色の指定が二重になり、どちらも詰めきれないため）。
-     * 配色はコミュニティの公式サイト（FLAMATE）に合わせた紺＋淡い青。
-       同じ人たちが行き来する場所なので、色が違うと別のサービスに見えてしまう。
-       主要ボタンは向こうと同じ「淡い青の面に紺の文字」にしている。
+     * ダークテーマ専用。eスポーツの放送画面のような、紺＋電光ブルー〜シアン。
+       発光（box-shadowのにじみ）と斜めのアクセントで試合前の高揚感を出す。
      * 色は役割で分ける。青＝操作できる場所 / 金＝王座・上位 / 緑赤＝勝敗。
        この3系統以外に色を増やさないことで、情報そのものが目立つようにする。
+     * 見出し・数字はOxanium（同梱woff2、ラテン文字のみ）。日本語は端末ゴシックに
+       フォールバックし、混植で機械的な字面を作る。
      * 面は「枠線で囲む」のではなく「背景の明度差」で分ける。線を減らすほど
        1枚のカードの中の情報が読みやすくなる。
      * 数値は等幅数字（tabular-nums）で桁を揃える。
+     * 動きは prefers-reduced-motion で全停止できるものだけにする。
    ========================================================================== */
+
+/* 可変フォント1ファイルに全ウェイトが入っている（latinサブセット、約14KB） */
+@font-face {
+  font-family: 'Oxanium';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('../fonts/oxanium.woff2') format('woff2');
+}
 
 :root {
   color-scheme: dark;
 
-  /* ---- 面（下から上へ明るくなる）。基準は公式サイトの紺 #0c131f ---- */
-  --bg: #0c131f;
-  --surface: #121b2b;
-  --surface-2: #182338;
-  --surface-3: #212f47;
+  /* ---- 面（下から上へ明るくなる）。基準は深い紺 ---- */
+  --bg: #0a1020;
+  --surface: #101a2e;
+  --surface-2: #16233c;
+  --surface-3: #1e2f4e;
 
   /* ---- 線 ---- */
-  --border: #26374f;
-  --border-soft: #1c2941;
-  --border-strong: #3a5170;
+  --border: #24385a;
+  --border-soft: #1a2944;
+  --border-strong: #375179;
 
-  /* ---- 文字。本文は公式サイトと同じ淡い青みの白 ---- */
-  --text: #e3eaf8;
-  --text-dim: #c5d1ec;
-  --text-faint: #8ea3c2;
+  /* ---- 文字 ---- */
+  --text: #e6edfb;
+  --text-dim: #a9bbd9;
+  --text-faint: #7e93b8;
 
   /* ---- アクセント（操作）----
-     公式サイトの主要ボタンに合わせ、塗りは淡い青・文字は紺にする
-     （暗い面に明るい面を置くほうが、押す場所として先に目に入る）。
-     --accent-bright は暗い背景に置く文字・線用。 */
-  --accent: #c5d1ec;
-  --accent-fg: #0c131f;
-  --accent-hover: #dbe4f7;
-  --accent-active: #aebede;
-  --accent-bright: #91aed9;
-  --accent-soft: rgba(145, 174, 217, 0.16);
-  --accent-ring: rgba(145, 174, 217, 0.55);
+     電光ブルー→シアンのグラデーションが主役。塗った面には紺の文字を置く。
+     --accent-bright は暗い背景に置く文字・線用、--glow は発光のにじみ用。 */
+  --accent: #3fa9ff;
+  --accent-2: #35e0ff;
+  --accent-grad: linear-gradient(135deg, #3d8bff, #35e0ff);
+  --accent-fg: #051224;
+  --accent-hover: #63bbff;
+  --accent-active: #2e8fe0;
+  --accent-bright: #6fc3ff;
+  --accent-soft: rgba(63, 169, 255, 0.14);
+  --accent-ring: rgba(63, 169, 255, 0.55);
+  --glow: rgba(53, 224, 255, 0.35);
+
+  /* ---- 見出し・数字用フォント ---- */
+  --font-display: 'Oxanium', system-ui, sans-serif;
 
   /* ---- 意味を持つ色 ---- */
   --gold: #f0c05a;
@@ -86,10 +100,31 @@ body {
   line-height: 1.6;
   background: var(--bg);
   color: var(--text);
-  /* 上部に薄く光を置いて、画面全体が真っ平らに見えないようにする */
-  background-image: radial-gradient(1200px 400px at 50% -200px, rgba(145, 174, 217, 0.12), transparent 70%);
-  background-repeat: no-repeat;
+  /* アリーナの床のような、ごく薄いグリッド線。情報の邪魔をしない2%の明度差 */
+  background-image:
+    repeating-linear-gradient(0deg, rgba(111, 195, 255, 0.025) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(90deg, rgba(111, 195, 255, 0.025) 0 1px, transparent 1px 48px);
   background-attachment: fixed;
+}
+
+/* 会場の照明。青とシアンの光のかたまり2つが、ゆっくり漂う。
+   本文の後ろに固定で敷き、transform だけを動かしてGPUに任せる。 */
+body::before {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  inset: -20% -10%;
+  pointer-events: none;
+  background:
+    radial-gradient(620px 340px at 22% 4%, rgba(61, 139, 255, 0.16), transparent 70%),
+    radial-gradient(520px 300px at 82% -4%, rgba(53, 224, 255, 0.11), transparent 70%);
+  animation: arena-lights 46s ease-in-out infinite alternate;
+}
+
+@keyframes arena-lights {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(3%, 1.5%, 0) scale(1.06); }
+  to   { transform: translate3d(-2%, 0.5%, 0) scale(1.02); }
 }
 
 ::selection {
@@ -123,7 +158,7 @@ body {
    タイポグラフィ
    --------------------------------------------------------------------------- */
 
-/* 見出しは字間を広めに取る。公式サイトと同じ、静かで硬めの字面にする */
+/* 見出しは字間を広めに取り、放送のテロップのような硬めの字面にする */
 h1, h2, h3, h4 {
   line-height: 1.35;
   letter-spacing: 0.06em;
@@ -135,11 +170,26 @@ h2 {
   font-weight: 700;
 }
 
+/* セクション見出しの前に、斜めに切ったグラデーションのスラッシュを置く。
+   放送画面のテロップの「見出しの印」。ヒーローの題は下線で飾るので除く。 */
+main h2:not(.hero-title)::before {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 0.9em;
+  margin-right: 0.5em;
+  vertical-align: -0.08em;
+  background: var(--accent-grad);
+  transform: skewX(-18deg);
+  border-radius: 2px;
+  box-shadow: 0 0 12px var(--glow);
+}
+
 h3 { font-size: 1.05rem; }
 
 a { color: var(--accent-bright); }
 
-a:hover { color: #c5d1ec; }
+a:hover { color: var(--accent-2); }
 
 /* 数値の桁を揃える。順位・スコア・人数が縦に並んだときに読みやすい。 */
 .rank-cell,
@@ -147,6 +197,15 @@ a:hover { color: #c5d1ec; }
 .stat-value,
 td {
   font-variant-numeric: tabular-nums;
+}
+
+/* ラテン文字と数字だけが出る場所は表示用フォント（Oxanium）。
+   日本語が混ざる場所には使わない（フォールバックの切り替わりが目立つため）。 */
+.rank-cell,
+.player-score,
+.stat-value,
+.seed-badge {
+  font-family: var(--font-display);
 }
 
 /* ---------------------------------------------------------------------------
@@ -159,10 +218,22 @@ header {
   z-index: 20;
   margin: 0 -1.5rem 1.5rem;
   padding: 0.6rem 1.5rem;
-  border-bottom: 1px solid var(--border-soft);
-  background: rgba(12, 19, 31, 0.86);
+  background: rgba(10, 16, 32, 0.84);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+}
+
+/* 下辺は単色の線ではなく、中央が光るグラデーションの1px */
+header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent, rgba(61, 139, 255, 0.55) 30%, rgba(53, 224, 255, 0.75) 50%,
+    rgba(61, 139, 255, 0.55) 70%, transparent);
 }
 
 /* 左からメニューボタン、タイトル、右端にアカウント。
@@ -176,6 +247,7 @@ header {
 header h1 {
   margin: 0;
   margin-right: auto;
+  font-family: var(--font-display);
   font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -189,6 +261,20 @@ header h1 a {
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
+}
+
+/* タイトルの前の小さな斜めの光。ロゴ代わりの目印 */
+header h1 a::before {
+  content: '';
+  display: inline-block;
+  width: 0.45em;
+  height: 0.85em;
+  margin-right: 0.55em;
+  vertical-align: -0.06em;
+  background: var(--accent-grad);
+  transform: skewX(-18deg);
+  border-radius: 2px;
+  box-shadow: 0 0 10px var(--glow);
 }
 
 .header-row #login-btn {
@@ -329,12 +415,6 @@ header h1 a {
   font-size: 0.85rem;
 }
 
-.dirty-badge {
-  font-size: 0.8rem;
-  color: var(--warn);
-  font-weight: 700;
-}
-
 .status-line {
   font-size: 0.88rem;
   min-height: 1.2em;
@@ -375,6 +455,15 @@ section {
   border: 1px solid var(--border-soft);
   border-radius: var(--r-lg);
   background: var(--surface);
+}
+
+/* ページを開いた瞬間、ふわっと持ち上がる。routeFromHash は同一ページの再描画では
+   hidden を切り替えないので、Realtimeの更新でこれが再生されることはない。 */
+.view { animation: view-in 0.28s ease-out; }
+
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* ホームは中で複数のブロックを積むので、外側の器は持たない */
@@ -418,8 +507,6 @@ section {
   background: rgba(255, 255, 255, 0.012);
 }
 
-.muted { color: var(--text-faint); }
-
 /* ---------------------------------------------------------------------------
    ボタン
    --------------------------------------------------------------------------- */
@@ -437,22 +524,23 @@ button,
   padding: 0.5rem 1.1rem;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
-  background: var(--accent);
+  background: var(--accent-grad);
   color: var(--accent-fg);
   font-family: inherit;
   font-size: 0.92rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
-  box-shadow: var(--shadow-sm);
-  transition: background 0.15s ease, border-color 0.15s ease,
-              transform 0.08s ease, color 0.15s ease;
+  box-shadow: 0 2px 12px -3px var(--glow), var(--shadow-sm);
+  transition: filter 0.15s ease, border-color 0.15s ease, background 0.15s ease,
+              box-shadow 0.15s ease, transform 0.08s ease, color 0.15s ease;
 }
 
+/* グラデーションは transition できないので、明度で反応させる */
 button:hover:not(:disabled),
-.as-link:hover { background: var(--accent-hover); color: var(--accent-fg); }
+.as-link:hover { filter: brightness(1.14); color: var(--accent-fg); }
 
 button:active:not(:disabled),
-.as-link:active { background: var(--accent-active); transform: translateY(1px); }
+.as-link:active { filter: brightness(0.9); transform: translateY(1px); }
 
 button:disabled {
   opacity: 0.42;
@@ -533,13 +621,6 @@ a.btn-secondary:hover {
 }
 
 .back-link.as-button:hover { background: none; }
-
-.settings-link {
-  display: inline-block;
-  margin-top: 0.5rem;
-  color: var(--accent-bright);
-  font-size: 0.9rem;
-}
 
 .row-actions {
   display: flex;
@@ -888,30 +969,9 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   letter-spacing: 0.04em;
   color: var(--accent-bright);
   background: var(--accent-soft);
-  border: 1px solid rgba(145, 174, 217, 0.4);
+  border: 1px solid rgba(63, 169, 255, 0.4);
   border-radius: var(--r-pill);
   vertical-align: middle;
-}
-
-.account-badge {
-  padding: 0.15rem 0.55rem;
-  border-radius: var(--r-pill);
-  font-size: 0.72rem;
-  font-weight: 600;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-faint);
-}
-
-.account-badge.linked {
-  color: var(--accent-bright);
-  border-color: rgba(145, 174, 217, 0.4);
-  background: var(--accent-soft);
-}
-
-.account-label {
-  font-size: 0.85rem;
-  color: var(--text-dim);
 }
 
 /* ---------------------------------------------------------------------------
@@ -981,32 +1041,88 @@ td code { font-size: 0.85em; }
    ホーム：ヒーローとお知らせ
    --------------------------------------------------------------------------- */
 
-/* 入口の顔。公式サイトに合わせて中央に据え、字間を広げて静かに見せる */
+/* 入口の顔。会場の照明が当たるステージのように、中央に据えて光らせる */
 .hero {
-  padding: 3.25rem 1.75rem 3rem;
+  position: relative;
+  overflow: hidden;
+  padding: 3.5rem 1.75rem 3.25rem;
   margin-bottom: 2rem;
   text-align: center;
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  background:
-    radial-gradient(700px 260px at 50% -30%, rgba(145, 174, 217, 0.22), transparent 70%),
-    linear-gradient(160deg, var(--surface-2), var(--bg));
+  background: linear-gradient(160deg, var(--surface-2), var(--bg));
 }
 
+/* ステージの照明2つ。ゆっくり漂わせて「生きている画面」にする */
+.hero::before,
+.hero::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  width: 480px;
+  height: 300px;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(10px);
+}
+
+.hero::before {
+  top: -160px;
+  left: 12%;
+  background: radial-gradient(closest-side, rgba(61, 139, 255, 0.28), transparent);
+  animation: hero-blob-a 14s ease-in-out infinite alternate;
+}
+
+.hero::after {
+  top: -140px;
+  right: 8%;
+  background: radial-gradient(closest-side, rgba(53, 224, 255, 0.2), transparent);
+  animation: hero-blob-b 18s ease-in-out infinite alternate;
+}
+
+@keyframes hero-blob-a {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(60px, 24px, 0) scale(1.12); }
+}
+
+@keyframes hero-blob-b {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-70px, 30px, 0) scale(0.94); }
+}
+
+.hero > * { position: relative; z-index: 1; }
+
+/* 英字の小見出しはグラデーション文字で。表示用フォントの見せ場 */
 .hero-eyebrow {
   margin: 0 0 0.9rem;
-  font-size: 0.72rem;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.32em;
   text-transform: uppercase;
-  color: var(--accent-bright);
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .hero-title {
-  margin: 0 0 1rem;
+  margin: 0 0 1.1rem;
   font-size: 2rem;
   font-weight: 800;
   letter-spacing: 0.08em;
+}
+
+/* 題の下に、短いグラデーションの下線を敷く */
+.hero-title::after {
+  content: '';
+  display: block;
+  width: 4.5rem;
+  height: 3px;
+  margin: 0.9rem auto 0;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  box-shadow: 0 0 14px var(--glow);
 }
 
 .hero-lead {
@@ -1040,13 +1156,6 @@ td code { font-size: 0.85em; }
   gap: 1rem;
 }
 
-/* 本文を読ませる一覧（お知らせ）は1列。横に詰めると本文が細切れになる。 */
-.card-list {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-}
-
 .card {
   display: flex;
   flex-direction: column;
@@ -1059,11 +1168,12 @@ td code { font-size: 0.85em; }
   transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* リンクになっているカードだけ、押せることが分かるように反応させる */
+/* リンクになっているカードだけ、押せることが分かるように反応させる。
+   浮き上がり＋シアンの発光で「選ばれている」感を出す */
 a.card:hover {
   border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow);
+  transform: translateY(-3px);
+  box-shadow: 0 0 0 1px var(--accent-soft), 0 8px 28px -8px var(--glow), var(--shadow);
   color: inherit;
 }
 
@@ -1136,33 +1246,14 @@ a.card:hover {
   white-space: nowrap;
 }
 
-/* お知らせ：固定したものは左に色帯を付けて目立たせる */
-.card.pinned { border-left: 3px solid var(--accent-bright); }
-
-/* お知らせ本文。改行を入力どおり見せる（textContentで入れているのでHTMLは混ざらない） */
-.card-text {
-  margin: 0.2rem 0 0;
-  color: var(--text-dim);
-  line-height: 1.75;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+/* お知らせ：固定したものは左にグラデーションの帯を付けて目立たせる */
+.card.pinned {
+  border-left: 3px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(180deg, #3d8bff, #35e0ff) border-box;
 }
 
-/* カード内の操作（お知らせの編集・削除）。本文と線で区切る。 */
-.card-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-self: stretch;
-  margin-top: 0.6rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--border-soft);
-}
-
-.card-actions button {
-  min-height: 2.1rem;
-  padding: 0.35rem 0.85rem;
-  font-size: 0.82rem;
-}
 
 /* ---- 別ページへの入口（大会詳細からブラケットへ など） ----
    ボタンではなく「行」で見せる。ページ内の操作ではなく移動であることが
@@ -1324,24 +1415,42 @@ a.card:hover {
 .partner-picker .empty-hint { margin: 0.2rem 0; }
 
 /* エントリーはこのページの主目的。他のボタンより一回り大きくし、
-   塗りに幅を持たせて視線が最初に止まるようにする。 */
+   発光をひとまわり強くして視線が最初に止まるようにする。 */
 .btn-entry {
+  position: relative;
+  overflow: hidden;
   min-height: 3rem;
   padding: 0.75rem 2rem;
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.03em;
-  background: linear-gradient(135deg, #dbe4f7, var(--accent-bright));
-  box-shadow: 0 4px 16px -4px var(--accent-ring);
+  animation: entry-glow 3.2s ease-in-out infinite;
 }
 
-.btn-entry:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ecf1fb, #a8c0e2);
-  box-shadow: 0 6px 20px -4px var(--accent-ring);
+/* 呼吸のようなゆっくりした発光。目で追わせるのではなく、気配で気づかせる */
+@keyframes entry-glow {
+  0%, 100% { box-shadow: 0 4px 16px -4px var(--glow), var(--shadow-sm); }
+  50%      { box-shadow: 0 4px 26px -2px var(--glow), var(--shadow-sm); }
 }
 
-.btn-entry:active:not(:disabled) {
-  background: linear-gradient(135deg, var(--accent-active), #7f9fcd);
+/* hover で光が一度だけ走る */
+.btn-entry::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -75%;
+  width: 50%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-18deg);
+  pointer-events: none;
+}
+
+.btn-entry:hover:not(:disabled)::after { animation: btn-sweep 0.6s ease; }
+
+@keyframes btn-sweep {
+  from { left: -75%; }
+  to   { left: 125%; }
 }
 
 /* 参加者チップ（大会情報の「エントリー中の選手」で使用） */
@@ -1449,12 +1558,13 @@ a.card:hover {
 
 .round-header {
   text-align: center;
-  font-size: 0.72rem;
+  font-family: var(--font-display);
+  font-size: 0.74rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   margin-bottom: 0.4rem;
-  color: var(--text-faint);
+  color: var(--text-dim);
 }
 
 /* 回戦ごとの開始と配信台。列の高さが揃わないと隣の列と対戦表がずれるので、
@@ -1491,20 +1601,27 @@ a.card:hover {
   font-size: 0.72rem;
 }
 
-/* 配信台に乗る試合 */
-.match-box.streamed { border-color: var(--info); }
+/* 配信台に乗る試合。進行中はシアンの発光でカメラが向いていることを示す */
+.match-box.streamed {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 14px -4px var(--glow);
+}
 
 .stream-tag {
   padding: 0.15rem 0.5rem;
-  background: var(--info);
-  color: #06121f;
+  background: var(--accent-grad);
+  color: var(--accent-fg);
   font-size: 0.68rem;
   font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 /* 進行中でない回戦（終わった回戦・これから始まる回戦）の配信台は、
    色を落として今どこが配信されているのかを見分けやすくする */
-.match-box.streamed.streamed-idle { border-color: var(--border-strong); }
+.match-box.streamed.streamed-idle {
+  border-color: var(--border-strong);
+  box-shadow: none;
+}
 
 .streamed-idle .stream-tag {
   background: var(--surface-3);
@@ -1526,7 +1643,7 @@ a.card:hover {
   box-shadow: none;
 }
 
-.stream-toggle-btn.on { color: var(--info); }
+.stream-toggle-btn.on { color: var(--accent-2); }
 
 .stream-toggle-btn:hover:not(:disabled) {
   background: var(--surface-3);
@@ -1664,16 +1781,6 @@ a.card:hover {
   text-align: right;
 }
 
-/* 勝敗入力の操作エリア（不戦勝チェック・勝者選択・確定ボタン） */
-.match-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.55rem;
-  border-top: 1px solid var(--border-soft);
-  background: var(--surface);
-}
-
 .walkover-toggle {
   display: flex;
   align-items: center;
@@ -1687,12 +1794,6 @@ a.card:hover {
   width: 100%;
   padding: 0.35rem;
   font-size: 0.85rem;
-}
-
-.match-controls button[type="submit"] {
-  min-height: 2rem;
-  padding: 0.35rem;
-  font-size: 0.82rem;
 }
 
 /* カードの右端に縦いっぱいの細い列で置く鉛筆（開く・編集の入口）。
@@ -1953,9 +2054,10 @@ dialog.dialog-chat {
 }
 
 .chat-tab.is-active {
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--accent-2);
   background: var(--surface-2);
   color: var(--text);
+  box-shadow: inset 0 -10px 14px -14px var(--glow);
 }
 
 /* 承認待ちなど、開かないと気づけない用があるときの印 */
@@ -2456,18 +2558,29 @@ dialog.dialog-chat {
 .rank-cell {
   font-weight: 800;
   text-align: center;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   color: var(--text-dim);
 }
 
-.rank-1 .rank-cell { color: var(--gold); }
-.rank-2 .rank-cell { color: var(--silver); }
-.rank-3 .rank-cell { color: var(--bronze); }
+.rank-1 .rank-cell { font-size: 1.25rem; color: var(--gold); }
+.rank-2 .rank-cell { font-size: 1.15rem; color: var(--silver); }
+.rank-3 .rank-cell { font-size: 1.1rem; color: var(--bronze); }
 
-/* 上位3名は行そのものを淡く染めて、表の中で自然に浮かせる */
-.ranking-table tr.rank-1 td { background: rgba(240, 192, 90, 0.07); }
-.ranking-table tr.rank-2 td { background: rgba(195, 203, 219, 0.05); }
-.ranking-table tr.rank-3 td { background: rgba(207, 139, 87, 0.05); }
+/* 王座は静かに明滅させる。表彰台のライトのイメージ */
+.ranking-table tr.rank-1 .rank-cell {
+  text-shadow: 0 0 10px rgba(240, 192, 90, 0.5);
+  animation: crown-glow 4s ease-in-out infinite;
+}
+
+@keyframes crown-glow {
+  0%, 100% { text-shadow: 0 0 6px rgba(240, 192, 90, 0.3); }
+  50%      { text-shadow: 0 0 16px rgba(240, 192, 90, 0.75); }
+}
+
+/* 上位3名は行を左から差し込む光のグラデーションで浮かせる */
+.ranking-table tr.rank-1 td { background: linear-gradient(90deg, rgba(240, 192, 90, 0.14), rgba(240, 192, 90, 0.04) 55%, transparent); }
+.ranking-table tr.rank-2 td { background: linear-gradient(90deg, rgba(195, 203, 219, 0.11), rgba(195, 203, 219, 0.03) 55%, transparent); }
+.ranking-table tr.rank-3 td { background: linear-gradient(90deg, rgba(207, 139, 87, 0.11), rgba(207, 139, 87, 0.03) 55%, transparent); }
 
 .rank-change-cell { text-align: center; }
 
@@ -2507,7 +2620,7 @@ tr.own-row > td:first-child { box-shadow: inset 3px 0 0 var(--accent-bright); }
    名前の欄を見ているときに強調が視界から外れることがあるため。 */
 tr.own-row .player-identity a { color: var(--accent-bright); }
 
-tr.own-row:hover > td { background: rgba(145, 174, 217, 0.24) !important; }
+tr.own-row:hover > td { background: rgba(63, 169, 255, 0.24) !important; }
 
 /* ---------------------------------------------------------------------------
    ダイアログ
@@ -2521,7 +2634,22 @@ dialog {
   width: calc(100% - 2rem);
   background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 0 40px -12px var(--glow), var(--shadow-lg);
+  /* 上辺にグラデーションの光の線。radius に沿わせるため border-image は使わない */
+  background-image: linear-gradient(90deg,
+    transparent 6%, rgba(61, 139, 255, 0.7) 35%, rgba(53, 224, 255, 0.9) 50%,
+    rgba(61, 139, 255, 0.7) 65%, transparent 94%);
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
+  background-position: top center;
+}
+
+/* 開いた瞬間にわずかに浮き上がる */
+dialog[open] { animation: dialog-in 0.2s ease-out; }
+
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* 本文を書き込むフォーム（お知らせの投稿）は横幅を広めに取る */
@@ -2532,8 +2660,8 @@ dialog .inline-form > label,
 dialog .inline-form > .image-preview-row { flex: 1 1 100%; }
 
 dialog::backdrop {
-  background: rgba(5, 7, 12, 0.7);
-  backdrop-filter: blur(3px);
+  background: rgba(4, 8, 16, 0.72);
+  backdrop-filter: blur(5px);
 }
 
 dialog h3 {
@@ -2788,10 +2916,12 @@ dialog h3 {
   .chat-tab { font-size: 0.82rem; }
 }
 
-/* 動きを減らす設定を尊重する */
+/* 動きを減らす設定を尊重する。無限ループのアニメーションは回数も1回に落とす
+   （0.01msで無限に回り続けるとCPUを食い続けるため） */
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }

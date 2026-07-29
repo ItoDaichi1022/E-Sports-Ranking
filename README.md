@@ -33,6 +33,7 @@ Supabaseプロジェクトの作成とOAuthの登録が必要です。手順は 
 ```
 index.html             画面の骨組み
 css/style.css
+fonts/                 見出し・数字用フォント Oxanium（OFLライセンス、woff2を同梱）
 js/
   app.js               画面のルーティングとイベント配線
   supabaseClient.js    接続先の設定（ここを書き換える）
@@ -58,17 +59,18 @@ supabase/
   migration-002.sql    構築済みプロジェクトへの差分適用（〜013まで番号順に当てる）
   SETUP.md             セットアップ手順
 scripts/
-  migrate.mjs          旧JSONデータをDBへ移行する
-  verify-migration.mjs 移行前後で戦績・ランキングが一致するか検証する
   check-cache-version.mjs デプロイ前にキャッシュ更新の版数を確認する
-data/                  移行前のJSONデータ（参照用に残してある）
 doc/design.md          設計ドキュメント
 ```
 
 ## ローカルで動かす
 
+静的ファイルを配るだけなので、どんな静的サーバーでも動きます。
+
 ```bash
-python -m http.server 8000
+npx --yes serve .        # Node があるとき
+python -m http.server 8000   # Python があるとき
 ```
 
-`http://localhost:8000/` を開きます。先に [supabase/SETUP.md](supabase/SETUP.md) の手順3まで済ませてください。
+`http://localhost:8000/`（`serve` は表示されたポート）を開きます。
+先に [supabase/SETUP.md](supabase/SETUP.md) の手順3まで済ませてください。

@@ -150,36 +150,7 @@ URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デ�
 
 2人目以降の運営者は、この作業を繰り返すか、`admin_set_player_role` を使ってください。
 
-## 7. 旧データを移行する（任意）
-
-`data/` に残っているJSONをDBへ入れる場合だけ実行します。
-現在入っているのは動作確認用のテストデータ（大会名 `test1`〜`test4`、選手 `A`〜`Y` など）なので、
-**まっさらな状態で始めるならこの手順は飛ばしてください。**
-
-```bash
-# 変換結果だけ確認する（DBには書き込まない）
-node scripts/migrate.mjs --dry-run
-
-# 実際に投入する
-SUPABASE_URL=https://xxxxxxxx.supabase.co \
-SUPABASE_SERVICE_ROLE_KEY=eyJ... \
-node scripts/migrate.mjs
-```
-
-`SUPABASE_SERVICE_ROLE_KEY` は Project Settings → API の **service_role** キーです。
-RLSを迂回する強い権限を持つので、このコマンドを打つ時だけ使い、コードには書かないでください。
-
-移行前後でランキングや戦績が変わっていないことは、次のコマンドで確認できます。
-
-```bash
-node scripts/verify-migration.mjs
-```
-
-移行してきた選手は「代理登録」（本人のアカウントが無い状態）になります。
-本人がログインして選手登録したら、**選手ページの一覧**でその行の
-「本人のアカウントを統合...」から本人を選んでください。過去の戦績が引き継がれます。
-
-## 7.5. 既に構築済みの場合：差分を適用する
+## 7. 既に構築済みの場合：差分を適用する
 
 既に `schema.sql` を実行してあるプロジェクトには、あとから入った変更だけを当てます。
 **新しくプロジェクトを作る場合は不要です**（`schema.sql` に取り込み済み）。
@@ -251,12 +222,15 @@ GitHubをデータベース代わりに使う仕組みは廃止されました�
 
 ## ローカルでの動作確認
 
+静的ファイルを配るだけなので、手元にある静的サーバーで構いません。
+
 ```bash
-python -m http.server 8000
+npx --yes serve .            # Node があるとき
+python -m http.server 8000   # Python があるとき
 ```
 
-`http://localhost:8000/` を開きます。OAuthを試す場合は、手順4-4のRedirect URLsに
-`http://localhost:8000/` を追加しておいてください。
+`http://localhost:8000/`（`serve` は表示されたポート）を開きます。OAuthを試す場合は、
+手順4-4のRedirect URLsに同じURLを追加しておいてください。
 
 ## うまくいかないとき
 
