@@ -1142,6 +1142,174 @@ td code { font-size: 0.85em; }
 }
 
 /* ---------------------------------------------------------------------------
+   はじめに（使い方ガイド）
+
+   図は実物と同じコンポーネントのクラスで組む。スクリーンショットと違って
+   デザインを変えても図が勝手に追従する。図の中の操作風の要素は .guide-inert。
+   --------------------------------------------------------------------------- */
+
+.guide-steps {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+}
+
+/* 左に説明、右に図。図が無い段は説明だけが全幅に広がる */
+.guide-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.guide-step:has(> .guide-step-body:only-child) { grid-template-columns: minmax(0, 1fr); }
+
+.guide-step h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.5rem;
+}
+
+/* 段番号。表示用フォントのグラデーション数字で「手順」を目立たせる */
+.guide-step-num {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: var(--r-sm);
+  background: var(--accent-grad);
+  color: var(--accent-fg);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  box-shadow: 0 0 12px -2px var(--glow);
+}
+
+.guide-step-body p {
+  margin: 0 0 0.6rem;
+  color: var(--text-dim);
+  line-height: 1.85;
+}
+
+.guide-step-body strong { color: var(--text); }
+
+/* 図の器。実物のカードがそのまま置いてあるように見せる */
+.guide-figure {
+  margin: 0;
+  padding: 1.25rem 1rem 0.9rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.guide-figure figcaption {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* 図の中の操作風の要素は押せない（span なので何も起きないが、カーソルも反応させない） */
+.guide-inert {
+  pointer-events: none;
+  user-select: none;
+}
+
+.guide-figure-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: min(100%, 220px);
+}
+
+.guide-figure-stack > * { width: 100%; }
+
+/* 対戦カードの図。実物と同じ幅で */
+.guide-match {
+  width: min(100%, 230px);
+  text-align: left;
+}
+
+.guide-chat-mock {
+  width: 100%;
+  text-align: left;
+}
+
+.guide-chat-mock .chat-room-code { margin-bottom: 0; }
+
+/* 図の中のタブは span なので、button と同じ箱の形をここで与える */
+.guide-chat-mock .chat-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.guide-mini-btn {
+  margin-left: auto;
+  min-height: 0;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+/* ゲームカウント入力欄の見た目だけの数字 */
+.guide-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.2rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.guide-report-btn { margin-top: 0.7rem; }
+
+/* 報告→承認→確定 の流れ */
+.guide-flow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+}
+
+.guide-flow-step {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.guide-flow-arrow {
+  color: var(--accent-bright);
+  font-weight: 700;
+}
+
+.guide-cta {
+  justify-content: flex-start;
+  margin-top: 2.25rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* ---------------------------------------------------------------------------
    カード（募集・大会履歴・お知らせ 共通）
 
    一覧に並ぶ「島」の形をここで一本化する。上に画像の枠、下に本文。
@@ -2914,6 +3082,9 @@ dialog h3 {
   }
 
   .chat-tab { font-size: 0.82rem; }
+
+  /* ガイドは1列に。説明の下に図が来る */
+  .guide-step { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* 動きを減らす設定を尊重する。無限ループのアニメーションは回数も1回に落とす

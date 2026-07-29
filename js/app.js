@@ -213,6 +213,7 @@ function applyAuthUI() {
 
 const VIEW_IDS = {
   home: 'view-home',
+  guide: 'view-guide', // はじめに（静的ページ。描画関数は持たない）
   news: 'view-news',
   recruit: 'view-recruit',
   // create=大会作成（運営）、tournament=大会詳細、bracket=対戦表。
