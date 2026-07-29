@@ -53,6 +53,10 @@ for (const [key, value] of Object.entries(imports)) {
   collect(value.match(/\?v=(\d+)$/)?.[1], `インポートマップの "${key}"`);
 }
 
+// 読み物ページ（pages/*.html）は data-src で読み込む。ここも同じ版数にそろえる。
+const pageRefs = [...html.matchAll(/data-src="(pages\/[\w.-]+\.html)(\?v=(\d+))?"/g)];
+for (const [, file, , v] of pageRefs) collect(v, file);
+
 if (versions.size > 1) {
   fail(`版数がそろっていません: ${[...versions].sort().join(', ')}`);
 } else if (versions.size === 1) {
@@ -81,6 +85,16 @@ const known = new Set(jsFiles.map((n) => `./js/${n}`));
 for (const key of Object.keys(imports)) {
   if (!known.has(key)) fail(`"${key}" は存在しないファイルを指しています`);
 }
+
+// data-src の指す読み物ページが実在するか。綴りを間違えると、そのページを
+// 開いたときに初めて白紙になるので、ここで気付けるようにする。
+const pageFiles = new Set(
+  readdirSync(path.join(ROOT, 'pages')).map((n) => `pages/${n}`),
+);
+for (const [, file] of pageRefs) {
+  if (!pageFiles.has(file)) fail(`data-src の "${file}" が存在しません`);
+}
+if (pageRefs.length) console.log(`OK   読み物ページ${pageRefs.length}件がすべて存在する`);
 
 console.log(problems === 0 ? '\nすべて通りました。' : `\n${problems}件の問題があります。`);
 process.exit(problems === 0 ? 0 : 1);

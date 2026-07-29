@@ -258,6 +258,51 @@ function parseHash() {
 // （Realtimeの更新でも routeFromHash は呼ばれるので、毎回戻すと読んでいる途中で飛んでしまう）。
 let lastRouteKey = null;
 
+// ---- 読み物ページの読み込み ----
+//
+// 「はじめに」「利用規約」「プライバシーポリシー」は、中身が長いわりに
+// JSからは一切触らない読み物なので、index.html には空の <section> だけを置き、
+// 本文は pages/*.html に分けてある（index.html を読める長さに保つため）。
+// 読み込むのは、そのページが最初に開かれたときの1回だけ。
+//
+// 読み込み先のURLは <section data-src="pages/guide.html?v=69"> に書いてある。
+// ?v= を index.html の他の版数と同じ場所に置くことで、デプロイ時の一括置換と
+// scripts/check-cache-version.mjs の確認から漏れないようにしている。
+
+const pageLoads = new Map(); // viewId -> Promise（二重取得を防ぐ）
+
+function loadStaticPage(viewId) {
+  const el = $(viewId);
+  const src = el?.dataset.src;
+  if (!src) return; // 既に読み込み済み（下で data-src を消している）か、静的ページではない
+
+  if (pageLoads.has(viewId)) return;
+
+  // 取りに行っている間の白紙を避ける。すぐ返ってくれば見えないが、
+  // 回線が遅いときに「開いたのに何も無い」と見えるのを防ぐ。
+  el.innerHTML = '<p class="status-line loading">読み込んでいます...</p>';
+
+  const task = fetch(src)
+    .then((res) => {
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.text();
+    })
+    .then((html) => {
+      el.innerHTML = html;
+      // 二度と取りに行かない印。属性が残っていると、再訪のたびに読み直してしまう。
+      delete el.dataset.src;
+    })
+    .catch((err) => {
+      // 読めなかったときは、白紙のまま放置せず理由を出して読み直せるようにする
+      // （通信が切れている、デプロイの途中で古い ?v= を見に行った、など）。
+      pageLoads.delete(viewId);
+      el.innerHTML = '<p class="status-line error">'
+        + 'このページを読み込めませんでした。通信状況を確認して、再読み込みしてください。</p>';
+      console.error(`${src} の読み込みに失敗しました`, err);
+    });
+  pageLoads.set(viewId, task);
+}
+
 function routeFromHash() {
   const { page, param } = parseHash();
 
@@ -279,6 +324,10 @@ function routeFromHash() {
   Object.entries(VIEW_IDS).forEach(([name, id]) => {
     $(id).hidden = name !== target;
   });
+
+  // 中身を別ファイルに分けてある読み物ページ（はじめに・利用規約・プライバシーポリシー）。
+  // data-src が付いていないページでは何もしない。
+  loadStaticPage(VIEW_IDS[target]);
 
   // 別の画面へ移ったときは先頭から見せる。ハッシュだけを書き換える作りなので、
   // 何もしないとブラウザは前の画面のスクロール位置をそのまま引き継いでしまい、
@@ -1930,7 +1979,10 @@ tournamentDeleteBtn.addEventListener('click', async () => {
 // 「はじめに」の目次。ページ内の移動なので、ハッシュは変えずにスクロールで運ぶ。
 // （ハッシュはページの切り替えに使っているため、#見出しID を入れると
 //   routeFromHash が知らないページとして扱い、ホームへ戻してしまう）
-$('guide-toc').addEventListener('click', (e) => {
+//
+// 目次そのものは pages/guide.html の中にあり、この時点ではまだ存在しない。
+// そこで、常にある入れ物（view-guide）で受けて、中の目次リンクを拾う。
+$('view-guide').addEventListener('click', (e) => {
   const link = e.target.closest('[data-guide-target]');
   if (!link) return;
   e.preventDefault();

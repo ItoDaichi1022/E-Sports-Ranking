@@ -1,7 +1,8 @@
 # Cloudflare にアップロードする静的アセットから除外するもの（.gitignore と同じ書式）。
 #
-# このサイトが配信で実際に使うのは index.html と css/ js/ だけ（index.html が読むのは
-# css/style.css・js/vendor/supabase.js・js/app.js とその import 先のみ）。
+# このサイトが配信で実際に使うのは index.html と css/ js/ fonts/ pages/ だけ
+# （index.html が読むのは css/style.css・fonts/oxanium.woff2・js/vendor/supabase.js・
+#  js/app.js とその import 先、それに data-src で読む pages/*.html のみ）。
 # それ以外――特にビルド環境が生成する node_modules――を上げてしまうと、
 # workerd（100MB超）のような巨大ファイルが 25MiB 上限に引っかかりデプロイが失敗する。
 

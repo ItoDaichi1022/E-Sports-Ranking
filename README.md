@@ -1,6 +1,7 @@
-# E-Sports-Ranking
+# IgniteArena — どこでも熱く、遊べ。
 
 コミュニティ内のトーナメント運営と個人ランキングをまとめて扱うWebアプリです。
+（リポジトリ名は E-sportsRanking、サイト名は IgniteArena）
 
 - **ゲスト**（ログイン不要）で大会履歴・ブラケット・選手プロフィール・ランキングを閲覧できる
 - **Google / Discord**でログインすると、自分の選手プロフィールを持てる
@@ -31,7 +32,12 @@ Supabaseプロジェクトの作成とOAuthの登録が必要です。手順は 
 ## ディレクトリ
 
 ```
-index.html             画面の骨組み
+index.html             画面の骨組み（各ページの器と、JSが触る入力欄）
+pages/                  中身が長い読み物ページ。index.html の空の <section> に
+                        初回表示のときだけ読み込む（index.html を短く保つため）
+  guide.html           はじめに（使い方）
+  terms.html           利用規約
+  privacy.html         プライバシーポリシー
 css/style.css
 fonts/                 見出し・数字用フォント Oxanium（OFLライセンス、woff2を同梱）
 js/
