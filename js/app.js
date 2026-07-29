@@ -111,6 +111,7 @@ const playerBackBtn = $('player-back-btn');
 
 const profileTitleEl = $('profile-title');
 const profileNoteEl = $('profile-note');
+const profileViewEl = $('profile-view');
 const profileFormContainer = $('profile-form-container');
 const profileLinksEl = $('profile-links');
 const profileLoginPanel = $('profile-login-panel');
@@ -230,15 +231,18 @@ const VIEW_IDS = {
   tournament: 'view-tournament-detail',
   history: 'view-history',
   bracket: 'view-bracket',
-  players: 'view-players',
   player: 'view-player-detail',
+  // 選手一覧はランキングと同じページに統合した。#players は以前のリンクや
+  // ブックマークから来る人のために、そのまま同じ画面へ通す。
+  players: 'view-ranking',
   ranking: 'view-ranking',
   profile: 'view-profile',
 };
 
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
 const NAV_PAGE_OF = {
-  tournament: 'history', bracket: 'history', player: 'players', news: 'home',
+  tournament: 'history', bracket: 'history', player: 'ranking',
+  players: 'ranking', news: 'home',
 };
 
 function parseHash() {
@@ -292,10 +296,12 @@ function routeFromHash() {
   else if (target === 'tournament') renderTournamentDetail(param);
   else if (target === 'history') renderHistoryList();
   else if (target === 'bracket') renderBracketPage(param);
-  else if (target === 'players') refreshPlayerUI();
   else if (target === 'player') renderPlayerDetail(param);
-  else if (target === 'ranking') renderRankingPage();
-  else if (target === 'profile') renderProfilePage();
+  // 選手検索とランキングは同じページ。どちらのハッシュで来ても両方を描く。
+  else if (target === 'players' || target === 'ranking') {
+    refreshPlayerUI();
+    renderRankingPage();
+  } else if (target === 'profile') renderProfilePage();
 
   // 中身を入れ替えたあとに戻す。先に戻しても、描画で高さが変わると位置がずれる。
   if (routeChanged) window.scrollTo(0, 0);
@@ -586,12 +592,19 @@ async function resolveImageUrl(picker, folder) {
   return currentUrl ?? '';
 }
 
+// マイページで入力欄を開いているか。普段は他の人から見えるプロフィールを出し、
+// 編集アイコンを押したときだけ入力欄に切り替える（自分の見え方を先に確かめられるように）。
+let profileEditing = false;
+
 function renderProfilePage() {
   profileLinksEl.innerHTML = '';
+  profileViewEl.innerHTML = '';
+  profileViewEl.hidden = true;
 
   // ログアウト中：ログインの入口だけを見せる
   if (!isLoggedIn()) {
     profileFormMode = null;
+    profileEditing = false;
     profileFormContainer.innerHTML = '';
     profileLoginPanel.hidden = false;
     profileAccountActions.hidden = true;
@@ -611,9 +624,10 @@ function renderProfilePage() {
   const keepExistingForm = profileFormMode === mode && isProfileFormMounted(profileFormContainer);
   profileFormMode = mode;
 
+  // 登録がまだの人には、いきなり入力欄を出す（見せるプロフィールがまだ無い）
   if (needsOnboarding()) {
     profileTitleEl.textContent = '選手登録';
-    profileNoteEl.textContent = '表示名だけでも登録できます。あとからいつでも変更できます。';
+    profileNoteEl.textContent = '表示名など必要事項を記入すると登録が完了します。あとからいつでも変更できます。';
     if (keepExistingForm) return;
     renderProfileForm(profileFormContainer, null, {
       submitLabel: '登録する',
@@ -630,11 +644,25 @@ function renderProfilePage() {
   }
 
   profileTitleEl.textContent = 'マイページ';
+
+  // 普段は「他の人から見える姿」をそのまま出す。編集は鉛筆から。
+  if (!profileEditing) {
+    profileFormMode = null;
+    profileFormContainer.innerHTML = '';
+    profileNoteEl.textContent = 'これが他の人から見えるあなたのプロフィールです。';
+    renderOwnProfileView();
+    return;
+  }
+
   profileNoteEl.textContent = 'ここで編集した内容は、あなたの選手ページに表示されます。';
 
   if (!keepExistingForm) {
     renderProfileForm(profileFormContainer, auth.player, {
       submitLabel: '保存',
+      onCancel: () => {
+        profileEditing = false;
+        renderProfilePage();
+      },
       onSubmit: async (profile) => {
         // 表示名を変えたら旧名を過去名に残す（players.js の updatePlayer と同じ扱い）
         const pastNames = [...auth.player.pastNames];
@@ -656,14 +684,48 @@ function renderProfilePage() {
         await reloadOwnPlayer();
         await refreshFromDb();
         setStatus('プロフィールを保存しました。', 'success');
+        // 保存できたら閲覧に戻す。直した結果が他の人にどう見えるかをその場で確かめられる。
+        profileEditing = false;
+        renderProfilePage();
       },
     });
   }
+}
+
+// 他の人から見えるプロフィールをそのまま出す。選手ページと同じ部品を使うので、
+// ここでの見え方＝選手ページでの見え方になる。
+function renderOwnProfileView() {
+  const player = auth.player;
+  profileViewEl.hidden = false;
+
+  const details = profileSectionHtml(player);
+
+  profileViewEl.innerHTML = `
+    <div class="player-detail-header">
+      <div class="player-identity">
+        ${avatarHtml(player, 'lg')}
+        <div>
+          <h3 class="profile-view-name">
+            ${escapeHtml(player.currentName)}
+            <button type="button" class="profile-edit-link profile-edit-btn"
+                    title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</button>
+          </h3>
+          ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>` : ''}
+        </div>
+      </div>
+    </div>
+    ${details || '<p class="empty-hint">まだ表示名だけです。鉛筆アイコンからアイコン・使用キャラ・自己紹介などを追加できます。</p>'}
+  `;
+
+  profileViewEl.querySelector('.profile-edit-btn').addEventListener('click', () => {
+    profileEditing = true;
+    renderProfilePage();
+  });
 
   const link = document.createElement('a');
   link.className = 'back-link';
-  link.href = `#player/${encodeURIComponent(auth.player.id)}`;
-  link.textContent = '自分の選手ページを見る →';
+  link.href = `#player/${encodeURIComponent(player.id)}`;
+  link.textContent = '自分の選手ページ（戦歴つき）を見る →';
   profileLinksEl.appendChild(link);
 }
 

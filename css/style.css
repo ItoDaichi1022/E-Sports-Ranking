@@ -800,16 +800,30 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   background: rgba(67, 217, 163, 0.1);
 }
 
-#participant-search-input,
-#player-search-input {
+#participant-search-input {
   width: 100%;
   margin-bottom: 0.75rem;
 }
 
+/* ランキングの上に置く選手検索。ここが「あの人は何位か」を探す入口なので、
+   ランキング本体と見分けが付くよう、面を1段落として帯にする。 */
+.player-search {
+  margin-bottom: 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
 #player-search-input {
   display: block;
+  width: 100%;
   max-width: 420px;
+  margin: 0;
 }
+
+/* 検索結果が出ているときだけ、ランキングとの間に余白を入れる（空なら詰める） */
+#player-list:not(:empty) { margin-bottom: 1.5rem; }
 
 /* 選手が増えても画面が縦に伸びないよう、固定高さでスクロールさせる */
 .scroll-box {
@@ -1168,13 +1182,6 @@ td code { font-size: 0.85em; }
 
 .guide-step:has(> .guide-step-body:only-child) { grid-template-columns: minmax(0, 1fr); }
 
-.guide-step h3 {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin: 0 0 0.5rem;
-}
-
 /* 段番号。表示用フォントのグラデーション数字で「手順」を目立たせる */
 .guide-step-num {
   flex: none;
@@ -1309,6 +1316,306 @@ td code { font-size: 0.85em; }
   padding-top: 1.5rem;
   border-top: 1px solid var(--border-soft);
 }
+
+/* ---- 目次と章立て ---- */
+
+.guide-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.25rem 0 2rem;
+}
+
+.guide-toc a {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.guide-toc a:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* 章の見出し。ページ内リンクで飛んでくるので、ヘッダーに隠れない位置で止める */
+.guide-chapter {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 2.75rem 0 0.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-soft);
+  scroll-margin-top: 4.5rem;
+  font-size: 1.15rem;
+}
+
+.guide-steps + .guide-chapter,
+.guide-two-col + .guide-chapter { margin-top: 3rem; }
+
+.guide-chapter-num {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: var(--r-sm);
+  background: var(--accent-grad);
+  color: var(--accent-fg);
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  box-shadow: 0 0 14px -2px var(--glow);
+}
+
+.guide-chapter-lead {
+  margin: 0 0 1.25rem;
+  color: var(--text-dim);
+  line-height: 1.85;
+}
+
+.guide-step h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.guide-list {
+  margin: 0 0 0.6rem;
+  padding-left: 1.2rem;
+  color: var(--text-dim);
+  line-height: 1.85;
+}
+
+.guide-list li { margin-bottom: 0.3rem; }
+
+/* 説明と図を左右に並べる（章0・章2で使う。狭い画面では1列） */
+.guide-two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+  gap: 1.25rem;
+  align-items: start;
+  margin-bottom: 1.75rem;
+}
+
+.guide-two-col h4 { margin: 0 0 0.5rem; font-size: 1rem; }
+
+/* ---- 章0：ページ一覧 ---- */
+
+.guide-pages {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0.8rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+}
+
+.guide-page-card {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--accent-bright);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.guide-page-card h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.guide-page-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.75;
+  color: var(--text-dim);
+}
+
+/* 図を横いっぱいに使うとき（メニューの図など） */
+.guide-figure-wide { align-items: stretch; }
+
+/* ---- 図の中の部品 ---- */
+
+.guide-nav-mock {
+  width: min(100%, 260px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.guide-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.guide-nav-toggle {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.guide-nav-toggle span {
+  display: block;
+  height: 2px;
+  background: var(--text-dim);
+  border-radius: 1px;
+}
+
+.guide-nav-title {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-nav-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem;
+  background: var(--surface);
+}
+
+.guide-nav-menu-sm {
+  width: min(100%, 220px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.guide-nav-item {
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--r-sm);
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.guide-nav-item.is-active {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* 権限が付いて増えるメニューは、増えたことが分かるよう縁で示す */
+.guide-nav-item.is-new {
+  border: 1px dashed var(--accent);
+  color: var(--accent-bright);
+  font-weight: 700;
+}
+
+.guide-nav-contact {
+  margin-top: 0.25rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-faint);
+  font-size: 0.78rem;
+}
+
+/* マイページの図 */
+.guide-profile-mock {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 0.9rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.guide-profile-name {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.guide-profile-sub {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+.guide-pencil {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+
+.guide-pencil svg { width: 0.9rem; height: 0.9rem; }
+
+/* 大会作成・ランキング集計の入力欄の図 */
+.guide-form-mock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+}
+
+.guide-form-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.guide-form-input,
+.guide-form-select {
+  padding: 0.45rem 0.6rem;
+  margin-bottom: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-size: 0.85rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-form-select::after {
+  content: ' ▾';
+  color: var(--text-faint);
+}
+
+/* 回戦の操作の図 */
+.guide-round-mock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-size: 0.72rem;
+}
+
+.guide-round-note { color: var(--text-faint); }
+
+/* ランキング表の図。本物の表と同じクラスを使うので、幅だけ整える */
+.guide-rank-mock { width: 100%; font-size: 0.85rem; }
+.guide-rank-mock td { padding: 0.4rem 0.5rem; }
+
+.guide-figure .ranking-mark { width: 100%; }
 
 /* ---------------------------------------------------------------------------
    カード（募集・大会履歴・お知らせ 共通）
@@ -2729,6 +3036,30 @@ dialog.dialog-chat {
   background: var(--accent-soft);
 }
 
+/* マイページの編集アイコンは button なので、ボタンの塗り・影を打ち消して
+   選手ページのリンク版と同じ見た目にそろえる */
+.profile-edit-btn {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  min-height: 0;
+}
+
+.profile-edit-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  filter: none;
+}
+
+.profile-view-name {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin: 0 0 0.25rem;
+  font-size: 1.3rem;
+  overflow-wrap: anywhere;
+}
+
 .stat-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -3191,6 +3522,8 @@ dialog h3 {
 
   /* ガイドは1列に。説明の下に図が来る */
   .guide-step { grid-template-columns: minmax(0, 1fr); }
+  .guide-two-col { grid-template-columns: minmax(0, 1fr); }
+  .guide-toc a { font-size: 0.8rem; }
 
   /* 画像アップロードの「ファイルを選択」欄。ネイティブの部品は中の文言ぶんの
      幅を確保しようとし、幅を明示しないと枠の右へはみ出して見える

@@ -57,14 +57,14 @@ export function renderPlayerTable(containerEl, options = {}) {
 
   containerEl.innerHTML = '';
 
+  // 検索していないときは何も出さない。この下にはランキングが続くので、
+  // 「入力すると検索できます」のような案内文があると、そのぶん本題が押し下げられる
+  // （何を入れる欄かは入力欄のプレースホルダで足りる）。
+  const query = filterQuery.trim().toLowerCase();
+  if (!query) return;
+
   if (state.players.length === 0) {
     containerEl.innerHTML = '<p class="empty-hint">まだ選手が登録されていません。</p>';
-    return;
-  }
-
-  const query = filterQuery.trim().toLowerCase();
-  if (!query) {
-    containerEl.innerHTML = '<p class="empty-hint">選手名を入力すると検索できます。</p>';
     return;
   }
 

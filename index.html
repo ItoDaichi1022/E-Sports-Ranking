@@ -10,7 +10,7 @@
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=64">
+<link rel="stylesheet" href="css/style.css?v=65">
 </head>
 <body>
 <header>
@@ -27,8 +27,7 @@
       <a href="#recruit" data-page="recruit">募集中の大会</a>
       <a href="#create" data-page="create" id="nav-tournament-link">大会作成</a>
       <a href="#history" data-page="history">大会履歴</a>
-      <a href="#players" data-page="players">選手</a>
-      <a href="#ranking" data-page="ranking">ランキング</a>
+      <a href="#ranking" data-page="ranking">ランキング・選手</a>
       <a href="#profile" data-page="profile">マイページ</a>
       <!-- お問い合わせだけは画面遷移ではなく外部（X）へ飛ぶので、区切り線で分ける -->
       <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer"
@@ -213,22 +212,91 @@
 
   <!-- 初めての人向けの使い方。図はスクリーンショットではなく、実際のUIと同じ
        CSSコンポーネントで組んである（見た目を変えても図が古くならない）。
-       図の中のボタン風の要素は span なので押しても何も起きない。 -->
+       図の中のボタン風の要素は span なので押しても何も起きない（.guide-inert）。
+
+       章立て:
+         0. このサイトの各ページ  1. 大会へのエントリー
+         2. ランキングの仕組み    3. 大会を開きたい人へ -->
   <section id="view-guide" class="view" hidden>
     <h2>はじめに — このサイトの使い方</h2>
     <p class="note">
       大会の対戦表・選手の戦績・ランキングは、ログインなしで誰でも見られます。
-      大会に<strong>参加する</strong>ときだけ、以下の手順が必要です。
+      大会に<strong>参加する</strong>ときだけ、ログインと選手登録が必要です。
+    </p>
+
+    <nav class="guide-toc" aria-label="目次">
+      <a href="#guide-pages">0. 各ページの説明</a>
+      <a href="#guide-entry">1. 大会エントリー方法</a>
+      <a href="#guide-ranking">2. ランキングの仕組み</a>
+      <a href="#guide-host">3. 大会を開きたい人へ</a>
+    </nav>
+
+    <!-- ================= 0. 各ページの説明 ================= -->
+    <h3 class="guide-chapter" id="guide-pages"><span class="guide-chapter-num">0</span>このサイトの各ページ</h3>
+    <p class="guide-chapter-lead">
+      画面の移動は、左上の<strong>メニュー（☰）</strong>からです。ページは全部で6つあります。
+    </p>
+
+    <figure class="guide-figure guide-figure-wide">
+      <div class="guide-nav-mock">
+        <div class="guide-nav-bar">
+          <span class="guide-nav-toggle" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span class="guide-nav-title">トーナメント運営ツール</span>
+        </div>
+        <div class="guide-nav-menu">
+          <span class="guide-nav-item">ホーム</span>
+          <span class="guide-nav-item is-active">はじめに</span>
+          <span class="guide-nav-item">募集中の大会</span>
+          <span class="guide-nav-item">大会履歴</span>
+          <span class="guide-nav-item">ランキング・選手</span>
+          <span class="guide-nav-item">マイページ</span>
+          <span class="guide-nav-item guide-nav-contact">お問い合わせ（X）</span>
+        </div>
+      </div>
+      <figcaption>左上の☰を押すと、この一覧が開きます</figcaption>
+    </figure>
+
+    <ul class="guide-pages">
+      <li class="guide-page-card">
+        <h4>ホーム</h4>
+        <p>運営からの<strong>お知らせ</strong>が新しい順に並びます。まずここを見れば、いま何が動いているか分かります。</p>
+      </li>
+      <li class="guide-page-card">
+        <h4>募集中の大会</h4>
+        <p>いまエントリーを受け付けている大会の一覧です。<strong>参加はここから</strong>。</p>
+      </li>
+      <li class="guide-page-card">
+        <h4>大会履歴</h4>
+        <p>過去の大会と、進行中の大会。開くとルール・参加者・<strong>対戦表</strong>が見られます。</p>
+      </li>
+      <li class="guide-page-card">
+        <h4>ランキング・選手</h4>
+        <p>公開中のランキング。上の検索欄に名前を入れると、<strong>その選手のページ</strong>を探せます。</p>
+      </li>
+      <li class="guide-page-card">
+        <h4>マイページ</h4>
+        <p>ログイン・選手登録と、<strong>自分のプロフィール</strong>。鉛筆アイコンから編集します。</p>
+      </li>
+      <li class="guide-page-card">
+        <h4>お問い合わせ（X）</h4>
+        <p>運営への連絡先です。分からないことや、大会を開きたいときはこちらへ。</p>
+      </li>
+    </ul>
+
+    <!-- ================= 1. 大会エントリー方法 ================= -->
+    <h3 class="guide-chapter" id="guide-entry"><span class="guide-chapter-num">1</span>大会エントリー方法</h3>
+    <p class="guide-chapter-lead">
+      ログイン → エントリー → 対戦 → 結果の報告、という流れです。
     </p>
 
     <ol class="guide-steps">
       <li class="guide-step">
         <div class="guide-step-body">
-          <h3><span class="guide-step-num">1</span>ログインして選手登録</h3>
+          <h4><span class="guide-step-num">1</span>ログインして選手登録</h4>
           <p>
             右上の「ログイン」から、GoogleまたはDiscordのアカウントでログインします。
             初回は<strong>表示名など必要事項を記入</strong>すると選手登録が完了します。
-            プロフィール（アイコン・使用キャラ・SNSなど）はあとからマイページでいつでも編集できます。
+            アイコン・使用キャラ・自己紹介は、あとからマイページでいつでも変えられます。
           </p>
         </div>
         <figure class="guide-figure">
@@ -242,10 +310,39 @@
 
       <li class="guide-step">
         <div class="guide-step-body">
-          <h3><span class="guide-step-num">2</span>大会にエントリー</h3>
+          <h4><span class="guide-step-num">2</span>マイページでプロフィールを整える</h4>
           <p>
-            メニューの「募集中の大会」から大会を開き、ルールを確認して
-            「エントリーする」を押すだけです。募集中の間は何度でも取り消せます。
+            マイページには<strong>他の人から見えるあなたのプロフィール</strong>が出ます。
+            名前の横の<strong>鉛筆アイコン</strong>を押すと編集画面に切り替わります。
+            アイコンを設定しておくと、対戦表やランキングで見つけてもらいやすくなります。
+          </p>
+        </div>
+        <figure class="guide-figure">
+          <div class="guide-profile-mock">
+            <span class="avatar avatar-md guide-inert">G</span>
+            <div>
+              <span class="guide-profile-name">
+                Gyu
+                <span class="guide-pencil guide-inert" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+                  </svg>
+                </span>
+              </span>
+              <span class="guide-profile-sub">使用キャラクター: シビ、ソフィア</span>
+            </div>
+          </div>
+          <figcaption>マイページ。鉛筆から編集に切り替わります</figcaption>
+        </figure>
+      </li>
+
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">3</span>大会にエントリー</h4>
+          <p>
+            「募集中の大会」から大会を開き、ルールを確認して「エントリーする」を押すだけです。
+            <strong>募集中の間は何度でも取り消せます</strong>。
             締め切られると、それまでの戦績をもとに対戦表（トーナメント表）が作られます。
           </p>
         </div>
@@ -259,7 +356,7 @@
 
       <li class="guide-step">
         <div class="guide-step-body">
-          <h3><span class="guide-step-num">3</span>対戦表で自分を見つける</h3>
+          <h4><span class="guide-step-num">4</span>対戦表で自分を見つける</h4>
           <p>
             大会が始まったら対戦表を開きます。<strong>色の付いた行があなた</strong>です。
             対戦カードの右端にある<strong>鉛筆アイコン</strong>を押すと、その対戦の画面
@@ -293,7 +390,7 @@
 
       <li class="guide-step">
         <div class="guide-step-body">
-          <h3><span class="guide-step-num">4</span>ルームコードを確認して対戦</h3>
+          <h4><span class="guide-step-num">5</span>ルームコードを確認して対戦</h4>
           <p>
             対戦の画面を開くと、いちばん上に<strong>ルームコード欄</strong>があります。
             配信される試合では運営が先に記入していることもあります。
@@ -319,7 +416,7 @@
 
       <li class="guide-step">
         <div class="guide-step-body">
-          <h3><span class="guide-step-num">5</span>ゲームカウントを報告</h3>
+          <h4><span class="guide-step-num">6</span>ゲームカウントを報告</h4>
           <p>
             試合が終わったら、対戦画面の「ゲームカウント」タブで結果を入力します。
             <strong>相手が承認すると確定</strong>し、対戦表が自動で進みます。
@@ -335,7 +432,7 @@
         </div>
         <figure class="guide-figure">
           <div class="chat-result guide-chat-mock">
-            <h4 class="chat-result-heading">ゲームカウントの報告</h4>
+            <h5 class="chat-result-heading">ゲームカウントの報告</h5>
             <div class="chat-result-row"><span>あなた</span><span class="guide-score">2</span></div>
             <div class="chat-result-row"><span>対戦相手</span><span class="guide-score">1</span></div>
             <span class="as-link guide-inert guide-report-btn">この結果を報告する</span>
@@ -346,24 +443,252 @@
 
       <li class="guide-step">
         <div class="guide-step-body">
-          <h3><span class="guide-step-num">6</span>困ったときは</h3>
+          <h4><span class="guide-step-num">7</span>困ったときは</h4>
           <p>
             相手と連絡がつかない・結果が食い違うなど、もめたときは対戦画面の
             <strong>「運営に報告」</strong>を押してください。運営の画面にすぐ印が付きます。
-            サイト全体についての質問は、メニュー下部の
-            <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">お問い合わせ（X）</a>へ。
-          </p>
-          <p>
-            確定した試合の結果は選手ページの戦歴に自動で反映され、
-            条件を満たす大会は<a href="#ranking">ランキング</a>のスコアにもなります。
           </p>
         </div>
+        <figure class="guide-figure">
+          <div class="guide-figure-stack">
+            <span class="as-link btn-report guide-inert">運営に報告</span>
+          </div>
+          <figcaption>対戦画面の左下にあります</figcaption>
+        </figure>
+      </li>
+    </ol>
+
+    <!-- ================= 2. ランキングの仕組み ================= -->
+    <h3 class="guide-chapter" id="guide-ranking"><span class="guide-chapter-num">2</span>ランキングの仕組み</h3>
+    <p class="guide-chapter-lead">
+      すべての大会がランキングに入るわけではありません。<strong>条件を満たした大会</strong>の試合だけがスコアになります。
+    </p>
+
+    <div class="guide-two-col">
+      <div class="guide-step-body">
+        <h4>ランキングに入る大会の条件</h4>
+        <p>
+          次の<strong>2つとも</strong>を満たす大会が対象です。どちらか一方でも欠けると、
+          その大会の試合はスコアに影響しません（戦歴には残ります）。
+        </p>
+        <ul class="guide-list">
+          <li><strong>参加24人以上</strong>であること</li>
+          <li>対戦方法が<strong>1v1 または リレー</strong>であること（2v2・その他は対象外）</li>
+        </ul>
+        <p>
+          対象かどうかは、各大会の詳細ページに印で出ています。エントリーする前に確認できます。
+        </p>
+      </div>
+      <figure class="guide-figure">
+        <div class="ranking-mark ranking-mark-on guide-inert">
+          <span class="ranking-mark-title">ランキング反映対象</span>
+          <span class="ranking-mark-note">この大会の試合はランキングのスコアに反映されます。</span>
+        </div>
+        <div class="ranking-mark ranking-mark-off guide-inert">
+          <span class="ranking-mark-title">ランキング対象外</span>
+          <span class="ranking-mark-note">参加が24人に満たないため対象外です。</span>
+        </div>
+        <figcaption>大会の詳細ページに出る印</figcaption>
+      </figure>
+    </div>
+
+    <div class="guide-two-col">
+      <div class="guide-step-body">
+        <h4>スコアと順位の見かた</h4>
+        <p>
+          スコアは<strong>相手の強さで重み付け</strong>して計算します。強い選手に勝つほど大きく上がり、
+          格下に負けるほど大きく下がります。大会の規模（参加人数）も重みになります。
+        </p>
+        <p>
+          順位の右にある<strong>▲▼の印</strong>は、前回公開したランキングと比べた動きです。
+          <strong>NEW</strong> は今回から入った選手です。
+        </p>
+        <p>
+          ランキングは自動では変わりません。<strong>運営が集計して公開したとき</strong>に切り替わります。
+          集計期間はページ上部に出ています。
+        </p>
+      </div>
+      <figure class="guide-figure">
+        <table class="ranking-table guide-inert guide-rank-mock">
+          <tbody>
+            <tr class="rank-1"><td class="rank-cell">1</td><td>Gyu</td><td><span class="rank-change up">▲2</span></td></tr>
+            <tr class="rank-2"><td class="rank-cell">2</td><td>Sora</td><td><span class="rank-change down">▼1</span></td></tr>
+            <tr class="rank-3"><td class="rank-cell">3</td><td>Rin</td><td><span class="rank-change new">NEW</span></td></tr>
+          </tbody>
+        </table>
+        <figcaption>上位3名は金・銀・銅で示されます</figcaption>
+      </figure>
+    </div>
+
+    <!-- ================= 3. 大会を開きたい人へ ================= -->
+    <h3 class="guide-chapter" id="guide-host"><span class="guide-chapter-num">3</span>大会を開きたい人へ</h3>
+    <p class="guide-chapter-lead">
+      大会を作れるのは<strong>運営権限を持つアカウント</strong>だけです。まずは連絡から。
+    </p>
+
+    <ol class="guide-steps">
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">1</span>運営に連絡して権限をもらう</h4>
+          <p>
+            <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">お問い合わせ（X）</a>
+            から、<strong>開きたい大会の内容</strong>と<strong>このサイトでの表示名</strong>を伝えてください。
+            先に<strong>ログインと選手登録を済ませておく</strong>と、そのアカウントに権限を付けられます。
+          </p>
+          <p>
+            権限が付くと、メニューに<strong>「大会作成」</strong>が現れます。
+          </p>
+        </div>
+        <figure class="guide-figure">
+          <div class="guide-nav-menu guide-nav-menu-sm">
+            <span class="guide-nav-item">大会履歴</span>
+            <span class="guide-nav-item is-new">大会作成</span>
+            <span class="guide-nav-item">ランキング・選手</span>
+          </div>
+          <figcaption>権限が付くと増えるメニュー</figcaption>
+        </figure>
+      </li>
+
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">2</span>大会を作る</h4>
+          <p>
+            「大会作成」で、大会名・開催日・<strong>対戦方法</strong>・定員・ルール・
+            <strong>配信元のURL</strong>・画像を入力します。対戦方法は
+            <strong>ランキングの対象かどうかを決める</strong>ので、必ず実態に合わせてください。
+          </p>
+          <p>
+            参加者の集め方は2通りです。
+          </p>
+          <ul class="guide-list">
+            <li><strong>エントリーを募集する</strong> — 選手が自分で参加登録する（通常はこちら）</li>
+            <li><strong>運営が参加者を直接選ぶ</strong> — その場で対戦表まで作る</li>
+          </ul>
+        </div>
+        <figure class="guide-figure">
+          <div class="guide-form-mock">
+            <span class="guide-form-label">対戦方法</span>
+            <span class="guide-form-select">1v1（ランキング反映対象）</span>
+            <span class="guide-form-label">配信元（任意・URL）</span>
+            <span class="guide-form-input">https://www.twitch.tv/…</span>
+          </div>
+          <figcaption>大会作成の入力欄（一部）</figcaption>
+        </figure>
+      </li>
+
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">3</span>締め切って対戦表を作る</h4>
+          <p>
+            集まったら「<strong>締め切ってブラケット生成</strong>」を押します。
+            それまでの戦績からシードが決まり、対戦表が自動で作られます。
+          </p>
+          <p>
+            自動の組み合わせを直したいときは、対戦表ページの
+            <strong>「組み合わせを調整する」</strong>から、選手を2人ずつ選んで入れ替えられます
+            （<strong>回戦を開始する前まで</strong>）。
+          </p>
+        </div>
+        <figure class="guide-figure">
+          <div class="guide-figure-stack">
+            <span class="as-link guide-inert">締め切ってブラケット生成</span>
+            <span class="as-link btn-secondary guide-inert">組み合わせを調整する</span>
+          </div>
+          <figcaption>締め切りと、組み合わせの手直し</figcaption>
+        </figure>
+      </li>
+
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">4</span>配信台を決めて回戦を開始する</h4>
+          <p>
+            回戦ごとに、<strong>配信に乗せる試合（配信台）</strong>を選んでから
+            「開始」を押します。開始して初めて、選手はゲームカウントを報告できるようになります。
+          </p>
+          <p>
+            配信台の試合は、開始前に<strong>ルームコードを先に記入</strong>しておけます。
+            選手は開始と同時にコードを確認できます。
+          </p>
+        </div>
+        <figure class="guide-figure">
+          <div class="guide-round-mock">
+            <span class="round-status started guide-inert">進行中</span>
+            <span class="guide-round-note">配信台 1試合</span>
+            <span class="as-link guide-inert guide-mini-btn">R1 を開始</span>
+          </div>
+          <figcaption>各回戦の見出しの下にあります</figcaption>
+        </figure>
+      </li>
+
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">5</span>結果を確認して大会を確定する</h4>
+          <p>
+            選手どうしで確定した結果は自動で進みます。運営は対戦カードの鉛筆から
+            <strong>その場で結果を入れる</strong>ことも、<strong>不戦勝で確定</strong>することもできます。
+          </p>
+          <p>
+            すべての対戦が終わると「結果を確定する」が出ます。押すと最終順位が決まり、
+            各選手の戦歴に反映されます。
+          </p>
+        </div>
+        <figure class="guide-figure">
+          <div class="guide-figure-stack">
+            <span class="as-link guide-inert">結果を確定する</span>
+          </div>
+          <figcaption>全対戦が終わると出ます</figcaption>
+        </figure>
+      </li>
+
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">6</span>ランキングを公開する</h4>
+          <p>
+            「ランキング・選手」ページの<strong>「ランキングを作成する」</strong>から、
+            集計する期間を<strong>カレンダーで指定</strong>します。その場で結果を確かめられます
+            （この時点ではまだ閲覧者には見えません）。
+          </p>
+          <p>
+            発表用の画像を書き出してから、<strong>「このランキングを公開する」</strong>を押すと切り替わります。
+          </p>
+        </div>
+        <figure class="guide-figure">
+          <div class="guide-form-mock">
+            <span class="guide-form-label">集計開始日</span>
+            <span class="guide-form-input">2026-04-01</span>
+            <span class="guide-form-label">集計終了日</span>
+            <span class="guide-form-input">2026-06-30</span>
+          </div>
+          <div class="guide-figure-stack">
+            <span class="as-link btn-secondary guide-inert guide-mini-btn">画像を書き出す</span>
+            <span class="as-link guide-inert guide-mini-btn">このランキングを公開する</span>
+          </div>
+          <figcaption>集計期間を決めて公開します</figcaption>
+        </figure>
+      </li>
+
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">7</span>もめごとへの対応</h4>
+          <p>
+            選手から「運営に報告」が届くと、<strong>大会のカードと対戦表に印</strong>が出ます。
+            対戦のチャットを開いて内容を確認し、「対応済みにする」を押すと印が消えます。
+          </p>
+        </div>
+        <figure class="guide-figure">
+          <div class="report-notice guide-inert">
+            <span class="report-notice-title">⚠ 未対応の報告が1件あります</span>
+            <span class="report-notice-note">対戦表を開き、印の付いた対戦のチャットから確認してください。</span>
+          </div>
+          <figcaption>運営にだけ出る印です</figcaption>
+        </figure>
       </li>
     </ol>
 
     <div class="hero-actions guide-cta">
       <a class="as-link" href="#recruit">募集中の大会を見る</a>
       <a class="as-link btn-secondary" href="#profile">ログイン・選手登録へ</a>
+      <a class="as-link btn-secondary" href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">お問い合わせ（X）</a>
     </div>
   </section>
 
@@ -386,6 +711,9 @@
       <p id="profile-login-error" class="status-line error"></p>
     </div>
 
+    <!-- 普段は他の人から見えるプロフィールをそのまま出し、編集アイコンで入力欄に切り替える。
+         中身は js/app.js（表示は profileSectionHtml、編集は renderProfileForm）。 -->
+    <div id="profile-view" hidden></div>
     <div id="profile-form-container"></div>
     <div id="profile-links"></div>
 
@@ -583,20 +911,22 @@
     <div id="result-section" class="result-section"></div>
   </section>
 
-  <section id="view-players" class="view" hidden>
-    <h2>選手</h2>
-    <p class="note">表示名をクリックすると個人戦績が見られます。</p>
-    <input type="text" id="player-search-input" placeholder="選手を名前で検索">
-    <div id="player-list"></div>
-  </section>
-
   <section id="view-player-detail" class="view" hidden>
     <button type="button" id="player-back-btn" class="back-link as-button">← 戻る</button>
     <div id="player-detail"></div>
   </section>
 
+  <!-- ランキングと選手検索は同じページ。「あの人は何位だろう」と「ランキングを見たい」は
+       同じ流れの中にあるので、上に検索、下にランキングを置いて1画面にまとめている。 -->
   <section id="view-ranking" class="view" hidden>
-    <h2>ランキング</h2>
+    <h2>ランキング・選手</h2>
+
+    <div class="player-search">
+      <input type="text" id="player-search-input" placeholder="選手を名前で検索">
+    </div>
+    <!-- 検索したときだけ結果が出る。何も入れていなければランキングだけが並ぶ。 -->
+    <div id="player-list"></div>
+
     <p class="note">
       スコアに反映されるのは「参加24人以上」かつ「対戦方法が1v1またはリレー」の大会の試合です。
       対象かどうかは各大会の詳細ページに表示されます。
@@ -638,7 +968,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=64"></script>
+<script src="js/vendor/supabase.js?v=65"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -650,27 +980,27 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=64",
-    "./js/bracket.js":        "./js/bracket.js?v=64",
-    "./js/bracketView.js":    "./js/bracketView.js?v=64",
-    "./js/db.js":             "./js/db.js?v=64",
-    "./js/entries.js":        "./js/entries.js?v=64",
-    "./js/icons.js":          "./js/icons.js?v=64",
-    "./js/matchChat.js":      "./js/matchChat.js?v=64",
-    "./js/playerStats.js":    "./js/playerStats.js?v=64",
-    "./js/players.js":        "./js/players.js?v=64",
-    "./js/profile.js":        "./js/profile.js?v=64",
-    "./js/ranking.js":        "./js/ranking.js?v=64",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=64",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=64",
-    "./js/rankingView.js":    "./js/rankingView.js?v=64",
-    "./js/state.js":          "./js/state.js?v=64",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=64",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=64",
-    "./js/util.js":           "./js/util.js?v=64"
+    "./js/auth.js":           "./js/auth.js?v=65",
+    "./js/bracket.js":        "./js/bracket.js?v=65",
+    "./js/bracketView.js":    "./js/bracketView.js?v=65",
+    "./js/db.js":             "./js/db.js?v=65",
+    "./js/entries.js":        "./js/entries.js?v=65",
+    "./js/icons.js":          "./js/icons.js?v=65",
+    "./js/matchChat.js":      "./js/matchChat.js?v=65",
+    "./js/playerStats.js":    "./js/playerStats.js?v=65",
+    "./js/players.js":        "./js/players.js?v=65",
+    "./js/profile.js":        "./js/profile.js?v=65",
+    "./js/ranking.js":        "./js/ranking.js?v=65",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=65",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=65",
+    "./js/rankingView.js":    "./js/rankingView.js?v=65",
+    "./js/state.js":          "./js/state.js?v=65",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=65",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=65",
+    "./js/util.js":           "./js/util.js?v=65"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=64"></script>
+<script type="module" src="js/app.js?v=65"></script>
 </body>
 </html>
