@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { avatarHtml } from './util.js';
+import { makeIconButton } from './icons.js';
 
 // 表示名を更新する。名前を変えた場合、旧名は pastNames に自動で残す。
 // 戦績は不変のid（uuid）に紐づくので、名前が変わっても分断されない。
@@ -143,10 +144,7 @@ export function renderPlayerTable(containerEl, options = {}) {
       }
 
       if (isAdmin) {
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'btn-remove';
-        removeBtn.textContent = '削除';
+        const removeBtn = makeIconButton('trash', '選手を削除', { className: 'btn-remove' });
         removeBtn.addEventListener('click', async () => {
           const guard = canRemovePlayer(p.id);
           if (!guard.ok) {

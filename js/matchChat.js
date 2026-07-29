@@ -20,6 +20,7 @@ import {
 import { auth, isAdmin } from './auth.js';
 import { confirmMatch } from './bracket.js';
 import { escapeHtml } from './util.js';
+import { setButtonIcon, makeIconButton } from './icons.js';
 import * as db from './db.js';
 
 const POLL_INTERVAL_MS = 5000;
@@ -52,6 +53,9 @@ const panelResultEl = document.getElementById('match-chat-panel-result');
 // 開いている部屋。閉じている間は null。
 let room = null; // { tournamentId, matchId, roundIndex, messages: [], lastAt, onRefresh, onChanged }
 let pollTimer = null;
+
+// 「送信」は紙飛行機で伝わるので、狭い画面で幅を取る文字はやめる
+setButtonIcon(sendBtn, 'send', '送信');
 
 // 開いている部屋の試合を state から引き直す。
 //
@@ -250,10 +254,7 @@ function renderRoomCode() {
   input.setAttribute('aria-label', 'ルームコード');
 
   // 書き写すのではなく貼り付けて入室したいので、コピーを1タップで済ませる
-  const copyBtn = document.createElement('button');
-  copyBtn.type = 'button';
-  copyBtn.className = 'btn-secondary room-code-copy-btn';
-  copyBtn.textContent = 'コピー';
+  const copyBtn = makeIconButton('copy', 'コードをコピー', { className: 'btn-secondary room-code-copy-btn' });
   copyBtn.disabled = !input.value.trim();
   copyBtn.addEventListener('click', () => copyRoomCode(input, copyBtn));
 
@@ -317,9 +318,10 @@ async function copyRoomCode(input, btn) {
     try { copied = document.execCommand('copy'); } catch { copied = false; }
   }
 
-  btn.textContent = copied ? 'コピーしました' : '選択しました';
+  // 押した結果が見えないと不安になるので、しばらくチェック印に変える
+  setButtonIcon(btn, 'check', copied ? 'コピーしました' : '選択しました');
   clearTimeout(roomCodeCopyTimer);
-  roomCodeCopyTimer = setTimeout(() => { btn.textContent = 'コピー'; }, 1800);
+  roomCodeCopyTimer = setTimeout(() => setButtonIcon(btn, 'copy', 'コードをコピー'), 1800);
 }
 
 // 保存ボタンは押すと押せなくなるだけなので、通ったことを一言添えて見せる。

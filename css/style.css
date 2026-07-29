@@ -485,6 +485,16 @@ a.btn-secondary:hover {
 
 .btn-remove:active:not(:disabled) { background: rgba(226, 68, 92, 0.2); }
 
+/* アイコンだけのボタン（js/icons.js の makeIconButton が付ける）。
+   文字が無いぶん幅を詰め、絵の大きさはどこでも同じにする */
+.icon-btn { padding: 0.45rem 0.7rem; }
+
+.icon-btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: none;
+}
+
 /* リンクをボタンと同じ見た目に揃える */
 .as-link {
   display: inline-flex;
@@ -1655,7 +1665,8 @@ a.card:hover {
 }
 
 .edit-match-btn {
-  display: block;
+  display: flex;
+  justify-content: center;
   width: 100%;
   min-height: 0;
   padding: 0.3rem 0.6rem;

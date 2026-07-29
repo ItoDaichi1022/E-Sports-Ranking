@@ -6,6 +6,7 @@ import {
 import { editMatch } from './bracket.js';
 import { auth, isAdmin } from './auth.js';
 import { canUseMatchChat, openMatchChat } from './matchChat.js';
+import { iconSvg, makeIconButton } from './icons.js';
 import * as db from './db.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
@@ -107,17 +108,6 @@ function drawConnectorLines(bracket, wrapper, matchElements) {
   wrapper.appendChild(svg);
 }
 
-// 鉛筆のアイコン。文字で「タップで開く」と書き添えると枠の中がうるさくなるので、
-// 記入できる場所を示す絵に寄せる。
-function editIconSvg() {
-  return `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
-    </svg>`;
-}
-
 // 「自分のいるところを押すと、その対戦の記入と相手とのチャットができる」ための仕掛け。
 // 名前欄だけを押せるようにし、スコア入力や確定ボタンを押したときは開かない。
 // あわせて行の右端に鉛筆アイコンを置く。見た目だけでは押せると伝わらず、ここが
@@ -135,12 +125,7 @@ function makeRowChatTarget(row, onOpen, { own = false } = {}) {
     onOpen();
   });
 
-  const editBtn = document.createElement('button');
-  editBtn.type = 'button';
-  editBtn.className = 'row-edit-btn';
-  editBtn.title = nameEl.title;
-  editBtn.setAttribute('aria-label', nameEl.title);
-  editBtn.innerHTML = editIconSvg();
+  const editBtn = makeIconButton('pencil', nameEl.title, { className: 'row-edit-btn' });
   editBtn.addEventListener('click', onOpen);
   row.row.appendChild(editBtn);
 }
@@ -334,8 +319,10 @@ function renderMatchBox(
     if (!readOnly) {
       const editBtn = document.createElement('button');
       editBtn.type = 'button';
-      editBtn.className = 'edit-match-btn';
-      editBtn.textContent = '編集';
+      editBtn.className = 'edit-match-btn icon-btn';
+      editBtn.title = '結果を編集';
+      editBtn.setAttribute('aria-label', '結果を編集');
+      editBtn.innerHTML = iconSvg('pencil');
       editBtn.addEventListener('click', () => {
         const ok = confirm('この試合の結果を編集しますか？以降のラウンドに既に反映・確定している結果があれば、それらも未確定に戻ります。');
         if (!ok) return;

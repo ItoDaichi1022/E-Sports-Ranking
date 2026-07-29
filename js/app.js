@@ -24,6 +24,7 @@ import {
   signInWithProvider, signOut, reloadOwnPlayer,
 } from './auth.js';
 import { isConfigured } from './supabaseClient.js';
+import { makeIconButton } from './icons.js';
 import * as db from './db.js';
 
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
@@ -373,16 +374,10 @@ function renderNewsPage(id) {
 
   if (!isAdmin()) return;
 
-  const editBtn = document.createElement('button');
-  editBtn.type = 'button';
-  editBtn.className = 'btn-secondary';
-  editBtn.textContent = '編集';
+  const editBtn = makeIconButton('pencil', 'お知らせを編集', { className: 'btn-secondary' });
   editBtn.addEventListener('click', () => openAnnouncementForm(a));
 
-  const delBtn = document.createElement('button');
-  delBtn.type = 'button';
-  delBtn.className = 'btn-remove';
-  delBtn.textContent = '削除';
+  const delBtn = makeIconButton('trash', 'お知らせを削除', { className: 'btn-remove' });
   delBtn.addEventListener('click', async () => {
     if (!confirm(`お知らせ「${a.title}」を削除しますか？`)) return;
     const ok = await persist(() => db.deleteAnnouncement(a.id), 'お知らせの削除');
@@ -487,10 +482,7 @@ function renderSelectedList() {
     nameLabel.className = 'seed-name';
     nameLabel.textContent = player ? player.currentName : id;
 
-    const upBtn = document.createElement('button');
-    upBtn.type = 'button';
-    upBtn.className = 'btn-secondary';
-    upBtn.textContent = '↑';
+    const upBtn = makeIconButton('arrowUp', 'シードを1つ上げる', { className: 'btn-secondary' });
     upBtn.disabled = index === 0;
     upBtn.addEventListener('click', () => {
       [selectedParticipantIds[index - 1], selectedParticipantIds[index]] =
@@ -498,10 +490,7 @@ function renderSelectedList() {
       renderSelectedList();
     });
 
-    const downBtn = document.createElement('button');
-    downBtn.type = 'button';
-    downBtn.className = 'btn-secondary';
-    downBtn.textContent = '↓';
+    const downBtn = makeIconButton('arrowDown', 'シードを1つ下げる', { className: 'btn-secondary' });
     downBtn.disabled = index === selectedParticipantIds.length - 1;
     downBtn.addEventListener('click', () => {
       [selectedParticipantIds[index + 1], selectedParticipantIds[index]] =
@@ -509,10 +498,7 @@ function renderSelectedList() {
       renderSelectedList();
     });
 
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'btn-secondary';
-    removeBtn.textContent = '✕';
+    const removeBtn = makeIconButton('x', '参加者から外す', { className: 'btn-secondary' });
     removeBtn.addEventListener('click', () => {
       selectedParticipantIds = selectedParticipantIds.filter((pid) => pid !== id);
       renderParticipantCheckboxes();
