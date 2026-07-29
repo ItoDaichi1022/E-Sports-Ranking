@@ -1851,19 +1851,28 @@ a.card:hover {
 
 .player-name.own-chat-row:hover { background: var(--surface-3); }
 
-/* 自分の行に添える「タップで開く」。見た目だけでは押せると伝わらないので文字で示す */
-.own-row-hint {
-  display: inline-block;
-  margin-left: 0.4rem;
-  padding: 0.05rem 0.5rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  vertical-align: middle;
+/* 記入できる行の右端に置く鉛筆。見た目だけでは押せると伝わらないので印を出す。
+   枠が狭いので、文字ではなくアイコン1つで示す。 */
+.row-edit-btn {
+  flex: none;
+  min-height: 0;
+  margin-left: 0.15rem;
+  padding: 0.25rem;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--accent-bright);
+  box-shadow: none;
+}
+
+.row-edit-btn svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.row-edit-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-bright);
 }
 
 /* 対戦表の上に出す、出場者向けの1行案内 */

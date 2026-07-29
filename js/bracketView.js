@@ -107,27 +107,42 @@ function drawConnectorLines(bracket, wrapper, matchElements) {
   wrapper.appendChild(svg);
 }
 
-// 「自分のいるところをタップすると対戦相手とチャットできる」ための仕掛け。
-// 名前欄だけを押せるようにし、スコア入力や確定ボタンを押したときは開かない。
-// own: 自分の対戦であることを示す行かどうか（運営がどちらの名前を押しても開ける
-// 場合は own を付けない。目立たせるのは本人の行だけにするため）。
-function makeRowChatTarget(targetEl, onOpen, { own = false } = {}) {
-  targetEl.classList.add('chat-target');
-  if (own) {
-    targetEl.classList.add('own-chat-row');
-    // 「押せる」ことが見た目だけでは伝わらなかったので、文字で示す。
-    // ここが唯一の入口なのに、新規の人は名前を押せると思わない。
-    const hint = document.createElement('span');
-    hint.className = 'own-row-hint';
-    hint.textContent = 'タップで開く';
-    targetEl.appendChild(hint);
-  }
-  targetEl.title = own ? '対戦相手とチャット' : 'この対戦を開く';
+// 鉛筆のアイコン。文字で「タップで開く」と書き添えると枠の中がうるさくなるので、
+// 記入できる場所を示す絵に寄せる。
+function editIconSvg() {
+  return `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>`;
+}
 
-  targetEl.addEventListener('click', (e) => {
+// 「自分のいるところを押すと、その対戦の記入と相手とのチャットができる」ための仕掛け。
+// 名前欄だけを押せるようにし、スコア入力や確定ボタンを押したときは開かない。
+// あわせて行の右端に鉛筆アイコンを置く。見た目だけでは押せると伝わらず、ここが
+// 唯一の入口なのに、新規の人は名前を押せると思わない。
+// own: 自分の対戦であることを示す行かどうか（運営がどちらの名前を押しても開ける
+// 場合は own を付けない。地色で目立たせるのは本人の行だけにするため）。
+function makeRowChatTarget(row, onOpen, { own = false } = {}) {
+  const { nameEl } = row;
+  nameEl.classList.add('chat-target');
+  if (own) nameEl.classList.add('own-chat-row');
+  nameEl.title = own ? '開いて記入する' : 'この対戦を開く';
+
+  nameEl.addEventListener('click', (e) => {
     if (e.target.closest('input, button, select, label')) return;
     onOpen();
   });
+
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'row-edit-btn';
+  editBtn.title = nameEl.title;
+  editBtn.setAttribute('aria-label', nameEl.title);
+  editBtn.innerHTML = editIconSvg();
+  editBtn.addEventListener('click', onOpen);
+  row.row.appendChild(editBtn);
 }
 
 // 対戦表の下端に付けるチャットの入口。自分の行を押す導線に気づかない人と、
@@ -273,13 +288,13 @@ function renderMatchBox(
   if (chatAvailable) {
     box.classList.add('has-chat');
     if (!readOnly) {
-      [r1, r2].forEach((row) => makeRowChatTarget(row.nameEl, openChat));
+      [r1, r2].forEach((row) => makeRowChatTarget(row, openChat));
       ownRowIsChatEntry = true;
     } else {
       // 自分がいる側の名前欄だけを押せるようにする。
       [[p1, r1], [p2, r2]].forEach(([entrantId, row]) => {
         if (getEntrantMemberIds(tournamentId, entrantId).includes(auth.player?.id)) {
-          makeRowChatTarget(row.nameEl, openChat, { own: true });
+          makeRowChatTarget(row, openChat, { own: true });
           ownRowIsChatEntry = true;
         }
       });
