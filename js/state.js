@@ -28,7 +28,10 @@ export const state = {
   // 確定済みの成績。tournamentId -> { playerId: 勝ち上がりの深さ }。
   // 優勝=1、準優勝=2、ベストN=N で、小さいほど上位（DBの tournament_entries.placement）。
   placements: {},
-  publishedRanking: null, // { publishedAt, periodMonths, rankings: [...] } | null（未公開）
+  // { publishedAt, periodStart, periodEnd, periodMonths, rankings: [...] } | null（未公開）
+  // periodStart/periodEnd はカレンダーで選んだ集計期間（'YYYY-MM-DD'、片側または両方
+  // null なら無制限）。periodMonths は移行前の「直近Nか月」形式の古い公開データにだけ残る。
+  publishedRanking: null,
   // ホーム画面の運営からのお知らせ。pinned優先＋新しい順で並べて持つ。
   announcements: [],  // { id, title, body, imageUrl, pinned, createdAt, updatedAt }
 

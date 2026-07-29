@@ -157,10 +157,15 @@
 
 ### published_rankings のスナップショット形式
 
+集計期間は運営がカレンダーで選んだ開始日・終了日（`period_start` / `period_end`）。
+どちらも省略でき、省略した側は無制限になる（両方省略なら全期間）。
+`period_months`（「直近Nか月」形式）は移行前の古いデータにだけ残り、新規の公開では書き込まない。
+
 ```json
 {
   "published_at": "2026-07-19T12:34:56.000Z",
-  "period_months": 3,
+  "period_start": "2026-04-01",
+  "period_end": "2026-06-30",
   "data": {
     "rankings": [
       { "id": "uuid", "name": "Gyu", "score": 100, "tournamentsPlayed": 4,

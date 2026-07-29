@@ -9,7 +9,7 @@ import {
 } from './bracket.js';
 import { renderBracket } from './bracketView.js';
 import { reportChipHtml, syncOpenChat } from './matchChat.js';
-import { computeRankings, computeRankingsForPeriod, withRankChange, rankChangeInfo } from './ranking.js';
+import { computeRankings, computeRankingsForRange, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
 import { getPlayerStats, championLabel } from './playerStats.js';
@@ -118,7 +118,8 @@ const profileAccountEmail = $('profile-account-email');
 
 const rankingContainer = $('ranking-container');
 const rankingEditorEl = $('ranking-editor');
-const rankingPeriodSelect = $('ranking-period-select');
+const rankingStartInput = $('ranking-start-input');
+const rankingEndInput = $('ranking-end-input');
 const rankingExportBtn = $('ranking-export-btn');
 const rankingPublishBtn = $('ranking-publish-btn');
 const rankingPublishedStatusEl = $('ranking-published-status');
@@ -1139,9 +1140,24 @@ function formatJaDate(date) {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
-// periodMonths か月分をさかのぼった開始日と、基準日（endDate）を「〇年〇月〇日〜〇年〇月〇日」の形にする。
-// periodMonths が null（全期間）の場合は範囲が定まらないのでそのまま返す。
-function periodRangeLabel(periodMonths, endDate) {
+// 'YYYY-MM-DD' をそのまま「〇年〇月〇日」にする。new Date(文字列) を経由すると
+// タイムゾーンの解釈次第で日付がずれかねないので、文字列を直接分解する。
+function formatJaDateStr(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return `${y}年${m}月${d}日`;
+}
+
+// カレンダーで選んだ開始日・終了日（'YYYY-MM-DD' または null）を
+// 「〇年〇月〇日〜〇年〇月〇日」の形にする。片方だけ省略した場合はその側を開けたまま表示し、
+// 両方省略なら「全期間」と表示する。
+function periodRangeLabel(start, end) {
+  if (!start && !end) return '全期間';
+  return `${start ? formatJaDateStr(start) : ''}〜${end ? formatJaDateStr(end) : ''}`;
+}
+
+// 移行前の「直近Nか月」形式で公開された古いデータだけに使う表示。
+// periodMonths か月分をさかのぼった開始日と、基準日（endDate）を範囲表示にする。
+function legacyMonthsRangeLabel(periodMonths, endDate) {
   if (periodMonths == null) return '全期間';
   const start = new Date(endDate);
   start.setMonth(start.getMonth() - Number(periodMonths));
@@ -1151,7 +1167,9 @@ function periodRangeLabel(periodMonths, endDate) {
 function publishedStatusLine() {
   const published = state.publishedRanking;
   const periodLabel = published
-    ? periodRangeLabel(published.periodMonths ?? null, new Date(published.publishedAt))
+    ? (published.periodStart || published.periodEnd
+      ? periodRangeLabel(published.periodStart, published.periodEnd)
+      : legacyMonthsRangeLabel(published.periodMonths ?? null, new Date(published.publishedAt)))
     : '';
 
   if (isAdmin()) {
@@ -1161,12 +1179,17 @@ function publishedStatusLine() {
   return published ? `集計期間: ${periodLabel}` : '';
 }
 
+// 日付入力欄から、現在選ばれている範囲を取り出す（空欄は無制限を表す null）。
+function selectedRankingRange() {
+  return { start: rankingStartInput.value || null, end: rankingEndInput.value || null };
+}
+
 // 運営には選択中の期間のライブプレビューを、それ以外には公開済みスナップショットを見せる。
 function renderRankingPage() {
   rankingPublishedStatusEl.textContent = publishedStatusLine();
 
   if (isAdmin()) {
-    const { rankings: preview } = computeRankingsForPeriod(state, rankingPeriodSelect.value);
+    const { rankings: preview } = computeRankingsForRange(state, selectedRankingRange());
     const previewWithChange = withRankChange(preview, state.publishedRanking?.rankings);
     renderRankingTable(
       rankingContainer,
@@ -1407,12 +1430,15 @@ tournamentForm.addEventListener('change', (e) => {
   tournamentSubmitBtn.textContent = manual ? 'ブラケットを生成' : '大会を作成';
 });
 
-rankingPeriodSelect.addEventListener('change', () => {
+rankingStartInput.addEventListener('change', () => {
+  if (isAdmin()) renderRankingPage();
+});
+rankingEndInput.addEventListener('change', () => {
   if (isAdmin()) renderRankingPage();
 });
 
 rankingExportBtn.addEventListener('click', async () => {
-  const { rankings } = computeRankingsForPeriod(state, rankingPeriodSelect.value);
+  const { rankings } = computeRankingsForRange(state, selectedRankingRange());
   if (rankings.length === 0) {
     alert('この期間に確定した試合がまだないため、画像を書き出せません。');
     return;
@@ -1431,19 +1457,24 @@ rankingExportBtn.addEventListener('click', async () => {
 });
 
 rankingPublishBtn.addEventListener('click', async () => {
-  const period = rankingPeriodSelect.value;
-  const { periodMonths, rankings } = computeRankingsForPeriod(state, period);
+  const range = selectedRankingRange();
+  if (range.start && range.end && range.start > range.end) {
+    alert('開始日が終了日より後になっています。');
+    return;
+  }
+  const { periodStart, periodEnd, rankings } = computeRankingsForRange(state, range);
 
   if (rankings.length === 0) {
     alert('この期間に確定した試合がまだないため、公開できません。');
     return;
   }
-  if (!confirm(`${periodRangeLabel(periodMonths, new Date())}のランキングを公開します。閲覧者に反映されます。よろしいですか？`)) return;
+  if (!confirm(`${periodRangeLabel(periodStart, periodEnd)}のランキングを公開します。閲覧者に反映されます。よろしいですか？`)) return;
 
   // 前回公開時点の順位を各エントリに焼き込み、公開後もずっと「前回との差」が分かるようにする
   const snapshot = {
     publishedAt: new Date().toISOString(),
-    periodMonths,
+    periodStart,
+    periodEnd,
     rankings: withRankChange(rankings, state.publishedRanking?.rankings),
   };
 

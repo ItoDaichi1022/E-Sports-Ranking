@@ -40,27 +40,32 @@ export function rankChangeInfo(previousRank, rank) {
   return { label: '―', className: 'same' };
 }
 
-// 期間セレクトの値（'1'〜'12' または 'all'）から periodMonths とランキングをまとめて計算する。
-// renderRankingPage / 公開ボタン / 画像書き出しボタンの3箇所で同じ計算が必要なため共通化する。
-export function computeRankingsForPeriod(state, period) {
-  const periodMonths = period === 'all' ? null : Number(period);
-  const filteredMatches = filterMatchesByPeriod(state, periodMonths);
-  return { periodMonths, rankings: computeRankings({ ...state, matches: filteredMatches }) };
+// カレンダーで選んだ開始日・終了日（'YYYY-MM-DD' 文字列。どちらも省略可）から
+// ランキングをまとめて計算する。renderRankingPage / 公開ボタン / 画像書き出しボタンの
+// 3箇所で同じ計算が必要なため共通化する。
+export function computeRankingsForRange(state, { start = null, end = null } = {}) {
+  const filteredMatches = filterMatchesByRange(state, { start, end });
+  return {
+    periodStart: start,
+    periodEnd: end,
+    rankings: computeRankings({ ...state, matches: filteredMatches }),
+  };
 }
 
-// 大会の開催日をもとに、直近Nヶ月以内の試合だけを残す。日付未設定の大会の試合は対象外とする
-// （いつの試合か判定できないため）。periodMonths が null/'all' の場合は全期間（フィルタなし）。
-export function filterMatchesByPeriod(state, periodMonths) {
-  if (periodMonths == null || periodMonths === 'all') return state.matches;
-
-  const cutoff = new Date();
-  cutoff.setMonth(cutoff.getMonth() - Number(periodMonths));
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+// 大会の開催日（'YYYY-MM-DD'）が start〜end の範囲に入っている試合だけを残す。
+// 日付未設定の大会の試合は対象外とする（いつの試合か判定できないため）。
+// start・end はどちらも省略可（null）で、省略した側は無制限になる。
+// 両方省略なら全期間（フィルタなし）。
+export function filterMatchesByRange(state, { start = null, end = null } = {}) {
+  if (!start && !end) return state.matches;
 
   const dateByTournament = new Map(state.tournaments.map((t) => [t.id, t.date]));
   return state.matches.filter((m) => {
     const date = dateByTournament.get(m.tournamentId);
-    return date && date >= cutoffStr;
+    if (!date) return false;
+    if (start && date < start) return false;
+    if (end && date > end) return false;
+    return true;
   });
 }
 

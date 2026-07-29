@@ -242,10 +242,16 @@ create table if not exists match_chat_reports (
 
 -- 運営が「公開する」を押した瞬間のランキングのスナップショット。
 -- 常時計算するスコアは保存しないという設計原則（doc/design.md 6章）を維持する。
+--
+-- 集計期間は運営がカレンダーで選んだ開始日・終了日そのもの（片方だけ・両方とも
+-- 省略も可、省略側は無制限）。period_months は移行前の「直近Nか月」形式の名残で、
+-- 古い公開データの表示にだけ使う（新規の公開では書き込まない）。
 create table if not exists published_rankings (
   id            uuid primary key default gen_random_uuid(),
   published_at  timestamptz not null default now(),
   period_months int,
+  period_start  date,
+  period_end    date,
   data          jsonb not null
 );
 

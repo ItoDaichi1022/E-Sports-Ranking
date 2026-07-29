@@ -335,7 +335,10 @@ export async function loadAll() {
   state.publishedRanking = snapshot
     ? {
         publishedAt: snapshot.published_at,
-        periodMonths: snapshot.period_months,
+        periodStart: snapshot.period_start ?? null,
+        periodEnd: snapshot.period_end ?? null,
+        // 移行前の「直近Nか月」形式で公開された古いデータの表示にだけ使う
+        periodMonths: snapshot.period_months ?? null,
         rankings: snapshot.data?.rankings ?? [],
       }
     : null;
@@ -1084,10 +1087,12 @@ export async function refreshChatReports() {
 // ---------------------------------------------------------------------------
 
 // 公開のたびに1行追加する（上書きではない）。過去に何をいつ公開したかが残る。
+// period_months はもう書き込まない（カレンダーの開始日・終了日に置き換わったため）。
 export async function publishRanking(snapshot) {
   const { error } = await supabase.from('published_rankings').insert({
     published_at: snapshot.publishedAt,
-    period_months: snapshot.periodMonths,
+    period_start: snapshot.periodStart,
+    period_end: snapshot.periodEnd,
     data: { rankings: snapshot.rankings },
   });
   check(error, 'ランキングの公開');

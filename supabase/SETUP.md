@@ -172,6 +172,7 @@ URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デ�
 | [`migration-011.sql`](migration-011.sql) | 回戦ごとの開始と配信台（`tournament_rounds` テーブル） |
 | [`migration-012.sql`](migration-012.sql) | 対戦カードごとのルームコード（`match_room_codes` テーブル） |
 | [`migration-013.sql`](migration-013.sql) | ゲスト閲覧が42501で失敗する不具合の修正（`is_match_participant` の実行権限） |
+| [`migration-014.sql`](migration-014.sql) | ランキング公開の集計期間をカレンダーの開始日・終了日で選べるようにする（`published_rankings.period_start` / `period_end`） |
 
 補足:
 

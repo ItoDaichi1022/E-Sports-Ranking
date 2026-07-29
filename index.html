@@ -10,7 +10,7 @@
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=59">
+<link rel="stylesheet" href="css/style.css?v=61">
 </head>
 <body>
 <header>
@@ -227,7 +227,7 @@
           <h3><span class="guide-step-num">1</span>ログインして選手登録</h3>
           <p>
             右上の「ログイン」から、GoogleまたはDiscordのアカウントでログインします。
-            初回は<strong>表示名を1つ入れるだけ</strong>で選手登録が完了します。
+            初回は<strong>表示名など必要事項を記入</strong>すると選手登録が完了します。
             プロフィール（アイコン・使用キャラ・SNSなど）はあとからマイページでいつでも編集できます。
           </p>
         </div>
@@ -591,16 +591,16 @@
       スコアに反映されるのは「参加24人以上」かつ「対戦方法が1v1またはリレー」の大会の試合です。
       対象かどうかは各大会の詳細ページに表示されます。
     </p>
+    <!-- 集計期間はカレンダーで開始日・終了日を直接選ぶ（「直近Nか月」ではなく）。
+         どちらも空欄でよく、その側は無制限になる（両方空欄なら全期間）。 -->
     <div id="ranking-editor" class="inline-form" hidden>
       <label>
-        集計対象期間
-        <select id="ranking-period-select">
-          <option value="1">直近1か月</option>
-          <option value="3" selected>直近3か月</option>
-          <option value="6">直近6か月</option>
-          <option value="12">直近12か月</option>
-          <option value="all">全期間</option>
-        </select>
+        集計開始日（空欄で無制限）
+        <input type="date" id="ranking-start-input">
+      </label>
+      <label>
+        集計終了日（空欄で無制限）
+        <input type="date" id="ranking-end-input">
       </label>
       <button type="button" id="ranking-export-btn" class="btn-secondary">画像を書き出す</button>
       <button type="button" id="ranking-publish-btn">このランキングを公開する</button>
@@ -622,7 +622,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=59"></script>
+<script src="js/vendor/supabase.js?v=61"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -634,27 +634,27 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=59",
-    "./js/bracket.js":        "./js/bracket.js?v=59",
-    "./js/bracketView.js":    "./js/bracketView.js?v=59",
-    "./js/db.js":             "./js/db.js?v=59",
-    "./js/entries.js":        "./js/entries.js?v=59",
-    "./js/icons.js":          "./js/icons.js?v=59",
-    "./js/matchChat.js":      "./js/matchChat.js?v=59",
-    "./js/playerStats.js":    "./js/playerStats.js?v=59",
-    "./js/players.js":        "./js/players.js?v=59",
-    "./js/profile.js":        "./js/profile.js?v=59",
-    "./js/ranking.js":        "./js/ranking.js?v=59",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=59",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=59",
-    "./js/rankingView.js":    "./js/rankingView.js?v=59",
-    "./js/state.js":          "./js/state.js?v=59",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=59",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=59",
-    "./js/util.js":           "./js/util.js?v=59"
+    "./js/auth.js":           "./js/auth.js?v=61",
+    "./js/bracket.js":        "./js/bracket.js?v=61",
+    "./js/bracketView.js":    "./js/bracketView.js?v=61",
+    "./js/db.js":             "./js/db.js?v=61",
+    "./js/entries.js":        "./js/entries.js?v=61",
+    "./js/icons.js":          "./js/icons.js?v=61",
+    "./js/matchChat.js":      "./js/matchChat.js?v=61",
+    "./js/playerStats.js":    "./js/playerStats.js?v=61",
+    "./js/players.js":        "./js/players.js?v=61",
+    "./js/profile.js":        "./js/profile.js?v=61",
+    "./js/ranking.js":        "./js/ranking.js?v=61",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=61",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=61",
+    "./js/rankingView.js":    "./js/rankingView.js?v=61",
+    "./js/state.js":          "./js/state.js?v=61",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=61",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=61",
+    "./js/util.js":           "./js/util.js?v=61"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=59"></script>
+<script type="module" src="js/app.js?v=61"></script>
 </body>
 </html>
