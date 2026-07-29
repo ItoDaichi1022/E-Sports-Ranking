@@ -1304,7 +1304,12 @@ revoke all on function round_is_started(uuid, uuid)    from anon, public;
 revoke all on function report_match_result(uuid, uuid, text, uuid) from anon, public;
 revoke all on function approve_match_result(uuid, uuid)            from anon, public;
 grant execute on function bracket_match(uuid, uuid)       to authenticated;
-grant execute on function is_match_participant(uuid, uuid) to authenticated;
+-- is_match_participant だけは anon にも許可する。match_result_reports と
+-- match_room_codes の select ポリシーは anon にも適用され、その中でこの関数を
+-- 呼ぶため、実行権限が無いとゲストの読み込み自体が42501で失敗する
+-- （行が0件になるのではなく、エラーになる）。ログインしていなければ
+-- 常に偽を返すだけなので、ゲストに見えるデータは増えない。
+grant execute on function is_match_participant(uuid, uuid) to anon, authenticated;
 grant execute on function can_use_match_chat(uuid, uuid)  to authenticated;
 grant execute on function match_chat_is_open(uuid, uuid)  to authenticated;
 grant execute on function my_entrant_id(uuid)             to authenticated;

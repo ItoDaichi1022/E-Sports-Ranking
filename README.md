@@ -55,7 +55,7 @@ js/
   vendor/supabase.js   supabase-js（同梱。CDNに依存しないため）
 supabase/
   schema.sql           テーブル・RLS・トリガー・RPC
-  migration-002.sql    構築済みプロジェクトへの差分適用（〜012まで番号順に当てる）
+  migration-002.sql    構築済みプロジェクトへの差分適用（〜013まで番号順に当てる）
   SETUP.md             セットアップ手順
 scripts/
   migrate.mjs          旧JSONデータをDBへ移行する

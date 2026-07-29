@@ -200,6 +200,7 @@ node scripts/verify-migration.mjs
 | [`migration-010.sql`](migration-010.sql) | 選手によるゲームカウントの入力（`match_result_reports` テーブル） |
 | [`migration-011.sql`](migration-011.sql) | 回戦ごとの開始と配信台（`tournament_rounds` テーブル） |
 | [`migration-012.sql`](migration-012.sql) | 対戦カードごとのルームコード（`match_room_codes` テーブル） |
+| [`migration-013.sql`](migration-013.sql) | ゲスト閲覧が42501で失敗する不具合の修正（`is_match_participant` の実行権限） |
 
 補足:
 
