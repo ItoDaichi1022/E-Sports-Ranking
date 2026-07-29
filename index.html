@@ -10,7 +10,7 @@
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=68">
+<link rel="stylesheet" href="css/style.css?v=69">
 </head>
 <body>
 <header>
@@ -1056,7 +1056,7 @@
       <article>
         <h3>第2条（定義）</h3>
         <ol class="legal-items">
-          <li>「運営者」とは、本サイトを管理・運営する【要記入：運営者名（個人名または団体名）】をいいます。</li>
+          <li>「運営者」とは、本サイトを管理・運営する者（Gyu、その他の運営者）を指します。</li>
           <li>「運営権限」とは、大会の作成、対戦表の管理、試合結果の確定、ランキングの公開などを行える権限をいいます。</li>
           <li>「選手」とは、本サイトに選手登録を行い、選手ページを持つ利用者をいいます。</li>
         </ol>
@@ -1210,7 +1210,7 @@
       <article>
         <h3>1. 運営者</h3>
         <p>
-          本サイトの運営者（個人情報の取扱いについて責任を負う者）は【要記入：運営者名（個人名または団体名）】です。
+          本サイトの運営者（個人情報の取扱いについて責任を負う者）はGyuです。
           連絡先は<a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">X（@tomokkugyu）</a>のダイレクトメッセージです。
         </p>
       </article>
@@ -1395,7 +1395,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=68"></script>
+<script src="js/vendor/supabase.js?v=69"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -1407,27 +1407,27 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=68",
-    "./js/bracket.js":        "./js/bracket.js?v=68",
-    "./js/bracketView.js":    "./js/bracketView.js?v=68",
-    "./js/db.js":             "./js/db.js?v=68",
-    "./js/entries.js":        "./js/entries.js?v=68",
-    "./js/icons.js":          "./js/icons.js?v=68",
-    "./js/matchChat.js":      "./js/matchChat.js?v=68",
-    "./js/playerStats.js":    "./js/playerStats.js?v=68",
-    "./js/players.js":        "./js/players.js?v=68",
-    "./js/profile.js":        "./js/profile.js?v=68",
-    "./js/ranking.js":        "./js/ranking.js?v=68",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=68",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=68",
-    "./js/rankingView.js":    "./js/rankingView.js?v=68",
-    "./js/state.js":          "./js/state.js?v=68",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=68",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=68",
-    "./js/util.js":           "./js/util.js?v=68"
+    "./js/auth.js":           "./js/auth.js?v=69",
+    "./js/bracket.js":        "./js/bracket.js?v=69",
+    "./js/bracketView.js":    "./js/bracketView.js?v=69",
+    "./js/db.js":             "./js/db.js?v=69",
+    "./js/entries.js":        "./js/entries.js?v=69",
+    "./js/icons.js":          "./js/icons.js?v=69",
+    "./js/matchChat.js":      "./js/matchChat.js?v=69",
+    "./js/playerStats.js":    "./js/playerStats.js?v=69",
+    "./js/players.js":        "./js/players.js?v=69",
+    "./js/profile.js":        "./js/profile.js?v=69",
+    "./js/ranking.js":        "./js/ranking.js?v=69",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=69",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=69",
+    "./js/rankingView.js":    "./js/rankingView.js?v=69",
+    "./js/state.js":          "./js/state.js?v=69",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=69",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=69",
+    "./js/util.js":           "./js/util.js?v=69"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=68"></script>
+<script type="module" src="js/app.js?v=69"></script>
 </body>
 </html>

@@ -1192,7 +1192,9 @@ td code { font-size: 0.85em; }
 
 .guide-step:has(> .guide-step-body:only-child) { grid-template-columns: minmax(0, 1fr); }
 
-/* 段番号。表示用フォントのグラデーション数字で「手順」を目立たせる */
+/* 段番号。章番号（.guide-chapter-num）と同じ形・同じフォントだが、面の色を変える。
+   章＝グラデーションで塗りつぶし、段＝暗い面に枠線。どちらも塗りつぶしにすると
+   「2章の3段目」なのか「2章と3章」なのか、番号を見ただけでは区別できなくなる。 */
 .guide-step-num {
   flex: none;
   display: inline-flex;
@@ -1201,12 +1203,12 @@ td code { font-size: 0.85em; }
   width: 1.9rem;
   height: 1.9rem;
   border-radius: var(--r-sm);
-  background: var(--accent-grad);
-  color: var(--accent-fg);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--accent-bright);
   font-family: var(--font-display);
   font-size: 1.05rem;
   font-weight: 700;
-  box-shadow: 0 0 12px -2px var(--glow);
 }
 
 .guide-step-body p {
@@ -1367,6 +1369,7 @@ td code { font-size: 0.85em; }
 .guide-steps + .guide-chapter,
 .guide-two-col + .guide-chapter { margin-top: 3rem; }
 
+/* 章番号。段番号より一回り大きく、グラデーションで塗りつぶす（対比は .guide-step-num を参照） */
 .guide-chapter-num {
   flex: none;
   display: inline-flex;
@@ -3676,7 +3679,20 @@ dialog h3 {
   /* ガイドは1列に。説明の下に図が来る */
   .guide-step { grid-template-columns: minmax(0, 1fr); }
   .guide-two-col { grid-template-columns: minmax(0, 1fr); }
-  .guide-toc a { font-size: 0.8rem; }
+
+  /* 目次は縦1列。横並びのまま折り返すと、章名の長さしだいで「0章と1章だけ
+     同じ行、残りは1行ずつ」のように並びが不揃いになり、目次に見えなくなる。
+     縦に揃えれば章の順序がそのまま上から下に並び、指でも押しやすい。 */
+  .guide-toc {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+
+  .guide-toc a {
+    padding: 0.55rem 0.9rem;
+    font-size: 0.8rem;
+  }
 
   /* 規約類。項番のぶら下げ幅を詰め、表は2列を等分にして横スクロールを避ける */
   .legal-items { padding-left: 1.8rem; }
