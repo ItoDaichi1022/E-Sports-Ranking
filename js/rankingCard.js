@@ -6,7 +6,9 @@ export const CARD_HEIGHT = 1080;
 
 const FONT_FAMILY = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 const COLOR_BORDER = '#888';
-const COLOR_ACCENT = '#2b6cb0';
+// カードは白地なので、サイトのライム（#8fd633）そのままでは薄すぎて読めない。
+// 同じ黄緑の色相のまま、白の上で成立する濃さまで落としたもの。
+const COLOR_ACCENT = '#41831a';
 const COLOR_MUTED = '#666';
 const COLOR_TEXT = '#1a1a1a';
 

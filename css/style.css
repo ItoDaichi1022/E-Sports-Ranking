@@ -1,11 +1,12 @@
 /* ============================================================================
-   トーナメント運営＆ランキングサイト スタイル 「ネオンアリーナ」
+   IgniteArena スタイル 「イグアナ」
 
    設計方針:
-     * ダークテーマ専用。eスポーツの放送画面のような、紺＋電光ブルー〜シアン。
-       発光（box-shadowのにじみ）と斜めのアクセントで試合前の高揚感を出す。
-     * 色は役割で分ける。青＝操作できる場所 / 金＝王座・上位 / 緑赤＝勝敗。
+     * ダークテーマ専用。深緑＋ライム〜シャルトリューズ。通称「イグアナ」に合わせた
+       配色で、発光（box-shadowのにじみ）と斜めのアクセントで試合前の高揚感を出す。
+     * 色は役割で分ける。黄緑＝操作できる場所 / 金＝王座・上位 / ミント赤＝勝敗。
        この3系統以外に色を増やさないことで、情報そのものが目立つようにする。
+       操作の黄緑と勝敗のミントは、どちらも緑系だが色相を70度ほど離してある。
      * 見出し・数字はOxanium（同梱woff2、ラテン文字のみ）。日本語は端末ゴシックに
        フォールバックし、混植で機械的な字面を作る。
      * 面は「枠線で囲む」のではなく「背景の明度差」で分ける。線を減らすほど
@@ -26,35 +27,37 @@
 :root {
   color-scheme: dark;
 
-  /* ---- 面（下から上へ明るくなる）。基準は深い紺 ---- */
-  --bg: #0a1020;
-  --surface: #101a2e;
-  --surface-2: #16233c;
-  --surface-3: #1e2f4e;
+  /* ---- 面（下から上へ明るくなる）。基準はイグアナの陰、深い緑 ---- */
+  --bg: #0a1710;
+  --surface: #10241a;
+  --surface-2: #163122;
+  --surface-3: #1e422e;
 
   /* ---- 線 ---- */
-  --border: #24385a;
-  --border-soft: #1a2944;
-  --border-strong: #375179;
+  --border: #27573b;
+  --border-soft: #1c412c;
+  --border-strong: #3b7452;
 
   /* ---- 文字 ---- */
-  --text: #e6edfb;
-  --text-dim: #a9bbd9;
-  --text-faint: #7e93b8;
+  --text: #e9f4ea;
+  --text-dim: #aecab5;
+  --text-faint: #82a68d;
 
   /* ---- アクセント（操作）----
-     電光ブルー→シアンのグラデーションが主役。塗った面には紺の文字を置く。
-     --accent-bright は暗い背景に置く文字・線用、--glow は発光のにじみ用。 */
-  --accent: #3fa9ff;
-  --accent-2: #35e0ff;
-  --accent-grad: linear-gradient(135deg, #3d8bff, #35e0ff);
-  --accent-fg: #051224;
-  --accent-hover: #63bbff;
-  --accent-active: #2e8fe0;
-  --accent-bright: #6fc3ff;
-  --accent-soft: rgba(63, 169, 255, 0.14);
-  --accent-ring: rgba(63, 169, 255, 0.55);
-  --glow: rgba(53, 224, 255, 0.35);
+     イグアナのライム〜シャルトリューズのグラデーションが主役。塗った面には深緑の文字を置く。
+     --accent-bright は暗い背景に置く文字・線用、--glow は発光のにじみ用。
+     色相は黄緑（75〜85度）の帯に収める。ここを緑（145度あたり）まで下げると
+     勝敗・成功の --win（ミント）と見分けがつかなくなる。 */
+  --accent: #8fd633;
+  --accent-2: #cbee4e;
+  --accent-grad: linear-gradient(135deg, #7ac92b, #cbee4e);
+  --accent-fg: #10240a;
+  --accent-hover: #a5e04f;
+  --accent-active: #79b92a;
+  --accent-bright: #b8e86a;
+  --accent-soft: rgba(143, 214, 51, 0.14);
+  --accent-ring: rgba(143, 214, 51, 0.55);
+  --glow: rgba(180, 235, 70, 0.35);
 
   /* ---- 見出し・数字用フォント ---- */
   --font-display: 'Oxanium', system-ui, sans-serif;
@@ -102,8 +105,8 @@ body {
   color: var(--text);
   /* アリーナの床のような、ごく薄いグリッド線。情報の邪魔をしない2%の明度差 */
   background-image:
-    repeating-linear-gradient(0deg, rgba(111, 195, 255, 0.025) 0 1px, transparent 1px 48px),
-    repeating-linear-gradient(90deg, rgba(111, 195, 255, 0.025) 0 1px, transparent 1px 48px);
+    repeating-linear-gradient(0deg, rgba(184, 232, 106, 0.03) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(90deg, rgba(184, 232, 106, 0.03) 0 1px, transparent 1px 48px);
   background-attachment: fixed;
 }
 
@@ -116,8 +119,8 @@ body::before {
   inset: -20% -10%;
   pointer-events: none;
   background:
-    radial-gradient(620px 340px at 22% 4%, rgba(61, 139, 255, 0.16), transparent 70%),
-    radial-gradient(520px 300px at 82% -4%, rgba(53, 224, 255, 0.11), transparent 70%);
+    radial-gradient(620px 340px at 22% 4%, rgba(122, 201, 43, 0.16), transparent 70%),
+    radial-gradient(520px 300px at 82% -4%, rgba(203, 238, 78, 0.12), transparent 70%);
   animation: arena-lights 46s ease-in-out infinite alternate;
 }
 
@@ -218,7 +221,7 @@ header {
   z-index: 20;
   margin: 0 -1.5rem 1.5rem;
   padding: 0.6rem 1.5rem;
-  background: rgba(10, 16, 32, 0.84);
+  background: rgba(10, 23, 16, 0.86);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -232,8 +235,8 @@ header::after {
   bottom: 0;
   height: 1px;
   background: linear-gradient(90deg,
-    transparent, rgba(61, 139, 255, 0.55) 30%, rgba(53, 224, 255, 0.75) 50%,
-    rgba(61, 139, 255, 0.55) 70%, transparent);
+    transparent, rgba(122, 201, 43, 0.55) 30%, rgba(203, 238, 78, 0.8) 50%,
+    rgba(122, 201, 43, 0.55) 70%, transparent);
 }
 
 /* 左からメニューボタン、タイトル、右端にアカウント。
@@ -994,7 +997,7 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   letter-spacing: 0.04em;
   color: var(--accent-bright);
   background: var(--accent-soft);
-  border: 1px solid rgba(63, 169, 255, 0.4);
+  border: 1px solid rgba(143, 214, 51, 0.4);
   border-radius: var(--r-pill);
   vertical-align: middle;
 }
@@ -1094,14 +1097,14 @@ td code { font-size: 0.85em; }
 .hero::before {
   top: -160px;
   left: 12%;
-  background: radial-gradient(closest-side, rgba(61, 139, 255, 0.28), transparent);
+  background: radial-gradient(closest-side, rgba(122, 201, 43, 0.28), transparent);
   animation: hero-blob-a 14s ease-in-out infinite alternate;
 }
 
 .hero::after {
   top: -140px;
   right: 8%;
-  background: radial-gradient(closest-side, rgba(53, 224, 255, 0.2), transparent);
+  background: radial-gradient(closest-side, rgba(203, 238, 78, 0.22), transparent);
   animation: hero-blob-b 18s ease-in-out infinite alternate;
 }
 
@@ -1894,7 +1897,7 @@ a.card:hover {
   border-left: 3px solid transparent;
   background:
     linear-gradient(var(--surface), var(--surface)) padding-box,
-    linear-gradient(180deg, #3d8bff, #35e0ff) border-box;
+    linear-gradient(180deg, #7ac92b, #cbee4e) border-box;
 }
 
 
@@ -3392,7 +3395,7 @@ tr.own-row > td:first-child { box-shadow: inset 3px 0 0 var(--accent-bright); }
    名前の欄を見ているときに強調が視界から外れることがあるため。 */
 tr.own-row .player-identity a { color: var(--accent-bright); }
 
-tr.own-row:hover > td { background: rgba(63, 169, 255, 0.24) !important; }
+tr.own-row:hover > td { background: rgba(143, 214, 51, 0.24) !important; }
 
 /* ---------------------------------------------------------------------------
    ダイアログ
@@ -3409,8 +3412,8 @@ dialog {
   box-shadow: 0 0 40px -12px var(--glow), var(--shadow-lg);
   /* 上辺にグラデーションの光の線。radius に沿わせるため border-image は使わない */
   background-image: linear-gradient(90deg,
-    transparent 6%, rgba(61, 139, 255, 0.7) 35%, rgba(53, 224, 255, 0.9) 50%,
-    rgba(61, 139, 255, 0.7) 65%, transparent 94%);
+    transparent 6%, rgba(122, 201, 43, 0.7) 35%, rgba(203, 238, 78, 0.95) 50%,
+    rgba(122, 201, 43, 0.7) 65%, transparent 94%);
   background-repeat: no-repeat;
   background-size: 100% 2px;
   background-position: top center;
@@ -3432,7 +3435,7 @@ dialog .inline-form > label,
 dialog .inline-form > .image-preview-row { flex: 1 1 100%; }
 
 dialog::backdrop {
-  background: rgba(4, 8, 16, 0.72);
+  background: rgba(4, 14, 8, 0.74);
   backdrop-filter: blur(5px);
 }
 
