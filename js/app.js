@@ -24,7 +24,7 @@ import {
   signInWithProvider, signOut, reloadOwnPlayer,
 } from './auth.js';
 import { isConfigured } from './supabaseClient.js';
-import { makeIconButton } from './icons.js';
+import { iconSvg, makeIconButton } from './icons.js';
 import * as db from './db.js';
 
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
@@ -1218,9 +1218,11 @@ function renderPlayerDetail(playerId) {
       <div class="player-identity">
         ${avatarHtml(player, 'lg')}
         <div>
-          <h2>${escapeHtml(player.currentName)}</h2>
+          <h2>
+            ${escapeHtml(player.currentName)}
+            ${isOwn ? `<a href="#profile" class="profile-edit-link" title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</a>` : ''}
+          </h2>
           ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>` : ''}
-          ${isOwn ? '<p class="meta-line"><a href="#profile">プロフィールを編集する</a></p>' : ''}
           ${!isOwn && isAdmin() ? '<p class="meta-line"><button type="button" class="btn-secondary admin-rename-btn">表示名を変更</button></p>' : ''}
         </div>
       </div>

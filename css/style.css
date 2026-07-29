@@ -2626,6 +2626,31 @@ dialog.dialog-chat {
   word-break: break-word;
 }
 
+/* 自分の名前の横に置く「プロフィールを編集」への入口。名前のすぐ隣なので、
+   ボタンの塗り（発光グラデ）は名前より目立ってしまう。線画だけの控えめな入口にする。 */
+.profile-edit-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-left: 0.3rem;
+  padding: 0;
+  border-radius: var(--r-sm);
+  color: var(--text-faint);
+  vertical-align: middle;
+}
+
+.profile-edit-link svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.profile-edit-link:hover {
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+}
+
 .stat-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
