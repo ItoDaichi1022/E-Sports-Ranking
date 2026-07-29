@@ -10,7 +10,7 @@
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=61">
+<link rel="stylesheet" href="css/style.css?v=63">
 </head>
 <body>
 <header>
@@ -569,6 +569,8 @@
     <p id="bracket-meta" class="meta-line"></p>
     <!-- 出場している人にだけ出す使い方の案内。名前を押せることに気づいてもらう -->
     <p id="bracket-own-hint" class="bracket-own-hint" hidden></p>
+    <!-- 運営が自動生成された組み合わせを直すための欄（中身は js/app.js） -->
+    <div id="bracket-admin-tools" class="bracket-admin-tools" hidden></div>
     <div id="bracket-container"></div>
     <div id="result-section" class="result-section"></div>
   </section>
@@ -591,6 +593,11 @@
       スコアに反映されるのは「参加24人以上」かつ「対戦方法が1v1またはリレー」の大会の試合です。
       対象かどうかは各大会の詳細ページに表示されます。
     </p>
+    <!-- 運営がランキングを作るときだけ、下の編集欄を開く。畳んでおくのは、
+         開いている間は公開中のランキングではなく集計中のプレビューが出るため
+         （運営も普段は閲覧者と同じものを見る）。 -->
+    <button type="button" id="ranking-create-btn" class="btn-secondary" hidden>ランキングを作成する</button>
+
     <!-- 集計期間はカレンダーで開始日・終了日を直接選ぶ（「直近Nか月」ではなく）。
          どちらも空欄でよく、その側は無制限になる（両方空欄なら全期間）。 -->
     <div id="ranking-editor" class="inline-form" hidden>
@@ -604,6 +611,7 @@
       </label>
       <button type="button" id="ranking-export-btn" class="btn-secondary">画像を書き出す</button>
       <button type="button" id="ranking-publish-btn">このランキングを公開する</button>
+      <button type="button" id="ranking-cancel-btn" class="btn-secondary">やめる</button>
     </div>
     <p id="ranking-published-status" class="meta-line"></p>
     <div id="ranking-container"></div>
@@ -622,7 +630,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=61"></script>
+<script src="js/vendor/supabase.js?v=63"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -634,27 +642,27 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=61",
-    "./js/bracket.js":        "./js/bracket.js?v=61",
-    "./js/bracketView.js":    "./js/bracketView.js?v=61",
-    "./js/db.js":             "./js/db.js?v=61",
-    "./js/entries.js":        "./js/entries.js?v=61",
-    "./js/icons.js":          "./js/icons.js?v=61",
-    "./js/matchChat.js":      "./js/matchChat.js?v=61",
-    "./js/playerStats.js":    "./js/playerStats.js?v=61",
-    "./js/players.js":        "./js/players.js?v=61",
-    "./js/profile.js":        "./js/profile.js?v=61",
-    "./js/ranking.js":        "./js/ranking.js?v=61",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=61",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=61",
-    "./js/rankingView.js":    "./js/rankingView.js?v=61",
-    "./js/state.js":          "./js/state.js?v=61",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=61",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=61",
-    "./js/util.js":           "./js/util.js?v=61"
+    "./js/auth.js":           "./js/auth.js?v=63",
+    "./js/bracket.js":        "./js/bracket.js?v=63",
+    "./js/bracketView.js":    "./js/bracketView.js?v=63",
+    "./js/db.js":             "./js/db.js?v=63",
+    "./js/entries.js":        "./js/entries.js?v=63",
+    "./js/icons.js":          "./js/icons.js?v=63",
+    "./js/matchChat.js":      "./js/matchChat.js?v=63",
+    "./js/playerStats.js":    "./js/playerStats.js?v=63",
+    "./js/players.js":        "./js/players.js?v=63",
+    "./js/profile.js":        "./js/profile.js?v=63",
+    "./js/ranking.js":        "./js/ranking.js?v=63",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=63",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=63",
+    "./js/rankingView.js":    "./js/rankingView.js?v=63",
+    "./js/state.js":          "./js/state.js?v=63",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=63",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=63",
+    "./js/util.js":           "./js/util.js?v=63"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=61"></script>
+<script type="module" src="js/app.js?v=63"></script>
 </body>
 </html>

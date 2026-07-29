@@ -38,11 +38,16 @@ function playerScores(match) {
   return [parts[0].trim(), parts[1].trim()];
 }
 
+// 運営が組み合わせを直しているときの状態。renderBracket が毎回入れ直す。
+// 対戦表は同時に1つしか描かないので、引数で持ち回らずここに置いている。
+let swapCtx = { active: false, selected: null, onPick: null };
+
 // 選手名からその人のプロフィールへ。対戦相手がどんな選手なのかは、対戦表を見て
 // いちばん気になるところなので、名前をそのまま入口にする。
 // 誰が入るか決まっていない枠（TBD）は押せない文字のままにする。
 function playerNameLink(playerId, name) {
-  if (!playerId) {
+  // 入れ替え中は名前を押しても選手ページへ飛ばさない（押す意味が「選ぶ」に変わるため）
+  if (!playerId || swapCtx.active) {
     const span = document.createElement('span');
     span.textContent = name;
     return span;
@@ -128,6 +133,19 @@ function drawConnectorLines(bracket, wrapper, matchElements) {
   });
 
   wrapper.appendChild(svg);
+}
+
+// 入れ替え中は、選手の行そのものを「選ぶ」ボタンにする。
+// 1人目を選ぶと印が付き、2人目を選んだ時点で入れ替わる（呼び出し側が実行する）。
+function makeRowSwapTarget(row, entrantId) {
+  if (!entrantId) return; // 空き枠（TBD・BYEの相手）は選べない
+
+  row.row.classList.add('swap-target');
+  if (swapCtx.selected === entrantId) row.row.classList.add('swap-selected');
+  row.row.title = swapCtx.selected === entrantId
+    ? '選択中（もう一度押すと取り消し）'
+    : '入れ替える相手として選ぶ';
+  row.row.addEventListener('click', () => swapCtx.onPick(entrantId));
 }
 
 // 対戦カードの右端に1つだけ置く鉛筆。ルームコード・チャット・ゲームカウントの入口。
@@ -238,14 +256,16 @@ function renderMatchBox(
 
   // BYE（不戦勝）はラベルを出さず、進出した選手・チームの名前だけをそのまま表示する。
   if (match.isBye) {
-    const { row } = buildPlayerRow({
+    const byeRow = buildPlayerRow({
       seed: seedOf(match.winnerId),
       name: getEntrantName(tournamentId, match.winnerId),
       members: getEntrantMemberNames(tournamentId, match.winnerId),
       memberIds: getEntrantMemberIds(tournamentId, match.winnerId),
       isWinner: true,
     });
-    box.appendChild(row);
+    // 不戦勝の枠も入れ替えの対象。「この人にBYEを回したい」を直せるようにする。
+    if (swapCtx.active) makeRowSwapTarget(byeRow, match.winnerId);
+    box.appendChild(byeRow.row);
     return box;
   }
 
@@ -299,6 +319,16 @@ function renderMatchBox(
         row.nameEl.classList.add('own-chat-row');
       }
     });
+  }
+
+  // 入れ替え中は、この対戦カードで開けるのは「選ぶ」だけにする。
+  // チャットや結果の入力を混ぜると、押し間違いで別の操作に入ってしまう。
+  if (swapCtx.active) {
+    makeRowSwapTarget(r1, p1);
+    makeRowSwapTarget(r2, p2);
+    box.appendChild(r1.row);
+    box.appendChild(r2.row);
+    return box;
   }
 
   box.appendChild(r1.row);
@@ -446,6 +476,14 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
   const readOnly = !!options.readOnly;
   const onRefresh = options.onRefresh ?? (async () => {});
 
+  // options.swap: 運営が組み合わせを直している間だけ渡される
+  //   { selected, onPick } — selected は1人目に選んだ出場枠のID（まだ無ければ null）
+  swapCtx = {
+    active: Boolean(options.swap) && !readOnly,
+    selected: options.swap?.selected ?? null,
+    onPick: options.swap?.onPick ?? (() => {}),
+  };
+
   // 同じ大会の描き直しでは、横スクロール位置を引き継ぐ。
   // 対戦表は Realtime の更新（他の画面の変更でも飛んでくる）のたびに丸ごと
   // 作り直されるので、これが無いと見ている最中に先頭へ戻ってしまう。
@@ -485,7 +523,10 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
     header.textContent = round.name;
     col.appendChild(header);
 
-    col.appendChild(roundControls(tournamentId, roundIndex, round, readOnly, onRefresh));
+    // 入れ替え中は回戦の開始・配信台の操作を出さない（入れ替えが終わってから決める）
+    if (!swapCtx.active) {
+      col.appendChild(roundControls(tournamentId, roundIndex, round, readOnly, onRefresh));
+    }
 
     const body = document.createElement('div');
     body.className = 'round-body';

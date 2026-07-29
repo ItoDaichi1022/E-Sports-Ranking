@@ -2162,6 +2162,49 @@ a.card:hover {
   color: var(--text);
 }
 
+/* ---- 組み合わせの調整（運営・開始前だけ） ---- */
+
+.bracket-admin-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.bracket-admin-tools .note { margin: 0; }
+
+/* 調整中は「いま別のモードにいる」ことが分かるよう、帯ごと色を変える */
+.bracket-admin-tools.is-swapping {
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+}
+
+.bracket-swap-note {
+  margin: 0;
+  margin-right: auto;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* 調整中の選手の行。押せることを枠線で示し、選んだ1人目は塗って残す */
+.match-player.swap-target {
+  cursor: pointer;
+  outline: 1px dashed var(--border-strong);
+  outline-offset: -2px;
+}
+
+.match-player.swap-target:hover { background: var(--surface-3); }
+
+.match-player.swap-selected {
+  outline: 2px solid var(--accent-2);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 14px -4px var(--glow);
+}
+
 /* 入口は対戦表の枠の下端に敷く（編集ボタンと同じ形） */
 .match-chat-btn {
   display: block;
@@ -2787,6 +2830,9 @@ dialog.dialog-chat {
 .rank-change.down { color: var(--loss); }
 .rank-change.same { color: var(--text-faint); font-weight: 400; }
 .rank-change.new  { color: var(--accent-bright); }
+
+/* 集計欄を開く入口。閉じている間は下の公開中のランキングと詰まらないよう余白を取る */
+#ranking-create-btn { margin-bottom: 1rem; }
 
 #ranking-editor {
   padding: 1.1rem 1.25rem;

@@ -6,6 +6,7 @@ import { renderPlayerTable, updatePlayer } from './players.js';
 import { escapeHtml, avatarHtml, safeUrl, cardThumb, setupImagePicker } from './util.js';
 import {
   createBracket, updateTournament, allMatchesDecided, finalStandings, finalPlacements,
+  swapBracketEntrants,
 } from './bracket.js';
 import { renderBracket } from './bracketView.js';
 import { reportChipHtml, syncOpenChat } from './matchChat.js';
@@ -79,6 +80,7 @@ const historyListEl = $('history-list');
 const bracketTitleEl = $('bracket-title');
 const bracketMetaEl = $('bracket-meta');
 const bracketOwnHintEl = $('bracket-own-hint');
+const bracketAdminToolsEl = $('bracket-admin-tools');
 const bracketContainer = $('bracket-container');
 const tournamentEditBtn = $('tournament-edit-btn');
 const tournamentDeleteBtn = $('tournament-delete-btn');
@@ -117,11 +119,13 @@ const profileAccountActions = $('profile-account-actions');
 const profileAccountEmail = $('profile-account-email');
 
 const rankingContainer = $('ranking-container');
+const rankingCreateBtn = $('ranking-create-btn');
 const rankingEditorEl = $('ranking-editor');
 const rankingStartInput = $('ranking-start-input');
 const rankingEndInput = $('ranking-end-input');
 const rankingExportBtn = $('ranking-export-btn');
 const rankingPublishBtn = $('ranking-publish-btn');
+const rankingCancelBtn = $('ranking-cancel-btn');
 const rankingPublishedStatusEl = $('ranking-published-status');
 const rankingEditorNoteEl = $('ranking-editor-note');
 
@@ -190,13 +194,14 @@ function applyAuthUI() {
 
   navTournamentLink.hidden = !admin;
   announcementNewBtn.hidden = !admin;
-  rankingEditorEl.hidden = !admin;
-  rankingEditorNoteEl.hidden = !admin;
+  rankingCreateBtn.hidden = !admin;
   tournamentEditBtn.hidden = !admin;
   tournamentDeleteBtn.hidden = !admin;
   if (!admin) tournamentEditForm.hidden = true;
   // 運営でなくなったら投稿フォームも畳む
   if (!admin) closeAnnouncementForm();
+  // 同じく、開いていたランキングの編集欄も畳む
+  if (!admin) closeRankingEditor();
 
   loginBtn.hidden = loggedIn;
   accountAvatarEl.hidden = !loggedIn;
@@ -908,6 +913,107 @@ function renderTournamentDetail(tournamentId) {
   renderTournamentInfo(tournament);
 }
 
+// ---- 組み合わせの手直し（運営） ----
+//
+// 自動生成されたブラケットは、シード順のとおりに機械的に並ぶ。同じ地域の選手が
+// 1回戦で当たる、といった「表としては正しいが運営として避けたい」組み合わせを、
+// 開始前に手で直せるようにする。
+//
+// { tournamentId, selected } | null。selected は1人目に選んだ出場枠のID。
+let bracketSwap = null;
+
+// 直せるのは回戦が始まる前だけ。選手に対戦相手が見えたあとで動かすと、
+// 待ち合わせ済みの相手が変わってしまう。
+function canAdjustBracket(tournamentId) {
+  if (!state.brackets[tournamentId]) return false;
+  const started = state.rounds.some((r) => r.tournamentId === tournamentId && r.startedAt);
+  const hasResults = state.matches.some((m) => m.tournamentId === tournamentId);
+  return !started && !hasResults;
+}
+
+function renderBracketAdminTools(tournamentId) {
+  bracketAdminToolsEl.innerHTML = '';
+
+  if (!isAdmin() || !canAdjustBracket(tournamentId)) {
+    bracketAdminToolsEl.hidden = true;
+    if (bracketSwap?.tournamentId === tournamentId) bracketSwap = null;
+    return;
+  }
+
+  bracketAdminToolsEl.hidden = false;
+  const swapping = bracketSwap?.tournamentId === tournamentId;
+
+  if (!swapping) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-secondary';
+    btn.textContent = '組み合わせを調整する';
+    btn.addEventListener('click', () => {
+      bracketSwap = { tournamentId, selected: null };
+      renderBracketPage(tournamentId);
+    });
+    bracketAdminToolsEl.appendChild(btn);
+
+    const note = document.createElement('p');
+    note.className = 'note';
+    note.textContent = '回戦を開始する前なら、対戦カードの組み合わせを手で入れ替えられます。';
+    bracketAdminToolsEl.appendChild(note);
+    return;
+  }
+
+  bracketAdminToolsEl.classList.add('is-swapping');
+  const note = document.createElement('p');
+  note.className = 'bracket-swap-note';
+  note.textContent = bracketSwap.selected
+    ? '入れ替える相手を選んでください（選んだ2人の位置が入れ替わります）。'
+    : '位置を入れ替えたい選手を2人、順に押してください。';
+  bracketAdminToolsEl.appendChild(note);
+
+  const doneBtn = document.createElement('button');
+  doneBtn.type = 'button';
+  doneBtn.textContent = '調整を終える';
+  doneBtn.addEventListener('click', () => {
+    bracketSwap = null;
+    bracketAdminToolsEl.classList.remove('is-swapping');
+    renderBracketPage(tournamentId);
+  });
+  bracketAdminToolsEl.appendChild(doneBtn);
+}
+
+// 対戦表で選手が押されたとき。1人目は覚えるだけ、2人目でその場で入れ替える。
+async function onBracketSwapPick(tournamentId, entrantId) {
+  if (bracketSwap?.tournamentId !== tournamentId) return;
+
+  // 同じ人をもう一度押したら選択を解除する（押し間違いをその場で戻せる）
+  if (bracketSwap.selected === entrantId) {
+    bracketSwap.selected = null;
+    await renderBracketPage(tournamentId);
+    return;
+  }
+  if (!bracketSwap.selected) {
+    bracketSwap.selected = entrantId;
+    await renderBracketPage(tournamentId);
+    return;
+  }
+
+  const result = swapBracketEntrants(tournamentId, bracketSwap.selected, entrantId);
+  if (!result.ok) {
+    alert(result.error);
+    return;
+  }
+  bracketSwap.selected = null;
+  await renderBracketPage(tournamentId);
+
+  // 保存に失敗したら、DBから取り直して手元の入れ替えを捨てる（画面とDBを食い違わせない）
+  const ok = await persist(
+    () => db.saveBracket(tournamentId, state.brackets[tournamentId]), '対戦表の保存',
+  );
+  if (!ok) {
+    await refreshFromDb();
+    await renderBracketPage(tournamentId);
+  }
+}
+
 // 対戦表のページ。大会詳細から分けて、対戦表だけに集中できるようにする。
 //
 // 対戦表の中身はこのページに来て初めて取りに行く（loadAll は持ってこない）。
@@ -918,6 +1024,7 @@ async function renderBracketPage(tournamentId) {
     bracketTitleEl.textContent = '大会が見つかりません';
     bracketMetaEl.textContent = '';
     bracketOwnHintEl.hidden = true;
+    bracketAdminToolsEl.hidden = true;
     bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
     resultSectionEl.innerHTML = '';
     bracketBackLink.href = '#history';
@@ -956,6 +1063,9 @@ async function renderBracketPage(tournamentId) {
     if (page !== 'bracket' || param !== tournamentId) return;
   }
 
+  renderBracketAdminTools(tournamentId);
+  const swapping = bracketSwap?.tournamentId === tournamentId;
+
   // bracketView は state を書き換えてから onChanged を呼ぶ。ここでDBへ反映する。
   renderBracket(tournamentId, bracketContainer, async () => {
     renderBracketPage(tournamentId);
@@ -977,6 +1087,13 @@ async function renderBracketPage(tournamentId) {
     // 選手がゲームカウントを報告・承認したあと。DBの関数側で書き込みが済んでいるので、
     // ここは取り直して描き直すだけでよい（onChanged と違い、書き戻しはしない）。
     onRefresh: async () => { await refreshFromDb(); },
+    // 組み合わせの調整中だけ、選手の行を「選ぶ」対象にする
+    swap: swapping
+      ? {
+        selected: bracketSwap.selected,
+        onPick: (entrantId) => onBracketSwapPick(tournamentId, entrantId),
+      }
+      : null,
   });
 
   renderResultSection(tournament);
@@ -1184,11 +1301,32 @@ function selectedRankingRange() {
   return { start: rankingStartInput.value || null, end: rankingEndInput.value || null };
 }
 
-// 運営には選択中の期間のライブプレビューを、それ以外には公開済みスナップショットを見せる。
+// ランキングの集計欄を開いているか。開いている間だけ、運営には公開中のものではなく
+// 集計中のプレビューを見せる。普段は運営も閲覧者と同じ「公開中のランキング」を見る。
+let rankingEditorOpen = false;
+
+function openRankingEditor() {
+  rankingEditorOpen = true;
+  rankingEditorEl.hidden = false;
+  rankingEditorNoteEl.hidden = false;
+  rankingCreateBtn.hidden = true;
+  renderRankingPage();
+}
+
+function closeRankingEditor() {
+  rankingEditorOpen = false;
+  rankingEditorEl.hidden = true;
+  rankingEditorNoteEl.hidden = true;
+  rankingCreateBtn.hidden = !isAdmin();
+  renderRankingPage();
+}
+
+// 集計欄を開いている運営には選択中の期間のライブプレビューを、
+// それ以外には公開済みスナップショットを見せる。
 function renderRankingPage() {
   rankingPublishedStatusEl.textContent = publishedStatusLine();
 
-  if (isAdmin()) {
+  if (isAdmin() && rankingEditorOpen) {
     const { rankings: preview } = computeRankingsForRange(state, selectedRankingRange());
     const previewWithChange = withRankChange(preview, state.publishedRanking?.rankings);
     renderRankingTable(
@@ -1430,6 +1568,9 @@ tournamentForm.addEventListener('change', (e) => {
   tournamentSubmitBtn.textContent = manual ? 'ブラケットを生成' : '大会を作成';
 });
 
+rankingCreateBtn.addEventListener('click', openRankingEditor);
+rankingCancelBtn.addEventListener('click', closeRankingEditor);
+
 rankingStartInput.addEventListener('change', () => {
   if (isAdmin()) renderRankingPage();
 });
@@ -1485,13 +1626,10 @@ rankingPublishBtn.addEventListener('click', async () => {
 
   state.publishedRanking = snapshot;
 
-  // renderRankingPage() は運営には常にライブプレビューを見せるが、それだと公開直後の
-  // 「前回比」がプレビュー自身との比較になって全て「変動なし」に潰れる。公開した直後だけは
-  // 閲覧者が実際に見るスナップショット（正しい前回比バッジ入り）をそのまま表示する。
-  rankingPublishedStatusEl.textContent = publishedStatusLine();
-  renderRankingTable(
-    rankingContainer, snapshot.rankings, 'ランキングを計算できません。', auth.player?.id ?? null,
-  );
+  // 公開したら作業は終わりなので集計欄を畳む。閲覧者と同じ「公開中のランキング」
+  // （＝いま公開したスナップショット。正しい前回比バッジ入り）の表示に戻る。
+  // プレビューのまま残すと、前回比が自分自身との比較になって全て「変動なし」に潰れる。
+  closeRankingEditor();
 });
 
 // 「その他」を選んだときだけ説明欄を出す。他の選択肢では書いても表示に使われない。

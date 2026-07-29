@@ -94,6 +94,12 @@ export function createBracket(tournamentId, seededEntrantIds) {
   const bracketSize = nextPowerOfTwo(k);
   const order = seedOrder(bracketSize);
   const slots = order.map((seedNum) => (seedNum <= k ? seededEntrantIds[seedNum - 1] : null));
+  return createBracketFromSlots(tournamentId, slots);
+}
+
+// 1回戦の枠の並び（slots[0]とslots[1]が第1試合、以下2つずつ。空きはnull）から組み立てる。
+function createBracketFromSlots(tournamentId, slots) {
+  const bracketSize = slots.length;
   const totalRounds = Math.log2(bracketSize);
 
   const rounds = [];
@@ -127,6 +133,68 @@ export function createBracket(tournamentId, seededEntrantIds) {
   rounds[0].matches.forEach((m) => resolveIfBye(bracket, m));
 
   return bracket;
+}
+
+// 1回戦の枠の中から、その出場枠が入っている場所を探す。
+// 戻り値は { match, slot }（slot は 1 か 2）。見つからなければ null。
+function findEntrantSlot(bracket, entrantId) {
+  for (const m of bracket.rounds[0].matches) {
+    if (m.player1Id === entrantId) return { match: m, slot: 1 };
+    if (m.player2Id === entrantId) return { match: m, slot: 2 };
+  }
+  return null;
+}
+
+// 自動生成された組み合わせを、運営が手で直せるようにする（2人の位置を入れ替える）。
+//
+// 対戦カードのIDは作り直さず、1回戦の枠に入っている出場枠だけを差し替える。
+// IDを振り直すと、開始前に運営が決めた配信台・記入済みのルームコード・
+// 先に始まっていたチャットが、どれも行方不明の対戦カードを指すことになる。
+// 「この位置の対戦カード」に紐づくものは位置に残すのが正しい。
+//
+// 回戦が始まったあとは動かせない。選手には既に対戦相手が見えているため。
+export function swapBracketEntrants(tournamentId, entrantA, entrantB) {
+  const bracket = state.brackets[tournamentId];
+  if (!bracket) return { ok: false, error: '対象の大会が見つかりません。' };
+  if (entrantA === entrantB) return { ok: false, error: '同じ選手どうしは入れ替えられません。' };
+
+  const started = (state.rounds ?? []).some(
+    (r) => r.tournamentId === tournamentId && r.startedAt,
+  );
+  if (started) {
+    return { ok: false, error: '回戦が始まっているため入れ替えできません。先に回戦の開始を取り消してください。' };
+  }
+  if (state.matches.some((m) => m.tournamentId === tournamentId)) {
+    return { ok: false, error: '結果が確定した試合があるため入れ替えできません。' };
+  }
+
+  const a = findEntrantSlot(bracket, entrantA);
+  const b = findEntrantSlot(bracket, entrantB);
+  if (!a || !b) return { ok: false, error: '入れ替える相手が対戦表に見つかりません。' };
+
+  const key = (s) => (s.slot === 1 ? 'player1Id' : 'player2Id');
+  [a.match[key(a)], b.match[key(b)]] = [b.match[key(b)], a.match[key(a)]];
+
+  // 不戦勝の相手が入れ替わっている可能性があるので、判定をやり直す。
+  // 2回戦以降は1回戦の不戦勝で埋まった枠しか無い（結果はまだ1件も無いことを上で確かめている）ので、
+  // いったん全部空にしてから、1回戦の不戦勝だけを入れ直す。
+  bracket.rounds.forEach((round, roundIndex) => {
+    round.matches.forEach((m) => {
+      if (roundIndex > 0) {
+        m.player1Id = null;
+        m.player2Id = null;
+      }
+      m.winnerId = null;
+      m.loserId = null;
+      m.score = null;
+      m.confirmed = false;
+      m.isBye = false;
+      m.isWalkover = false;
+    });
+  });
+  bracket.rounds[0].matches.forEach((m) => resolveIfBye(bracket, m));
+
+  return { ok: true };
 }
 
 // 実際の対戦の勝敗を確定させる。matches スキーマに沿ったレコードを state.matches に積む。
