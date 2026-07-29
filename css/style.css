@@ -1664,16 +1664,21 @@ a.card:hover {
   font-size: 0.82rem;
 }
 
+/* カードの右端に縦いっぱいの細い列で置く鉛筆（開く・編集の入口）。
+   下の全幅バーだと行が1段増えてカードが縦に伸びるが、右の列なら高さが変わらない */
 .edit-match-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
+  align-items: center;
   justify-content: center;
-  width: 100%;
+  width: 2rem;
   min-height: 0;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.75rem;
-  font-weight: 500;
+  padding: 0;
   border: none;
-  border-top: 1px solid var(--border-soft);
+  border-left: 1px solid var(--border-soft);
   border-radius: 0;
   background: transparent;
   color: var(--text-faint);
@@ -1684,6 +1689,9 @@ a.card:hover {
   background: var(--surface-3);
   color: var(--text);
 }
+
+/* 鉛筆の列のぶんだけ中身を左に寄せ、名前やスコアが下に潜らないようにする */
+.match-box:has(> .edit-match-btn) { padding-right: 2rem; }
 
 .match-status {
   padding: 0.35rem 0.55rem;
@@ -1833,17 +1841,6 @@ a.card:hover {
   color: var(--win);
 }
 
-/* 対戦表のカードに出す1行。試合前に確認するものなので目に付く色にする */
-.match-room-code {
-  padding: 0.35rem 0.55rem;
-  border-top: 1px solid var(--border-soft);
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--info);
-  overflow-wrap: anywhere;
-}
 
 /* ---- 対戦カードごとのチャット ---- */
 

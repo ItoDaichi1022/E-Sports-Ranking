@@ -923,7 +923,7 @@ async function renderBracketPage(tournamentId) {
     && tournament.status !== 'finished';
   bracketOwnHintEl.hidden = !isParticipant || isAdmin();
   if (!bracketOwnHintEl.hidden) {
-    bracketOwnHintEl.textContent = '色の付いた自分の名前、または対戦カード下の鉛筆アイコンを押すと、ルームコードの確認・対戦相手とのチャット・ゲームカウントの報告ができます。';
+    bracketOwnHintEl.textContent = '色の付いた自分の名前、または対戦カード右の鉛筆アイコンを押すと、ルームコードの確認・対戦相手とのチャット・ゲームカウントの報告ができます。';
   }
 
   // 戻り先は大会詳細。ここへは詳細から来るため。
