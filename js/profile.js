@@ -59,8 +59,8 @@ const FIELDS = [
     note: '変更すると、以前の名前は「過去名」として選手ページに残ります。' },
   { key: 'gameAccountId', label: 'ゲームアカウントID', placeholder: '例: SW-1234-5678-9012' },
   { key: 'mainCharacters', label: '使用キャラクター', placeholder: '例: シビ, ソフィア（カンマ区切り）' },
-  { key: 'snsX', label: 'X', placeholder: '@handle または https://x.com/...' },
-  { key: 'snsYoutube', label: 'YouTube', placeholder: '@handle または https://youtube.com/...' },
+  { key: 'snsX', label: 'X', optional: true, placeholder: '@handle または https://x.com/...' },
+  { key: 'snsYoutube', label: 'YouTube', optional: true, placeholder: '@handle または https://youtube.com/...' },
 ];
 
 // フォームを作り直さずに、現在の入力内容だけを取り出せるようにしておく。
@@ -70,12 +70,15 @@ export function isProfileFormMounted(containerEl) {
   return Boolean(containerEl.querySelector('form.profile-form'));
 }
 
-// ラベル文字列と、未入力でもよい項目には「任意」の印を並べて1行に収める。
-function buildLabelHeading(text, { required = false } = {}) {
+// ラベル文字列と「任意」の印を並べて1行に収める。
+//
+// 印を出すのはSNSと自己紹介だけにしている。必須でない欄すべてに付けると、
+// 画面じゅうが「任意」だらけになって、かえってどこを埋めればよいか分からない。
+function buildLabelHeading(text, { optional = false } = {}) {
   const heading = document.createElement('span');
   heading.className = 'field-label-text';
   heading.appendChild(document.createTextNode(text));
-  if (!required) {
+  if (optional) {
     const tag = document.createElement('span');
     tag.className = 'optional-tag';
     tag.textContent = '任意';
@@ -94,7 +97,7 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
 
   FIELDS.forEach((field) => {
     const label = document.createElement('label');
-    label.appendChild(buildLabelHeading(field.label, { required: field.required }));
+    label.appendChild(buildLabelHeading(field.label, { optional: field.optional }));
 
     const input = document.createElement('input');
     input.type = 'text';
@@ -181,7 +184,7 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
 
   const bioLabel = document.createElement('label');
   bioLabel.className = 'rules-field';
-  bioLabel.appendChild(buildLabelHeading('自己紹介'));
+  bioLabel.appendChild(buildLabelHeading('自己紹介', { optional: true }));
   const bio = document.createElement('textarea');
   bio.name = 'bio';
   bio.rows = 4;

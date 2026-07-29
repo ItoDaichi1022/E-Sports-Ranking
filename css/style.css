@@ -4,7 +4,10 @@
    設計方針:
      * ダークテーマ専用。eスポーツの画面に馴染ませ、明暗の切り替えは持たない
        （両対応にすると色の指定が二重になり、どちらも詰めきれないため）。
-     * 色は役割で分ける。紫＝操作できる場所 / 金＝王座・上位 / 緑赤＝勝敗。
+     * 配色はコミュニティの公式サイト（FLAMATE）に合わせた紺＋淡い青。
+       同じ人たちが行き来する場所なので、色が違うと別のサービスに見えてしまう。
+       主要ボタンは向こうと同じ「淡い青の面に紺の文字」にしている。
+     * 色は役割で分ける。青＝操作できる場所 / 金＝王座・上位 / 緑赤＝勝敗。
        この3系統以外に色を増やさないことで、情報そのものが目立つようにする。
      * 面は「枠線で囲む」のではなく「背景の明度差」で分ける。線を減らすほど
        1枚のカードの中の情報が読みやすくなる。
@@ -14,31 +17,33 @@
 :root {
   color-scheme: dark;
 
-  /* ---- 面（下から上へ明るくなる） ---- */
-  --bg: #0b0e15;
-  --surface: #131824;
-  --surface-2: #1a2130;
-  --surface-3: #222a3c;
+  /* ---- 面（下から上へ明るくなる）。基準は公式サイトの紺 #0c131f ---- */
+  --bg: #0c131f;
+  --surface: #121b2b;
+  --surface-2: #182338;
+  --surface-3: #212f47;
 
   /* ---- 線 ---- */
-  --border: #262f42;
-  --border-soft: #1e2534;
-  --border-strong: #38445e;
+  --border: #26374f;
+  --border-soft: #1c2941;
+  --border-strong: #3a5170;
 
-  /* ---- 文字 ---- */
-  --text: #e7ebf5;
-  --text-dim: #9aa5bd;
-  --text-faint: #808da6;
+  /* ---- 文字。本文は公式サイトと同じ淡い青みの白 ---- */
+  --text: #e3eaf8;
+  --text-dim: #c5d1ec;
+  --text-faint: #8ea3c2;
 
   /* ---- アクセント（操作）----
-     塗り(--accent)は白文字とのコントラストを確保するため暗め、
-     文字色(--accent-bright)は暗い背景で読めるよう明るめ、と使い分ける。 */
-  --accent: #6d51e8;
-  --accent-hover: #7e63f2;
-  --accent-active: #5c42cf;
-  --accent-bright: #a996ff;
-  --accent-soft: rgba(109, 81, 232, 0.16);
-  --accent-ring: rgba(139, 116, 255, 0.5);
+     公式サイトの主要ボタンに合わせ、塗りは淡い青・文字は紺にする
+     （暗い面に明るい面を置くほうが、押す場所として先に目に入る）。
+     --accent-bright は暗い背景に置く文字・線用。 */
+  --accent: #c5d1ec;
+  --accent-fg: #0c131f;
+  --accent-hover: #dbe4f7;
+  --accent-active: #aebede;
+  --accent-bright: #91aed9;
+  --accent-soft: rgba(145, 174, 217, 0.16);
+  --accent-ring: rgba(145, 174, 217, 0.55);
 
   /* ---- 意味を持つ色 ---- */
   --gold: #f0c05a;
@@ -82,14 +87,14 @@ body {
   background: var(--bg);
   color: var(--text);
   /* 上部に薄く光を置いて、画面全体が真っ平らに見えないようにする */
-  background-image: radial-gradient(1200px 400px at 50% -200px, rgba(109, 81, 232, 0.14), transparent 70%);
+  background-image: radial-gradient(1200px 400px at 50% -200px, rgba(145, 174, 217, 0.12), transparent 70%);
   background-repeat: no-repeat;
   background-attachment: fixed;
 }
 
 ::selection {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 
 /* 暗い面にスクロールバーを馴染ませる */
@@ -118,9 +123,10 @@ body {
    タイポグラフィ
    --------------------------------------------------------------------------- */
 
+/* 見出しは字間を広めに取る。公式サイトと同じ、静かで硬めの字面にする */
 h1, h2, h3, h4 {
-  line-height: 1.3;
-  letter-spacing: 0.01em;
+  line-height: 1.35;
+  letter-spacing: 0.06em;
 }
 
 h2 {
@@ -133,7 +139,7 @@ h3 { font-size: 1.05rem; }
 
 a { color: var(--accent-bright); }
 
-a:hover { color: #c4b6ff; }
+a:hover { color: #c5d1ec; }
 
 /* 数値の桁を揃える。順位・スコア・人数が縦に並んだときに読みやすい。 */
 .rank-cell,
@@ -154,7 +160,7 @@ header {
   margin: 0 -1.5rem 1.5rem;
   padding: 0.6rem 1.5rem;
   border-bottom: 1px solid var(--border-soft);
-  background: rgba(11, 14, 21, 0.82);
+  background: rgba(12, 19, 31, 0.86);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -172,7 +178,7 @@ header h1 {
   margin-right: auto;
   font-size: 1.05rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.14em;
   min-width: 0;
 }
 
@@ -432,7 +438,7 @@ button,
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
   font-family: inherit;
   font-size: 0.92rem;
   font-weight: 600;
@@ -443,7 +449,7 @@ button,
 }
 
 button:hover:not(:disabled),
-.as-link:hover { background: var(--accent-hover); color: #fff; }
+.as-link:hover { background: var(--accent-hover); color: var(--accent-fg); }
 
 button:active:not(:disabled),
 .as-link:active { background: var(--accent-active); transform: translateY(1px); }
@@ -882,7 +888,7 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   letter-spacing: 0.04em;
   color: var(--accent-bright);
   background: var(--accent-soft);
-  border: 1px solid rgba(139, 116, 255, 0.35);
+  border: 1px solid rgba(145, 174, 217, 0.4);
   border-radius: var(--r-pill);
   vertical-align: middle;
 }
@@ -899,7 +905,7 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
 
 .account-badge.linked {
   color: var(--accent-bright);
-  border-color: rgba(139, 116, 255, 0.35);
+  border-color: rgba(145, 174, 217, 0.4);
   background: var(--accent-soft);
 }
 
@@ -975,45 +981,48 @@ td code { font-size: 0.85em; }
    ホーム：ヒーローとお知らせ
    --------------------------------------------------------------------------- */
 
+/* 入口の顔。公式サイトに合わせて中央に据え、字間を広げて静かに見せる */
 .hero {
-  padding: 2.25rem 1.75rem;
+  padding: 3.25rem 1.75rem 3rem;
   margin-bottom: 2rem;
+  text-align: center;
   border: 1px solid var(--border-soft);
   border-radius: var(--r-lg);
   background:
-    radial-gradient(600px 200px at 12% -40%, rgba(109, 81, 232, 0.3), transparent 70%),
-    linear-gradient(160deg, var(--surface-2), var(--surface));
+    radial-gradient(700px 260px at 50% -30%, rgba(145, 174, 217, 0.22), transparent 70%),
+    linear-gradient(160deg, var(--surface-2), var(--bg));
 }
 
 .hero-eyebrow {
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.9rem;
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
   color: var(--accent-bright);
 }
 
 .hero-title {
-  margin: 0 0 0.85rem;
-  font-size: 1.7rem;
+  margin: 0 0 1rem;
+  font-size: 2rem;
   font-weight: 800;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.08em;
 }
 
 .hero-lead {
-  margin: 0 0 0.6rem;
-  max-width: 46rem;
+  margin: 0 auto 0.6rem;
+  max-width: 42rem;
   color: var(--text-dim);
   font-size: 0.95rem;
-  line-height: 1.75;
+  line-height: 1.9;
 }
 
 .hero-actions {
   display: flex;
+  justify-content: center;
   gap: 0.7rem;
   flex-wrap: wrap;
-  margin-top: 1.5rem;
+  margin-top: 1.75rem;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1322,17 +1331,17 @@ a.card:hover {
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.03em;
-  background: linear-gradient(135deg, var(--accent), #8b74ff);
+  background: linear-gradient(135deg, #dbe4f7, var(--accent-bright));
   box-shadow: 0 4px 16px -4px var(--accent-ring);
 }
 
 .btn-entry:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--accent-hover), #9d89ff);
+  background: linear-gradient(135deg, #ecf1fb, #a8c0e2);
   box-shadow: 0 6px 20px -4px var(--accent-ring);
 }
 
 .btn-entry:active:not(:disabled) {
-  background: linear-gradient(135deg, var(--accent-active), #8b74ff);
+  background: linear-gradient(135deg, var(--accent-active), #7f9fcd);
 }
 
 /* 参加者チップ（大会情報の「エントリー中の選手」で使用） */
@@ -2498,7 +2507,7 @@ tr.own-row > td:first-child { box-shadow: inset 3px 0 0 var(--accent-bright); }
    名前の欄を見ているときに強調が視界から外れることがあるため。 */
 tr.own-row .player-identity a { color: var(--accent-bright); }
 
-tr.own-row:hover > td { background: rgba(109, 81, 232, 0.24) !important; }
+tr.own-row:hover > td { background: rgba(145, 174, 217, 0.24) !important; }
 
 /* ---------------------------------------------------------------------------
    ダイアログ
