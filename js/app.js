@@ -237,6 +237,9 @@ const VIEW_IDS = {
   players: 'view-ranking',
   ranking: 'view-ranking',
   profile: 'view-profile',
+  // 規約類（静的ページ。フッターから開く。描画関数は持たない）
+  terms: 'view-terms',
+  privacy: 'view-privacy',
 };
 
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
@@ -1922,6 +1925,24 @@ tournamentDeleteBtn.addEventListener('click', async () => {
   if (imageUrl) await db.removeImageByUrl(imageUrl).catch(() => {});
   await refreshFromDb();
   location.hash = '#history';
+});
+
+// 「はじめに」の目次。ページ内の移動なので、ハッシュは変えずにスクロールで運ぶ。
+// （ハッシュはページの切り替えに使っているため、#見出しID を入れると
+//   routeFromHash が知らないページとして扱い、ホームへ戻してしまう）
+$('guide-toc').addEventListener('click', (e) => {
+  const link = e.target.closest('[data-guide-target]');
+  if (!link) return;
+  e.preventDefault();
+
+  // 動きを減らす設定のときは滑らせない（CSSの prefers-reduced-motion は
+  // JSのスクロールまでは止められないので、ここで見て切り替える）
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 見出しには scroll-margin-top を入れてあるので、固定ヘッダーの下に隠れない
+  $(link.dataset.guideTarget)?.scrollIntoView({
+    behavior: reduce ? 'auto' : 'smooth',
+    block: 'start',
+  });
 });
 
 playerBackBtn.addEventListener('click', () => {

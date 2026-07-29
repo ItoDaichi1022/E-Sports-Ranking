@@ -10,7 +10,7 @@
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=65">
+<link rel="stylesheet" href="css/style.css?v=68">
 </head>
 <body>
 <header>
@@ -215,8 +215,8 @@
        図の中のボタン風の要素は span なので押しても何も起きない（.guide-inert）。
 
        章立て:
-         0. このサイトの各ページ  1. 大会へのエントリー
-         2. ランキングの仕組み    3. 大会を開きたい人へ -->
+         0. アカウントの作り方  1. このサイトの各ページ  2. 大会へのエントリー
+         3. ランキングの仕組み  4. 大会を開きたい人へ -->
   <section id="view-guide" class="view" hidden>
     <h2>はじめに — このサイトの使い方</h2>
     <p class="note">
@@ -224,15 +224,118 @@
       大会に<strong>参加する</strong>ときだけ、ログインと選手登録が必要です。
     </p>
 
-    <nav class="guide-toc" aria-label="目次">
-      <a href="#guide-pages">0. 各ページの説明</a>
-      <a href="#guide-entry">1. 大会エントリー方法</a>
-      <a href="#guide-ranking">2. ランキングの仕組み</a>
-      <a href="#guide-host">3. 大会を開きたい人へ</a>
+    <!-- ハッシュ（#〜）はページの切り替えに使っているので、href に見出しのIDを書くと
+         「そんなページは無い」と判断されてホームへ飛んでしまう。移動先は data 属性で
+         持ち、スクロールは js/app.js が行う（href はこのページに留めるための保険）。 -->
+    <nav id="guide-toc" class="guide-toc" aria-label="目次">
+      <a href="#guide" data-guide-target="guide-account">0. アカウントの作り方</a>
+      <a href="#guide" data-guide-target="guide-pages">1. 各ページの説明</a>
+      <a href="#guide" data-guide-target="guide-entry">2. 大会エントリー方法</a>
+      <a href="#guide" data-guide-target="guide-ranking">3. ランキングの仕組み</a>
+      <a href="#guide" data-guide-target="guide-host">4. 大会を開きたい人へ</a>
     </nav>
 
-    <!-- ================= 0. 各ページの説明 ================= -->
-    <h3 class="guide-chapter" id="guide-pages"><span class="guide-chapter-num">0</span>このサイトの各ページ</h3>
+    <!-- ================= 0. アカウントの作り方 ================= -->
+    <h3 class="guide-chapter" id="guide-account"><span class="guide-chapter-num">0</span>アカウントの作り方</h3>
+    <p class="guide-chapter-lead">
+      見るだけならログインは要りません。大会に<strong>参加する</strong>ときに必要になります。
+      持っているGoogleかDiscordのアカウントで入れるので、新しくパスワードを作る必要はありません。
+    </p>
+
+    <ol class="guide-steps">
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">1</span>ログインする</h4>
+          <p>
+            画面右上の<strong>「ログイン」</strong>を押すと、選ぶ画面が出ます。
+            <strong>Google</strong>か<strong>Discord</strong>の、どちらか持っているほうを押してください。
+            いつも使っているアカウントでそのまま入れます。
+          </p>
+          <p>
+            初めてでも、アカウントを新しく作る手続きはありません。
+            パスワードをこのサイトが預かることもありません。
+          </p>
+        </div>
+        <figure class="guide-figure">
+          <div class="guide-login-mock">
+            <span class="guide-login-title">ログイン</span>
+            <span class="as-link btn-secondary guide-inert">Googleでログイン</span>
+            <span class="as-link btn-secondary guide-inert">Discordでログイン</span>
+          </div>
+          <figcaption>どちらか持っているほうで大丈夫です</figcaption>
+        </figure>
+      </li>
+
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">2</span>選手として登録する</h4>
+          <p>
+            初回だけ<strong>選手登録</strong>の画面が出ます。
+            <strong>表示名</strong>（大会や対戦表に出る名前）を決めて登録すると完了です。
+          </p>
+          <p>
+            「任意」と付いている欄は空のままでも構いません。あとからいつでも足せます。
+          </p>
+          <ul class="guide-list">
+            <li><strong>表示名</strong> — 対戦表・ランキングに出る名前</li>
+            <li>ゲームアカウントID — フレンド申請に使う番号</li>
+            <li>使用キャラクター — カンマ区切りで複数書けます</li>
+            <li>X / YouTube・自己紹介 — 任意</li>
+          </ul>
+        </div>
+        <figure class="guide-figure">
+          <div class="guide-form-mock">
+            <span class="guide-form-label">表示名</span>
+            <span class="guide-form-input">Gyu</span>
+            <span class="guide-form-label">
+              使用キャラクター
+            </span>
+            <span class="guide-form-input">シビ, ソフィア</span>
+            <span class="guide-form-label">
+              X <span class="optional-tag">任意</span>
+            </span>
+            <span class="guide-form-input guide-form-empty">@handle または https://x.com/…</span>
+          </div>
+          <figcaption>選手登録の入力欄。必須は表示名だけです</figcaption>
+        </figure>
+      </li>
+
+      <li class="guide-step">
+        <div class="guide-step-body">
+          <h4><span class="guide-step-num">3</span>プロフィールを整える</h4>
+          <p>
+            マイページには<strong>他の人から見えるあなたのプロフィール</strong>がそのまま出ます。
+            直したいときは、名前の横の<strong>鉛筆アイコン</strong>を押すと編集画面に切り替わります。
+            保存すると、また見え方の確認に戻ります。
+          </p>
+          <p>
+            <strong>アイコンを設定しておく</strong>と、対戦表やランキングで見つけてもらいやすくなります。
+            表示名を変えても戦績は消えません（前の名前は「過去名」として残ります）。
+          </p>
+        </div>
+        <figure class="guide-figure">
+          <div class="guide-profile-mock">
+            <span class="avatar avatar-md guide-inert">G</span>
+            <div>
+              <span class="guide-profile-name">
+                Gyu
+                <span class="guide-pencil guide-inert" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+                  </svg>
+                </span>
+              </span>
+              <span class="guide-profile-sub">使用キャラクター: シビ、ソフィア</span>
+            </div>
+          </div>
+          <figcaption>マイページ。鉛筆から編集に切り替わります</figcaption>
+        </figure>
+      </li>
+    </ol>
+
+    <!-- ================= 1. 各ページの説明 ================= -->
+    <h3 class="guide-chapter" id="guide-pages"><span class="guide-chapter-num">1</span>このサイトの各ページ</h3>
     <p class="guide-chapter-lead">
       画面の移動は、左上の<strong>メニュー（☰）</strong>からです。ページは全部で6つあります。
     </p>
@@ -283,63 +386,17 @@
       </li>
     </ul>
 
-    <!-- ================= 1. 大会エントリー方法 ================= -->
-    <h3 class="guide-chapter" id="guide-entry"><span class="guide-chapter-num">1</span>大会エントリー方法</h3>
+    <!-- ================= 2. 大会エントリー方法 ================= -->
+    <h3 class="guide-chapter" id="guide-entry"><span class="guide-chapter-num">2</span>大会エントリー方法</h3>
     <p class="guide-chapter-lead">
-      ログイン → エントリー → 対戦 → 結果の報告、という流れです。
+      エントリー → 対戦 → 結果の報告、という流れです。
+      先に<a href="#guide" data-guide-target="guide-account">0. アカウントの作り方</a>を済ませておいてください。
     </p>
 
     <ol class="guide-steps">
       <li class="guide-step">
         <div class="guide-step-body">
-          <h4><span class="guide-step-num">1</span>ログインして選手登録</h4>
-          <p>
-            右上の「ログイン」から、GoogleまたはDiscordのアカウントでログインします。
-            初回は<strong>表示名など必要事項を記入</strong>すると選手登録が完了します。
-            アイコン・使用キャラ・自己紹介は、あとからマイページでいつでも変えられます。
-          </p>
-        </div>
-        <figure class="guide-figure">
-          <div class="guide-figure-stack">
-            <span class="as-link btn-secondary guide-inert">Googleでログイン</span>
-            <span class="as-link btn-secondary guide-inert">Discordでログイン</span>
-          </div>
-          <figcaption>ログイン画面。どちらのアカウントでも使えます</figcaption>
-        </figure>
-      </li>
-
-      <li class="guide-step">
-        <div class="guide-step-body">
-          <h4><span class="guide-step-num">2</span>マイページでプロフィールを整える</h4>
-          <p>
-            マイページには<strong>他の人から見えるあなたのプロフィール</strong>が出ます。
-            名前の横の<strong>鉛筆アイコン</strong>を押すと編集画面に切り替わります。
-            アイコンを設定しておくと、対戦表やランキングで見つけてもらいやすくなります。
-          </p>
-        </div>
-        <figure class="guide-figure">
-          <div class="guide-profile-mock">
-            <span class="avatar avatar-md guide-inert">G</span>
-            <div>
-              <span class="guide-profile-name">
-                Gyu
-                <span class="guide-pencil guide-inert" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                       stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
-                  </svg>
-                </span>
-              </span>
-              <span class="guide-profile-sub">使用キャラクター: シビ、ソフィア</span>
-            </div>
-          </div>
-          <figcaption>マイページ。鉛筆から編集に切り替わります</figcaption>
-        </figure>
-      </li>
-
-      <li class="guide-step">
-        <div class="guide-step-body">
-          <h4><span class="guide-step-num">3</span>大会にエントリー</h4>
+          <h4><span class="guide-step-num">1</span>大会にエントリー</h4>
           <p>
             「募集中の大会」から大会を開き、ルールを確認して「エントリーする」を押すだけです。
             <strong>募集中の間は何度でも取り消せます</strong>。
@@ -356,7 +413,7 @@
 
       <li class="guide-step">
         <div class="guide-step-body">
-          <h4><span class="guide-step-num">4</span>対戦表で自分を見つける</h4>
+          <h4><span class="guide-step-num">2</span>対戦表で自分を見つける</h4>
           <p>
             大会が始まったら対戦表を開きます。<strong>色の付いた行があなた</strong>です。
             対戦カードの右端にある<strong>鉛筆アイコン</strong>を押すと、その対戦の画面
@@ -390,7 +447,7 @@
 
       <li class="guide-step">
         <div class="guide-step-body">
-          <h4><span class="guide-step-num">5</span>ルームコードを確認して対戦</h4>
+          <h4><span class="guide-step-num">3</span>ルームコードを確認して対戦</h4>
           <p>
             対戦の画面を開くと、いちばん上に<strong>ルームコード欄</strong>があります。
             配信される試合では運営が先に記入していることもあります。
@@ -416,7 +473,7 @@
 
       <li class="guide-step">
         <div class="guide-step-body">
-          <h4><span class="guide-step-num">6</span>ゲームカウントを報告</h4>
+          <h4><span class="guide-step-num">4</span>ゲームカウントを報告</h4>
           <p>
             試合が終わったら、対戦画面の「ゲームカウント」タブで結果を入力します。
             <strong>相手が承認すると確定</strong>し、対戦表が自動で進みます。
@@ -443,7 +500,7 @@
 
       <li class="guide-step">
         <div class="guide-step-body">
-          <h4><span class="guide-step-num">7</span>困ったときは</h4>
+          <h4><span class="guide-step-num">5</span>困ったときは</h4>
           <p>
             相手と連絡がつかない・結果が食い違うなど、もめたときは対戦画面の
             <strong>「運営に報告」</strong>を押してください。運営の画面にすぐ印が付きます。
@@ -458,8 +515,8 @@
       </li>
     </ol>
 
-    <!-- ================= 2. ランキングの仕組み ================= -->
-    <h3 class="guide-chapter" id="guide-ranking"><span class="guide-chapter-num">2</span>ランキングの仕組み</h3>
+    <!-- ================= 3. ランキングの仕組み ================= -->
+    <h3 class="guide-chapter" id="guide-ranking"><span class="guide-chapter-num">3</span>ランキングの仕組み</h3>
     <p class="guide-chapter-lead">
       すべての大会がランキングに入るわけではありません。<strong>条件を満たした大会</strong>の試合だけがスコアになります。
     </p>
@@ -520,8 +577,8 @@
       </figure>
     </div>
 
-    <!-- ================= 3. 大会を開きたい人へ ================= -->
-    <h3 class="guide-chapter" id="guide-host"><span class="guide-chapter-num">3</span>大会を開きたい人へ</h3>
+    <!-- ================= 4. 大会を開きたい人へ ================= -->
+    <h3 class="guide-chapter" id="guide-host"><span class="guide-chapter-num">4</span>大会を開きたい人へ</h3>
     <p class="guide-chapter-lead">
       大会を作れるのは<strong>運営権限を持つアカウント</strong>だけです。まずは連絡から。
     </p>
@@ -533,7 +590,8 @@
           <p>
             <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">お問い合わせ（X）</a>
             から、<strong>開きたい大会の内容</strong>と<strong>このサイトでの表示名</strong>を伝えてください。
-            先に<strong>ログインと選手登録を済ませておく</strong>と、そのアカウントに権限を付けられます。
+            先に<a href="#guide" data-guide-target="guide-account">0. アカウントの作り方</a>を済ませておくと、
+            そのアカウントに権限を付けられます。
           </p>
           <p>
             権限が付くと、メニューに<strong>「大会作成」</strong>が現れます。
@@ -959,16 +1017,385 @@
     </p>
   </section>
 
+  <!-- ==========================================================================
+       利用規約 / プライバシーポリシー
+
+       どちらもフッターから開く静的ページ。JSの描画関数は持たず、routeFromHash が
+       #terms / #privacy で表示を切り替えるだけ（「はじめに」と同じ作り）。
+
+       ■ 利用規約 … このサイトを「どういう約束で使ってもらうか」を書いたもの。
+         参加者に守ってほしいこと（禁止事項）と、運営が責任を負わないこと（免責）が柱。
+         これが無いと、荒らしや不正が起きたときに「規約違反だからアカウントを止める」
+         という根拠が無く、その場の判断になってしまう。
+       ■ プライバシーポリシー … 「どんな個人情報を、何のために集めて、誰に見えるか」を
+         書いたもの。個人情報保護法で、利用目的の公表と、本人からの開示・削除請求への
+         対応窓口の明示が求められる。ログイン（メールアドレスの取得）がある時点で必要。
+
+       【要記入】と書いた箇所は運営側で埋めること。文言を変えたときは日付も更新する。
+       ========================================================================== -->
+
+  <section id="view-terms" class="view legal" hidden>
+    <h2>利用規約</h2>
+    <p class="legal-lead">
+      この利用規約（以下「本規約」）は、トーナメント運営ツール（以下「本サイト」）の利用条件を定めるものです。
+      本サイトを利用される方（以下「利用者」）は、本規約に同意したものとみなします。
+      要点は「他の参加者に迷惑をかけないこと」「対戦結果を正しく報告すること」の2つです。
+    </p>
+    <p class="legal-meta">制定日：2026年7月30日 ／ 最終改定日：2026年7月30日</p>
+
+    <div class="legal-articles">
+      <article>
+        <h3>第1条（適用）</h3>
+        <ol class="legal-items">
+          <li>本規約は、本サイトの利用に関する運営者と利用者との間の一切の関係に適用されます。</li>
+          <li>運営者が本サイト上に掲載する各大会のルール、お知らせ、その他の個別規定は、本規約の一部を構成します。</li>
+          <li>個別規定が本規約と異なる場合は、個別規定が優先します。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第2条（定義）</h3>
+        <ol class="legal-items">
+          <li>「運営者」とは、本サイトを管理・運営する【要記入：運営者名（個人名または団体名）】をいいます。</li>
+          <li>「運営権限」とは、大会の作成、対戦表の管理、試合結果の確定、ランキングの公開などを行える権限をいいます。</li>
+          <li>「選手」とは、本サイトに選手登録を行い、選手ページを持つ利用者をいいます。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第3条（アカウントの登録）</h3>
+        <ol class="legal-items">
+          <li>利用者は、GoogleアカウントまたはDiscordアカウントを用いてログインし、表示名などを登録することで選手となります。</li>
+          <li>登録する情報は正確なものとし、他人になりすます名称、他人の権利を侵害する名称、公序良俗に反する名称は使用できません。</li>
+          <li>一人の利用者が複数のアカウントを作成することはできません。ただし、運営者が事前に認めた場合を除きます。</li>
+          <li>18歳未満の方は、保護者の同意を得たうえで利用してください。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第4条（アカウントの管理）</h3>
+        <ol class="legal-items">
+          <li>利用者は、自己の責任においてログインに用いるアカウントを管理するものとします。</li>
+          <li>アカウントを第三者に貸与し、譲渡し、または共用することはできません。</li>
+          <li>アカウントを用いて行われた操作は、当該アカウントの利用者本人による操作とみなします。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第5条（禁止事項）</h3>
+        <p>利用者は、本サイトの利用にあたり、次の行為をしてはなりません。</p>
+        <ol class="legal-items">
+          <li>法令または公序良俗に違反する行為</li>
+          <li>他の利用者、運営者、その他の第三者に対する誹謗中傷、差別的言動、脅迫、つきまとい、その他のハラスメント行為</li>
+          <li>虚偽の対戦結果を報告する行為、意図的に報告を遅らせる行為、および対戦相手に虚偽の報告をさせる行為</li>
+          <li>大会の勝敗を不正に操作する行為（申し合わせによる敗退、他人による代理対戦、複数アカウントの使い分けなど）</li>
+          <li>ゲームの不具合、外部ツール、その他の不正な手段を用いて対戦を有利に進める行為</li>
+          <li>他人になりすます行為、および他人の氏名・画像・戦績を無断で使用する行為</li>
+          <li>対戦チャットやルームコードを、対戦以外の目的（宣伝、勧誘、外部サイトへの誘導など）に使用する行為</li>
+          <li>本サイトのサーバーまたはネットワークに過度の負荷をかける行為、不正アクセスを試みる行為、および運営権限を不正に取得しようとする行為</li>
+          <li>運営者の許可なく、本サイトの内容を商業目的で利用する行為</li>
+          <li>その他、運営者が本サイトの運営上不適切と合理的に判断する行為</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第6条（大会の運営と対戦結果）</h3>
+        <ol class="legal-items">
+          <li>大会の参加条件、対戦方法、進行方法は、各大会の詳細ページに掲載するルールによります。</li>
+          <li>対戦結果は、対戦した双方の報告が一致した時点で確定します。報告が一致しない場合、または一方が報告しない場合は、運営者が事実を確認したうえで結果を決定します。</li>
+          <li>前項により運営者が決定した結果に対しては、運営者への申し立てを受け付けますが、最終的な判断は運営者が行います。</li>
+          <li>対戦時刻に現れない、連絡が取れない、故意に対戦を遅延させるなどの場合、運営者は当該利用者を不戦敗または失格とすることができます。</li>
+          <li>ルームコードは対戦相手と運営者にのみ表示されます。これを第三者に伝えて対戦を妨害する行為は禁止します。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第7条（ランキング）</h3>
+        <ol class="legal-items">
+          <li>ランキングは、運営者が定める条件を満たす大会の試合結果をもとに集計されます。集計の条件と対象期間は本サイト上に表示します。</li>
+          <li>集計方法、対象条件、対象期間は、運営者の判断で変更することがあります。</li>
+          <li>誤った結果が登録されていたことが判明した場合、運営者は当該結果を訂正し、ランキングを再集計することができます。</li>
+          <li>ランキングの順位は、賞金その他の金銭的な価値を保証するものではありません。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第8条（利用者が登録した内容の取り扱い）</h3>
+        <ol class="legal-items">
+          <li>プロフィール、アイコン画像、自己紹介、チャットの発言など、利用者が本サイトに登録した内容（以下「投稿内容」）の権利は、当該利用者または正当な権利者に帰属します。</li>
+          <li>利用者は、投稿内容を本サイトに掲載すること、および本サイトの紹介・大会の告知・ランキングの発表のために、運営者が投稿内容（表示名、アイコン画像、戦績、順位を含みます）を必要な範囲で利用・複製・改変することを許諾するものとします。</li>
+          <li>利用者は、投稿内容について第三者の権利を侵害していないことを保証するものとします。</li>
+          <li>投稿内容が本規約に違反すると運営者が判断した場合、運営者は事前の通知なくこれを削除することができます。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第9条（権利の帰属）</h3>
+        <p>
+          本サイトを構成するプログラム、デザイン、掲載文章（前条の投稿内容を除く）に関する著作権その他の権利は、運営者または正当な権利者に帰属します。
+          本サイトで扱うゲームの名称、キャラクター、画像等に関する権利は、当該ゲームの権利者に帰属します。本サイトは当該ゲームの権利者とは無関係の、有志による非公式のサービスです。
+        </p>
+      </article>
+
+      <article>
+        <h3>第10条（利用の停止およびアカウントの削除）</h3>
+        <ol class="legal-items">
+          <li>運営者は、利用者が本規約に違反したと判断した場合、事前の通知なく、大会への参加の停止、投稿内容の削除、アカウントの削除、その他必要な措置をとることができます。</li>
+          <li>前項の措置により利用者に生じた損害について、運営者は責任を負いません。</li>
+          <li>利用者は、運営者に連絡することで、いつでも自身のアカウントの削除を求めることができます。ただし、確定済みの大会の対戦結果は、他の参加者の戦績と大会記録の正確性を保つため、表示名を伏せたうえで記録として残ることがあります。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第11条（サービスの変更・中断・終了）</h3>
+        <ol class="legal-items">
+          <li>運営者は、利用者への事前の通知なく、本サイトの内容を変更し、または提供を終了することができます。</li>
+          <li>システムの保守、障害、通信回線の停止、その他やむを得ない事由により、本サイトの提供を一時的に中断することがあります。</li>
+          <li>本項の変更・中断・終了により利用者に生じた損害について、運営者は責任を負いません。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第12条（免責事項）</h3>
+        <ol class="legal-items">
+          <li>本サイトは無償で提供されるものであり、運営者は、本サイトの内容の正確性、完全性、有用性、および利用者の特定の目的への適合性について、いかなる保証も行いません。</li>
+          <li>運営者は、システムの障害等により登録された情報が消失または改変された場合について、責任を負いません。重要な情報は利用者ご自身でも控えを取ってください。</li>
+          <li>利用者間、または利用者と第三者との間で生じた紛争については、当事者間で解決するものとし、運営者は責任を負いません。ただし、運営者が必要と判断した場合には、大会の運営に必要な範囲で関与することがあります。</li>
+          <li>本サイトから外部サイトへのリンクが張られている場合であっても、運営者はリンク先の内容について責任を負いません。</li>
+          <li>前各項にかかわらず、運営者の故意または重大な過失による場合には、この限りではありません。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第13条（本規約の変更）</h3>
+        <ol class="legal-items">
+          <li>運営者は、必要と判断した場合、本規約を変更することができます。</li>
+          <li>変更後の本規約は、本サイトに掲載した時点から効力を生じます。重要な変更を行う場合は、あわせてお知らせでご案内します。</li>
+          <li>変更後に本サイトを利用された場合、変更後の本規約に同意したものとみなします。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第14条（準拠法および管轄）</h3>
+        <ol class="legal-items">
+          <li>本規約の解釈にあたっては、日本法を準拠法とします。</li>
+          <li>本サイトに関して紛争が生じた場合には、運営者の所在地を管轄する裁判所を専属的合意管轄とします。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>第15条（お問い合わせ）</h3>
+        <p>
+          本規約に関するお問い合わせは、
+          <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">X（@tomokkugyu）</a>
+          までご連絡ください。
+        </p>
+      </article>
+    </div>
+
+    <p class="legal-nav">
+      <a href="#privacy">プライバシーポリシーを見る</a>
+    </p>
+  </section>
+
+  <section id="view-privacy" class="view legal" hidden>
+    <h2>プライバシーポリシー</h2>
+    <p class="legal-lead">
+      トーナメント運営ツール（以下「本サイト」）は、大会の運営とランキングの集計のために、利用者の情報をお預かりしています。
+      このページでは、何を取得し、何のために使い、誰が見られるのかを説明します。
+    </p>
+    <p class="legal-meta">制定日：2026年7月30日 ／ 最終改定日：2026年7月30日</p>
+
+    <div class="legal-articles">
+      <article>
+        <h3>1. 運営者</h3>
+        <p>
+          本サイトの運営者（個人情報の取扱いについて責任を負う者）は【要記入：運営者名（個人名または団体名）】です。
+          連絡先は<a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">X（@tomokkugyu）</a>のダイレクトメッセージです。
+        </p>
+      </article>
+
+      <article>
+        <h3>2. 取得する情報</h3>
+        <p>本サイトは、次の情報を取得します。</p>
+        <ol class="legal-items">
+          <li>
+            <strong>ログインに関する情報</strong><br>
+            GoogleまたはDiscordでログインしたときに、これらのサービスから受け取るメールアドレスとアカウント識別子。
+            パスワードは受け取らず、本サイトには保存されません。
+          </li>
+          <li>
+            <strong>選手登録・プロフィールの情報</strong><br>
+            表示名、過去の表示名、ゲームアカウントID、使用キャラクター、自己紹介、アイコン画像、XおよびYouTubeのアカウント。
+            表示名以外の入力は任意です。
+          </li>
+          <li>
+            <strong>大会の記録</strong><br>
+            大会へのエントリー状況、チーム編成、対戦結果、対戦相手とのチャットの内容、対戦部屋のルームコード、運営者への報告内容。
+          </li>
+          <li>
+            <strong>アクセスに関する情報</strong><br>
+            本サイトの配信およびデータの保管を担う事業者が自動的に記録する、IPアドレス、ブラウザの種類、アクセス日時などの情報。
+            運営者はこれらを個人を特定する目的では利用しません。
+          </li>
+        </ol>
+        <p class="legal-note">
+          本サイトは、広告配信やアクセス解析のためのツールを利用しておらず、行動履歴を追跡するCookieも使用していません。
+        </p>
+      </article>
+
+      <article>
+        <h3>3. 利用目的</h3>
+        <p>取得した情報は、次の目的でのみ利用します。</p>
+        <ol class="legal-items">
+          <li>本サイトへのログインおよび本人確認のため</li>
+          <li>大会のエントリー受付、対戦表の作成、対戦結果の記録のため</li>
+          <li>選手ページ、対戦表、ランキングの表示のため</li>
+          <li>対戦相手どうしの連絡（対戦チャット、ルームコードの共有）のため</li>
+          <li>不正な報告、規約違反、なりすましへの対応のため</li>
+          <li>お問い合わせへの回答のため</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>4. 情報が表示される範囲</h3>
+        <p>お預かりした情報のうち、他の人から見えるものと見えないものは次のとおりです。</p>
+        <div class="table-scroll">
+          <table class="legal-table">
+            <thead>
+              <tr><th>情報</th><th>見られる範囲</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>表示名・過去の表示名・アイコン画像・自己紹介・使用キャラクター・ゲームアカウントID・SNSのリンク</td>
+                <td>ログインしていない方を含む、誰でも</td>
+              </tr>
+              <tr>
+                <td>大会の参加状況・対戦結果・戦績・ランキングの順位</td>
+                <td>ログインしていない方を含む、誰でも</td>
+              </tr>
+              <tr>
+                <td>対戦チャットの内容・ルームコード</td>
+                <td>その試合の対戦者本人と、運営権限を持つ者のみ</td>
+              </tr>
+              <tr>
+                <td>運営者への報告内容</td>
+                <td>報告した本人と、運営権限を持つ者のみ</td>
+              </tr>
+              <tr>
+                <td>メールアドレス</td>
+                <td>本人のみ（マイページに表示されます）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="legal-note">
+          プロフィールと戦績は公開されることを前提とした情報です。知られたくない情報は入力しないでください。
+          ゲームアカウントIDと自己紹介は、いつでもマイページから削除できます。
+        </p>
+      </article>
+
+      <article>
+        <h3>5. 第三者への提供</h3>
+        <p>
+          運営者は、あらかじめ本人の同意を得ることなく、個人情報を第三者に提供することはありません。
+          ただし、法令に基づく場合、人の生命・身体・財産の保護のために必要であって本人の同意を得ることが困難な場合は、この限りではありません。
+        </p>
+      </article>
+
+      <article>
+        <h3>6. 外部サービスの利用</h3>
+        <p>本サイトは、その運営のために次の外部サービスを利用しています。これらの事業者のサーバーは日本国外に置かれている場合があります。</p>
+        <ol class="legal-items">
+          <li><strong>Supabase</strong>（Supabase, Inc.）… ログインの仕組み、データベース、画像の保管に利用しています。</li>
+          <li><strong>Cloudflare Pages</strong>（Cloudflare, Inc.）… 本サイトの配信に利用しています。</li>
+          <li><strong>Google</strong>（Google LLC）および<strong>Discord</strong>（Discord Inc.）… ログインに利用しています。ログインの際、これらのサービスに本サイトを利用した事実が伝わります。</li>
+        </ol>
+        <p class="legal-note">
+          各サービスにおける個人情報の取扱いについては、それぞれの事業者が定めるプライバシーポリシーをご確認ください。
+        </p>
+      </article>
+
+      <article>
+        <h3>7. ログイン状態の保持</h3>
+        <p>
+          ログイン状態を保つため、ブラウザの保存領域（ローカルストレージ）にログイン用の情報を保存します。
+          これはログインを維持するためだけに使われます。ログアウトすると削除されます。
+        </p>
+      </article>
+
+      <article>
+        <h3>8. 保存期間</h3>
+        <ol class="legal-items">
+          <li>プロフィールおよびログインに関する情報は、アカウントが削除されるまで保存します。</li>
+          <li>大会の記録とランキングは、大会の記録としての性質上、削除の申し出があった場合でも、表示名を伏せたうえで残すことがあります。</li>
+          <li>対戦チャットとルームコードは、大会が削除されたときにあわせて削除されます。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>9. 開示・訂正・削除の請求</h3>
+        <ol class="legal-items">
+          <li>プロフィールの内容は、マイページからご自身でいつでも確認・訂正・削除できます。</li>
+          <li>それ以外の情報について、開示、訂正、利用の停止、削除をご希望の場合は、下記のお問い合わせ先までご連絡ください。ご本人であることを確認のうえ、合理的な期間内に対応します。</li>
+          <li>アカウントの削除をご希望の場合も、同じ窓口で承ります。</li>
+        </ol>
+      </article>
+
+      <article>
+        <h3>10. 未成年の方の利用</h3>
+        <p>
+          18歳未満の方が本サイトを利用される場合は、保護者の同意を得たうえでご利用ください。
+          プロフィールは誰からでも見られるため、本名や学校名など、ご自身を特定できる情報は入力しないようご注意ください。
+        </p>
+      </article>
+
+      <article>
+        <h3>11. 安全管理</h3>
+        <p>
+          運営者は、お預かりした情報の漏えい、滅失、き損を防ぐため、通信の暗号化、アクセス権限の制限などの措置を講じます。
+          対戦チャットやルームコードなど、対戦者本人と運営者だけが見られる情報は、データベース側の権限設定によって他の利用者から読み取れないようにしています。
+        </p>
+      </article>
+
+      <article>
+        <h3>12. 本ポリシーの変更</h3>
+        <p>
+          本ポリシーは、必要に応じて変更することがあります。変更後の内容は本サイトに掲載した時点から適用されます。
+          取得する情報や利用目的を大きく変更する場合は、あわせてお知らせでご案内します。
+        </p>
+      </article>
+
+      <article>
+        <h3>13. お問い合わせ</h3>
+        <p>
+          個人情報の取扱いに関するお問い合わせは、
+          <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">X（@tomokkugyu）</a>
+          のダイレクトメッセージまでご連絡ください。
+        </p>
+      </article>
+    </div>
+
+    <p class="legal-nav">
+      <a href="#terms">利用規約を見る</a>
+    </p>
+  </section>
+
 </main>
 
-<!-- ページ下部のお問い合わせ。ハンバーガーメニューの一番下にも同じ入口がある。 -->
+<!-- ページ下部の共通リンク。main の外にあるので、どのページでも同じものが出る。
+     お問い合わせはハンバーガーメニューの一番下にも同じ入口がある。 -->
 <footer class="site-footer">
-  <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">お問い合わせ（X: @tomokkugyu）</a>
+  <nav class="footer-links">
+    <a href="#terms">利用規約</a>
+    <a href="#privacy">プライバシーポリシー</a>
+    <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">お問い合わせ（X: @tomokkugyu）</a>
+  </nav>
 </footer>
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=65"></script>
+<script src="js/vendor/supabase.js?v=68"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -980,27 +1407,27 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=65",
-    "./js/bracket.js":        "./js/bracket.js?v=65",
-    "./js/bracketView.js":    "./js/bracketView.js?v=65",
-    "./js/db.js":             "./js/db.js?v=65",
-    "./js/entries.js":        "./js/entries.js?v=65",
-    "./js/icons.js":          "./js/icons.js?v=65",
-    "./js/matchChat.js":      "./js/matchChat.js?v=65",
-    "./js/playerStats.js":    "./js/playerStats.js?v=65",
-    "./js/players.js":        "./js/players.js?v=65",
-    "./js/profile.js":        "./js/profile.js?v=65",
-    "./js/ranking.js":        "./js/ranking.js?v=65",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=65",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=65",
-    "./js/rankingView.js":    "./js/rankingView.js?v=65",
-    "./js/state.js":          "./js/state.js?v=65",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=65",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=65",
-    "./js/util.js":           "./js/util.js?v=65"
+    "./js/auth.js":           "./js/auth.js?v=68",
+    "./js/bracket.js":        "./js/bracket.js?v=68",
+    "./js/bracketView.js":    "./js/bracketView.js?v=68",
+    "./js/db.js":             "./js/db.js?v=68",
+    "./js/entries.js":        "./js/entries.js?v=68",
+    "./js/icons.js":          "./js/icons.js?v=68",
+    "./js/matchChat.js":      "./js/matchChat.js?v=68",
+    "./js/playerStats.js":    "./js/playerStats.js?v=68",
+    "./js/players.js":        "./js/players.js?v=68",
+    "./js/profile.js":        "./js/profile.js?v=68",
+    "./js/ranking.js":        "./js/ranking.js?v=68",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=68",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=68",
+    "./js/rankingView.js":    "./js/rankingView.js?v=68",
+    "./js/state.js":          "./js/state.js?v=68",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=68",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=68",
+    "./js/util.js":           "./js/util.js?v=68"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=65"></script>
+<script type="module" src="js/app.js?v=68"></script>
 </body>
 </html>

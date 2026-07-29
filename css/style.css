@@ -427,7 +427,7 @@ header h1 a::before {
 .status-line.success { color: var(--win); }
 .status-line.loading { color: var(--warn); }
 
-/* ---- ページ下部のお問い合わせ ---- */
+/* ---- ページ下部の共通リンク（規約類とお問い合わせ） ---- */
 .site-footer {
   max-width: 1080px;
   margin: 2.5rem auto 0;
@@ -435,6 +435,16 @@ header h1 a::before {
   border-top: 1px solid var(--border-soft);
   text-align: center;
   font-size: 0.85rem;
+}
+
+/* 狭い画面では縦に折り返す。区切りの「/」は隙間で表現するので、
+   折り返しても行末に記号が残らない。 */
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
 }
 
 .site-footer a { color: var(--text-faint); }
@@ -1595,6 +1605,29 @@ td code { font-size: 0.85em; }
   color: var(--text-faint);
 }
 
+/* 未入力の欄は、書かれた文字ではなく「例」だと分かるように薄くする */
+.guide-form-empty { color: var(--text-faint); }
+
+.guide-form-mock .optional-tag { margin-left: 0.3rem; }
+
+/* ログイン画面の図 */
+.guide-login-mock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: min(100%, 230px);
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.guide-login-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 /* 回戦の操作の図 */
 .guide-round-mock {
   display: flex;
@@ -1616,6 +1649,126 @@ td code { font-size: 0.85em; }
 .guide-rank-mock td { padding: 0.4rem 0.5rem; }
 
 .guide-figure .ranking-mark { width: 100%; }
+
+/* ---------------------------------------------------------------------------
+   規約類（利用規約・プライバシーポリシー）
+
+   読み物なので、装飾はほとんど付けない。長い条文が続くため、
+   ・1行の幅を詰めて（max-width）目が迷わないようにする
+   ・行間を広めに取る
+   ・条ごとに区切り線を引いて、どこからどこまでが1つの条か見えるようにする
+   の3点だけで組む。
+   --------------------------------------------------------------------------- */
+
+.legal {
+  /* 全角の日本語で40字前後。これ以上長いと次の行の頭を見失いやすい */
+  max-width: 46rem;
+  line-height: 1.9;
+}
+
+.legal-lead {
+  margin: 0 0 0.75rem;
+  color: var(--text-dim);
+}
+
+.legal-meta {
+  margin: 0 0 2rem;
+  color: var(--text-faint);
+  font-size: 0.82rem;
+}
+
+.legal-articles > article {
+  margin-top: 1.75rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.legal-articles > article:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.legal-articles h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  color: var(--accent-bright);
+}
+
+.legal-articles p { margin: 0 0 0.6rem; }
+.legal-articles p:last-child { margin-bottom: 0; }
+
+/* 条の中の項番。括弧つきの数字にして、条番号（第N条）と見分けられるようにする */
+.legal-items {
+  margin: 0;
+  padding-left: 2.2rem;
+  list-style: none;
+  counter-reset: legal-item;
+}
+
+.legal-items > li {
+  position: relative;
+  margin-bottom: 0.5rem;
+  counter-increment: legal-item;
+}
+
+.legal-items > li::before {
+  content: "(" counter(legal-item) ")";
+  position: absolute;
+  left: -2.2rem;
+  width: 2rem;
+  text-align: right;
+  color: var(--text-faint);
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.legal-items > li:last-child { margin-bottom: 0; }
+
+/* 条文そのものではない補足。本文より一段落とす */
+.legal-note {
+  margin-top: 0.75rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+/* 「情報が表示される範囲」の表 */
+.legal-table {
+  width: 100%;
+  margin: 0.75rem 0 0;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.legal-table th,
+.legal-table td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+.legal-table th {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* 右の列（見られる範囲）は文字数が少ないので、左の説明に幅を譲る */
+.legal-table td:last-child {
+  width: 34%;
+  color: var(--text-dim);
+}
+
+.legal-nav {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-soft);
+  font-size: 0.9rem;
+}
 
 /* ---------------------------------------------------------------------------
    カード（募集・大会履歴・お知らせ 共通）
@@ -3524,6 +3677,11 @@ dialog h3 {
   .guide-step { grid-template-columns: minmax(0, 1fr); }
   .guide-two-col { grid-template-columns: minmax(0, 1fr); }
   .guide-toc a { font-size: 0.8rem; }
+
+  /* 規約類。項番のぶら下げ幅を詰め、表は2列を等分にして横スクロールを避ける */
+  .legal-items { padding-left: 1.8rem; }
+  .legal-items > li::before { left: -1.8rem; width: 1.6rem; }
+  .legal-table td:last-child { width: 40%; }
 
   /* 画像アップロードの「ファイルを選択」欄。ネイティブの部品は中の文言ぶんの
      幅を確保しようとし、幅を明示しないと枠の右へはみ出して見える
