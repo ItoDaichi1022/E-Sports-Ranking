@@ -200,8 +200,16 @@ function streamToggle(tournamentId, roundIndex, match, onRefresh) {
   return btn;
 }
 
+// 「いま行われている回戦」かどうか。開始済みで、まだ確定していない対戦が残っている
+// 回戦を指す。配信台の色分けに使う（終わった回戦とこれからの回戦は落ち着いた色にする）。
+function isRoundInProgress(tournamentId, roundIndex, round) {
+  if (!isRoundStarted(tournamentId, roundIndex)) return false;
+  return round.matches.some((m) => !m.confirmed && !m.isBye);
+}
+
 function renderMatchBox(
   tournament, tournamentId, roundIndex, match, onChanged, readOnly, seedOf, onRefresh,
+  roundInProgress = true,
 ) {
   const box = document.createElement('div');
   box.className = 'match-box';
@@ -212,6 +220,9 @@ function renderMatchBox(
   const streamed = isStreamedMatch(tournamentId, roundIndex, match.id);
   if (streamed) {
     box.classList.add('streamed');
+    // いま行われている回戦の配信台だけを目立つ色にする。終わった回戦や、
+    // これから始まる回戦の配信台まで同じ色だと、どこが今の配信か分からない。
+    if (!roundInProgress) box.classList.add('streamed-idle');
     const tag = document.createElement('div');
     tag.className = 'stream-tag';
     tag.textContent = '配信台';
@@ -479,6 +490,8 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
     body.style.height = `${bodyHeight}px`;
     body.style.gridTemplateRows = `repeat(${bracket.bracketSize}, 1fr)`;
 
+    const roundInProgress = isRoundInProgress(tournamentId, roundIndex, round);
+
     round.matches.forEach((match, matchIndex) => {
       const { rowStart, rowSpan } = slotPlacement(roundIndex, matchIndex);
       const slot = document.createElement('div');
@@ -487,6 +500,7 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
 
       const box = renderMatchBox(
         tournament, tournamentId, roundIndex, match, onChanged, readOnly, seedOf, onRefresh,
+        roundInProgress,
       );
       matchElements.set(match.id, box);
       slot.appendChild(box);

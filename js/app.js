@@ -36,6 +36,8 @@ let currentBracketTournamentId = null;
 const $ = (id) => document.getElementById(id);
 
 const playerForm = $('player-form');
+const playerProxyBtn = $('player-proxy-btn');
+const playerFormCancelBtn = $('player-form-cancel-btn');
 const playerIdInput = $('player-id-input');
 const playerNameInput = $('player-name-input');
 const playerFormNote = $('player-form-note');
@@ -197,8 +199,9 @@ function applyAuthUI() {
   rankingEditorNoteEl.hidden = !admin;
   tournamentEditBtn.hidden = !admin;
   tournamentDeleteBtn.hidden = !admin;
-  playerForm.hidden = !admin;
-  playerFormNote.hidden = !admin;
+  playerProxyBtn.hidden = !admin;
+  // 運営でなくなったら開いていた代理登録の欄も畳む
+  if (!admin) closeProxyPlayerForm();
   if (!admin) tournamentEditForm.hidden = true;
   // 運営でなくなったら投稿フォームも畳む
   if (!admin) closeAnnouncementForm();
@@ -392,6 +395,22 @@ function renderNewsPage(id) {
 }
 
 // ---- 選手 ----
+
+// 代理登録の入力欄。ボタンを押したときだけ開く（普段は一覧の邪魔になるので畳んでおく）。
+function openProxyPlayerForm() {
+  playerForm.hidden = false;
+  playerFormNote.hidden = false;
+  playerProxyBtn.hidden = true;
+  playerNameInput.focus();
+}
+
+function closeProxyPlayerForm() {
+  playerForm.hidden = true;
+  playerFormNote.hidden = true;
+  playerProxyBtn.hidden = !isAdmin();
+  playerIdInput.value = '';
+  playerNameInput.value = '';
+}
 
 function refreshPlayerUI() {
   renderPlayerTable(playerListEl, {
@@ -1374,6 +1393,9 @@ setInterval(flushHeldRefresh, 5000);
 // ---- イベント配線 ----
 
 // 運営による代理登録（アカウントを持たない選手を先に作っておく）
+playerProxyBtn.addEventListener('click', openProxyPlayerForm);
+playerFormCancelBtn.addEventListener('click', closeProxyPlayerForm);
+
 playerForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = playerNameInput.value.trim();
@@ -1390,8 +1412,8 @@ playerForm.addEventListener('submit', async (e) => {
     });
   }, '選手の登録');
   if (!ok) return;
-  playerIdInput.value = '';
-  playerNameInput.value = '';
+  // 続けて何人も登録することは少ないので、登録できたら畳んで一覧に戻す
+  closeProxyPlayerForm();
   await refreshFromDb();
 });
 

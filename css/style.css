@@ -1493,6 +1493,15 @@ a.card:hover {
   font-weight: 700;
 }
 
+/* 進行中でない回戦（終わった回戦・これから始まる回戦）の配信台は、
+   色を落として今どこが配信されているのかを見分けやすくする */
+.match-box.streamed.streamed-idle { border-color: var(--border-strong); }
+
+.streamed-idle .stream-tag {
+  background: var(--surface-3);
+  color: var(--text-faint);
+}
+
 .stream-toggle-btn {
   display: block;
   width: 100%;
