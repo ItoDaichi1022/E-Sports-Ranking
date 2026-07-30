@@ -8,13 +8,13 @@
 <title>IgniteArena — どこでも熱く、遊べ。</title>
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。 -->
-<link rel="icon" href="img/icon.png?v=81" type="image/png">
-<link rel="apple-touch-icon" href="img/icon.png?v=81">
+<link rel="icon" href="img/icon.png?v=82" type="image/png">
+<link rel="apple-touch-icon" href="img/icon.png?v=82">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=81">
+<link rel="stylesheet" href="css/style.css?v=82">
 </head>
 <body>
 <header>
@@ -189,7 +189,7 @@
            画像が無いときは js/app.js がこのブロックごと隠す。 -->
       <div class="hero-game" id="hero-game">
         <img class="hero-game-logo" id="hero-game-logo"
-             src="img/game-logo.webp?v=81" alt="IgniteArena">
+             src="img/game-logo.webp?v=82" alt="IgniteArena">
       </div>
 
       <p class="hero-eyebrow">Tournament &amp; Ranking</p>
@@ -289,7 +289,7 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view" hidden data-src="pages/guide.html?v=81"></section>
+  <section id="view-guide" class="view" hidden data-src="pages/guide.html?v=82"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -527,7 +527,8 @@
     <a class="back-link" id="bracket-back-link" href="#tournaments">← 大会へ</a>
     <h2 id="bracket-title"></h2>
     <p id="bracket-meta" class="meta-line"></p>
-    <!-- 出場している人にだけ出す使い方の案内。名前を押せることに気づいてもらう -->
+    <!-- 出場している人にだけ出す使い方の案内。対戦を開く入口と、名前がプロフィールへ
+         行くことを先に伝える（「あなたの対戦」の欄は bracket-container の先頭） -->
     <p id="bracket-own-hint" class="bracket-own-hint" hidden></p>
     <!-- 運営が自動生成された組み合わせを直すための欄（中身は js/app.js） -->
     <div id="bracket-admin-tools" class="bracket-admin-tools" hidden></div>
@@ -588,9 +589,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal" hidden data-src="pages/terms.html?v=81"></section>
+  <section id="view-terms" class="view legal" hidden data-src="pages/terms.html?v=82"></section>
 
-  <section id="view-privacy" class="view legal" hidden data-src="pages/privacy.html?v=81"></section>
+  <section id="view-privacy" class="view legal" hidden data-src="pages/privacy.html?v=82"></section>
 
 </main>
 
@@ -611,7 +612,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=81"></script>
+<script src="js/vendor/supabase.js?v=82"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -623,27 +624,27 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=81",
-    "./js/bracket.js":        "./js/bracket.js?v=81",
-    "./js/bracketView.js":    "./js/bracketView.js?v=81",
-    "./js/db.js":             "./js/db.js?v=81",
-    "./js/entries.js":        "./js/entries.js?v=81",
-    "./js/icons.js":          "./js/icons.js?v=81",
-    "./js/matchChat.js":      "./js/matchChat.js?v=81",
-    "./js/playerStats.js":    "./js/playerStats.js?v=81",
-    "./js/players.js":        "./js/players.js?v=81",
-    "./js/profile.js":        "./js/profile.js?v=81",
-    "./js/ranking.js":        "./js/ranking.js?v=81",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=81",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=81",
-    "./js/rankingView.js":    "./js/rankingView.js?v=81",
-    "./js/state.js":          "./js/state.js?v=81",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=81",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=81",
-    "./js/util.js":           "./js/util.js?v=81"
+    "./js/auth.js":           "./js/auth.js?v=82",
+    "./js/bracket.js":        "./js/bracket.js?v=82",
+    "./js/bracketView.js":    "./js/bracketView.js?v=82",
+    "./js/db.js":             "./js/db.js?v=82",
+    "./js/entries.js":        "./js/entries.js?v=82",
+    "./js/icons.js":          "./js/icons.js?v=82",
+    "./js/matchChat.js":      "./js/matchChat.js?v=82",
+    "./js/playerStats.js":    "./js/playerStats.js?v=82",
+    "./js/players.js":        "./js/players.js?v=82",
+    "./js/profile.js":        "./js/profile.js?v=82",
+    "./js/ranking.js":        "./js/ranking.js?v=82",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=82",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=82",
+    "./js/rankingView.js":    "./js/rankingView.js?v=82",
+    "./js/state.js":          "./js/state.js?v=82",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=82",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=82",
+    "./js/util.js":           "./js/util.js?v=82"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=81"></script>
+<script type="module" src="js/app.js?v=82"></script>
 </body>
 </html>

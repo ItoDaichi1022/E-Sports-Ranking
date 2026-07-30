@@ -1402,13 +1402,14 @@ async function renderBracketPage(tournamentId) {
   if (!isCurrentRoute('bracket', tournamentId)) return;
 
   // 出場している選手にだけ、対戦表の使い方を1行で示す。
-  // 「自分の名前を押す」が唯一の入口なのに、初めての人はそこに気づけない。
+  // 入口は下の「あなたの対戦」と対戦カード下端のボタンの2つ。どちらも押せば分かる
+  // 形にしてあるが、選手名がプロフィールへ行くことだけは先に伝えておく。
   const isParticipant = Boolean(auth.player)
     && tournament.participantIds.includes(auth.player.id)
     && tournament.status !== 'finished';
   bracketOwnHintEl.hidden = !isParticipant || isAdmin();
   if (!bracketOwnHintEl.hidden) {
-    bracketOwnHintEl.textContent = '色の付いた行が自分の対戦です。対戦カード右の鉛筆アイコンを押すと、ルームコードの確認・対戦相手とのチャット・ゲームカウントの報告ができます。選手名を押すと、その選手のプロフィールが見られます。';
+    bracketOwnHintEl.textContent = '色の付いた行が自分の対戦です。下の「あなたの対戦」か、対戦カード下端のボタンから、ルームコードの確認・対戦相手とのチャット・ゲームカウントの報告ができます。選手名を押すと、その選手のプロフィールが見られます。';
   }
 
   // 戻り先は大会詳細。ここへは詳細から来るため。

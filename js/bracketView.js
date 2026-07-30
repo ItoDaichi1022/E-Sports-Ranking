@@ -10,7 +10,8 @@ import * as db from './db.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
 // 実際のトーナメント表のように中央揃えで配置される。
-const LEAF_ROW_HEIGHT_PX = 100;
+// 選手2行（約70px）＋下端の「対戦を開く」ボタン（約29px）が収まる高さにしてある。
+const LEAF_ROW_HEIGHT_PX = 116;
 
 let lastRenderArgs = null;
 let resizeRedrawTimer = null;
@@ -148,21 +149,16 @@ function makeRowSwapTarget(row, entrantId) {
   row.row.addEventListener('click', () => swapCtx.onPick(entrantId));
 }
 
-// 対戦カードの右端に1つだけ置く鉛筆。ルームコード・チャット・ゲームカウントの入口。
-// 名前はプロフィールへ行く入口なので、対戦を開く操作はこのアイコンに集約する。
-function cardEditButton(onOpen, label) {
-  const btn = makeIconButton('pencil', label, { className: 'edit-match-btn' });
-  btn.addEventListener('click', onOpen);
-  return btn;
-}
-
-// 対戦表の下端に付けるチャットの入口。自分の行を押す導線に気づかない人と、
-// どの試合にも入れる運営のための、もう1つの入口。
-function chatButton(match, onOpen) {
+// 対戦カードの下端に敷く、ルームコード・チャット・ゲームカウントの入口。
+//
+// 以前はこれを右端2remの鉛筆に載せていたが、カードの面積のほとんどは名前
+// （＝プロフィールへの入口）なので、狙いを外して選手ページへ飛んでしまう人がいた。
+// 幅いっぱいのボタンにして、押す場所と行き先を取り違えようがない形にする。
+function chatButton(label, onOpen, { primary = false } = {}) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'match-chat-btn';
-  btn.textContent = match.confirmed ? 'チャットを見る' : 'チャット';
+  btn.className = 'match-chat-btn' + (primary ? ' is-primary' : '');
+  btn.textContent = label;
   btn.addEventListener('click', onOpen);
   return btn;
 }
@@ -230,6 +226,86 @@ function streamToggle(tournamentId, roundIndex, match, onRefresh) {
 function isRoundInProgress(tournamentId, roundIndex, round) {
   if (!isRoundStarted(tournamentId, roundIndex)) return false;
   return round.matches.some((m) => !m.confirmed && !m.isBye);
+}
+
+// まだ終わっていない自分の対戦を1つ探す。早い回戦から見ていくので、
+// 見つかるのは「いま戦っている（これから戦う）試合」になる。
+// BYE は生成時点で確定済みなので、ここには出てこない。
+function findOwnMatch(tournament, bracket) {
+  const myEntrant = entrantIdOfPlayer(tournament, auth.player?.id);
+  if (!myEntrant) return null;
+
+  for (let roundIndex = 0; roundIndex < bracket.rounds.length; roundIndex += 1) {
+    const round = bracket.rounds[roundIndex];
+    const match = round.matches.find(
+      (m) => !m.confirmed && (m.player1Id === myEntrant || m.player2Id === myEntrant),
+    );
+    if (match) return { match, round, roundIndex, myEntrant };
+  }
+  return null;
+}
+
+// 対戦表の上に置く「あなたの対戦」。
+//
+// 対戦表は横に長く、回戦が進むほど自分の枠は端に寄っていく。表の中から自分を
+// 探して、狭いカードの中の正しい場所を押す——という手順を踏ませる代わりに、
+// 出場者にはここから直接ひらいてもらう。押し間違えようがないのが要点。
+function ownMatchPanel(tournament, tournamentId, bracket, onRefresh, onChanged) {
+  const own = findOwnMatch(tournament, bracket);
+  if (!own) return null;
+
+  const { match, round, roundIndex, myEntrant } = own;
+
+  const panel = document.createElement('div');
+  panel.className = 'own-match-panel';
+
+  const label = document.createElement('span');
+  label.className = 'own-match-label';
+  label.textContent = 'あなたの対戦';
+
+  const roundChip = document.createElement('span');
+  roundChip.className = 'own-match-round';
+  roundChip.textContent = round.name;
+
+  const opponentId = match.player1Id === myEntrant ? match.player2Id : match.player1Id;
+  const vs = document.createElement('span');
+  vs.className = 'own-match-vs';
+  vs.textContent = opponentId
+    ? `vs ${getEntrantName(tournamentId, opponentId)}`
+    : '対戦相手はまだ決まっていません';
+
+  panel.append(label, roundChip, vs);
+
+  // いま何を待っているのかを一言添える。対戦表のカードにも同じことは出ているが、
+  // ここだけ見て済ませられるようにする。
+  const pending = pendingResultReport(tournamentId, match.id);
+  const statusText = (() => {
+    if (!isRoundStarted(tournamentId, roundIndex)) return '運営の開始待ち';
+    if (!pending) return null;
+    return pending.reportedBy === myEntrant ? '相手の承認待ち' : '承認してください';
+  })();
+  if (statusText) {
+    const status = document.createElement('span');
+    status.className = 'own-match-status';
+    // 自分が動く番のときだけ強めに出す（待っているだけの状態と区別する）
+    if (pending && pending.reportedBy !== myEntrant) status.classList.add('is-action');
+    status.textContent = statusText;
+    panel.appendChild(status);
+  }
+
+  // 相手が決まるまではチャットの部屋も作れない（canUseMatchChat も同じ判定）
+  if (canUseMatchChat(tournament, match)) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'own-match-open';
+    btn.textContent = '対戦を開く';
+    btn.addEventListener('click', () => {
+      openMatchChat(tournament, match, roundIndex, onRefresh, onChanged);
+    });
+    panel.appendChild(btn);
+  }
+
+  return panel;
 }
 
 function renderMatchBox(
@@ -310,7 +386,7 @@ function renderMatchBox(
   }
 
   // 自分がいる側の行に薄い地色を敷いて、対戦表の中の自分を見つけやすくする。
-  // 押す操作は名前（プロフィール）と鉛筆（対戦を開く）に分かれているので、
+  // 押す操作は名前（プロフィール）と下端のボタン（対戦を開く）に分かれているので、
   // ここでは目印を付けるだけ。
   if (chatAvailable) {
     box.classList.add('has-chat');
@@ -361,8 +437,8 @@ function renderMatchBox(
       });
       box.appendChild(editBtn);
     }
-    // 確定した試合は鉛筆が「結果を編集」に変わるので、チャットは下のボタンから開く
-    if (chatAvailable) box.appendChild(chatButton(match, openChat));
+    // 終わった試合を見返すだけの入口なので、控えめな見た目のまま
+    if (chatAvailable) box.appendChild(chatButton('チャットを見る', openChat));
     return box;
   }
 
@@ -389,7 +465,7 @@ function renderMatchBox(
     if (!isRoundStarted(tournamentId, roundIndex)) {
       box.appendChild(streamToggle(tournamentId, roundIndex, match, onRefresh));
     }
-    if (chatAvailable) box.appendChild(cardEditButton(openChat, 'この対戦を開く'));
+    if (chatAvailable) box.appendChild(chatButton('この対戦を開く', openChat, { primary: true }));
     return box;
   }
 
@@ -403,7 +479,7 @@ function renderMatchBox(
     if (statusLine) box.appendChild(statusLine);
   }
 
-  if (chatAvailable) box.appendChild(cardEditButton(openChat, '開いて記入する'));
+  if (chatAvailable) box.appendChild(chatButton('開いて記入する', openChat, { primary: true }));
   return box;
 }
 
@@ -507,6 +583,13 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
   const seedByEntrant = new Map();
   if (tournament) tournament.entrantIds.forEach((id, i) => seedByEntrant.set(id, i + 1));
   const seedOf = (id) => (id != null && seedByEntrant.has(id) ? seedByEntrant.get(id) : null);
+
+  // 出場者への入口は対戦表の手前に出す。表の中を探させない。
+  // 入れ替え中は出さない（そのモードで押せるのは「選ぶ」だけにしてある）。
+  if (tournament && !swapCtx.active) {
+    const panel = ownMatchPanel(tournament, tournamentId, bracket, onRefresh, onChanged);
+    if (panel) containerEl.appendChild(panel);
+  }
 
   const wrapper = document.createElement('div');
   wrapper.className = 'bracket';
