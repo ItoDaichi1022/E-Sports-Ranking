@@ -2959,6 +2959,14 @@ a.card:hover {
   font-size: 0.95rem;
 }
 
+/* 確定済みの結果を運営が直す鉛筆。滅多に押さないうえ、押すと以降のラウンドの
+   確定まで巻き戻るので、アイコンだけにせず文字も添える。 */
+.chat-edit-result-btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: none;
+}
+
 .chat-result-form {
   display: flex;
   flex-direction: column;
@@ -3127,8 +3135,7 @@ a.card:hover {
   box-shadow: inset 0 0 14px -4px var(--glow);
 }
 
-/* 入口は対戦表の枠の下端に、幅いっぱいで敷く。
-   名前（プロフィールへの入口）と押し間違えないよう、当たり判定を横に長く取る。 */
+/* 入口は対戦表の枠の下端に敷く（編集ボタンと同じ形） */
 .match-chat-btn {
   display: block;
   width: 100%;
@@ -3149,31 +3156,48 @@ a.card:hover {
   color: var(--text);
 }
 
-/* まだ終わっていない試合の入口。ここから入って結果を入れるので、
-   見返すだけの「チャットを見る」より一段はっきり見せる。 */
-.match-chat-btn.is-primary {
-  background: var(--accent-soft);
-  color: var(--accent-bright);
-  font-weight: 700;
+/* ---- あなたの対戦（画面下端に貼り付ける入口） ----
+
+   対戦表のどこを見ていても同じ位置に出しておく。表の中から自分の枠を探して、
+   狭いカードの中の正しい場所を押す——という手順そのものを無くすのが狙い。
+   置き場所は #view-bracket の中なので、他のページへ移れば hidden で一緒に消える。 */
+
+.own-match-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* 本文より手前、開いたメニュー（z-index:30）より奥。
+     ダイアログは top layer なので、対戦チャットは常にこの上に出る。 */
+  z-index: 25;
+  border-top: 1px solid var(--accent);
+  /* 本文の上に重なるので、透けない面にする（下の文字が透けると両方読めない） */
+  background: var(--surface-2);
+  box-shadow: 0 -6px 20px -10px rgba(0, 0, 0, 0.9), 0 0 22px -12px var(--glow);
+  /* iPhoneのホームバーやAndroidのジェスチャーバーに文字がかからないようにする */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* 出入りのアニメーションは付けない。この帯は Realtime の更新のたびに作り直される
+     ので、動きを付けると他人の操作でいちいち下から生えてくることになる。 */
 }
 
-.match-chat-btn.is-primary:hover:not(:disabled) {
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-
-/* ---- あなたの対戦（対戦表の手前に置く入口） ---- */
-
+/* 帯は画面幅いっぱい、中身は本文（main）と同じ幅に収める */
 .own-match-panel {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.4rem 0.7rem;
-  margin-bottom: 0.9rem;
-  padding: 0.7rem 0.9rem;
-  border: 1px solid var(--accent);
-  border-radius: var(--r-sm);
-  background: var(--accent-soft);
+  gap: 0.3rem 0.7rem;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0.6rem 1.5rem;
+}
+
+/* 固定バーのぶん、ページの末尾に余白を作る（最後の要素が帯の下に隠れないように）。
+   バーが出るのは出場者が対戦表を見ているときだけなので、そのときだけ広げる。 */
+body:has(#view-bracket:not([hidden]) .own-match-bar) { padding-bottom: 8rem; }
+
+/* 「上へ戻る」の丸ボタンも、帯に重ならない高さへ逃がす */
+body:has(#view-bracket:not([hidden]) .own-match-bar) button.scroll-top-btn {
+  bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
 }
 
 .own-match-label {
@@ -3216,6 +3240,18 @@ a.card:hover {
   min-height: 0;
   padding: 0.4rem 1.1rem;
   font-size: 0.85rem;
+}
+
+/* 狭い画面では横に並べきれないので、ボタンだけ1行取って指で押しやすくする */
+@media (max-width: 640px) {
+  .own-match-panel { padding: 0.55rem 1rem; }
+
+  .own-match-open {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 0.15rem;
+    padding: 0.5rem 1.1rem;
+  }
 }
 
 /* 対戦チャットのダイアログはタブ2枚（話す／結果を入れる）。

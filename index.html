@@ -527,8 +527,9 @@
     <a class="back-link" id="bracket-back-link" href="#tournaments">← 大会へ</a>
     <h2 id="bracket-title"></h2>
     <p id="bracket-meta" class="meta-line"></p>
-    <!-- 出場している人にだけ出す使い方の案内。対戦を開く入口と、名前がプロフィールへ
-         行くことを先に伝える（「あなたの対戦」の欄は bracket-container の先頭） -->
+    <!-- 出場している人にだけ出す使い方の案内。自分の対戦を開く入口は画面下端に
+         貼り付く「あなたの対戦」（js/bracketView.js が bracket-container に入れる）。
+         ここでは、選手名を押すとプロフィールへ行くことを伝える。 -->
     <p id="bracket-own-hint" class="bracket-own-hint" hidden></p>
     <!-- 運営が自動生成された組み合わせを直すための欄（中身は js/app.js） -->
     <div id="bracket-admin-tools" class="bracket-admin-tools" hidden></div>

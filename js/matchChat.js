@@ -18,9 +18,9 @@ import {
   findTournament, pendingResultReport, isRoundStarted, matchRoomCode,
 } from './state.js';
 import { auth, isAdmin } from './auth.js';
-import { confirmMatch } from './bracket.js';
+import { confirmMatch, editMatch } from './bracket.js';
 import { escapeHtml } from './util.js';
-import { setButtonIcon, makeIconButton } from './icons.js';
+import { iconSvg, setButtonIcon, makeIconButton } from './icons.js';
 import * as db from './db.js';
 
 const POLL_INTERVAL_MS = 5000;
@@ -520,6 +520,45 @@ function adminConfirmForm(match, name1, name2) {
   return form;
 }
 
+// 確定した結果を運営が直すための鉛筆。
+//
+// 元は対戦表のカードの右端に置いていたが、カードの面積のほとんどは選手名
+// （＝プロフィールへの入口）で、狙いを外して選手ページへ飛ぶ人がいた。
+// この試合について何かするのはすべてこのダイアログの中、という形に寄せる。
+//
+// 押すと以降のラウンドの確定も巻き戻るので、ダイアログは閉じずに描き直す。
+// そのまま正しいカウントを入れ直せる（確定→編集→再確定が1画面で終わる）。
+function editConfirmedRow() {
+  const row = document.createElement('div');
+  row.className = 'row-actions';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn-secondary chat-edit-result-btn';
+  btn.innerHTML = `${iconSvg('pencil')}<span>結果を編集</span>`;
+
+  btn.addEventListener('click', () => {
+    const ok = confirm('この試合の結果を編集しますか？以降のラウンドに既に反映・確定している結果があれば、それらも未確定に戻ります。');
+    if (!ok) return;
+
+    const result = editMatch(room.tournamentId, room.matchId);
+    if (!result.ok) {
+      showError(result.error);
+      return;
+    }
+    showError(null);
+
+    // 対戦表の描き直しとDBへの書き戻しは呼び出し側（js/app.js）が持っている
+    room.onChanged?.();
+    renderResultPanel();
+    syncTabs();
+    syncWriteState();
+  });
+
+  row.appendChild(btn);
+  return row;
+}
+
 // 当事者には自分の対戦の報告欄、運営にはその場で確定できる欄を出す
 // （スペクテーターや無関係の選手には何も出さない）。
 function renderResultPanel() {
@@ -555,6 +594,8 @@ function renderResultPanel() {
       ? '不戦勝で確定しました。'
       : `${scoreSentence(name1, name2, match.score ?? '')} で確定しました。`;
     resultEl.appendChild(note);
+    // 確定を解いて入れ直せるのは運営だけ。BYE は編集できない（bracket.js の editMatch）
+    if (isAdmin() && !match.isBye) resultEl.appendChild(editConfirmedRow());
     return;
   }
 

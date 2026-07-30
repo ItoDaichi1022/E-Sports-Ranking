@@ -2,7 +2,6 @@ import {
   state, getEntrantName, getEntrantMemberNames, getEntrantMemberIds, openChatReports,
   pendingResultReport, entrantIdOfPlayer, roundState, isRoundStarted, isStreamedMatch,
 } from './state.js';
-import { editMatch } from './bracket.js';
 import { auth, isAdmin } from './auth.js';
 import { canUseMatchChat, openMatchChat } from './matchChat.js';
 import { makeIconButton } from './icons.js';
@@ -10,8 +9,7 @@ import * as db from './db.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
 // 実際のトーナメント表のように中央揃えで配置される。
-// 選手2行（約70px）＋下端の「対戦を開く」ボタン（約29px）が収まる高さにしてある。
-const LEAF_ROW_HEIGHT_PX = 116;
+const LEAF_ROW_HEIGHT_PX = 100;
 
 let lastRenderArgs = null;
 let resizeRedrawTimer = null;
@@ -149,15 +147,23 @@ function makeRowSwapTarget(row, entrantId) {
   row.row.addEventListener('click', () => swapCtx.onPick(entrantId));
 }
 
-// 対戦カードの下端に敷く、ルームコード・チャット・ゲームカウントの入口。
+// 対戦カードの右端に1つだけ置く鉛筆。ルームコード・チャット・ゲームカウントの入口。
 //
-// 以前はこれを右端2remの鉛筆に載せていたが、カードの面積のほとんどは名前
-// （＝プロフィールへの入口）なので、狙いを外して選手ページへ飛んでしまう人がいた。
-// 幅いっぱいのボタンにして、押す場所と行き先を取り違えようがない形にする。
-function chatButton(label, onOpen, { primary = false } = {}) {
+// 出場者にとっての主な入口は画面下端の固定バー（ownMatchBar）で、こちらは
+// 「どの試合にも入れる運営」と「自分の試合以外も見たい人」のための入口。
+// 名前はプロフィールへ行く入口なので、対戦を開く操作はこのアイコンに集約する。
+function cardEditButton(onOpen, label) {
+  const btn = makeIconButton('pencil', label, { className: 'edit-match-btn' });
+  btn.addEventListener('click', onOpen);
+  return btn;
+}
+
+// 確定した試合の入口。もう記入するものが無いので鉛筆は置かず、下端の帯だけにする
+// （運営が結果を直すときも、この帯から入ってチャットの中の「結果を編集」を押す）。
+function chatButton(label, onOpen) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'match-chat-btn' + (primary ? ' is-primary' : '');
+  btn.className = 'match-chat-btn';
   btn.textContent = label;
   btn.addEventListener('click', onOpen);
   return btn;
@@ -245,19 +251,28 @@ function findOwnMatch(tournament, bracket) {
   return null;
 }
 
-// 対戦表の上に置く「あなたの対戦」。
+// 画面の下端に貼り付ける「あなたの対戦」。
 //
-// 対戦表は横に長く、回戦が進むほど自分の枠は端に寄っていく。表の中から自分を
-// 探して、狭いカードの中の正しい場所を押す——という手順を踏ませる代わりに、
-// 出場者にはここから直接ひらいてもらう。押し間違えようがないのが要点。
-function ownMatchPanel(tournament, tournamentId, bracket, onRefresh, onChanged) {
+// 対戦表は縦にも横にも長く、回戦が進むほど自分の枠は端に寄っていく。表の中から
+// 自分を探して、狭いカードの中の正しい場所を押す——という手順を踏ませる代わりに、
+// 出場者にはここから直接ひらいてもらう。ページのどこを見ていても同じ位置に
+// 出ているので、探す必要も、押し間違えて選手ページへ飛ぶこともない。
+//
+// CSS で position: fixed にしているが、対戦表のページ（#view-bracket）の中に
+// 置いてあるので、他のページへ移れば hidden と一緒に消える。
+function ownMatchBar(tournament, tournamentId, bracket, onRefresh, onChanged) {
   const own = findOwnMatch(tournament, bracket);
   if (!own) return null;
 
   const { match, round, roundIndex, myEntrant } = own;
 
+  const bar = document.createElement('div');
+  bar.className = 'own-match-bar';
+
+  // 帯は画面の幅いっぱいに敷き、中身だけ本文と同じ幅に収める
   const panel = document.createElement('div');
   panel.className = 'own-match-panel';
+  bar.appendChild(panel);
 
   const label = document.createElement('span');
   label.className = 'own-match-label';
@@ -305,7 +320,7 @@ function ownMatchPanel(tournament, tournamentId, bracket, onRefresh, onChanged) 
     panel.appendChild(btn);
   }
 
-  return panel;
+  return bar;
 }
 
 function renderMatchBox(
@@ -386,7 +401,7 @@ function renderMatchBox(
   }
 
   // 自分がいる側の行に薄い地色を敷いて、対戦表の中の自分を見つけやすくする。
-  // 押す操作は名前（プロフィール）と下端のボタン（対戦を開く）に分かれているので、
+  // 押す操作は名前（プロフィール）と鉛筆（対戦を開く）に分かれているので、
   // ここでは目印を付けるだけ。
   if (chatAvailable) {
     box.classList.add('has-chat');
@@ -423,22 +438,12 @@ function renderMatchBox(
       r2.scoreSpan.textContent = s2 ?? '';
     }
 
-    if (!readOnly) {
-      const editBtn = makeIconButton('pencil', '結果を編集', { className: 'edit-match-btn' });
-      editBtn.addEventListener('click', () => {
-        const ok = confirm('この試合の結果を編集しますか？以降のラウンドに既に反映・確定している結果があれば、それらも未確定に戻ります。');
-        if (!ok) return;
-        const result = editMatch(tournamentId, match.id);
-        if (!result.ok) {
-          alert(result.error);
-          return;
-        }
-        onChanged();
-      });
-      box.appendChild(editBtn);
+    // 確定した結果を直す操作は、対戦チャットの「ゲームカウント」の中に移した
+    // （js/matchChat.js の renderResultPanel）。名前の隣に鉛筆を置くと、
+    // 狙いを外して選手ページへ飛ぶ人がいるので、カードには入口だけを残す。
+    if (chatAvailable) {
+      box.appendChild(chatButton(isAdmin() ? 'この対戦を開く' : 'チャットを見る', openChat));
     }
-    // 終わった試合を見返すだけの入口なので、控えめな見た目のまま
-    if (chatAvailable) box.appendChild(chatButton('チャットを見る', openChat));
     return box;
   }
 
@@ -465,7 +470,7 @@ function renderMatchBox(
     if (!isRoundStarted(tournamentId, roundIndex)) {
       box.appendChild(streamToggle(tournamentId, roundIndex, match, onRefresh));
     }
-    if (chatAvailable) box.appendChild(chatButton('この対戦を開く', openChat, { primary: true }));
+    if (chatAvailable) box.appendChild(cardEditButton(openChat, 'この対戦を開く'));
     return box;
   }
 
@@ -479,7 +484,7 @@ function renderMatchBox(
     if (statusLine) box.appendChild(statusLine);
   }
 
-  if (chatAvailable) box.appendChild(chatButton('開いて記入する', openChat, { primary: true }));
+  if (chatAvailable) box.appendChild(cardEditButton(openChat, '開いて記入する'));
   return box;
 }
 
@@ -584,11 +589,11 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
   if (tournament) tournament.entrantIds.forEach((id, i) => seedByEntrant.set(id, i + 1));
   const seedOf = (id) => (id != null && seedByEntrant.has(id) ? seedByEntrant.get(id) : null);
 
-  // 出場者への入口は対戦表の手前に出す。表の中を探させない。
+  // 出場者への入口は画面下端に貼り付ける（位置決めはCSS）。表の中を探させない。
   // 入れ替え中は出さない（そのモードで押せるのは「選ぶ」だけにしてある）。
   if (tournament && !swapCtx.active) {
-    const panel = ownMatchPanel(tournament, tournamentId, bracket, onRefresh, onChanged);
-    if (panel) containerEl.appendChild(panel);
+    const bar = ownMatchBar(tournament, tournamentId, bracket, onRefresh, onChanged);
+    if (bar) containerEl.appendChild(bar);
   }
 
   const wrapper = document.createElement('div');
