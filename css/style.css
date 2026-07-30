@@ -431,6 +431,13 @@ header h1 a::before {
 
 #main-nav .nav-contact:hover { color: var(--text); }
 
+/* メニューの区切り線。「サイトを知る／競技を見る／自分のこと」の3グループに分ける */
+#main-nav .nav-sep {
+  margin: 0.35rem 0.4rem;
+  border: none;
+  border-top: 1px solid var(--border-soft);
+}
+
 /* 保存中などのメッセージ行 */
 .sync-bar {
   display: flex;
@@ -571,6 +578,90 @@ section {
 }
 
 .home-section-head h2 { margin: 0; }
+
+/* ホームのお知らせ見出し右の「すべて見る」。主役はカードなので控えめに */
+.see-all-link {
+  color: var(--text-faint);
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+
+.see-all-link:hover { color: var(--text); }
+
+/* ホームのサイト紹介。初めて来た人が数秒で「何のサイトか」を掴むための短い箱 */
+.home-about {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+.home-about-lead {
+  margin: 0.6rem 0 0;
+  line-height: 1.8;
+}
+
+.home-about-points {
+  margin: 0.8rem 0;
+  padding-left: 1.2rem;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  line-height: 1.9;
+}
+
+.home-about .note { margin-bottom: 0; }
+
+/* ---------------------------------------------------------------------------
+   ページ内タブ（大会一覧の 募集中／進行中／終了）
+
+   見た目はチャットのタブ（.chat-tab）と揃えるが、こちらは押すとハッシュが変わる
+   リンク（#tournaments/{タブ名}）。現在のタブは is-active と aria-current で示す。
+   --------------------------------------------------------------------------- */
+
+.page-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-tab {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.4rem;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.page-tab:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.page-tab.is-active {
+  border-bottom-color: var(--accent-2);
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: inset 0 -10px 14px -14px var(--glow);
+}
+
+/* エントリー状況のグループ見出し。カードの束ごとの小さな区切り */
+.entries-group-title {
+  margin: 1.6rem 0 0.8rem;
+  font-size: 1.02rem;
+}
+
+#entries-content .entries-group-title:first-child { margin-top: 0.4rem; }
 
 .note {
   color: var(--text-dim);
@@ -1631,6 +1722,12 @@ td code { font-size: 0.85em; }
   font-weight: 700;
 }
 
+/* 実物のメニューの区切り線（#main-nav .nav-sep）に対応する図中の線 */
+.guide-nav-sep {
+  margin: 0.25rem 0.3rem;
+  border-top: 1px solid var(--border-soft);
+}
+
 /* 権限が付いて増えるメニューは、増えたことが分かるよう縁で示す */
 .guide-nav-item.is-new {
   border: 1px dashed var(--accent);
@@ -1968,7 +2065,7 @@ a.card:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* 大会履歴の優勝者。金は上位を示す色としてここと順位表だけに使う。 */
+/* 大会一覧の優勝者。金は上位を示す色としてここと順位表だけに使う。 */
 .card-champion {
   display: inline-flex;
   align-items: center;
@@ -1980,6 +2077,13 @@ a.card:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* エントリー状況の「自分の成績」。優勝者の金と紛れないよう普通の文字色で出す */
+.card-my-result {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
 }
 
 /* お知らせ：固定したものは左にグラデーションの帯を付けて目立たせる */

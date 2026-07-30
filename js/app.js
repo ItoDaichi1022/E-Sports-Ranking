@@ -13,7 +13,7 @@ import { reportChipHtml, syncOpenChat } from './matchChat.js';
 import { computeRankings, computeRankingsForRange, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
-import { getPlayerStats, championLabel } from './playerStats.js';
+import { getPlayerStats, championLabel, placementLabel } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
 import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
 import { renderProfileForm, profileSectionHtml, isProfileFormMounted } from './profile.js';
@@ -75,8 +75,19 @@ const announcementImagePicker = setupImagePicker({
   removeBtn: $('announcement-image-remove-btn'),
 });
 
-const recruitListEl = $('recruit-list');
-const historyListEl = $('history-list');
+const tournamentsListEl = $('tournaments-list');
+const tournamentsNoteEl = $('tournaments-note');
+// タブ名 → タブのリンク要素。renderTournamentsPage が is-active を付け替える
+const tournamentsTabEls = {
+  recruiting: $('tournaments-tab-recruiting'),
+  running: $('tournaments-tab-running'),
+  finished: $('tournaments-tab-finished'),
+};
+
+const entriesNoteEl = $('entries-note');
+const entriesLoginPanel = $('entries-login-panel');
+const entriesLoginBtn = $('entries-login-btn');
+const entriesContentEl = $('entries-content');
 
 const bracketTitleEl = $('bracket-title');
 const bracketMetaEl = $('bracket-meta');
@@ -154,6 +165,7 @@ const announcementFormErrorEl = $('announcement-form-error');
 const announcementSubmitBtn = $('announcement-submit-btn');
 const announcementCancelBtn = $('announcement-cancel-btn');
 
+const newsListEl = $('news-list');
 const newsHeroEl = $('news-hero');
 const newsTitleEl = $('news-title');
 const newsDateEl = $('news-date');
@@ -223,13 +235,17 @@ function applyAuthUI() {
 const VIEW_IDS = {
   home: 'view-home',
   guide: 'view-guide', // はじめに（静的ページ。描画関数は持たない）
+  // #news はお知らせ一覧、#news/{id} は詳細。routeFromHash がパラメータの有無で分ける
   news: 'view-news',
-  recruit: 'view-recruit',
+  newslist: 'view-news-list',
+  // 大会一覧。募集中・進行中・終了はページ内タブ（#tournaments/{タブ名}）
+  tournaments: 'view-tournaments',
+  // 自分がエントリー・出場した大会のまとめ
+  entries: 'view-entries',
   // create=大会作成（運営）、tournament=大会詳細、bracket=対戦表。
   // 詳細と対戦表は別ページに分けてある。
   create: 'view-tournament',
   tournament: 'view-tournament-detail',
-  history: 'view-history',
   bracket: 'view-bracket',
   player: 'view-player-detail',
   // 選手一覧はランキングと同じページに統合した。#players は以前のリンクや
@@ -244,8 +260,8 @@ const VIEW_IDS = {
 
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
 const NAV_PAGE_OF = {
-  tournament: 'history', bracket: 'history', player: 'ranking',
-  players: 'ranking', news: 'home',
+  tournament: 'tournaments', bracket: 'tournaments', player: 'ranking',
+  players: 'ranking', news: 'newslist',
 };
 
 function parseHash() {
@@ -313,7 +329,20 @@ function routeFromHash() {
     return;
   }
 
+  // ページ統合前の旧URL。古いリンク・ブックマークから来た人を対応するタブへ通す。
+  if (page === 'recruit') {
+    location.replace('#tournaments/recruiting');
+    return;
+  }
+  if (page === 'history') {
+    location.replace('#tournaments/finished');
+    return;
+  }
+
   let target = VIEW_IDS[page] ? page : 'home';
+
+  // #news はパラメータの有無で一覧と詳細に分かれる（#news=一覧、#news/{id}=詳細）
+  if (page === 'news' && !param) target = 'newslist';
 
   // 大会作成は運営限定。マイページはログアウト中でも開ける（そこからログインする）
   if (target === 'create' && !isAdmin()) {
@@ -343,10 +372,11 @@ function routeFromHash() {
 
   if (target === 'home') renderHome();
   else if (target === 'news') renderNewsPage(param);
-  else if (target === 'recruit') renderRecruit();
+  else if (target === 'newslist') renderNewsListPage();
+  else if (target === 'tournaments') renderTournamentsPage(param);
+  else if (target === 'entries') renderEntriesPage();
   else if (target === 'create') { renderParticipantCheckboxes(); renderSelectedList(); }
   else if (target === 'tournament') renderTournamentDetail(param);
-  else if (target === 'history') renderHistoryList();
   else if (target === 'bracket') renderBracketPage(param);
   else if (target === 'player') renderPlayerDetail(param);
   // 選手検索とランキングは同じページ。どちらのハッシュで来ても両方を描く。
@@ -390,20 +420,34 @@ function closeAnnouncementForm() {
   announcementFormErrorEl.textContent = '';
 }
 
-function renderHome() {
-  announcementListEl.innerHTML = '';
+// ホームに出すお知らせの件数。最新の動きが分かれば十分なので数件に絞り、
+// 全件はお知らせ一覧ページ（#news）で見せる。
+const HOME_ANNOUNCEMENT_COUNT = 3;
 
-  if (state.announcements.length === 0) {
-    announcementListEl.innerHTML = '<p class="empty-hint">まだお知らせはありません。</p>';
+function renderHome() {
+  renderAnnouncementCards(announcementListEl, state.announcements.slice(0, HOME_ANNOUNCEMENT_COUNT));
+}
+
+// お知らせ一覧ページ。全件を新しい順（固定を先頭）に並べる。
+function renderNewsListPage() {
+  renderAnnouncementCards(newsListEl, state.announcements);
+}
+
+// お知らせのカード一覧。ホームとお知らせ一覧ページの両方から使う。
+function renderAnnouncementCards(containerEl, announcements) {
+  containerEl.innerHTML = '';
+
+  if (announcements.length === 0) {
+    containerEl.innerHTML = '<p class="empty-hint">まだお知らせはありません。</p>';
     return;
   }
 
   // 一覧は画像・題名・日付だけの入口。本文は詳細ページ（#news/{id}）で読ませる。
-  // カードの形と並べ方は募集・大会履歴と共通（css の .card 系）。
+  // カードの形と並べ方は大会一覧と共通（css の .card 系）。
   const list = document.createElement('div');
   list.className = 'card-grid';
 
-  state.announcements.forEach((a) => {
+  announcements.forEach((a) => {
     const card = document.createElement('a');
     card.className = `card${a.pinned ? ' pinned' : ''}`;
     card.href = `#news/${encodeURIComponent(a.id)}`;
@@ -431,7 +475,7 @@ function renderHome() {
     list.appendChild(card);
   });
 
-  announcementListEl.appendChild(list);
+  containerEl.appendChild(list);
 }
 
 // お知らせの詳細。画像 → 題名 → 日付 → 本文 → 運営操作 の順に出す。
@@ -466,7 +510,7 @@ function renderNewsPage(id) {
     if (a.imageUrl) await db.removeImageByUrl(a.imageUrl).catch(() => {});
     await refreshFromDb();
     // 消したお知らせのページに留まらないよう一覧へ戻す
-    location.hash = '#home';
+    location.hash = '#news';
   });
 
   newsActionsEl.append(editBtn, delBtn);
@@ -616,10 +660,6 @@ function seedBySelectedRanking() {
 }
 
 // ---- 募集ページ ----
-
-function renderRecruit() {
-  renderRecruitPage(recruitListEl);
-}
 
 // ---- マイページ ----
 
@@ -785,7 +825,63 @@ function renderOwnProfileView() {
   profileLinksEl.appendChild(link);
 }
 
-// ---- 大会履歴 ----
+// ---- エントリー状況 ----
+//
+// 自分がエントリー・出場した大会だけを、募集中・進行中・終了に分けて並べる。
+// マイページはプロフィールの場所なので、自分の大会への入口はこちらに集約する。
+
+// グループの並びは大会の時間の流れ（これから出る → いま出ている → 出終わった）。
+// 準備中は「募集中に入れたが運営が一時的に募集を止めた」状態なので、エントリー中に含める。
+const ENTRY_GROUPS = [
+  { title: 'エントリー中の大会', statuses: ['recruiting', 'draft'] },
+  { title: '出場中の大会', statuses: ['running'] },
+  { title: '過去に出場した大会', statuses: ['finished'] },
+];
+
+function renderEntriesPage() {
+  entriesContentEl.innerHTML = '';
+
+  if (!isLoggedIn()) {
+    entriesLoginPanel.hidden = false;
+    entriesNoteEl.textContent = 'ログインすると、自分がエントリー・出場した大会がここにまとまります。';
+    return;
+  }
+  entriesLoginPanel.hidden = true;
+
+  // ログイン済みでも選手登録がまだならエントリーできないので、登録へ案内する
+  if (!auth.player) {
+    entriesNoteEl.textContent = '';
+    entriesContentEl.innerHTML = '<p class="empty-hint">選手登録がまだです。'
+      + '<a href="#profile">マイページ</a>で登録すると、大会にエントリーできます。</p>';
+    return;
+  }
+
+  entriesNoteEl.textContent = '自分がエントリー・出場した大会の一覧です。大会を選ぶと詳細に移動します。';
+
+  const mine = state.tournaments.filter((t) => t.participantIds.includes(auth.player.id));
+
+  if (mine.length === 0) {
+    entriesContentEl.innerHTML = '<p class="empty-hint">まだエントリーした大会がありません。'
+      + '<a href="#tournaments">募集中の大会</a>からエントリーできます。</p>';
+    return;
+  }
+
+  ENTRY_GROUPS.forEach(({ title, statuses }) => {
+    const items = mine.filter((t) => statuses.includes(t.status));
+    if (items.length === 0) return; // 空のグループは見出しごと出さない
+
+    const heading = document.createElement('h3');
+    heading.className = 'entries-group-title';
+    heading.textContent = title;
+    entriesContentEl.appendChild(heading);
+
+    const listWrap = document.createElement('div');
+    renderTournamentCards(listWrap, [...items].reverse(), '', { placementFor: auth.player.id });
+    entriesContentEl.appendChild(listWrap);
+  });
+}
+
+// ---- 大会一覧（募集中・進行中・終了のタブ） ----
 
 // 大会の規模の表示。ブラケットの枠になるのはチーム戦ではチームなので、
 // 「16チーム」を主にしつつ、実際に出た人数も添える。
@@ -823,14 +919,44 @@ function tournamentStatusLabel(t) {
   return champion ? `優勝: ${champion}` : label;
 }
 
-function renderHistoryList() {
-  historyListEl.innerHTML = '';
+const TOURNAMENT_TABS = ['recruiting', 'running', 'finished'];
 
-  // 準備中・募集中は募集ページの担当。履歴には実際に始まった大会だけを並べる。
-  const visible = state.tournaments.filter((t) => t.status === 'running' || t.status === 'finished');
+// タブごとの説明。そのタブで何ができるかを1行で示す。
+const TOURNAMENT_TAB_NOTES = {
+  recruiting: '大会を選ぶと、ルールや参加者を確認してエントリーできます。募集中はいつでも取り消せます。',
+  running: '大会を選ぶとブラケット（進行状況）を確認できます。',
+  finished: '大会を選ぶとブラケット（最終結果）を確認できます。',
+};
 
-  if (visible.length === 0) {
-    historyListEl.innerHTML = '<p class="empty-hint">まだ開催された大会がありません。</p>';
+function renderTournamentsPage(param) {
+  const tab = TOURNAMENT_TABS.includes(param) ? param : 'recruiting';
+
+  Object.entries(tournamentsTabEls).forEach(([name, el]) => {
+    el.classList.toggle('is-active', name === tab);
+    if (name === tab) el.setAttribute('aria-current', 'page');
+    else el.removeAttribute('aria-current');
+  });
+  tournamentsNoteEl.textContent = TOURNAMENT_TAB_NOTES[tab];
+
+  // 募集中タブは、エントリー導線ごと entries.js に任せる（運営には準備中も見える）
+  if (tab === 'recruiting') {
+    renderRecruitPage(tournamentsListEl);
+    return;
+  }
+
+  const visible = state.tournaments.filter((t) => t.status === tab);
+  renderTournamentCards(tournamentsListEl, [...visible].reverse(), tab === 'running'
+    ? '進行中の大会はありません。'
+    : 'まだ終了した大会がありません。');
+}
+
+// 始まった大会（進行中・終了）のカード一覧。大会一覧とエントリー状況で使う。
+// placementFor に選手IDを渡すと、終了した大会にその選手の成績を添える。
+function renderTournamentCards(containerEl, tournaments, emptyText, { placementFor = null } = {}) {
+  containerEl.innerHTML = '';
+
+  if (tournaments.length === 0) {
+    containerEl.innerHTML = `<p class="empty-hint">${escapeHtml(emptyText)}</p>`;
     return;
   }
 
@@ -838,12 +964,15 @@ function renderHistoryList() {
   const list = document.createElement('div');
   list.className = 'card-grid';
 
-  [...visible].reverse().forEach((t) => {
+  tournaments.forEach((t) => {
     const card = document.createElement('a');
     card.className = 'card';
     card.href = `#tournament/${encodeURIComponent(t.id)}`;
 
     const { label, tone, champion } = tournamentStatusInfo(t);
+    const placement = placementFor && t.status === 'finished'
+      ? placementLabel(t.id, placementFor)
+      : null;
 
     const body = document.createElement('div');
     body.className = 'card-body';
@@ -853,13 +982,14 @@ function renderHistoryList() {
       <span class="status-chip status-${tone}">${escapeHtml(label)}</span>
       ${reportChipHtml(t.id)}
       ${champion ? `<span class="card-champion">優勝 ${escapeHtml(champion)}</span>` : ''}
+      ${placement ? `<span class="card-my-result">自分の成績: ${escapeHtml(placement)}</span>` : ''}
     `;
 
     card.append(cardThumb(t.imageUrl, t.name), body);
     list.appendChild(card);
   });
 
-  historyListEl.appendChild(list);
+  containerEl.appendChild(list);
 }
 
 // ---- ブラケットページ ----
@@ -1011,13 +1141,12 @@ function renderTournamentInfo(tournament) {
   tournamentInfoEl.innerHTML = html;
 }
 
-// 大会の一覧（募集・履歴）から戻るときの行き先。
-// 募集中・準備中の大会は履歴に並ばないので、戻り先を募集ページにする。
+// 大会一覧へ戻るときの行き先。この大会がいま並んでいるタブへ戻す。
+// 準備中は運営にだけ募集中タブに並ぶので、募集中タブ扱いにする。
 function backToListLink(tournament) {
-  const fromRecruit = tournament.status === 'draft' || tournament.status === 'recruiting';
-  return fromRecruit
-    ? { href: '#recruit', text: '← 募集中の大会へ' }
-    : { href: '#history', text: '← 大会履歴へ' };
+  const tab = tournament.status === 'draft' ? 'recruiting'
+    : TOURNAMENT_TABS.includes(tournament.status) ? tournament.status : 'finished';
+  return { href: `#tournaments/${tab}`, text: '← 大会一覧へ' };
 }
 
 // 大会詳細。対戦表そのものは別ページ（#bracket/{id}）に分けてあり、
@@ -1178,8 +1307,8 @@ async function renderBracketPage(tournamentId) {
     bracketAdminToolsEl.hidden = true;
     bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
     resultSectionEl.innerHTML = '';
-    bracketBackLink.href = '#history';
-    bracketBackLink.textContent = '← 大会履歴へ';
+    bracketBackLink.href = '#tournaments';
+    bracketBackLink.textContent = '← 大会一覧へ';
     return;
   }
 
@@ -1905,7 +2034,7 @@ tournamentForm.addEventListener('submit', async (e) => {
   selectedParticipantIds = [];
 
   await refreshFromDb();
-  location.hash = manual ? `#tournament/${encodeURIComponent(tournament.id)}` : '#recruit';
+  location.hash = manual ? `#tournament/${encodeURIComponent(tournament.id)}` : '#tournaments/recruiting';
 });
 
 tournamentEditBtn.addEventListener('click', () => {
@@ -1977,7 +2106,7 @@ tournamentDeleteBtn.addEventListener('click', async () => {
   if (!ok) return;
   if (imageUrl) await db.removeImageByUrl(imageUrl).catch(() => {});
   await refreshFromDb();
-  location.hash = '#history';
+  location.hash = '#tournaments';
 });
 
 // 「はじめに」の目次。ページ内の移動なので、ハッシュは変えずにスクロールで運ぶ。
@@ -2068,6 +2197,9 @@ loginCancelBtn.addEventListener('click', () => loginDialog.close());
 
 // 募集ページの「ログインしてエントリー」など、他モジュールからの要求
 document.addEventListener('request-login', openLoginDialog);
+
+// エントリー状況ページのログイン導線。ページ遷移せずダイアログだけ開く
+entriesLoginBtn.addEventListener('click', openLoginDialog);
 
 // マイページからのログイン。ダイアログを介さず、その場で認可画面へ送る。
 profileGoogleBtn.addEventListener('click', async () => {
