@@ -17,6 +17,7 @@ import { getPlayerStats, championLabel, placementLabelOf } from './playerStats.j
 import { tournamentTier } from './tournamentTier.js';
 import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
 import { renderProfileForm, profileSectionHtml, isProfileFormMounted } from './profile.js';
+import { keepFormDraft, clearFormDraft } from './formDraft.js';
 import {
   renderRecruitPage, renderTournamentActions, STATUS_LABELS, entrantUnit,
 } from './entries.js';
@@ -57,6 +58,7 @@ const tournamentSubmitBtn = $('tournament-submit-btn');
 const tournamentMatchTypeInput = $('tournament-match-type-input');
 const tournamentMatchTypeNoteField = $('tournament-match-type-note-field');
 const tournamentMatchTypeNoteInput = $('tournament-match-type-note-input');
+const tournamentThirdPlaceInput = $('tournament-third-place-input');
 
 // 大会作成・大会編集・お知らせの画像アップロード。HTML側の入力を配線する。
 const tournamentImagePicker = setupImagePicker({
@@ -413,6 +415,10 @@ function routeFromHash() {
 
 // 投稿・編集フォームを開く。announcement を渡すと編集、null なら新規。
 // ホーム（新規）と詳細ページ（編集）の両方から開くのでダイアログにしている。
+// 下書きの控えは投稿ごとに分ける。新規と編集で同じ鍵にすると、
+// 書きかけの新規投稿が、既存のお知らせを編集したときに流れ込んでしまう。
+const announcementDraftKey = (id) => `announcement-${id || 'new'}`;
+
 function openAnnouncementForm(announcement) {
   announcementIdInput.value = announcement?.id ?? '';
   announcementTitleInput.value = announcement?.title ?? '';
@@ -422,13 +428,17 @@ function openAnnouncementForm(announcement) {
   announcementFormErrorEl.textContent = '';
   announcementDialogTitle.textContent = announcement ? 'お知らせを編集' : '新しいお知らせ';
   announcementSubmitBtn.textContent = announcement ? '更新する' : '投稿する';
+  // 保存済みの内容を入れ終えてから下書きを重ねる（書きかけがあればそちらが勝つ）
+  keepFormDraft(announcementForm, announcementDraftKey(announcement?.id));
   announcementDialog.showModal();
   // ダイアログは閉じても要素が残るので、前に開いたときのスクロール位置を持っている
   announcementDialog.scrollTop = 0;
   announcementTitleInput.focus();
 }
 
+// 閉じるのは「やめる」か「投稿できた」かのどちらか。どちらも書きかけを持ち越さない。
 function closeAnnouncementForm() {
+  clearFormDraft(announcementDraftKey(announcementIdInput.value));
   announcementDialog.close();
   announcementForm.reset();
   announcementIdInput.value = '';
@@ -734,7 +744,28 @@ async function resolveImageUrl(picker, folder) {
 
 // マイページで入力欄を開いているか。普段は他の人から見えるプロフィールを出し、
 // 編集アイコンを押したときだけ入力欄に切り替える（自分の見え方を先に確かめられるように）。
-let profileEditing = false;
+//
+// 開いていたかどうかもタブに控える。他のアプリへ移って戻るとページごと捨てられて
+// いることがあり、そのとき閲覧の姿に戻ってしまうと、控えてある書きかけ
+// （js/formDraft.js）があることに気づけない。開いた状態で戻せば、そのまま続けられる。
+const PROFILE_EDITING_KEY = 'profile-editing';
+let profileEditing = (() => {
+  try {
+    return sessionStorage.getItem(PROFILE_EDITING_KEY) === '1';
+  } catch {
+    return false;
+  }
+})();
+
+function setProfileEditing(on) {
+  profileEditing = on;
+  try {
+    if (on) sessionStorage.setItem(PROFILE_EDITING_KEY, '1');
+    else sessionStorage.removeItem(PROFILE_EDITING_KEY);
+  } catch {
+    // 控えられなくても編集そのものは続けられる
+  }
+}
 
 function renderProfilePage() {
   profileLinksEl.innerHTML = '';
@@ -744,7 +775,7 @@ function renderProfilePage() {
   // ログアウト中：ログインの入口だけを見せる
   if (!isLoggedIn()) {
     profileFormMode = null;
-    profileEditing = false;
+    setProfileEditing(false);
     profileFormContainer.innerHTML = '';
     profileLoginPanel.hidden = false;
     profileAccountActions.hidden = true;
@@ -771,6 +802,7 @@ function renderProfilePage() {
     if (keepExistingForm) return;
     renderProfileForm(profileFormContainer, null, {
       submitLabel: '登録する',
+      draftKey: 'profile-onboarding',
       onSubmit: async (profile) => {
         const avatarUrl = await resolveAvatar(profile, '');
         await db.createOwnPlayer(auth.user.id, { ...profile, avatarUrl, pastNames: [] });
@@ -799,8 +831,12 @@ function renderProfilePage() {
   if (!keepExistingForm) {
     renderProfileForm(profileFormContainer, auth.player, {
       submitLabel: '保存',
+      draftKey: `profile-${auth.player.id}`,
       onCancel: () => {
-        profileEditing = false;
+        // 「キャンセル」は書きかけを捨てる操作。控えも一緒に捨てないと、
+        // 次に編集を開いたときに、捨てたはずの内容が戻ってくる。
+        clearFormDraft(`profile-${auth.player.id}`);
+        setProfileEditing(false);
         renderProfilePage();
       },
       onSubmit: async (profile) => {
@@ -825,7 +861,7 @@ function renderProfilePage() {
         await refreshFromDb();
         setStatus('プロフィールを保存しました。', 'success');
         // 保存できたら閲覧に戻す。直した結果が他の人にどう見えるかをその場で確かめられる。
-        profileEditing = false;
+        setProfileEditing(false);
         renderProfilePage();
       },
     });
@@ -858,7 +894,7 @@ function renderOwnProfileView() {
   `;
 
   profileViewEl.querySelector('.profile-edit-btn').addEventListener('click', () => {
-    profileEditing = true;
+    setProfileEditing(true);
     renderProfilePage();
   });
 
@@ -1152,6 +1188,7 @@ function renderTournamentInfo(tournament) {
       <div><dt>規模</dt><dd>${tournamentTier(tournament.entrantCount)}</dd></div>
       <div><dt>対戦方法</dt><dd>${escapeHtml(matchTypeLabel(tournament))}</dd></div>
       <div><dt>形式</dt><dd>${escapeHtml(formatLabel)}</dd></div>
+      <div><dt>三位決定戦</dt><dd>${tournament.thirdPlaceMatch ? '行う' : '行わない'}</dd></div>
       <div><dt>開催日</dt><dd>${escapeHtml(tournament.date || '日付未設定')}</dd></div>
       <div><dt>進行状況</dt><dd>${escapeHtml(tournamentStatusLabel(tournament))}</dd></div>
     </dl>
@@ -2055,6 +2092,11 @@ function syncEntryModeForMatchType() {
 }
 tournamentMatchTypeInput.addEventListener('change', syncEntryModeForMatchType);
 
+// 大会作成は項目が多く、途中で他のアプリへ移ることもある。書きかけを控えておく。
+// 選んだ参加者（selectedParticipantIds）は入力欄ではないので控えの対象外。
+const TOURNAMENT_DRAFT_KEY = 'tournament-create';
+keepFormDraft(tournamentForm, TOURNAMENT_DRAFT_KEY);
+
 tournamentForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -2100,6 +2142,9 @@ tournamentForm.addEventListener('submit', async (e) => {
     rules: tournamentRulesInput.value.trim() || null,
     streamUrl,
     imageUrl: '',
+    // 三位決定戦。実際に置くかどうかはブラケット生成時に出場枠の数で決まる
+    // （4枠未満だと準決勝の敗者がそろわない。js/bracket.js の canHoldThirdPlaceMatch）。
+    thirdPlaceMatch: tournamentThirdPlaceInput.checked,
     weight: null,
     // 定員はエントリー募集を制御するためのもの。運営が参加者を直接選ぶ場合は
     // 意味を持たないうえ、選んだ人数が定員を超えると自分で自分を弾いてしまう。
@@ -2126,7 +2171,9 @@ tournamentForm.addEventListener('submit', async (e) => {
     // 失敗時に取り消す形で埋め合わせる。
     try {
       await db.replaceEntries(tournament.id, tournament.entrantIds);
-      const bracket = createBracket(tournament.id, tournament.entrantIds);
+      const bracket = createBracket(tournament.id, tournament.entrantIds, {
+        thirdPlace: tournament.thirdPlaceMatch,
+      });
       await db.saveBracket(tournament.id, bracket);
     } catch (err) {
       await db.deleteTournament(tournament.id).catch(() => {});
@@ -2145,8 +2192,11 @@ tournamentForm.addEventListener('submit', async (e) => {
   tournamentCapacityInput.value = '';
   tournamentRulesInput.value = '';
   tournamentStreamInput.value = '';
+  tournamentThirdPlaceInput.checked = false;
   tournamentImagePicker.setCurrent('');
   selectedParticipantIds = [];
+  // 作れたので下書きは用済み（残すと次に大会を作るとき前回の内容が入ってくる）
+  clearFormDraft(TOURNAMENT_DRAFT_KEY);
 
   await refreshFromDb();
   location.hash = manual ? `#tournament/${encodeURIComponent(tournament.id)}` : '#tournaments/recruiting';
@@ -2164,10 +2214,14 @@ tournamentEditBtn.addEventListener('click', () => {
   tournamentEditRulesInput.value = tournament.rules || '';
   tournamentEditStreamInput.value = tournament.streamUrl || '';
   tournamentEditImagePicker.setCurrent(tournament.imageUrl || '');
+  // 保存済みの内容を入れ終えてから下書きを重ねる（書きかけがあればそちらが勝つ）
+  keepFormDraft(tournamentEditForm, `tournament-edit-${tournament.id}`);
   tournamentEditForm.hidden = !tournamentEditForm.hidden;
 });
 
 tournamentEditCancelBtn.addEventListener('click', () => {
+  // 「キャンセル」は書きかけを捨てる操作なので、控えも一緒に捨てる
+  clearFormDraft(`tournament-edit-${currentBracketTournamentId}`);
   tournamentEditForm.hidden = true;
 });
 
@@ -2206,7 +2260,10 @@ tournamentEditForm.addEventListener('submit', async (e) => {
       await db.removeImageByUrl(previousImage).catch(() => {});
     }
   }, '大会情報の保存');
-  if (ok) tournamentEditForm.hidden = true;
+  if (ok) {
+    clearFormDraft(`tournament-edit-${currentBracketTournamentId}`);
+    tournamentEditForm.hidden = true;
+  }
   renderTournamentDetail(currentBracketTournamentId);
 });
 

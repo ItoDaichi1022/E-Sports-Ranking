@@ -8,13 +8,13 @@
 <title>IgniteArena — どこでも熱く、遊べ。</title>
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。 -->
-<link rel="icon" href="img/icon.png?v=82" type="image/png">
-<link rel="apple-touch-icon" href="img/icon.png?v=82">
+<link rel="icon" href="img/icon.png?v=83" type="image/png">
+<link rel="apple-touch-icon" href="img/icon.png?v=83">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=82">
+<link rel="stylesheet" href="css/style.css?v=83">
 </head>
 <body>
 <header>
@@ -189,7 +189,7 @@
            画像が無いときは js/app.js がこのブロックごと隠す。 -->
       <div class="hero-game" id="hero-game">
         <img class="hero-game-logo" id="hero-game-logo"
-             src="img/game-logo.webp?v=82" alt="IgniteArena">
+             src="img/game-logo.webp?v=83" alt="IgniteArena">
       </div>
 
       <p class="hero-eyebrow">Tournament &amp; Ranking</p>
@@ -289,7 +289,7 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view" hidden data-src="pages/guide.html?v=82"></section>
+  <section id="view-guide" class="view" hidden data-src="pages/guide.html?v=83"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -393,6 +393,16 @@
         ルール（任意）
         <textarea id="tournament-rules-input" rows="4" placeholder="例: 3本先取、キャラ1人縛りなし、持ちキャラ変更は大会中1回まで"></textarea>
       </label>
+      <!-- 三位決定戦。ブラケットを作るときに準決勝の敗者どうしの試合を足すかどうかで、
+           あとから切り替えても表は作り直されないので、作成時にだけ決める。 -->
+      <fieldset class="third-place-field">
+        <legend>三位決定戦</legend>
+        <label class="checkbox-inline">
+          <input type="checkbox" id="tournament-third-place-input">
+          準決勝の敗者どうしで3位を決める
+        </label>
+        <p class="note">行わない場合、準決勝で負けた2人はどちらも「ベスト4」になります。参加が4人（4チーム）未満のときは、準決勝の敗者がそろわないため行いません。</p>
+      </fieldset>
       <label class="image-field">
         画像（任意・5MBまで）
         <input type="file" id="tournament-image-input" accept="image/png,image/jpeg,image/webp,image/gif">
@@ -590,9 +600,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal" hidden data-src="pages/terms.html?v=82"></section>
+  <section id="view-terms" class="view legal" hidden data-src="pages/terms.html?v=83"></section>
 
-  <section id="view-privacy" class="view legal" hidden data-src="pages/privacy.html?v=82"></section>
+  <section id="view-privacy" class="view legal" hidden data-src="pages/privacy.html?v=83"></section>
 
 </main>
 
@@ -613,7 +623,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=82"></script>
+<script src="js/vendor/supabase.js?v=83"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -625,27 +635,28 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=82",
-    "./js/bracket.js":        "./js/bracket.js?v=82",
-    "./js/bracketView.js":    "./js/bracketView.js?v=82",
-    "./js/db.js":             "./js/db.js?v=82",
-    "./js/entries.js":        "./js/entries.js?v=82",
-    "./js/icons.js":          "./js/icons.js?v=82",
-    "./js/matchChat.js":      "./js/matchChat.js?v=82",
-    "./js/playerStats.js":    "./js/playerStats.js?v=82",
-    "./js/players.js":        "./js/players.js?v=82",
-    "./js/profile.js":        "./js/profile.js?v=82",
-    "./js/ranking.js":        "./js/ranking.js?v=82",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=82",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=82",
-    "./js/rankingView.js":    "./js/rankingView.js?v=82",
-    "./js/state.js":          "./js/state.js?v=82",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=82",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=82",
-    "./js/util.js":           "./js/util.js?v=82"
+    "./js/auth.js":           "./js/auth.js?v=83",
+    "./js/bracket.js":        "./js/bracket.js?v=83",
+    "./js/bracketView.js":    "./js/bracketView.js?v=83",
+    "./js/db.js":             "./js/db.js?v=83",
+    "./js/entries.js":        "./js/entries.js?v=83",
+    "./js/formDraft.js":      "./js/formDraft.js?v=83",
+    "./js/icons.js":          "./js/icons.js?v=83",
+    "./js/matchChat.js":      "./js/matchChat.js?v=83",
+    "./js/playerStats.js":    "./js/playerStats.js?v=83",
+    "./js/players.js":        "./js/players.js?v=83",
+    "./js/profile.js":        "./js/profile.js?v=83",
+    "./js/ranking.js":        "./js/ranking.js?v=83",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=83",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=83",
+    "./js/rankingView.js":    "./js/rankingView.js?v=83",
+    "./js/state.js":          "./js/state.js?v=83",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=83",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=83",
+    "./js/util.js":           "./js/util.js?v=83"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=82"></script>
+<script type="module" src="js/app.js?v=83"></script>
 </body>
 </html>

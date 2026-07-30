@@ -2,6 +2,7 @@ import {
   state, getEntrantName, getEntrantMemberNames, getEntrantMemberIds, openChatReports,
   pendingResultReport, entrantIdOfPlayer, roundState, isRoundStarted, isStreamedMatch,
 } from './state.js';
+import { thirdPlaceMatchOf } from './bracket.js';
 import { auth, isAdmin } from './auth.js';
 import { canUseMatchChat, openMatchChat } from './matchChat.js';
 import { makeIconButton } from './icons.js';
@@ -280,7 +281,8 @@ function ownMatchBar(tournament, tournamentId, bracket, onRefresh, onChanged) {
 
   const roundChip = document.createElement('span');
   roundChip.className = 'own-match-round';
-  roundChip.textContent = round.name;
+  // 三位決定戦は決勝と同じ回戦に属しているので、回戦名（F）ではなく試合の名前を出す
+  roundChip.textContent = match.isThirdPlace ? '3位決定戦' : round.name;
 
   const opponentId = match.player1Id === myEntrant ? match.player2Id : match.player1Id;
   const vs = document.createElement('span');
@@ -623,7 +625,9 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
 
     const roundInProgress = isRoundInProgress(tournamentId, roundIndex, round);
 
-    round.matches.forEach((match, matchIndex) => {
+    // 三位決定戦は勝ち上がりの枝から外れた試合なので、この並びには混ぜない
+    // （下で決勝の隣に独立した列として出す）。
+    round.matches.filter((m) => !m.isThirdPlace).forEach((match, matchIndex) => {
       const { rowStart, rowSpan } = slotPlacement(roundIndex, matchIndex);
       const slot = document.createElement('div');
       slot.className = 'match-slot';
@@ -641,6 +645,45 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
     col.appendChild(body);
     wrapper.appendChild(col);
   });
+
+  // 三位決定戦の列。決勝と同じ回戦（同じタイミング）で行うので、決勝の右隣に置く。
+  // 準決勝から線は引かない。勝ち上がりの線と混ざると、負けた側が上がってきたように見える。
+  const thirdPlace = thirdPlaceMatchOf(bracket);
+  if (thirdPlace) {
+    const roundIndex = bracket.totalRounds - 1;
+    const col = document.createElement('div');
+    col.className = 'round-column';
+
+    const header = document.createElement('div');
+    header.className = 'round-header';
+    header.textContent = '3位決定戦';
+    col.appendChild(header);
+
+    // 決勝の列と高さをそろえるための空欄。開始と配信台は決勝の回戦の操作が兼ねる
+    // （同じ回戦に属する試合なので、開始も一緒）。
+    if (!swapCtx.active) {
+      const spacer = document.createElement('div');
+      spacer.className = 'round-controls';
+      col.appendChild(spacer);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'round-body';
+    body.style.height = `${bodyHeight}px`;
+    body.style.gridTemplateRows = `repeat(${bracket.bracketSize}, 1fr)`;
+
+    const slot = document.createElement('div');
+    slot.className = 'match-slot';
+    slot.style.gridRow = `1 / span ${bracket.bracketSize}`;
+    slot.appendChild(renderMatchBox(
+      tournament, tournamentId, roundIndex, thirdPlace, onChanged, readOnly, seedOf, onRefresh,
+      isRoundInProgress(tournamentId, roundIndex, bracket.rounds[roundIndex]),
+    ));
+    body.appendChild(slot);
+
+    col.appendChild(body);
+    wrapper.appendChild(col);
+  }
 
   containerEl.appendChild(wrapper);
   drawConnectorLines(bracket, wrapper, matchElements);

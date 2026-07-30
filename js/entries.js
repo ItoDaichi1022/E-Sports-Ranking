@@ -77,7 +77,9 @@ export async function closeRecruitmentAndStart(tournamentId) {
 
   // BYEはブラケット生成時に自動確定するが、対戦相手がいないので試合としては記録しない
   // （旧実装と同じ扱い。matchesに入るのは confirmMatch を通った実際の対戦だけ）。
-  const bracket = createBracket(tournamentId, seeded);
+  const bracket = createBracket(tournamentId, seeded, {
+    thirdPlace: tournament.thirdPlaceMatch,
+  });
   await db.saveBracket(tournamentId, bracket);
   await db.setTournamentStatus(tournamentId, 'running');
 

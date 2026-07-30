@@ -2,6 +2,7 @@
 // 新規登録（初回ログイン後のオンボーディング）と、あとからの編集で同じフォームを使う。
 
 import { escapeHtml, safeUrl, initialOf } from './util.js';
+import { keepFormDraft, clearFormDraft } from './formDraft.js';
 
 // 使用キャラは配列で持つが、入力はカンマ区切りの1行で受ける。
 function parseCharacters(text) {
@@ -89,7 +90,13 @@ function buildLabelHeading(text, { optional = false } = {}) {
 
 // プロフィール編集フォームを描画する。
 // onSubmit(profile) は入力内容をまとめたオブジェクトを受け取る。
-export function renderProfileForm(containerEl, player, { onSubmit, submitLabel = '保存', onCancel = null }) {
+//
+// draftKey を渡すと、入力中の内容を控えて次に建てたときに書き戻す（js/formDraft.js）。
+// スマートフォンで他のアプリへ移って戻るとページごと捨てられていることがあり、
+// そこで書きかけが消えるという声があったため。
+export function renderProfileForm(
+  containerEl, player, { onSubmit, submitLabel = '保存', onCancel = null, draftKey = null },
+) {
   containerEl.innerHTML = '';
 
   const form = document.createElement('form');
@@ -265,6 +272,8 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
       pickedFile = null;
       removeAvatar = false;
       fileInput.value = '';
+      // 保存できたので下書きは用済み。残すと、次に開いたときに古い内容が上書きしてくる
+      if (draftKey) clearFormDraft(draftKey);
       // 成功しても画面の見た目がほとんど変わらないことがあるので、その場に明示する
       setMessage('保存しました。', 'success');
     } catch (err) {
@@ -279,6 +288,9 @@ export function renderProfileForm(containerEl, player, { onSubmit, submitLabel =
   });
 
   containerEl.appendChild(form);
+
+  // 書き戻しは、保存済みの内容を入れ終えて画面に付けた後に行う（下書きを上に重ねる）
+  if (draftKey) keepFormDraft(form, draftKey);
 }
 
 // 選手ページに出すプロフィール部分（自己紹介・使用キャラ・ゲームID・SNS）。

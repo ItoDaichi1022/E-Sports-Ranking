@@ -1096,7 +1096,8 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   cursor: pointer;
 }
 
-.entry-mode {
+.entry-mode,
+.third-place-field {
   flex: 1 1 100%;
   margin: 0;
   padding: 0.9rem 1rem;
@@ -1105,7 +1106,8 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   background: var(--surface-2);
 }
 
-.entry-mode legend {
+.entry-mode legend,
+.third-place-field legend {
   padding: 0 0.4rem;
   font-size: 0.78rem;
   font-weight: 600;

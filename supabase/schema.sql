@@ -53,6 +53,9 @@ create table if not exists tournaments (
   image_url  text,
   -- 配信元。この大会の配信を見に行くURL（TwitchやYouTubeのチャンネル等）
   stream_url text,
+  -- 三位決定戦を行うか。真ならブラケット生成時に準決勝の敗者どうしの試合を足す
+  -- （js/bracket.js）。行わない大会では準決勝で負けた2人は同率のベスト4になる。
+  third_place_match boolean not null default false,
   -- draft(準備中) → recruiting(募集中) → running(進行中) → finished(終了)
   status     text not null default 'draft',
   capacity   int,

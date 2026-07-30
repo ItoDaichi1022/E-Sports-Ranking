@@ -115,6 +115,8 @@ function toTournament(row, { entrantIds, participantIds, teams }) {
     imageUrl: row.image_url ?? '',
     // 配信元のURL。未設定は空文字（入力欄の value にそのまま渡せる形に揃える）
     streamUrl: row.stream_url ?? '',
+    // 三位決定戦を行うか。この列より前に作られた大会は null で来るので偽に寄せる
+    thirdPlaceMatch: Boolean(row.third_place_match),
     weight: row.weight,
     status: row.status,
     capacity: row.capacity,
@@ -760,6 +762,7 @@ export async function createTournament(tournament) {
       rules: tournament.rules || null,
       image_url: tournament.imageUrl || null,
       stream_url: tournament.streamUrl || null,
+      third_place_match: Boolean(tournament.thirdPlaceMatch),
       status: tournament.status ?? 'draft',
       capacity: tournament.capacity ?? null,
       weight: tournament.weight ?? null,
@@ -782,6 +785,7 @@ export async function saveTournament(tournament) {
       rules: tournament.rules || null,
       image_url: tournament.imageUrl || null,
       stream_url: tournament.streamUrl || null,
+      third_place_match: Boolean(tournament.thirdPlaceMatch),
       status: tournament.status,
       capacity: tournament.capacity ?? null,
     })

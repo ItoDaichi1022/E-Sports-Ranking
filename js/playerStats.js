@@ -5,6 +5,9 @@ import { tournamentTier } from './tournamentTier.js';
 function depthLabel(depth) {
   if (depth <= 1) return '優勝';
   if (depth === 2) return '準優勝';
+  // 3 が入るのは三位決定戦を行った大会だけ。行わない大会では準決勝で負けた2人とも
+  // ベスト4（depth=4）になるので、「3位」と出ることはない。
+  if (depth === 3) return '3位';
   return `ベスト${depth}`;
 }
 

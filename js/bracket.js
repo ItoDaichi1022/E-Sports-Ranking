@@ -63,6 +63,9 @@ function makeEmptyMatch(round) {
 }
 
 // 勝者を確定させ、次ラウンドの対応スロットへ進出させる（BYE解決にも使う共通処理）。
+//
+// 三位決定戦を置いている大会では、準決勝に loserNextMatchId が入っている。
+// 負けた側もそこへ送る（BYEは対戦が成立していないので敗者がおらず、何も送らない）。
 function applyWinner(bracket, match, winnerId, score, isBye, isWalkover) {
   match.winnerId = winnerId;
   match.loserId = isBye ? null : (match.player1Id === winnerId ? match.player2Id : match.player1Id);
@@ -71,11 +74,16 @@ function applyWinner(bracket, match, winnerId, score, isBye, isWalkover) {
   match.isBye = !!isBye;
   match.isWalkover = !!isWalkover;
 
-  if (match.nextMatchId) {
-    const nextMatch = findMatchById(bracket, match.nextMatchId);
-    if (match.nextSlot === 1) nextMatch.player1Id = winnerId;
-    else nextMatch.player2Id = winnerId;
-  }
+  advanceTo(bracket, match.nextMatchId, match.nextSlot, winnerId);
+  if (match.loserId) advanceTo(bracket, match.loserNextMatchId, match.loserNextSlot, match.loserId);
+}
+
+function advanceTo(bracket, matchId, slot, entrantId) {
+  if (!matchId) return;
+  const target = findMatchById(bracket, matchId);
+  if (!target) return;
+  if (slot === 1) target.player1Id = entrantId;
+  else target.player2Id = entrantId;
 }
 
 function resolveIfBye(bracket, match) {
@@ -85,20 +93,35 @@ function resolveIfBye(bracket, match) {
   else if (player2Id && !player1Id) applyWinner(bracket, match, player2Id, null, true);
 }
 
+// 三位決定戦を開ける条件。準決勝の敗者2人がそろうことが要る。
+//
+// 出場枠が3つ以下だと準決勝の片方が不戦勝（BYE）になり、敗者が1人しか出ない。
+// 表の大きさ（bracketSize）ではなく実際の出場枠数で見るのは、4枠の表に3人しか
+// いない場合がまさにこれに当たるため。準決勝そのものが無い2枠の表も同じ理由で外れる。
+export const THIRD_PLACE_MIN_ENTRANTS = 4;
+
+export function canHoldThirdPlaceMatch(entrantCount) {
+  return entrantCount >= THIRD_PLACE_MIN_ENTRANTS;
+}
+
 // シード順（seededEntrantIds[0] = 1位シード）でシングルエリミネーションのブラケットを生成する。
 // 出場枠が2のべき乗でない場合は上位シードにBYE（不戦勝）を割り当てる。
-export function createBracket(tournamentId, seededEntrantIds) {
+//
+// options.thirdPlace: 三位決定戦を置くか（大会作成時の設定。条件を満たさない場合は無視する）
+export function createBracket(tournamentId, seededEntrantIds, { thirdPlace = false } = {}) {
   const k = seededEntrantIds.length;
   if (k < 2) throw new Error('出場枠が2つ以上必要です。');
 
   const bracketSize = nextPowerOfTwo(k);
   const order = seedOrder(bracketSize);
   const slots = order.map((seedNum) => (seedNum <= k ? seededEntrantIds[seedNum - 1] : null));
-  return createBracketFromSlots(tournamentId, slots);
+  return createBracketFromSlots(tournamentId, slots, {
+    thirdPlace: thirdPlace && canHoldThirdPlaceMatch(k),
+  });
 }
 
 // 1回戦の枠の並び（slots[0]とslots[1]が第1試合、以下2つずつ。空きはnull）から組み立てる。
-function createBracketFromSlots(tournamentId, slots) {
+function createBracketFromSlots(tournamentId, slots, { thirdPlace = false } = {}) {
   const bracketSize = slots.length;
   const totalRounds = Math.log2(bracketSize);
 
@@ -129,10 +152,42 @@ function createBracketFromSlots(tournamentId, slots) {
 
   const bracket = { tournamentId, bracketSize, totalRounds, rounds };
 
+  // 三位決定戦は、決勝ラウンドの2試合目として持つ。
+  //
+  // 別の場所（bracket.thirdPlaceMatch のような独立した欄）に置くと、試合を1件ずつ
+  // 辿っている処理——結果の確定・対戦チャット・回戦の開始・DBへの書き戻し——を
+  // すべて「そこも見る」形に直さなければならない。決勝と同じ回戦で行うものなので、
+  // 決勝ラウンドに並べておけば、rounds を歩く既存の処理がそのまま拾ってくれる。
+  // 表の中での置き場所だけは別扱いになるので、印（isThirdPlace）を付けておく。
+  if (thirdPlace && totalRounds >= 2) {
+    const semiFinals = rounds[totalRounds - 2].matches;
+    const thirdPlaceMatch = makeEmptyMatch('3位決定戦');
+    thirdPlaceMatch.isThirdPlace = true;
+    rounds[totalRounds - 1].matches.push(thirdPlaceMatch);
+
+    // 準決勝は勝者を決勝へ、敗者をこの試合へ送る（上の枠の敗者が player1 側）
+    semiFinals.forEach((semi, i) => {
+      semi.loserNextMatchId = thirdPlaceMatch.id;
+      semi.loserNextSlot = i + 1;
+    });
+  }
+
   // BYEが絡む対戦は1回戦にのみ発生するため、生成直後にまとめて自動解決する。
   rounds[0].matches.forEach((m) => resolveIfBye(bracket, m));
 
   return bracket;
+}
+
+// 決勝。三位決定戦を置いている大会では最終ラウンドに2試合あるので、印で見分ける。
+function finalMatchOf(bracket) {
+  const finalRound = bracket?.rounds[bracket.rounds.length - 1];
+  return finalRound?.matches.find((m) => !m.isThirdPlace) ?? null;
+}
+
+// 三位決定戦。置いていない大会では null。
+export function thirdPlaceMatchOf(bracket) {
+  const finalRound = bracket?.rounds[bracket.rounds.length - 1];
+  return finalRound?.matches.find((m) => m.isThirdPlace) ?? null;
 }
 
 // 1回戦の枠の中から、その出場枠が入っている場所を探す。
@@ -246,12 +301,21 @@ function resetMatchResult(match) {
   match.isWalkover = false;
 }
 
-// 対象試合の勝者が次ラウンドへ渡した進出枠を取り消す。次の試合が既に確定済みだった場合は
+// 対象試合が次の試合へ渡した進出枠を取り消す。次の試合が既に確定済みだった場合は
 // その結果も無効になるため、記録を削除したうえで再帰的に取り消していく。
+//
+// 準決勝は勝者（決勝）と敗者（三位決定戦）の2方向へ送っているので、両方を辿る。
 function cascadeClearNext(bracket, tournamentId, match) {
-  if (!match.nextMatchId) return;
-  const nextMatch = findMatchById(bracket, match.nextMatchId);
-  if (match.nextSlot === 1) nextMatch.player1Id = null;
+  clearForward(bracket, tournamentId, match.nextMatchId, match.nextSlot);
+  clearForward(bracket, tournamentId, match.loserNextMatchId, match.loserNextSlot);
+}
+
+function clearForward(bracket, tournamentId, nextMatchId, nextSlot) {
+  if (!nextMatchId) return;
+  const nextMatch = findMatchById(bracket, nextMatchId);
+  if (!nextMatch) return;
+
+  if (nextSlot === 1) nextMatch.player1Id = null;
   else nextMatch.player2Id = null;
 
   if (nextMatch.confirmed) {
@@ -337,9 +401,8 @@ export function updateTournament(
 
 // ブラケット全体の勝者（決勝が確定していればそのwinnerId）を返す。
 export function getChampionId(bracket) {
-  const finalRound = bracket.rounds[bracket.rounds.length - 1];
-  const finalMatch = finalRound.matches[0];
-  return finalMatch.confirmed ? finalMatch.winnerId : null;
+  const finalMatch = finalMatchOf(bracket);
+  return finalMatch?.confirmed ? finalMatch.winnerId : null;
 }
 
 // 表の全欄が埋まったか（BYEを含め、すべての試合が確定済みか）。
@@ -362,15 +425,34 @@ export function finalPlacements(bracket) {
   const champion = getChampionId(bracket);
   if (champion) placements.push({ entrantId: champion, depth: 1 });
 
+  const third = decidedThirdPlace(bracket);
+  const semiFinalIndex = bracket.totalRounds - 2;
+
   bracket.rounds.forEach((round, roundIndex) => {
     const depth = bracket.bracketSize / 2 ** roundIndex;
     round.matches.forEach((m) => {
+      // 三位決定戦とその材料（準決勝の敗者）は、負けた回戦では順位が決まらない
+      if (m.isThirdPlace) return;
+      if (third && roundIndex === semiFinalIndex) return;
       if (!m.confirmed || !m.loserId) return;
       placements.push({ entrantId: m.loserId, depth });
     });
   });
 
+  // 三位決定戦を行った大会では、準決勝で負けた2人が「同じベスト4」ではなく3位と4位に分かれる
+  if (third) {
+    placements.push({ entrantId: third.winnerId, depth: 3 });
+    if (third.loserId) placements.push({ entrantId: third.loserId, depth: 4 });
+  }
+
   return placements;
+}
+
+// 決着している三位決定戦。置いていない・まだ終わっていない場合は null。
+// null のときは準決勝の敗者2人が同率（従来どおりベスト4）として扱われる。
+function decidedThirdPlace(bracket) {
+  const m = thirdPlaceMatchOf(bracket);
+  return m?.confirmed && m.winnerId ? m : null;
 }
 
 // シングルエリミネーションの最終順位を求める。
@@ -388,17 +470,29 @@ export function finalStandings(bracket, limit = 16) {
   const champion = getChampionId(bracket);
   if (champion) standings.push({ entrantId: champion, rank: 1 });
 
+  const third = decidedThirdPlace(bracket);
+  const semiFinalIndex = bracket.totalRounds - 2;
+
   bracket.rounds.forEach((round, roundIndex) => {
     // そのラウンドで敗退した人の順位。決勝(最終ラウンド)の敗者が2位になる。
     const rank = bracket.bracketSize / 2 ** (roundIndex + 1) + 1;
     if (rank > limit) return;
 
     round.matches.forEach((m) => {
+      // 三位決定戦とその材料（準決勝の敗者）は、負けた回戦では順位が決まらない
+      if (m.isThirdPlace) return;
+      if (third && roundIndex === semiFinalIndex) return;
       // BYEは対戦が成立していないので敗者がいない
       if (!m.confirmed || !m.loserId) return;
       standings.push({ entrantId: m.loserId, rank });
     });
   });
+
+  // 三位決定戦を行った大会は、同率3位ではなく3位と4位に分かれる
+  if (third) {
+    standings.push({ entrantId: third.winnerId, rank: 3 });
+    if (third.loserId) standings.push({ entrantId: third.loserId, rank: 4 });
+  }
 
   return standings.sort((a, b) => a.rank - b.rank);
 }
