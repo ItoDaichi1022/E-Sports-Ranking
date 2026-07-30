@@ -8,10 +8,19 @@
      * 色は役割で分ける。黄緑＝操作できる場所 / 金＝王座・上位 / ミント赤＝勝敗。
        この3系統以外に色を増やさないことで、情報そのものが目立つようにする。
        操作の黄緑と勝敗のミントは、どちらも緑系だが色相を80度ほど離してある。
+       ゲームのロゴだけは例外で、サイトの色に混ぜず元の色のまま置く（.hero-game）。
      * 見出し・数字はOxanium（同梱woff2、ラテン文字のみ）。日本語は端末ゴシックに
        フォールバックし、混植で機械的な字面を作る。
-     * 面は「枠線で囲む」のではなく「背景の明度差」で分ける。線を減らすほど
-       1枚のカードの中の情報が読みやすくなる。
+
+     レイアウトの組み立て方（編集誌面のように読ませる）:
+     * ページの器（section）は枠で囲わない。黒を広く見せて、余白の大きさで
+       塊を分ける。囲いを持つのは実際にまとまりのあるもの（一覧のカード・表・
+       入力欄の集まり=.panel）だけにする。カードの中にカードを入れない。
+     * 見出しは「英字の小さなラベル＋日本語の大きな題」の2段（.page-head）。
+       日本語が主役で、英字はその上に乗る札。下の細い線までを1つの塊とする。
+     * 階層は大きさより「印」で示す。ページの題＝英字ラベル、本文の小見出し＝
+       左の縦線、その下＝字間を空けた小さな札。
+     * 順序のあるものには大きな番号を振る（ホームの01/02/03、ガイドの章）。
      * 数値は等幅数字（tabular-nums）で桁を揃える。
      * 動きは prefers-reduced-motion で全停止できるものだけにする。
    ========================================================================== */
@@ -194,28 +203,91 @@ p, li, dd, dt, figcaption, caption, blockquote {
   text-wrap: pretty;
 }
 
+/* ページの題。画面幅に連れて大きくし、余白と一緒に「間」を作る。
+   小さい見出しをたくさん置くより、大きな題を1つ置いて空きを取るほうが
+   ページの切り替わりが分かりやすい。 */
 h2 {
   margin: 0 0 1.1rem;
-  font-size: 1.3rem;
-  font-weight: 700;
+  font-size: clamp(1.5rem, 4.5vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
 }
 
-/* セクション見出しの前に、斜めに切ったグラデーションのスラッシュを置く。
-   放送画面のテロップの「見出しの印」。ヒーローの題は下線で飾るので除く。 */
-main h2:not(.hero-title)::before {
+h3 {
+  font-size: 1.15rem;
+  letter-spacing: 0.03em;
+}
+
+/* 本文の中の小見出し（「大会情報」「最終順位」など）。ページの題との差を、
+   大きさではなく左の線と余白で作る。クラスの付いた見出し（一覧のカードの題、
+   ガイドの章など）はそれぞれ専用の意匠を持つので対象から外す。 */
+main h3:not([class]) {
+  margin: 2.6rem 0 1rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--accent);
+  line-height: 1.4;
+}
+
+/* ホームの3段の見出しは番号が印になっているので、線は付けない */
+.home-step-body h3:not([class]) {
+  margin: 0 0 0.5rem;
+  padding-left: 0;
+  border-left: none;
+}
+
+/* さらに下の見出し（「配信元」「ルール」など）は、小さく字間を空けた札にする */
+main h4:not([class]) {
+  margin: 2rem 0 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--text-faint);
+}
+
+/* ---- ページの見出し（英字ラベル＋日本語の題）----
+
+   英字を小さく widely tracked で置き、その下に日本語の題を大きく置く。
+   日本語が主役で、英字はその上に乗る小さな見出し札という関係にする。
+   下の細い線までを1つの塊として、本文との間に大きく余白を空ける。 */
+.page-head {
+  margin-bottom: 2rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.page-eyebrow {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+}
+
+/* 英字ラベルの前の小さな斜めの光。セクションの始まりの印 */
+.page-eyebrow::before {
   content: '';
   display: inline-block;
   width: 0.5em;
-  height: 0.9em;
-  margin-right: 0.5em;
-  vertical-align: -0.08em;
+  height: 0.85em;
+  margin-right: 0.7em;
+  vertical-align: -0.06em;
   background: var(--accent-grad);
   transform: skewX(-18deg);
   border-radius: 2px;
-  box-shadow: 0 0 12px var(--glow);
+  box-shadow: 0 0 10px var(--glow);
 }
 
-h3 { font-size: 1.05rem; }
+.page-head h2 {
+  margin: 0;
+}
+
+/* 題のすぐ下に添える一文。題と離しすぎると別の段落に見えるので詰める */
+.page-head .note {
+  margin: 0.8rem 0 0;
+}
 
 a { color: var(--accent-bright); }
 
@@ -384,8 +456,14 @@ header h1 a::before {
 
 #main-nav.open { display: flex; }
 
+/* 日本語の項目名を主に、英語を右に小さく添える。英語は同じ内容の言い換えで、
+   読まなくても困らない。字面にリズムを作るための添え物として置く。 */
 #main-nav a {
   position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.9rem;
   padding: 0.75rem 0.9rem;
   border-radius: var(--r-sm);
   color: var(--text-dim);
@@ -394,6 +472,18 @@ header h1 a::before {
   font-weight: 500;
   transition: background 0.15s ease, color 0.15s ease;
 }
+
+.nav-en {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+#main-nav a.active .nav-en { color: var(--accent-bright); }
 
 #main-nav a:hover {
   background: var(--surface-2);
@@ -543,12 +633,30 @@ main {
   margin: 0 auto;
 }
 
+/* ページの器は「枠で囲う」のをやめ、余白だけで区切る。
+   全部の面をカードにすると、カードの中にカードが入って境界が増え、
+   どこからどこまでが1つの塊なのか読み取りにくくなる。黒を広く見せて、
+   浮かせるのは実際にまとまりを持つもの（一覧のカード・表・入力欄）だけにする。 */
 section {
-  margin: 0 0 1.5rem;
+  margin: 0 0 3.5rem;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+/* 入力欄の集まりだけは面を持たせる。枠が無いと、どこまでが1つの
+   フォームなのか分からなくなる（項目が縦にただ並んでいるように見える）。 */
+.panel {
   padding: 1.5rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--r-lg);
   background: var(--surface);
+}
+
+@media (max-width: 640px) {
+  section { margin-bottom: 2.5rem; }
+
+  .panel { padding: 1.1rem; }
 }
 
 /* ページを開いた瞬間、ふわっと持ち上がる。routeFromHash は同一ページの再描画では
@@ -567,14 +675,17 @@ section {
   padding: 0;
 }
 
+.home-section { margin-bottom: 4.5rem; }
+
+.home-section:last-child { margin-bottom: 0; }
+
 /* 見出しと右側のボタンを1行に並べる（「お知らせ」＋「新しいお知らせ」など） */
 .home-section-head {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
 }
 
 .home-section-head h2 { margin: 0; }
@@ -584,33 +695,97 @@ section {
   color: var(--text-faint);
   font-size: 0.88rem;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .see-all-link:hover { color: var(--text); }
 
-/* ホームのサイト紹介。初めて来た人が数秒で「何のサイトか」を掴むための短い箱 */
-.home-about {
-  margin-bottom: 2rem;
-  padding: 1.5rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--r-lg);
-  background: var(--surface);
-}
-
-.home-about-lead {
-  margin: 0.6rem 0 0;
-  line-height: 1.8;
-}
-
-.home-about-points {
-  margin: 0.8rem 0;
-  padding-left: 1.2rem;
-  color: var(--text-dim);
-  font-size: 0.92rem;
+/* 見出しの直後に置く導入の一文。本文より一段大きくして、
+   ここだけ読めば概要が分かる「つかみ」にする。 */
+.home-lead {
+  margin: 0 0 2.5rem;
+  max-width: 34em;
+  font-size: clamp(1rem, 2.6vw, 1.15rem);
   line-height: 1.9;
+  color: var(--text-dim);
 }
 
-.home-about .note { margin-bottom: 0; }
+/* ---- 「見る → 出る → 残る」の3段 ----
+
+   番号を大きく振って、上から順に読ませる。番号は飾りではなく順路の印なので、
+   文字より前に、文字より大きく置く。狭い画面では番号を上に逃がして
+   本文の幅を確保する。 */
+.home-steps {
+  list-style: none;
+  margin: 0 0 2rem;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.home-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.6rem;
+  padding: 1.8rem 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.home-step:last-child { border-bottom: 1px solid var(--border-soft); }
+
+/* 番号。塗らずに輪郭だけの数字にして、面の主張を抑えつつ大きさで存在させる */
+.home-step-num {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 6vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* 見出しの1行目と数字の天地を合わせる */
+  margin-top: 0.1em;
+}
+
+.home-step-body { min-width: 0; }
+
+.home-step-label {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.home-step-body h3 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.05rem, 3vw, 1.25rem);
+}
+
+.home-step-body p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  line-height: 1.85;
+}
+
+@media (max-width: 640px) {
+  .home-section { margin-bottom: 3rem; }
+
+  .home-lead { margin-bottom: 1.8rem; }
+
+  .home-step {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1.4rem 0;
+  }
+
+  .home-step-num { margin-top: 0; }
+}
 
 /* ---------------------------------------------------------------------------
    ページ内タブ（大会一覧の 募集中／進行中／終了）
@@ -619,40 +794,52 @@ section {
    リンク（#tournaments/{タブ名}）。現在のタブは is-active と aria-current で示す。
    --------------------------------------------------------------------------- */
 
+/* 下線でつなぐ横並びのタブ。面を塗らず、下の線と文字色だけで現在地を示す。
+   広い画面では文字の幅ぶんだけに詰めて左に寄せる（幅いっぱいに引き伸ばすと、
+   タブ同士が遠すぎて「並んでいる選択肢」に見えなくなる）。 */
 .page-tabs {
   display: flex;
-  gap: 0.3rem;
-  margin-bottom: 0.9rem;
-  border-bottom: 1px solid var(--border);
+  gap: 0.4rem;
+  margin-bottom: 1.6rem;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .page-tab {
-  flex: 1;
-  min-width: 0;
   min-height: 2.75rem;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem 0.4rem;
+  padding: 0.5rem 1.2rem;
+  margin-bottom: -1px;
   border-bottom: 2px solid transparent;
-  border-radius: var(--r-sm) var(--r-sm) 0 0;
-  color: var(--text-dim);
-  font-size: 0.9rem;
+  color: var(--text-faint);
+  font-size: 0.92rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
   text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
-.page-tab:hover {
-  background: var(--surface-2);
-  color: var(--text);
-}
+.page-tab:hover { color: var(--text); }
 
 .page-tab.is-active {
   border-bottom-color: var(--accent-2);
-  background: var(--surface-2);
   color: var(--text);
-  box-shadow: inset 0 -10px 14px -14px var(--glow);
+}
+
+/* 狭い画面では指で押す的にするため、幅を等分して大きくする */
+@media (max-width: 640px) {
+  .page-tabs {
+    gap: 0;
+    margin-bottom: 1.2rem;
+  }
+
+  .page-tab {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.4rem;
+    font-size: 0.88rem;
+  }
 }
 
 /* エントリー状況のグループ見出し。カードの束ごとの小さな区切り */
@@ -985,12 +1172,11 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
 
 /* ランキングの上に置く選手検索。ここが「あの人は何位か」を探す入口なので、
    ランキング本体と見分けが付くよう、面を1段落として帯にする。 */
+/* 検索欄は入力欄そのものだけを置く。囲いを付けると、面が広い画面では
+   ただの帯になって、何のための箱なのか分からなくなる。 */
 .player-search {
-  margin-bottom: 1rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--r);
-  background: var(--surface-2);
+  margin-bottom: 1.6rem;
+  max-width: 26rem;
 }
 
 #player-search-input {
@@ -1235,15 +1421,18 @@ td code { font-size: 0.85em; }
    --------------------------------------------------------------------------- */
 
 /* 入口の顔。会場の照明が当たるステージのように、中央に据えて光らせる */
+/* サイトの顔。枠で囲った「箱」ではなく、黒い面の上に直接置いた見開きにする。
+   囲いを外したぶん、上下に大きく余白を取って場所そのものを主張させる。 */
 .hero {
   position: relative;
   overflow: hidden;
-  padding: 3.5rem 1.75rem 3.25rem;
-  margin-bottom: 2rem;
-  text-align: center;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: linear-gradient(160deg, var(--surface-2), var(--bg));
+  padding: 4.5rem 0 4rem;
+  margin-bottom: 4.5rem;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
+  background: none;
 }
 
 /* ステージの照明2つ。ゆっくり漂わせて「生きている画面」にする */
@@ -1260,16 +1449,16 @@ td code { font-size: 0.85em; }
 }
 
 .hero::before {
-  top: -160px;
-  left: 12%;
-  background: radial-gradient(closest-side, rgba(122, 184, 0, 0.26), transparent);
+  top: -180px;
+  left: -8%;
+  background: radial-gradient(closest-side, rgba(122, 184, 0, 0.22), transparent);
   animation: hero-blob-a 14s ease-in-out infinite alternate;
 }
 
 .hero::after {
-  top: -140px;
-  right: 8%;
-  background: radial-gradient(closest-side, rgba(195, 245, 60, 0.2), transparent);
+  top: -120px;
+  right: -4%;
+  background: radial-gradient(closest-side, rgba(195, 245, 60, 0.16), transparent);
   animation: hero-blob-b 18s ease-in-out infinite alternate;
 }
 
@@ -1298,14 +1487,12 @@ td code { font-size: 0.85em; }
    白い台紙に載った印の形になる（js/app.js が画像の四隅を見て自動で付ける）。 */
 .hero-game {
   display: flex;
-  justify-content: center;
-  margin-bottom: 1.6rem;
-  padding-bottom: 1.4rem;
-  border-bottom: 1px solid var(--border-soft);
+  justify-content: flex-start;
+  margin-bottom: 2rem;
 }
 
 .hero-game-logo {
-  width: min(58%, 260px);
+  width: min(46%, 230px);
   height: auto;
   /* 黒地に置いた暖色は実際より強く光って見えるので、少しだけ落ち着かせる */
   opacity: 0.92;
@@ -1322,19 +1509,16 @@ td code { font-size: 0.85em; }
 }
 
 @media (max-width: 640px) {
-  .hero-game {
-    margin-bottom: 1.2rem;
-    padding-bottom: 1.1rem;
-  }
+  .hero-game { margin-bottom: 1.5rem; }
 
-  .hero-game-logo { width: min(72%, 220px); }
+  .hero-game-logo { width: min(62%, 200px); }
 }
 
 /* 英字の小見出しはグラデーション文字で。表示用フォントの見せ場。
    字間を広く取っているぶん実寸が長い。画面幅に応じて字間ごと縮め、
    細い端末で「TOURNAMENT & / RANKING」と2行に割れないようにする。 */
 .hero-eyebrow {
-  margin: 0 0 0.9rem;
+  margin: 0 0 1.1rem;
   font-family: var(--font-display);
   font-size: clamp(0.62rem, 2.6vw, 0.78rem);
   font-weight: 700;
@@ -1354,12 +1538,12 @@ td code { font-size: 0.85em; }
    （PCは2.6rem、スマホは1.9rem）のではなく画面幅に連動させて、どの幅でも
    「1行に収まる最大の大きさ」になるようにしている。 */
 .hero-title {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.7rem;
   font-family: var(--font-display);
-  font-size: clamp(1.6rem, 8.5vw, 2.6rem);
+  font-size: clamp(2.1rem, 10vw, 4rem);
   font-weight: 800;
-  letter-spacing: 0.06em;
-  line-height: 1.15;
+  letter-spacing: 0.04em;
+  line-height: 1.05;
   white-space: nowrap;
 }
 
@@ -1368,7 +1552,7 @@ td code { font-size: 0.85em; }
 .hero-tagline {
   margin: 0 0 1.1rem;
   color: var(--accent-bright);
-  font-size: clamp(0.9rem, 3.6vw, 1.05rem);
+  font-size: clamp(1.05rem, 4.4vw, 1.5rem);
   font-weight: 700;
   letter-spacing: clamp(0.06em, 0.5vw, 0.12em);
   white-space: nowrap;
@@ -1379,7 +1563,7 @@ td code { font-size: 0.85em; }
   display: block;
   width: 4.5rem;
   height: 3px;
-  margin: 1rem auto 0;
+  margin: 1.4rem 0 0;
   border-radius: 999px;
   background: var(--accent-grad);
   box-shadow: 0 0 14px var(--glow);
@@ -1387,10 +1571,10 @@ td code { font-size: 0.85em; }
 
 .hero-actions {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.7rem;
   flex-wrap: wrap;
-  margin-top: 1.75rem;
+  margin-top: 2.25rem;
 }
 
 /* flexの中のボタンは、既定では「中身の最小幅（min-content）まで縮めてよい」と
@@ -3206,11 +3390,9 @@ dialog.dialog-chat {
    大会情報（ブラケットの下）
    --------------------------------------------------------------------------- */
 
-.tournament-info {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border-soft);
-}
+/* 区切りは見出し（左の線）と余白が受け持つので、ここに横線は引かない。
+   線を重ねると「線の下に線」になって、かえって塊が読み取りにくくなる。 */
+.tournament-info { margin-top: 0.5rem; }
 
 .tournament-info h3 {
   margin: 0 0 1rem;
@@ -3857,16 +4039,21 @@ dialog h3 {
   /* 指で押せる高さを確保する */
   #main-nav a { padding: 0.85rem 0.9rem; }
 
-  section {
-    padding: 1.15rem 1rem;
-    border-radius: var(--r);
+  /* 見出しの大きさは clamp() で画面幅に連動させてあるので、ここでの上書きは不要 */
+
+  .page-head {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.9rem;
   }
 
-  h2 { font-size: 1.15rem; }
+  .page-eyebrow {
+    font-size: 0.64rem;
+    letter-spacing: 0.24em;
+  }
 
   .hero {
-    padding: 1.75rem 1.25rem;
-    border-radius: var(--r);
+    padding: 2.5rem 0 2.75rem;
+    margin-bottom: 3rem;
   }
 
   /* ヒーローの文字は clamp() で画面幅に連動させてあるので、ここでの上書きは不要 */

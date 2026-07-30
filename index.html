@@ -8,13 +8,13 @@
 <title>IgniteArena — どこでも熱く、遊べ。</title>
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。 -->
-<link rel="icon" href="img/icon.png?v=79" type="image/png">
-<link rel="apple-touch-icon" href="img/icon.png?v=79">
+<link rel="icon" href="img/icon.png?v=80" type="image/png">
+<link rel="apple-touch-icon" href="img/icon.png?v=80">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=79">
+<link rel="stylesheet" href="css/style.css?v=80">
 </head>
 <body>
 <header>
@@ -29,16 +29,16 @@
          区切り線で分ける。大会の状態（募集中・進行中・終了）はメニューでは分けず、
          「大会」ページの中のタブに任せる。 -->
     <nav id="main-nav">
-      <a href="#home" data-page="home">ホーム</a>
-      <a href="#guide" data-page="guide">はじめに</a>
-      <a href="#news" data-page="newslist">お知らせ</a>
+      <a href="#home" data-page="home"><span class="nav-ja">ホーム</span><span class="nav-en">Home</span></a>
+      <a href="#guide" data-page="guide"><span class="nav-ja">はじめに</span><span class="nav-en">Getting Started</span></a>
+      <a href="#news" data-page="newslist"><span class="nav-ja">お知らせ</span><span class="nav-en">News</span></a>
       <hr class="nav-sep">
-      <a href="#tournaments" data-page="tournaments">大会</a>
-      <a href="#ranking" data-page="ranking">ランキング・選手</a>
-      <a href="#create" data-page="create" id="nav-tournament-link">大会作成</a>
+      <a href="#tournaments" data-page="tournaments"><span class="nav-ja">大会</span><span class="nav-en">Tournaments</span></a>
+      <a href="#ranking" data-page="ranking"><span class="nav-ja">ランキング・選手</span><span class="nav-en">Ranking</span></a>
+      <a href="#create" data-page="create" id="nav-tournament-link"><span class="nav-ja">大会作成</span><span class="nav-en">Create</span></a>
       <hr class="nav-sep">
-      <a href="#entries" data-page="entries">エントリー状況</a>
-      <a href="#profile" data-page="profile">マイページ</a>
+      <a href="#entries" data-page="entries"><span class="nav-ja">エントリー状況</span><span class="nav-en">My Entries</span></a>
+      <a href="#profile" data-page="profile"><span class="nav-ja">マイページ</span><span class="nav-en">Profile</span></a>
       <!-- お問い合わせだけは画面遷移ではなく外部（X）へ飛ぶので、区切り線で分ける -->
       <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer"
          class="nav-contact">お問い合わせ（X）</a>
@@ -189,7 +189,7 @@
            画像が無いときは js/app.js がこのブロックごと隠す。 -->
       <div class="hero-game" id="hero-game">
         <img class="hero-game-logo" id="hero-game-logo"
-             src="img/game-logo.png?v=79" alt="FLASH PARTY">
+             src="img/game-logo.webp?v=80" alt="FLASH PARTY">
       </div>
 
       <p class="hero-eyebrow">Tournament &amp; Ranking</p>
@@ -204,26 +204,58 @@
     </div>
 
     <!-- 初めて来た人が数秒で「何のサイトか・自分は対象か」を掴むための短い紹介。
-         詳しい説明は「はじめに」の担当なので、ここは3行で止める。 -->
-    <div class="home-section home-about">
-      <h2>IgniteArenaとは</h2>
-      <p class="home-about-lead">
-        コミュニティの大会運営と選手ランキングをひとつにまとめたサイトです。
-        大会へのエントリーから対戦表・結果の確認、戦績にもとづくランキングまで、ここで完結します。
+         詳しい説明は「はじめに」の担当なので、ここは短く止める。 -->
+    <div class="home-section">
+      <div class="page-head">
+        <p class="page-eyebrow">About</p>
+        <h2>IgniteArenaとは</h2>
+      </div>
+      <p class="home-lead">
+        コミュニティの大会運営と選手ランキングを、ひとつにまとめたサイトです。
       </p>
-      <ul class="home-about-points">
-        <li>大会や選手を見るだけならログイン不要</li>
-        <li>ログインすると選手プロフィールを持てて、募集中の大会にボタン1つでエントリー</li>
-        <li>試合の結果は選手の戦歴とランキングに自動で反映</li>
-      </ul>
+
+      <!-- 「見る → 出る → 残る」の3段。番号を大きく振って、
+           上から順に読めば参加までの流れが分かる形にする。 -->
+      <ol class="home-steps">
+        <li class="home-step">
+          <span class="home-step-num">01</span>
+          <div class="home-step-body">
+            <p class="home-step-label">Watch</p>
+            <h3>見るだけならログイン不要</h3>
+            <p>大会の対戦表も、選手のプロフィールも、ランキングも、そのまま見られます。</p>
+          </div>
+        </li>
+        <li class="home-step">
+          <span class="home-step-num">02</span>
+          <div class="home-step-body">
+            <p class="home-step-label">Enter</p>
+            <h3>ボタン1つでエントリー</h3>
+            <p>ログインして選手登録をすると、募集中の大会に参加できます。募集中はいつでも取り消せます。</p>
+          </div>
+        </li>
+        <li class="home-step">
+          <span class="home-step-num">03</span>
+          <div class="home-step-body">
+            <p class="home-step-label">Record</p>
+            <h3>戦績が積み上がる</h3>
+            <p>試合の結果は自動であなたの戦歴に残り、ランキングに反映されます。</p>
+          </div>
+        </li>
+      </ol>
+
       <p class="note">くわしい使い方は<a href="#guide">「はじめに」</a>をどうぞ。</p>
     </div>
 
     <div class="home-section">
-      <div class="home-section-head">
-        <h2>お知らせ</h2>
-        <!-- ホームには最新の数件だけを出す。全件はお知らせ一覧ページ（#news）の担当 -->
-        <a class="see-all-link" href="#news">すべて見る →</a>
+      <div class="page-head">
+        <div class="home-section-head">
+          <div>
+            <p class="page-eyebrow">News</p>
+            <h2>お知らせ</h2>
+          </div>
+          <!-- ホームには最新の数件だけを出す。全件はお知らせ一覧ページ（#news）の担当 -->
+          <a class="see-all-link" href="#news">すべて見る →</a>
+        </div>
       </div>
 
       <div id="announcement-list"></div>
@@ -233,9 +265,14 @@
   <!-- お知らせの一覧。ホームは最新の数件だけなので、全件はこのページで見せる。
        新規投稿ボタン（運営のみ）もお知らせの管理場所であるここに置く。 -->
   <section id="view-news-list" class="view" hidden>
-    <div class="home-section-head">
-      <h2>お知らせ</h2>
-      <button type="button" id="announcement-new-btn" class="btn-secondary" hidden>新しいお知らせ</button>
+    <div class="page-head">
+      <div class="home-section-head">
+        <div>
+          <p class="page-eyebrow">News</p>
+          <h2>お知らせ</h2>
+        </div>
+        <button type="button" id="announcement-new-btn" class="btn-secondary" hidden>新しいお知らせ</button>
+      </div>
     </div>
     <div id="news-list"></div>
   </section>
@@ -252,13 +289,16 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view" hidden data-src="pages/guide.html?v=79"></section>
+  <section id="view-guide" class="view" hidden data-src="pages/guide.html?v=80"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
        別ページではなく1ページ＋タブにまとめた。 -->
   <section id="view-tournaments" class="view" hidden>
-    <h2>大会</h2>
+    <div class="page-head">
+      <p class="page-eyebrow">Tournaments</p>
+      <h2>大会</h2>
+    </div>
     <div class="page-tabs">
       <a id="tournaments-tab-recruiting" class="page-tab" href="#tournaments/recruiting">募集中</a>
       <a id="tournaments-tab-running" class="page-tab" href="#tournaments/running">進行中</a>
@@ -271,8 +311,11 @@
   <!-- エントリー状況（自分の大会のまとめ）。マイページはプロフィールの場所なので、
        自分がエントリー・出場した大会への入口はこの独立ページに集約する。 -->
   <section id="view-entries" class="view" hidden>
-    <h2>エントリー状況</h2>
-    <p class="note" id="entries-note"></p>
+    <div class="page-head">
+      <p class="page-eyebrow">My Entries</p>
+      <h2>エントリー状況</h2>
+      <p class="note" id="entries-note"></p>
+    </div>
     <div id="entries-login-panel" hidden>
       <button type="button" id="entries-login-btn" class="btn-entry">ログインして確認する</button>
     </div>
@@ -280,8 +323,11 @@
   </section>
 
   <section id="view-profile" class="view" hidden>
-    <h2 id="profile-title">マイページ</h2>
-    <p class="note" id="profile-note"></p>
+    <div class="page-head">
+      <p class="page-eyebrow">Profile</p>
+      <h2 id="profile-title">マイページ</h2>
+      <p class="note" id="profile-note"></p>
+    </div>
 
     <!-- 未ログインのときだけ出るログイン案内 -->
     <div id="profile-login-panel" hidden>
@@ -305,9 +351,12 @@
   </section>
 
   <section id="view-tournament" class="view" hidden>
-    <h2>大会作成</h2>
+    <div class="page-head">
+      <p class="page-eyebrow">Create</p>
+      <h2>大会作成</h2>
+    </div>
 
-    <form id="tournament-form" class="inline-form">
+    <form id="tournament-form" class="inline-form panel">
       <label>
         大会名
         <input type="text" id="tournament-name-input" placeholder="例: 第1回大会" required>
@@ -494,7 +543,10 @@
   <!-- ランキングと選手検索は同じページ。「あの人は何位だろう」と「ランキングを見たい」は
        同じ流れの中にあるので、上に検索、下にランキングを置いて1画面にまとめている。 -->
   <section id="view-ranking" class="view" hidden>
-    <h2>ランキング・選手</h2>
+    <div class="page-head">
+      <p class="page-eyebrow">Ranking</p>
+      <h2>ランキング・選手</h2>
+    </div>
 
     <div class="player-search">
       <input type="text" id="player-search-input" placeholder="選手を名前で検索">
@@ -536,9 +588,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal" hidden data-src="pages/terms.html?v=79"></section>
+  <section id="view-terms" class="view legal" hidden data-src="pages/terms.html?v=80"></section>
 
-  <section id="view-privacy" class="view legal" hidden data-src="pages/privacy.html?v=79"></section>
+  <section id="view-privacy" class="view legal" hidden data-src="pages/privacy.html?v=80"></section>
 
 </main>
 
@@ -559,7 +611,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=79"></script>
+<script src="js/vendor/supabase.js?v=80"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -571,27 +623,27 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=79",
-    "./js/bracket.js":        "./js/bracket.js?v=79",
-    "./js/bracketView.js":    "./js/bracketView.js?v=79",
-    "./js/db.js":             "./js/db.js?v=79",
-    "./js/entries.js":        "./js/entries.js?v=79",
-    "./js/icons.js":          "./js/icons.js?v=79",
-    "./js/matchChat.js":      "./js/matchChat.js?v=79",
-    "./js/playerStats.js":    "./js/playerStats.js?v=79",
-    "./js/players.js":        "./js/players.js?v=79",
-    "./js/profile.js":        "./js/profile.js?v=79",
-    "./js/ranking.js":        "./js/ranking.js?v=79",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=79",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=79",
-    "./js/rankingView.js":    "./js/rankingView.js?v=79",
-    "./js/state.js":          "./js/state.js?v=79",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=79",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=79",
-    "./js/util.js":           "./js/util.js?v=79"
+    "./js/auth.js":           "./js/auth.js?v=80",
+    "./js/bracket.js":        "./js/bracket.js?v=80",
+    "./js/bracketView.js":    "./js/bracketView.js?v=80",
+    "./js/db.js":             "./js/db.js?v=80",
+    "./js/entries.js":        "./js/entries.js?v=80",
+    "./js/icons.js":          "./js/icons.js?v=80",
+    "./js/matchChat.js":      "./js/matchChat.js?v=80",
+    "./js/playerStats.js":    "./js/playerStats.js?v=80",
+    "./js/players.js":        "./js/players.js?v=80",
+    "./js/profile.js":        "./js/profile.js?v=80",
+    "./js/ranking.js":        "./js/ranking.js?v=80",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=80",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=80",
+    "./js/rankingView.js":    "./js/rankingView.js?v=80",
+    "./js/state.js":          "./js/state.js?v=80",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=80",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=80",
+    "./js/util.js":           "./js/util.js?v=80"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=79"></script>
+<script type="module" src="js/app.js?v=80"></script>
 </body>
 </html>

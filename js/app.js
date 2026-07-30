@@ -2400,7 +2400,7 @@ scrollTopBtn.addEventListener('click', () => {
 
 // ---- ホームのゲームのマーク ----
 //
-// 画像は差し替える前提の1ファイル（img/game-logo.png）なので、
+// 画像は差し替える前提の1ファイル（img/game-logo.webp）なので、
 // 「ファイルがまだ無い」「白背景の画像が来た」のどちらでも画面が崩れないようにする。
 
 const heroGameEl = $('hero-game');
