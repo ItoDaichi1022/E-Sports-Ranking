@@ -8,20 +8,19 @@ function depthLabel(depth) {
   return `ベスト${depth}`;
 }
 
-// 大会での成績を確定済みの記録（state.placements）から引く。
-// 出場していない大会・対戦表が組まれる前の大会では null。
+// 出場した大会での成績の表示。depth は確定済みの勝ち上がりの深さ（DBの placement）で、
+// 未確定なら null を渡す。
 //
 // 運営が結果を確定させていない大会では成績を出さない。表が埋まっただけの段階で
 // 「優勝」と表示してしまうと、確定前に結果が広まり、入力ミスを直せなくなる。
 // 記録はまさにその確定操作のときに書き込まれるので、有無がそのまま判定になる。
-export function placementLabel(tournamentId, playerId) {
+export function placementLabelOf(tournamentId, depth) {
   if (!state.bracketIds.has(tournamentId)) return null;
 
-  const tournament = state.tournaments.find((t) => t.id === tournamentId);
-  if (!tournament || !tournament.participantIds.includes(playerId)) return null;
+  const tournament = findTournament(tournamentId);
+  if (!tournament) return null;
   if (tournament.status !== 'finished') return '進行中';
 
-  const depth = state.placements[tournamentId]?.[playerId];
   return depth == null ? '進行中' : depthLabel(depth);
 }
 
@@ -29,10 +28,15 @@ export function placementLabel(tournamentId, playerId) {
 //
 // チーム戦ではチーム名を返す。メンバー全員のエントリー行に優勝の記録が入っているので、
 // 選手名で返すと片方だけが優勝者として出てしまう。
+//
+// チーム名は、チームの行を読み込んでいない大会でも一覧に出せるよう
+// state.teamChampions に控えてある（db.js の loadAll が集める）。
 export function championLabel(tournamentId) {
   const tournament = findTournament(tournamentId);
   if (isTeamTournament(tournament)) {
-    return tournament.teams.find((tm) => tm.placement === 1)?.name ?? null;
+    return tournament?.teams.find((tm) => tm.placement === 1)?.name
+      ?? state.teamChampions[tournamentId]
+      ?? null;
   }
 
   const byPlayer = state.placements[tournamentId];
@@ -57,7 +61,7 @@ export function bestAchievement(playerId, tournamentIds = null) {
     if (depth == null) return;
     // 規模は出場枠の数で測る。チーム戦の「16チーム大会」を32人大会として扱うと、
     // 表の大きさ（＝勝ち上がりの重み）と釣り合わなくなる。
-    const participantCount = t.entrantIds.length;
+    const participantCount = t.entrantCount;
     const value = participantCount / depth;
     if (!best || value > best.value) {
       best = {
@@ -73,23 +77,28 @@ export function bestAchievement(playerId, tournamentIds = null) {
   return best;
 }
 
-// 選手個人の戦績サマリー（通算・大会別・試合一覧）を state から集計する。
+// 選手個人の戦績サマリー（通算・大会別・試合一覧）を、その選手ぶんだけ取ってきた
+// 記録（db.loadPlayerRecord の戻り値）から組み立てる。
 //
-// 対象になるのは選手として記録された試合だけ。チーム戦（2v2）の試合は
+// 全選手の試合を state に持たなくても組めるよう、材料は引数で受け取る。
+//   record.matches  その選手が勝者か敗者として記録されている試合
+//   record.entries  その選手の出場記録 { tournamentId, placement, teamName }
+//
+// 通算に数えるのは選手として記録された試合だけ。チーム戦（2v2）の試合は
 // チーム列に記録されていて winnerId が null なので、ここには入らない
 // （個人の通算成績にチーム戦の勝敗を混ぜない、という方針）。
-// 出場した大会そのものは participantIds から拾うので、2v2も一覧には並ぶ。
-export function getPlayerStats(playerId) {
-  const playerMatches = state.matches.filter(
-    (m) => m.winnerId === playerId || m.loserId === playerId,
-  );
-  const wins = playerMatches.filter((m) => m.winnerId === playerId).length;
-  const losses = playerMatches.length - wins;
+// 出場した大会そのものは出場記録から拾うので、2v2も一覧には並ぶ。
+export function getPlayerStats(playerId, record) {
+  const { matches: playerMatches, entries } = record;
 
-  const tournamentIds = new Set(playerMatches.map((m) => m.tournamentId));
-  state.tournaments.forEach((t) => {
-    if (t.participantIds.includes(playerId)) tournamentIds.add(t.id);
-  });
+  const wins = playerMatches.filter((m) => m.winnerId === playerId).length;
+  const losses = playerMatches.filter((m) => m.loserId === playerId).length;
+
+  const placementByTournament = new Map(entries.map((e) => [e.tournamentId, e.placement]));
+  const teamNameByTournament = new Map(entries.map((e) => [e.tournamentId, e.teamName]));
+
+  const tournamentIds = new Set(entries.map((e) => e.tournamentId));
+  playerMatches.forEach((m) => tournamentIds.add(m.tournamentId));
 
   const tournaments = state.tournaments
     .filter((t) => tournamentIds.has(t.id))
@@ -99,9 +108,9 @@ export function getPlayerStats(playerId) {
         tournament: t,
         wins: tm.filter((m) => m.winnerId === playerId).length,
         losses: tm.filter((m) => m.loserId === playerId).length,
-        placement: placementLabel(t.id, playerId),
+        placement: placementLabelOf(t.id, placementByTournament.get(t.id) ?? null),
         // チーム戦のときだけ、どのチームで出たか
-        teamName: t.teams?.find((team) => team.memberIds.includes(playerId))?.name ?? null,
+        teamName: teamNameByTournament.get(t.id) ?? null,
       };
     });
 

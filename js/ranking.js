@@ -17,7 +17,7 @@ export const RANKING_CONFIG = {
 // （ここに来るのは1v1・リレーの大会だけなので、出場枠＝参加人数）
 function getTournamentWeight(tournament) {
   if (tournament.weight != null) return tournament.weight;
-  return tournament.entrantIds.length;
+  return tournament.entrantCount;
 }
 
 // 各ランキングエントリに、前回公開時点の順位（previousRank）を付与する。

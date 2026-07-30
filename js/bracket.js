@@ -298,7 +298,7 @@ export function updateTournament(
     // 対戦表と成績が壊れるため、参加者を空にしてからでないと変更させない。
     const wasTeam = tournament.matchType === '2v2';
     const willBeTeam = matchType === '2v2';
-    if (wasTeam !== willBeTeam && tournament.participantIds.length > 0) {
+    if (wasTeam !== willBeTeam && tournament.participantCount > 0) {
       return {
         ok: false,
         error: 'すでに参加者がいるため、チーム戦（2v2）と個人戦の間で対戦方法を変更できません。'
@@ -316,7 +316,7 @@ export function updateTournament(
     }
     // 既にエントリーしている枠を追い出すことになる定員は受け付けない。
     // 数えるのは出場枠（チーム戦ではチーム数）で、DBの定員トリガーと揃える。
-    const entered = tournament.entrantIds.length;
+    const entered = tournament.entrantCount;
     if (capacity !== null && capacity < entered) {
       const unit = isTeamTournament(tournament) ? 'チーム' : '人';
       return {

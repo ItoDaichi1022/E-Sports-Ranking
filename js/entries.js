@@ -35,7 +35,7 @@ function myEntrantId(tournament) {
 // （DBの定員トリガーが count(distinct coalesce(team_id, player_id)) で数えるのと同じ）。
 function remainingSlots(tournament) {
   if (tournament.capacity == null) return null;
-  return Math.max(0, tournament.capacity - tournament.entrantIds.length);
+  return Math.max(0, tournament.capacity - tournament.entrantCount);
 }
 
 // エントリー済みの出場枠を、現在のランキング順に並べてシード順を決める（⑤）。
@@ -61,6 +61,10 @@ export function seedEntrants(tournament) {
 
 // 募集を締め切り、シードを確定してブラケットを生成する。
 export async function closeRecruitmentAndStart(tournamentId) {
+  // シードは全期間のランキングで決まるので、ここで初めて全データを読み込む
+  // （普段は試合結果を持っていない。js/db.js の ensureFullData を参照）。
+  await db.ensureFullData();
+
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) throw new Error('大会が見つかりません。');
   if (tournament.entrantIds.length < 2) {
@@ -81,6 +85,8 @@ export async function closeRecruitmentAndStart(tournamentId) {
   state.bracketIds.add(tournamentId);
   tournament.entrantIds = seeded;
   tournament.participantIds = seeded.flatMap((id) => getEntrantMemberIds(tournamentId, id));
+  tournament.entrantCount = tournament.entrantIds.length;
+  tournament.participantCount = tournament.participantIds.length;
   tournament.status = 'running';
   return bracket;
 }
@@ -452,7 +458,7 @@ function adminControls(tournament, onChanged) {
     closeBtn.type = 'button';
     closeBtn.textContent = '締め切ってブラケット生成';
     closeBtn.addEventListener('click', async () => {
-      const count = `${tournament.entrantIds.length}${entrantUnit(tournament)}`;
+      const count = `${tournament.entrantCount}${entrantUnit(tournament)}`;
       if (!confirm(`「${tournament.name}」の募集を締め切り、現在の${count}でブラケットを生成します。よろしいですか？`)) return;
       closeBtn.disabled = true;
       try {

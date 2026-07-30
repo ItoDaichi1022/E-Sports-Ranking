@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { avatarHtml } from './util.js';
 import { makeIconButton } from './icons.js';
+import * as db from './db.js';
 
 // 表示名を更新する。名前を変えた場合、旧名は pastNames に自動で残す。
 // 戦績は不変のid（uuid）に紐づくので、名前が変わっても分断されない。
@@ -22,11 +23,16 @@ export function updatePlayer(id, { currentName }) {
 }
 
 // 試合結果や大会参加者に記録が残っている選手は削除できない（戦績の分断を防ぐ）。
-export function canRemovePlayer(id) {
-  if (state.matches.some((m) => m.winnerId === id || m.loserId === id)) {
+//
+// 判定はDBに数えてもらう。試合とエントリーは手元に全件あるとは限らない
+// （増え続けるので必要なぶんだけ読む方針。js/state.js の説明を参照）ため、
+// state を見て判定すると「記録がある選手を消せてしまう」ことが起きる。
+export async function canRemovePlayer(id) {
+  const { inMatches, inTournaments } = await db.playerHasRecords(id);
+  if (inMatches) {
     return { ok: false, reason: 'この選手は試合結果に記録されているため削除できません。' };
   }
-  if (state.tournaments.some((t) => t.participantIds.includes(id))) {
+  if (inTournaments) {
     return { ok: false, reason: 'この選手は大会の参加者に含まれているため削除できません。' };
   }
   return { ok: true };
@@ -146,14 +152,18 @@ export function renderPlayerTable(containerEl, options = {}) {
       if (isAdmin) {
         const removeBtn = makeIconButton('trash', '選手を削除', { className: 'btn-remove' });
         removeBtn.addEventListener('click', async () => {
-          const guard = canRemovePlayer(p.id);
-          if (!guard.ok) {
-            alert(guard.reason);
-            return;
-          }
-          if (!confirm(`選手「${p.currentName}」を削除しますか？`)) return;
           removeBtn.disabled = true;
           try {
+            const guard = await canRemovePlayer(p.id);
+            if (!guard.ok) {
+              alert(guard.reason);
+              removeBtn.disabled = false;
+              return;
+            }
+            if (!confirm(`選手「${p.currentName}」を削除しますか？`)) {
+              removeBtn.disabled = false;
+              return;
+            }
             await onDelete(p);
           } catch (err) {
             alert(err.message);

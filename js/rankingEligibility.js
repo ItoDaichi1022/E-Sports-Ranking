@@ -39,7 +39,7 @@ export function rankingEligibility(tournament) {
 
   // 数えるのは出場枠。チーム戦は下の対戦方法の条件で必ず外れるので、
   // ここが人数かチーム数かは結果に影響しないが、画面に出る「参加人数」と揃えておく。
-  const count = tournament.entrantIds.length;
+  const count = tournament.entrantCount;
   if (count < RANKED_MIN_PARTICIPANTS) {
     reasons.push(`参加${RANKED_MIN_PARTICIPANTS}人以上（現在${count}人）`);
   }

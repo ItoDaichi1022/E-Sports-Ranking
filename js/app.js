@@ -13,7 +13,7 @@ import { reportChipHtml, syncOpenChat } from './matchChat.js';
 import { computeRankings, computeRankingsForRange, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
 import { downloadRankingCards } from './rankingCard.js';
-import { getPlayerStats, championLabel, placementLabel } from './playerStats.js';
+import { getPlayerStats, championLabel, placementLabelOf } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
 import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
 import { renderProfileForm, profileSectionHtml, isProfileFormMounted } from './profile.js';
@@ -270,6 +270,15 @@ function parseHash() {
   return { page: page || 'home', param: param ? decodeURIComponent(param) : null };
 }
 
+// いま表示しているのがこのページか。データを取りに行っている間に別の画面へ
+// 移ることがあるので、非同期の描画は結果を書き込む前にこれで確かめる
+// （確かめないと、移った先の画面に前のページの内容が出てしまう）。
+function isCurrentRoute(page, param = null) {
+  const now = parseHash();
+  if (now.page !== page) return false;
+  return param == null || now.param === param;
+}
+
 // 直前に表示していた画面。ページが変わったときだけスクロールを先頭へ戻すために覚えておく
 // （Realtimeの更新でも routeFromHash は呼ばれるので、毎回戻すと読んでいる途中で飛んでしまう）。
 let lastRouteKey = null;
@@ -370,15 +379,22 @@ function routeFromHash() {
     a.classList.toggle('active', a.dataset.page === navPage);
   });
 
+  // ページによっては、その画面で初めて必要になるデータを取りに行ってから描く
+  // （非同期の描画。中で失敗は拾っているので、ここでは最後の受け皿だけ用意する）。
+  const draw = (result) => Promise.resolve(result).catch((err) => {
+    console.error('画面の描画に失敗しました', err);
+    setStatus(err.message, 'error');
+  });
+
   if (target === 'home') renderHome();
-  else if (target === 'news') renderNewsPage(param);
-  else if (target === 'newslist') renderNewsListPage();
+  else if (target === 'news') draw(renderNewsPage(param));
+  else if (target === 'newslist') draw(renderNewsListPage());
   else if (target === 'tournaments') renderTournamentsPage(param);
-  else if (target === 'entries') renderEntriesPage();
+  else if (target === 'entries') draw(renderEntriesPage());
   else if (target === 'create') { renderParticipantCheckboxes(); renderSelectedList(); }
-  else if (target === 'tournament') renderTournamentDetail(param);
-  else if (target === 'bracket') renderBracketPage(param);
-  else if (target === 'player') renderPlayerDetail(param);
+  else if (target === 'tournament') draw(renderTournamentDetail(param));
+  else if (target === 'bracket') draw(renderBracketPage(param));
+  else if (target === 'player') draw(renderPlayerDetail(param));
   // 選手検索とランキングは同じページ。どちらのハッシュで来ても両方を描く。
   else if (target === 'players' || target === 'ranking') {
     refreshPlayerUI();
@@ -429,7 +445,16 @@ function renderHome() {
 }
 
 // お知らせ一覧ページ。全件を新しい順（固定を先頭）に並べる。
-function renderNewsListPage() {
+// 普段は最新の数件しか読んでいないので、ここで全件を取りに行く。
+async function renderNewsListPage() {
+  renderAnnouncementCards(newsListEl, state.announcements);
+  try {
+    await db.ensureAllAnnouncements();
+  } catch (err) {
+    setStatus(err.message, 'error');
+    return;
+  }
+  if (!isCurrentRoute('news')) return;
   renderAnnouncementCards(newsListEl, state.announcements);
 }
 
@@ -479,8 +504,19 @@ function renderAnnouncementCards(containerEl, announcements) {
 }
 
 // お知らせの詳細。画像 → 題名 → 日付 → 本文 → 運営操作 の順に出す。
-function renderNewsPage(id) {
+async function renderNewsPage(id) {
   newsActionsEl.innerHTML = '';
+
+  // 最新数件にしか入っていない状態で古いお知らせのURLを直接開かれることがある。
+  // 「見つかりません」を出す前に、全件を取りに行って確かめる。
+  if (!state.announcements.some((x) => x.id === id)) {
+    try {
+      await db.ensureAllAnnouncements();
+    } catch (err) {
+      setStatus(err.message, 'error');
+    }
+    if (!isCurrentRoute('news', id)) return;
+  }
 
   const a = state.announcements.find((x) => x.id === id);
   if (!a) {
@@ -644,7 +680,15 @@ function shuffleSelected() {
 }
 
 // 現在のランキング順（上位ほどシード上位）に並び替える。ランキング未算出の選手は末尾にまとめる。
-function seedBySelectedRanking() {
+async function seedBySelectedRanking() {
+  // 並び替えの根拠になるランキングには全期間の試合結果が要る（普段は持っていない）
+  try {
+    await db.ensureFullData();
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+
   const rankings = computeRankings(state);
   if (rankings.length === 0) {
     alert('ランキング反映対象の大会に確定した試合がまだないため、ランキング順には並び替えられません。');
@@ -838,10 +882,11 @@ const ENTRY_GROUPS = [
   { title: '過去に出場した大会', statuses: ['finished'] },
 ];
 
-function renderEntriesPage() {
-  entriesContentEl.innerHTML = '';
-
+// 自分の出場記録は、この選手のぶんだけDBから取る（全大会のエントリー行は
+// 手元に持っていない。js/db.js の loadPlayerEntries を参照）。
+async function renderEntriesPage() {
   if (!isLoggedIn()) {
+    entriesContentEl.innerHTML = '';
     entriesLoginPanel.hidden = false;
     entriesNoteEl.textContent = 'ログインすると、自分がエントリー・出場した大会がここにまとまります。';
     return;
@@ -858,7 +903,21 @@ function renderEntriesPage() {
 
   entriesNoteEl.textContent = '自分がエントリー・出場した大会の一覧です。大会を選ぶと詳細に移動します。';
 
-  const mine = state.tournaments.filter((t) => t.participantIds.includes(auth.player.id));
+  const playerId = auth.player.id;
+  let entries;
+  try {
+    entries = await db.loadPlayerEntries(playerId);
+  } catch (err) {
+    entriesContentEl.innerHTML = `<p class="empty-hint">${escapeHtml(err.message)}</p>`;
+    return;
+  }
+  if (!isCurrentRoute('entries')) return;
+
+  entriesContentEl.innerHTML = '';
+
+  const myTournamentIds = new Set(entries.map((e) => e.tournamentId));
+  const placements = new Map(entries.map((e) => [e.tournamentId, e.placement]));
+  const mine = state.tournaments.filter((t) => myTournamentIds.has(t.id));
 
   if (mine.length === 0) {
     entriesContentEl.innerHTML = '<p class="empty-hint">まだエントリーした大会がありません。'
@@ -876,7 +935,7 @@ function renderEntriesPage() {
     entriesContentEl.appendChild(heading);
 
     const listWrap = document.createElement('div');
-    renderTournamentCards(listWrap, [...items].reverse(), '', { placementFor: auth.player.id });
+    renderTournamentCards(listWrap, [...items].reverse(), '', { myPlacements: placements });
     entriesContentEl.appendChild(listWrap);
   });
 }
@@ -885,9 +944,11 @@ function renderEntriesPage() {
 
 // 大会の規模の表示。ブラケットの枠になるのはチーム戦ではチームなので、
 // 「16チーム」を主にしつつ、実際に出た人数も添える。
+// 数えるのは行を読み込んでいない大会でも出せる entrantCount / participantCount
+// （一覧では出場者の行そのものは持っていない。js/state.js の説明を参照）。
 function entrantCountLabel(t) {
-  const count = `${t.entrantIds.length}${entrantUnit(t)}`;
-  return isTeamTournament(t) ? `${count}（${t.participantIds.length}人）` : count;
+  const count = `${t.entrantCount}${entrantUnit(t)}`;
+  return isTeamTournament(t) ? `${count}（${t.participantCount}人）` : count;
 }
 
 // 優勝者を名指しするのは、運営が結果を確定させた大会だけ。
@@ -951,8 +1012,8 @@ function renderTournamentsPage(param) {
 }
 
 // 始まった大会（進行中・終了）のカード一覧。大会一覧とエントリー状況で使う。
-// placementFor に選手IDを渡すと、終了した大会にその選手の成績を添える。
-function renderTournamentCards(containerEl, tournaments, emptyText, { placementFor = null } = {}) {
+// myPlacements（大会ID → 勝ち上がりの深さ）を渡すと、その成績をカードに添える。
+function renderTournamentCards(containerEl, tournaments, emptyText, { myPlacements = null } = {}) {
   containerEl.innerHTML = '';
 
   if (tournaments.length === 0) {
@@ -970,8 +1031,8 @@ function renderTournamentCards(containerEl, tournaments, emptyText, { placementF
     card.href = `#tournament/${encodeURIComponent(t.id)}`;
 
     const { label, tone, champion } = tournamentStatusInfo(t);
-    const placement = placementFor && t.status === 'finished'
-      ? placementLabel(t.id, placementFor)
+    const placement = myPlacements
+      ? placementLabelOf(t.id, myPlacements.get(t.id) ?? null)
       : null;
 
     const body = document.createElement('div');
@@ -1066,7 +1127,7 @@ function renderTournamentInfo(tournament) {
   // 定員もチーム戦ではチーム数（DBの定員トリガーと同じ数え方）
   const countLabel = tournament.capacity == null
     ? entrantCountLabel(tournament)
-    : `${tournament.entrantIds.length} / ${tournament.capacity}${unit}`;
+    : `${tournament.entrantCount} / ${tournament.capacity}${unit}`;
   const countHeading = tournament.status === 'recruiting'
     ? 'エントリー'
     : `参加${unit === 'チーム' ? 'チーム数' : '人数'}`;
@@ -1088,7 +1149,7 @@ function renderTournamentInfo(tournament) {
     ${rankingEligibilityHtml(tournament)}
     <dl class="tournament-info-grid">
       <div><dt>${countHeading}</dt><dd>${escapeHtml(countLabel)}</dd></div>
-      <div><dt>規模</dt><dd>${tournamentTier(tournament.entrantIds.length)}</dd></div>
+      <div><dt>規模</dt><dd>${tournamentTier(tournament.entrantCount)}</dd></div>
       <div><dt>対戦方法</dt><dd>${escapeHtml(matchTypeLabel(tournament))}</dd></div>
       <div><dt>形式</dt><dd>${escapeHtml(formatLabel)}</dd></div>
       <div><dt>開催日</dt><dd>${escapeHtml(tournament.date || '日付未設定')}</dd></div>
@@ -1117,7 +1178,7 @@ function renderTournamentInfo(tournament) {
 
   // ブラケットが出来る前は対戦表が無いので、代わりに顔ぶれを見せる。
   // 募集中の大会の詳細を選手が確認できるようにするための表示。
-  if (!state.bracketIds.has(tournament.id) && tournament.entrantIds.length > 0) {
+  if (!state.bracketIds.has(tournament.id) && tournament.entrantCount > 0) {
     if (isTeamTournament(tournament)) {
       // チーム戦はチーム名を主に、メンバーを添える。誰と誰が組んでいるかが
       // 分からないと、これから申し込む人が相手を選べない。
@@ -1151,7 +1212,10 @@ function backToListLink(tournament) {
 
 // 大会詳細。対戦表そのものは別ページ（#bracket/{id}）に分けてあり、
 // ここには「ブラケットを見る」という入口だけを置く。
-function renderTournamentDetail(tournamentId) {
+//
+// 「誰が出ているか」はこのページで初めて必要になるので、ここで取りに行く
+// （一覧では人数しか持っていない。js/state.js の説明を参照）。
+async function renderTournamentDetail(tournamentId) {
   currentBracketTournamentId = tournamentId;
   tournamentEditForm.hidden = true;
 
@@ -1165,6 +1229,15 @@ function renderTournamentDetail(tournamentId) {
     bracketLinkEl.hidden = true;
     return;
   }
+
+  try {
+    await db.ensureTournamentDetail(tournamentId);
+  } catch (err) {
+    tournamentInfoEl.innerHTML = `<p class="empty-hint">${escapeHtml(err.message)}</p>`;
+    return;
+  }
+  // 読み込んでいる間に別の画面へ移っていたら、そこへ古い内容を描かない
+  if (!isCurrentRoute('tournament', tournamentId)) return;
 
   renderHero(tournamentHeroEl, tournament.imageUrl);
   tournamentTitleEl.textContent = tournament.name;
@@ -1315,6 +1388,19 @@ async function renderBracketPage(tournamentId) {
   bracketTitleEl.textContent = tournament.name;
   bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
 
+  // 出場者の行とこの大会の試合結果を揃えてから描く。表の名前を引くのに出場者が、
+  // 勝敗の保存（syncTournamentProgress の差分照合）に試合結果が要る。
+  try {
+    await Promise.all([
+      db.ensureTournamentDetail(tournamentId),
+      db.ensureTournamentMatches(tournamentId),
+    ]);
+  } catch (err) {
+    bracketContainer.innerHTML = `<p class="empty-hint">${escapeHtml(err.message)}</p>`;
+    return;
+  }
+  if (!isCurrentRoute('bracket', tournamentId)) return;
+
   // 出場している選手にだけ、対戦表の使い方を1行で示す。
   // 「自分の名前を押す」が唯一の入口なのに、初めての人はそこに気づけない。
   const isParticipant = Boolean(auth.player)
@@ -1339,8 +1425,7 @@ async function renderBracketPage(tournamentId) {
       return;
     }
     // 読み込んでいる間に別のページへ移っていたら、そこへ古い表を描かない
-    const { page, param } = parseHash();
-    if (page !== 'bracket' || param !== tournamentId) return;
+    if (!isCurrentRoute('bracket', tournamentId)) return;
   }
 
   renderBracketAdminTools(tournamentId);
@@ -1358,6 +1443,7 @@ async function renderBracketPage(tournamentId) {
         await db.clearEntryPlacements(tournamentId);
         await db.setTournamentStatus(tournamentId, 'running');
         delete state.placements[tournamentId];
+        delete state.teamChampions[tournamentId];
         tournament.status = 'running';
         await renderBracketPage(tournamentId);
       }
@@ -1516,6 +1602,7 @@ function renderResultSection(tournament) {
         await db.setTournamentStatus(tournament.id, 'running');
         await db.clearEntryPlacements(tournament.id);
         delete state.placements[tournament.id];
+        delete state.teamChampions[tournament.id];
         tournament.teams.forEach((tm) => { tm.placement = null; });
         tournament.status = 'running';
       }, '確定の取り消し');
@@ -1585,7 +1672,21 @@ function selectedRankingRange() {
 // 集計中のプレビューを見せる。普段は運営も閲覧者と同じ「公開中のランキング」を見る。
 let rankingEditorOpen = false;
 
-function openRankingEditor() {
+// ランキングの集計には全期間の試合結果が要る。普段は持っていないので、
+// 運営がこの欄を開いたときに初めて全データを読み込む。
+async function openRankingEditor() {
+  rankingCreateBtn.disabled = true;
+  setStatus('集計データを読み込んでいます...', 'loading');
+  try {
+    await db.ensureFullData();
+  } catch (err) {
+    setStatus(err.message, 'error');
+    rankingCreateBtn.disabled = false;
+    return;
+  }
+  setStatus('');
+  rankingCreateBtn.disabled = false;
+
   rankingEditorOpen = true;
   rankingEditorEl.hidden = false;
   rankingEditorNoteEl.hidden = false;
@@ -1636,14 +1737,25 @@ const VISIBLE_TOURNAMENTS = 3;
 // 読んでいる最中に勝手に畳まれてしまう。
 let expandedTournamentsFor = null;
 
-function renderPlayerDetail(playerId) {
+// 戦績はこの選手のぶんだけ取りに行く（全選手の試合は手元に持っていない。
+// js/db.js の loadPlayerRecord を参照）。
+async function renderPlayerDetail(playerId) {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) {
     playerDetailEl.innerHTML = '<p class="empty-hint">選手が見つかりません。</p>';
     return;
   }
 
-  const stats = getPlayerStats(playerId);
+  let record;
+  try {
+    record = await db.loadPlayerRecord(playerId);
+  } catch (err) {
+    playerDetailEl.innerHTML = `<p class="empty-hint">${escapeHtml(err.message)}</p>`;
+    return;
+  }
+  if (!isCurrentRoute('player', playerId)) return;
+
+  const stats = getPlayerStats(playerId, record);
   const rankEntry = state.publishedRanking?.rankings.find((r) => r.id === playerId);
   const rankLabel = state.publishedRanking ? (rankEntry ? `${rankEntry.rank}位` : '対象外') : '未公開';
   const rankChangeHtml = rankEntry && rankEntry.previousRank !== undefined
@@ -1997,6 +2109,8 @@ tournamentForm.addEventListener('submit', async (e) => {
     entrantIds: manual ? [...selectedParticipantIds] : [],
     participantIds: manual ? [...selectedParticipantIds] : [],
     teams: [],
+    entrantCount: manual ? selectedParticipantIds.length : 0,
+    participantCount: manual ? selectedParticipantIds.length : 0,
   };
 
   tournamentSubmitBtn.disabled = true;

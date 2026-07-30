@@ -6,7 +6,7 @@ export const state = {
   //   snsX, snsTwitch, snsYoutube, role, userId }
   players: [],
   // { id, name, date, format, matchType, matchTypeNote, entrantIds: [], participantIds: [],
-  //   teams: [], weight, rules, imageUrl, status, capacity }
+  //   teams: [], entrantCount, participantCount, weight, rules, imageUrl, status, capacity }
   //
   // 出場の単位が2つあることに注意（2v2でこの2つがズレる）。
   //   entrantIds     ブラケットの枠に入る単位。個人戦は選手ID、チーム戦はチームID。
@@ -15,6 +15,11 @@ export const state = {
   //                  選手ページ・選手削除の判定はこちら
   // 個人戦ではこの2つは同じ配列になるので、既存の挙動は変わらない。
   // teams は チーム戦のときだけ入る { id, name, memberIds: [], seed, placement }。
+  //
+  // 【重要】この3つの配列は「詳細を開いた大会」でしか埋まらない（db.js の
+  // ensureTournamentDetail が読み込む）。まだ読んでいない大会では空配列になる。
+  // 一覧に出す人数は、行を運ばずDB側で数えた entrantCount / participantCount を使うこと。
+  // 「誰が出ているか」を配列から引く処理は、必ず先に ensureTournamentDetail を呼ぶ。
   tournaments: [],
   // 個人戦は winnerId/loserId、チーム戦は winnerTeamId/loserTeamId が入る（DB側の制約で排他）
   matches: [],        // { id, tournamentId, winnerId, loserId, winnerTeamId, loserTeamId, score, round }
@@ -27,7 +32,14 @@ export const state = {
 
   // 確定済みの成績。tournamentId -> { playerId: 勝ち上がりの深さ }。
   // 優勝=1、準優勝=2、ベストN=N で、小さいほど上位（DBの tournament_entries.placement）。
+  //
+  // 普段入っているのは優勝（=1）だけ。一覧に「優勝: ○○」を出すのに必要で、
+  // かつ1大会1〜2行にしかならないため常に読む。それ以外の順位は、詳細を開いた大会と
+  // 選手ページで読み込んだぶんだけ入る。
   placements: {},
+  // チーム戦の優勝チーム名。tournamentId -> チーム名。
+  // チームの行を読み込んでいない大会でも「優勝: ○○」を出せるようにするための控え。
+  teamChampions: {},
   // { publishedAt, periodStart, periodEnd, periodMonths, rankings: [...] } | null（未公開）
   // periodStart/periodEnd はカレンダーで選んだ集計期間（'YYYY-MM-DD'、片側または両方
   // null なら無制限）。periodMonths は移行前の「直近Nか月」形式の古い公開データにだけ残る。

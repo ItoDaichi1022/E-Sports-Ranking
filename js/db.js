@@ -123,6 +123,10 @@ function toTournament(row, { entrantIds, participantIds, teams }) {
     entrantIds,
     participantIds,
     teams,
+    // 一覧カード用の人数。行を読み込んでいない大会では loadAll が
+    // 埋め込みカウントの値で上書きする（配列は空でも人数は出せるように）
+    entrantCount: entrantIds.length,
+    participantCount: participantIds.length,
   };
 }
 
@@ -242,34 +246,79 @@ function checkRpc(error, what) {
 // 読み込み
 // ---------------------------------------------------------------------------
 
-// 全データを取得して state を丸ごと差し替える。認証は不要（RLSがSELECTを全員に許可）。
+// どこまで読み込んだかの記録。増え続けるデータ（エントリー・試合結果・お知らせ）は
+// 最初に全部読まず、そのページを開いたときに必要な分だけ取りに行く（下の ensure〜 関数）。
+// loadAll はこの記録に従って「読み込み済みの範囲だけ」を取り直し、
+// 開きっぱなしのページがRealtimeの更新で古くならないようにする。
+const loadedDetailIds = new Set(); // エントリー・チームを読み込んだ大会
+const loadedMatchIds = new Set(); // 試合結果を読み込んだ大会（対戦表を開いた大会）
+let fullDataLoaded = false; // 運営の集計操作（ensureFullData）で全件を読み込んだか
+let allAnnouncementsLoaded = false; // お知らせを全件読み込んだか（一覧ページを開いたか）
+
+// 先に読むお知らせの件数。ホーム（最新3件）に足りればよく、全件は一覧ページで読む。
+const ANNOUNCEMENTS_PRELOAD = 6;
+
+const noRows = () => Promise.resolve({ data: [], error: null, count: 0 });
+
+// 基本データを取得して state を丸ごと差し替える。認証は不要（RLSがSELECTを全員に許可）。
 // 途中で失敗しても中途半端な表示にならないよう、全部揃ってから state に入れる。
 //
-// ブラケットだけは中身を持ってこない。JSONBが1大会あたり数KB〜数十KBあり、
-// 全大会分となるとこの読み込みの大半を占めるのに、使うのは対戦表を開いた1大会だけだから。
-// ここでは「どの大会に対戦表があるか」のIDだけを取り、中身は loadBracket で取りに行く。
-// 順位（優勝/準優勝/ベストN）は tournament_entries.placement に保存済みなので、
-// 一覧や選手ページはブラケットが無くてもこれまで通り表示できる。
+// 増え続けるデータは行を運ばない：
+//   ブラケット      IDだけ取り、中身は loadBracket（対戦表を開いたとき）
+//   エントリー・チーム  一覧カード用の人数はDB側で数えてもらい（埋め込みカウント）、
+//                   行は ensureTournamentDetail（大会詳細を開いたとき）。
+//                   ただし優勝の記録（placement=1）だけは「優勝: ○○」表示用に常に取る
+//                   （1大会あたり1〜2行で、終了した大会の数しか増えない）
+//   試合結果        ensureTournamentMatches（対戦表を開いたとき）と
+//                   ensureFullData（運営の集計操作）でだけ読む
+//   お知らせ        最新数件だけ。全件は ensureAllAnnouncements（一覧ページ）
 export async function loadAll() {
-  // 既に開いている対戦表は中身も取り直す。Realtimeで勝敗が届いたときに
-  // 見ている表がその場で更新されるようにするため（通常は0件か1件）。
+  // 既に開いている対戦表・詳細ページは中身も取り直す。Realtimeで変更が届いたときに
+  // 見ている画面がその場で更新されるようにするため（通常は0件か1件）。
   const openBracketIds = Object.keys(state.brackets);
+  const detailIds = [...loadedDetailIds];
+  const matchIds = [...loadedMatchIds];
 
-  const [players, tournaments, teams, entries, bracketIds, openBrackets, matches, ranking,
+  const [players, tournaments, teams, entries, championEntries, championTeams,
+    bracketIds, openBrackets, matches, ranking,
     announcements, reports, resultReports, rounds, roomCodes] = await Promise.all([
     supabase.from('players').select('*').order('display_name'),
-    supabase.from('tournaments').select('*').order('date', { ascending: true, nullsFirst: false }),
-    supabase.from('tournament_teams').select('*'),
-    supabase.from('tournament_entries').select('*'),
+    // 一覧カードに出す人数は行を運ばずDB側で数えてもらう（埋め込みカウント）
+    supabase.from('tournaments')
+      .select('*, tournament_entries(count), tournament_teams(count)')
+      .order('date', { ascending: true, nullsFirst: false }),
+    fullDataLoaded
+      ? supabase.from('tournament_teams').select('*')
+      : (detailIds.length
+        ? supabase.from('tournament_teams').select('*').in('tournament_id', detailIds)
+        : noRows()),
+    fullDataLoaded
+      ? supabase.from('tournament_entries').select('*')
+      : (detailIds.length
+        ? supabase.from('tournament_entries').select('*').in('tournament_id', detailIds)
+        : noRows()),
+    // 優勝の記録。全件読み込み後は entries に含まれるので二重に取らない
+    fullDataLoaded
+      ? noRows()
+      : supabase.from('tournament_entries').select('tournament_id, player_id, placement').eq('placement', 1),
+    fullDataLoaded
+      ? noRows()
+      : supabase.from('tournament_teams').select('tournament_id, name, placement').eq('placement', 1),
     supabase.from('brackets').select('tournament_id'),
     openBracketIds.length > 0
       ? supabase.from('brackets').select('tournament_id, data, updated_at').in('tournament_id', openBracketIds)
-      : Promise.resolve({ data: [], error: null }),
-    supabase.from('matches').select('*'),
+      : noRows(),
+    fullDataLoaded
+      ? supabase.from('matches').select('*')
+      : (matchIds.length
+        ? supabase.from('matches').select('*').in('tournament_id', matchIds)
+        : noRows()),
     // スナップショットは最新の1件だけ使う（過去の公開履歴は残しておく）
     supabase.from('published_rankings').select('*').order('published_at', { ascending: false }).limit(1),
     // 固定を先頭に、あとは新しい順
-    supabase.from('announcements').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
+    allAnnouncementsLoaded
+      ? supabase.from('announcements').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false })
+      : supabase.from('announcements').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(ANNOUNCEMENTS_PRELOAD),
     // RLSにより、運営には全件・一般の選手には自分の分だけ・ゲストには0件が返る
     supabase.from('match_chat_reports').select('*').order('created_at', { ascending: false }),
     // 承認待ちのゲームカウント。当事者と運営にしか返らない
@@ -284,6 +333,8 @@ export async function loadAll() {
   check(tournaments.error, '大会の読み込み');
   check(teams.error, 'チームの読み込み');
   check(entries.error, 'エントリーの読み込み');
+  check(championEntries.error, '優勝記録の読み込み');
+  check(championTeams.error, '優勝チームの読み込み');
   check(bracketIds.error, 'ブラケットの読み込み');
   check(openBrackets.error, 'ブラケットの読み込み');
   check(matches.error, '試合結果の読み込み');
@@ -315,6 +366,19 @@ export async function loadAll() {
     teamsByTournament.get(t.tournament_id).push(t);
   });
 
+  // 優勝の記録。行ごと読んでいない大会でも「優勝: ○○」を出せるようにする。
+  championEntries.data.forEach((e) => {
+    if (!placementsByTournament[e.tournament_id]) placementsByTournament[e.tournament_id] = {};
+    placementsByTournament[e.tournament_id][e.player_id] = e.placement;
+  });
+
+  // チーム戦の優勝チーム名（championLabel がチームの行の代わりに参照する）
+  const teamChampions = {};
+  championTeams.data.forEach((t) => { teamChampions[t.tournament_id] = t.name; });
+  teams.data.forEach((t) => {
+    if (t.placement === 1) teamChampions[t.tournament_id] = t.name;
+  });
+
   // 取り直した分だけをキャッシュに残す。消された大会のブラケットもここで落ちる。
   // 版数も一緒に更新しておかないと、次の保存が「DB側が進んでいる」と誤検知する。
   const bracketsById = {};
@@ -325,12 +389,29 @@ export async function loadAll() {
 
   const snapshot = ranking.data?.[0];
 
+  const detailLoaded = (id) => fullDataLoaded || loadedDetailIds.has(id);
+
   state.players = players.data.map(toPlayer);
-  state.tournaments = tournaments.data.map((t) => toTournament(
-    t,
-    buildEntrants(teamsByTournament.get(t.id) ?? [], entriesByTournament.get(t.id) ?? []),
-  ));
+  state.tournaments = tournaments.data.map((t) => {
+    // 行を読み込んだ大会だけ entrantIds などの配列を組み立てる。それ以外は空配列のままにし、
+    // 一覧カードに出す人数は埋め込みカウントから拾う（詳細を開くと実際の配列に置き換わる）。
+    const assembled = detailLoaded(t.id)
+      ? buildEntrants(teamsByTournament.get(t.id) ?? [], entriesByTournament.get(t.id) ?? [])
+      : { entrantIds: [], participantIds: [], teams: [] };
+    const tournament = toTournament(t, assembled);
+    if (detailLoaded(t.id)) {
+      tournament.participantCount = assembled.participantIds.length;
+      tournament.entrantCount = assembled.entrantIds.length;
+    } else {
+      const participantCount = t.tournament_entries?.[0]?.count ?? 0;
+      const teamCount = t.tournament_teams?.[0]?.count ?? 0;
+      tournament.participantCount = participantCount;
+      tournament.entrantCount = teamCount > 0 ? teamCount : participantCount;
+    }
+    return tournament;
+  });
   state.matches = matches.data.map(toMatch);
+  state.teamChampions = teamChampions;
   state.brackets = bracketsById;
   state.bracketIds = new Set(bracketIds.data.map((b) => b.tournament_id));
   state.placements = placementsByTournament;
@@ -349,6 +430,139 @@ export async function loadAll() {
   state.resultReports = resultReports.data.map(toResultReport);
   state.rounds = rounds.data.map(toRound);
   state.roomCodes = roomCodes.data.map(toRoomCode);
+}
+
+// 大会のエントリー・チームの行を読み込み、entrantIds などを実際の配列にする。
+// 「誰が出ているか」を出すページ（大会詳細・対戦表）の入り口で呼ぶ。
+// 一度読めば以後の loadAll が取り直すため、開いている間は最新に保たれる。
+export async function ensureTournamentDetail(tournamentId) {
+  if (fullDataLoaded || loadedDetailIds.has(tournamentId)) return;
+
+  const [teams, entries] = await Promise.all([
+    supabase.from('tournament_teams').select('*').eq('tournament_id', tournamentId),
+    supabase.from('tournament_entries').select('*').eq('tournament_id', tournamentId),
+  ]);
+  check(teams.error, 'チームの読み込み');
+  check(entries.error, 'エントリーの読み込み');
+
+  loadedDetailIds.add(tournamentId);
+
+  const tournament = state.tournaments.find((t) => t.id === tournamentId);
+  if (!tournament) return;
+
+  const assembled = buildEntrants(teams.data, entries.data);
+  tournament.entrantIds = assembled.entrantIds;
+  tournament.participantIds = assembled.participantIds;
+  tournament.teams = assembled.teams;
+  tournament.entrantCount = assembled.entrantIds.length;
+  tournament.participantCount = assembled.participantIds.length;
+
+  const placements = {};
+  entries.data.forEach((e) => {
+    if (e.placement != null) placements[e.player_id] = e.placement;
+  });
+  if (Object.keys(placements).length > 0) state.placements[tournamentId] = placements;
+
+  teams.data.forEach((t) => {
+    if (t.placement === 1) state.teamChampions[tournamentId] = t.name;
+  });
+}
+
+// その大会の試合結果を state.matches に読み込む。対戦表ページの入り口で呼ぶ。
+// syncTournamentProgress は state.matches とDBの差分で保存するため、
+// 対戦表を操作する前に必ずその大会の分が手元に揃っていなければならない。
+export async function ensureTournamentMatches(tournamentId) {
+  if (fullDataLoaded || loadedMatchIds.has(tournamentId)) return;
+
+  const { data, error } = await supabase
+    .from('matches')
+    .select('*')
+    .eq('tournament_id', tournamentId);
+  check(error, '試合結果の読み込み');
+
+  loadedMatchIds.add(tournamentId);
+  state.matches = state.matches
+    .filter((m) => m.tournamentId !== tournamentId)
+    .concat(data.map(toMatch));
+}
+
+// 運営の集計操作（ランキング編集・シード決定）用に全データを読み込む。
+// ランキングは全試合・全順位・チーム構成に依存するため、材料を丸ごと揃えてから
+// 既存の computeRankings をそのまま使う。一度読めば以後の loadAll も全件を取り直す。
+export async function ensureFullData() {
+  if (fullDataLoaded) return;
+  fullDataLoaded = true;
+  try {
+    await loadAll();
+  } catch (err) {
+    fullDataLoaded = false;
+    throw err;
+  }
+}
+
+// お知らせの全件読み込み（一覧ページ・古いお知らせの詳細用）。普段は最新数件しか読まない。
+export async function ensureAllAnnouncements() {
+  if (allAnnouncementsLoaded) return;
+
+  const { data, error } = await supabase
+    .from('announcements')
+    .select('*')
+    .order('pinned', { ascending: false })
+    .order('created_at', { ascending: false });
+  check(error, 'お知らせの読み込み');
+
+  allAnnouncementsLoaded = true;
+  state.announcements = data.map(toAnnouncement);
+}
+
+// 選手ページ用。その選手の出場記録（大会・順位・チーム名）だけを取る。
+// チーム名はエントリー行から tournament_teams を辿って一緒に受け取る。
+export async function loadPlayerEntries(playerId) {
+  const { data, error } = await supabase
+    .from('tournament_entries')
+    .select('tournament_id, placement, team:tournament_teams(name)')
+    .eq('player_id', playerId);
+  check(error, '出場記録の読み込み');
+
+  return data.map((e) => ({
+    tournamentId: e.tournament_id,
+    placement: e.placement,
+    teamName: e.team?.name ?? null,
+  }));
+}
+
+// 選手ページ用。その選手の試合と出場記録だけを取る（全試合は読まない）。
+// チーム戦の試合は選手IDが入っていないためここには含まれないが、
+// 個人の通算成績にチーム戦を混ぜない方針なので、これで足りる。
+export async function loadPlayerRecord(playerId) {
+  const [matches, entries] = await Promise.all([
+    supabase
+      .from('matches')
+      .select('*')
+      .or(`winner_id.eq.${playerId},loser_id.eq.${playerId}`),
+    loadPlayerEntries(playerId),
+  ]);
+  check(matches.error, '試合結果の読み込み');
+
+  return { matches: matches.data.map(toMatch), entries };
+}
+
+// 選手の削除ガード用。試合結果か出場記録が1件でも残っているかを行を運ばずに数える。
+export async function playerHasRecords(playerId) {
+  const [m, e] = await Promise.all([
+    supabase
+      .from('matches')
+      .select('id', { count: 'exact', head: true })
+      .or(`winner_id.eq.${playerId},loser_id.eq.${playerId}`),
+    supabase
+      .from('tournament_entries')
+      .select('tournament_id', { count: 'exact', head: true })
+      .eq('player_id', playerId),
+  ]);
+  check(m.error, '試合記録の確認');
+  check(e.error, '出場記録の確認');
+
+  return { inMatches: (m.count ?? 0) > 0, inTournaments: (e.count ?? 0) > 0 };
 }
 
 // ---------------------------------------------------------------------------
