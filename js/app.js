@@ -2398,7 +2398,7 @@ scrollTopBtn.addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
 });
 
-// ---- ホームのゲームのマーク ----
+// ---- ホームのロゴ ----
 //
 // 画像は差し替える前提の1ファイル（img/game-logo.webp）なので、
 // 「ファイルがまだ無い」「白背景の画像が来た」のどちらでも画面が崩れないようにする。
