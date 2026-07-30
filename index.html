@@ -6,6 +6,10 @@
 <!-- モバイルのブラウザUI（アドレスバー）も暗い面に揃える -->
 <meta name="theme-color" content="#050505">
 <title>IgniteArena — どこでも熱く、遊べ。</title>
+<!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
+     img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。 -->
+<link rel="icon" href="img/icon.png?v=79" type="image/png">
+<link rel="apple-touch-icon" href="img/icon.png?v=79">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
@@ -179,6 +183,15 @@
          言葉を足すほど強度が下がるので、名前とサブタイトルの2行で止める。
          行き先は下のボタンが示す。 -->
     <div class="hero">
+      <!-- 扱っているゲームのマーク。初めて来た人が「何のゲームの大会か」を
+           文字を読む前に掴めるようにする。サイトの色（緑）には混ぜず、
+           ゲーム側の色のまま独立した印として置く。
+           画像が無いときは js/app.js がこのブロックごと隠す。 -->
+      <div class="hero-game" id="hero-game">
+        <img class="hero-game-logo" id="hero-game-logo"
+             src="img/game-logo.png?v=79" alt="FLASH PARTY">
+      </div>
+
       <p class="hero-eyebrow">Tournament &amp; Ranking</p>
       <h2 class="hero-title">IgniteArena</h2>
       <p class="hero-tagline">どこでも熱く、遊べ。</p>

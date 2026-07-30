@@ -1285,6 +1285,51 @@ td code { font-size: 0.85em; }
 
 .hero > * { position: relative; z-index: 1; }
 
+/* ---- 扱っているゲームのマーク ----
+
+   サイトの色は黄緑のままにし、ゲームのロゴだけは元の色で置く（配色の方針は
+   このファイルの冒頭を参照）。並べると色は競合するので、干渉しない形にする:
+     * ロゴは中央、操作できるもの（ボタン）から離す。押せる物と間違えさせない
+     * サイト名との間に余白と細い区切りを入れ、別々の物として読ませる
+     * 常に少しだけ彩度を落とす。主役は下の「IgniteArena」なので、
+       ロゴが画面でいちばん強い色にならないようにする
+
+   背景が白いロゴ画像でも黒い面から浮かないよう、.is-plated を付けると
+   白い台紙に載った印の形になる（js/app.js が画像の四隅を見て自動で付ける）。 */
+.hero-game {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.6rem;
+  padding-bottom: 1.4rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.hero-game-logo {
+  width: min(58%, 260px);
+  height: auto;
+  /* 黒地に置いた暖色は実際より強く光って見えるので、少しだけ落ち着かせる */
+  opacity: 0.92;
+  filter: saturate(0.94);
+}
+
+/* 白背景の画像用の台紙。透過画像でも「印」として成立する形にしてある */
+.hero-game.is-plated .hero-game-logo {
+  padding: 0.7rem 1.1rem;
+  border-radius: var(--r);
+  background: #f7f7f5;
+  opacity: 1;
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 640px) {
+  .hero-game {
+    margin-bottom: 1.2rem;
+    padding-bottom: 1.1rem;
+  }
+
+  .hero-game-logo { width: min(72%, 220px); }
+}
+
 /* 英字の小見出しはグラデーション文字で。表示用フォントの見せ場。
    字間を広く取っているぶん実寸が長い。画面幅に応じて字間ごと縮め、
    細い端末で「TOURNAMENT & / RANKING」と2行に割れないようにする。 */

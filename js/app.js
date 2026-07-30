@@ -2398,6 +2398,61 @@ scrollTopBtn.addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
 });
 
+// ---- ホームのゲームのマーク ----
+//
+// 画像は差し替える前提の1ファイル（img/game-logo.png）なので、
+// 「ファイルがまだ無い」「白背景の画像が来た」のどちらでも画面が崩れないようにする。
+
+const heroGameEl = $('hero-game');
+const heroGameLogoEl = $('hero-game-logo');
+
+// 画像の四隅が明るいか。明るければ白背景の画像なので、黒い面から浮かないよう
+// 白い台紙に載せる（透過画像ならそのまま黒地に置く）。
+// 判定にはcanvasを使うが、失敗しても台紙を付けないだけで表示は続く。
+function looksLightBackground(img) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+
+    const w = canvas.width - 1;
+    const h = canvas.height - 1;
+    const corners = [[0, 0], [w, 0], [0, h], [w, h]];
+
+    return corners.every(([x, y]) => {
+      const [r, g, b, a] = ctx.getImageData(x, y, 1, 1).data;
+      // 透明なら「白背景ではない」。不透明で明るければ白背景と見なす。
+      if (a < 200) return false;
+      return (r + g + b) / 3 > 200;
+    });
+  } catch (err) {
+    // 別オリジンの画像などで画素を読めないことがある。台紙なしで続ける。
+    return false;
+  }
+}
+
+if (heroGameEl && heroGameLogoEl) {
+  // 画像がまだ置かれていなければ、割れた画像を出さずにブロックごと引っ込める
+  const hideBlock = () => { heroGameEl.hidden = true; };
+
+  const applyPlate = () => {
+    heroGameEl.classList.toggle('is-plated', looksLightBackground(heroGameLogoEl));
+  };
+
+  // このスクリプトはmodule（defer扱い）なので、走り出す頃には画像の読み込みが
+  // 終わっていることがある。その場合イベントはもう飛んでこないので、
+  // 先に complete を見て決める（naturalWidth が0なら読み込みに失敗している）。
+  if (heroGameLogoEl.complete) {
+    if (heroGameLogoEl.naturalWidth) applyPlate();
+    else hideBlock();
+  } else {
+    heroGameLogoEl.addEventListener('load', applyPlate);
+    heroGameLogoEl.addEventListener('error', hideBlock);
+  }
+}
+
 // ---- 狭い画面のメニュー ----
 //
 // 開閉状態は routeFromHash では触らない。背景の自動更新でも routeFromHash は
