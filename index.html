@@ -8,13 +8,13 @@
 <title>IgniteArena — どこでも熱く、遊べ。</title>
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。 -->
-<link rel="icon" href="img/icon.png?v=84" type="image/png">
-<link rel="apple-touch-icon" href="img/icon.png?v=84">
+<link rel="icon" href="img/icon.png?v=85" type="image/png">
+<link rel="apple-touch-icon" href="img/icon.png?v=85">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=84">
+<link rel="stylesheet" href="css/style.css?v=85">
 
 <!-- スクロールに合わせた登場アニメの「入れ物」を開ける印。
      登場アニメは「最初は透明 → 見えたら不透明」で作るが、その透明を素で
@@ -193,7 +193,11 @@
 </dialog>
 
 <main>
-  <section id="view-home" class="view">
+  <!-- class="stage" は「見せる面」の目印。この印が付いた画面にだけ、
+       スクロール連動の視差とマスク開き（js/stage.js と css の「ステージ」節）が働く。
+       対戦表・エントリー・チャットのような密な画面には付けない ── そこで要素が
+       動くと、読むのにも押すのにも邪魔になるため。 -->
+  <section id="view-home" class="view stage">
     <!-- サイトの顔。名乗りだけを置き、説明文は書かない。
          言葉を足すほど強度が下がるので、名前とサブタイトルの2行で止める。
          行き先は下のボタンが示す。 -->
@@ -209,7 +213,7 @@
              画像が無いときは js/app.js がこのブロックごと隠す。 -->
         <div class="hero-game reveal" id="hero-game">
           <img class="hero-game-logo" id="hero-game-logo"
-               src="img/game-logo.webp?v=84" alt="IgniteArena">
+               src="img/game-logo.webp?v=85" alt="IgniteArena">
         </div>
 
         <p class="hero-eyebrow reveal">Tournament &amp; Ranking</p>
@@ -319,7 +323,7 @@
 
   <!-- お知らせの一覧。ホームは最新の数件だけなので、全件はこのページで見せる。
        新規投稿ボタン（運営のみ）もお知らせの管理場所であるここに置く。 -->
-  <section id="view-news-list" class="view" hidden>
+  <section id="view-news-list" class="view stage" hidden>
     <div class="page-head">
       <div class="home-section-head">
         <div>
@@ -334,7 +338,7 @@
 
   <!-- お知らせの詳細。一覧のカードは画像・題名・日付だけの入口にしているので、
        本文はここで読ませる。上から 画像 → 題名 → 日付 → 本文 → 運営操作。 -->
-  <section id="view-news" class="view" hidden>
+  <section id="view-news" class="view stage" hidden>
     <a class="back-link" id="news-back-link" href="#news">← お知らせ一覧へ</a>
     <div id="news-hero" class="detail-hero" hidden></div>
     <h2 id="news-title"></h2>
@@ -344,7 +348,7 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view" hidden data-src="pages/guide.html?v=84"></section>
+  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=85"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -655,9 +659,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal" hidden data-src="pages/terms.html?v=84"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=85"></section>
 
-  <section id="view-privacy" class="view legal" hidden data-src="pages/privacy.html?v=84"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=85"></section>
 
 </main>
 
@@ -678,7 +682,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=84"></script>
+<script src="js/vendor/supabase.js?v=85"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -690,29 +694,29 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=84",
-    "./js/bracket.js":        "./js/bracket.js?v=84",
-    "./js/bracketView.js":    "./js/bracketView.js?v=84",
-    "./js/db.js":             "./js/db.js?v=84",
-    "./js/entries.js":        "./js/entries.js?v=84",
-    "./js/formDraft.js":      "./js/formDraft.js?v=84",
-    "./js/icons.js":          "./js/icons.js?v=84",
-    "./js/matchChat.js":      "./js/matchChat.js?v=84",
-    "./js/playerStats.js":    "./js/playerStats.js?v=84",
-    "./js/players.js":        "./js/players.js?v=84",
-    "./js/profile.js":        "./js/profile.js?v=84",
-    "./js/ranking.js":        "./js/ranking.js?v=84",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=84",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=84",
-    "./js/rankingView.js":    "./js/rankingView.js?v=84",
-    "./js/stage.js":          "./js/stage.js?v=84",
-    "./js/state.js":          "./js/state.js?v=84",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=84",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=84",
-    "./js/util.js":           "./js/util.js?v=84"
+    "./js/auth.js":           "./js/auth.js?v=85",
+    "./js/bracket.js":        "./js/bracket.js?v=85",
+    "./js/bracketView.js":    "./js/bracketView.js?v=85",
+    "./js/db.js":             "./js/db.js?v=85",
+    "./js/entries.js":        "./js/entries.js?v=85",
+    "./js/formDraft.js":      "./js/formDraft.js?v=85",
+    "./js/icons.js":          "./js/icons.js?v=85",
+    "./js/matchChat.js":      "./js/matchChat.js?v=85",
+    "./js/playerStats.js":    "./js/playerStats.js?v=85",
+    "./js/players.js":        "./js/players.js?v=85",
+    "./js/profile.js":        "./js/profile.js?v=85",
+    "./js/ranking.js":        "./js/ranking.js?v=85",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=85",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=85",
+    "./js/rankingView.js":    "./js/rankingView.js?v=85",
+    "./js/stage.js":          "./js/stage.js?v=85",
+    "./js/state.js":          "./js/state.js?v=85",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=85",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=85",
+    "./js/util.js":           "./js/util.js?v=85"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=84"></script>
+<script type="module" src="js/app.js?v=85"></script>
 </body>
 </html>

@@ -4489,12 +4489,15 @@ dialog h3 {
   object-fit: cover;
   /* 黒い面に置いた写真は実際より強く見えるので、少しだけ落ち着かせる */
   filter: saturate(0.88);
-  transition: transform 0.5s ease, filter 0.3s ease;
+  /* 拡大率は変数ごしに渡す。登場時（少し大きい状態から等倍へ）とホバーの拡大が
+     transform を直接奪い合うと、詳細度の勝ったほうが相手を殺してしまうため。 */
+  transform: scale(var(--thumb-scale, 1));
+  transition: transform 0.6s ease, filter 0.3s ease;
 }
 
 .showcase-card:hover .showcase-thumb img,
 .showcase-card:focus-visible .showcase-thumb img {
-  transform: scale(1.05);
+  --thumb-scale: 1.05;
   filter: saturate(1);
 }
 
@@ -4769,17 +4772,226 @@ body.nav-open header::after { opacity: 0; }
 }
 
 /* ---------------------------------------------------------------------------
+   マスク開き（帯の下から立ち上がる／画像が広がって開く）
+   --------------------------------------------------------------------------- */
+
+/* 見出しは「ふわっと出る」のではなく、帯の下から立ち上がってくる。
+   js/stage.js が中身を .stage-mask-body で包み、data-mask を付ける
+   （'on' = まだ画面に入っていない / 'in' = 入った）。
+   印を class ではなく data 属性にしているのは、見出しに class を生やすと
+   main h3:not([class]) 系の字組みが外れてしまうため。
+
+   掛けてはいけない見出しと、その理由:
+     .hero-tagline  … ::after に下線バーを持つ。overflow:hidden で切り落とされる
+     .page-eyebrow  … ::before に斜めの光を持つ。同上（こちらは下の視差の担当）
+     .guide-chapter … display:flex で章番号と横に並ぶ。包むと横並びが崩れる
+     .hero-title    … 既に1文字送りが掛かっている。二重に動かさない */
+
+.stage-mask-body { display: block; }
+
+.stage-ready [data-mask] {
+  overflow: hidden;
+  /* 日本語のディセンダ（「ジ」「ゃ」の下端）が切り落とされないよう、
+     わずかに下を逃がす。0.15em はほぼ見えない量。 */
+  padding-bottom: 0.15em;
+}
+
+.stage-ready [data-mask] .stage-mask-body {
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stage-ready [data-mask="on"] .stage-mask-body {
+  transform: translateY(105%);
+}
+
+/* 画像は下から広がって開く。中の写真は少し大きい状態から等倍へ戻し、
+   「引きながら開く」動きを重ねる。
+
+   拡大率をカスタムプロパティに逃がしているのは、ホバーの拡大と喧嘩させないため。
+   transform を直接上書きし合うと、詳細度の勝った側がホバーを殺してしまう。 */
+.showcase-thumb img { --thumb-scale: 1; }
+
+.stage-ready .showcase-thumb,
+.stage-ready .hero-game {
+  clip-path: inset(0 0 100% 0);
+  transition: clip-path 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stage-ready .showcase-card.is-in .showcase-thumb,
+.stage-ready .hero-game.is-in {
+  clip-path: inset(0 0 0 0);
+}
+
+.stage-ready .showcase-card:not(.is-in) .showcase-thumb img { --thumb-scale: 1.12; }
+
+/* ロゴは開く動きだけに任せ、塊ごとのフェードは打ち消す（二重に動かさない） */
+.stage-ready .hero-game {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------------------
+   スクロールに連動した視差
+   --------------------------------------------------------------------------- */
+
+/* 【必ず @supports で囲うこと】
+   animation-timeline に対応していないブラウザは、その宣言だけを捨てて
+   animation-name のほうは生かす。囲いを外すと、視差用のキーフレームが
+   読み込み時に1回だけ再生され、ズレた位置で固まってしまう。
+   囲えば、非対応の環境では何も動かない（＝いまの静止状態）だけで済む。
+
+   【タイムラインの選び分け】
+   view() も引数なしの scroll() も「いちばん近いスクロール容器」を見る。
+   .hero は overflow:hidden を持つスクロール容器なので、その中の要素に view() を
+   書いても進捗が永久に0のまま動かない。ヒーローの中だけは、文書全体のスクロールを
+   直接見る scroll(root block) を使い、範囲を画面1つぶんに切る。
+   .showcase-rail も overflow-x:auto でスクロール容器になるため、帯の中のカードには
+   視差を掛けず、上のマスク開きだけに任せている。
+
+   すべて .stage-ready の下に置く。動きを止めている人にはこの印が付かないので、
+   視差はそもそも1行も適用されない。 */
+
+@supports (animation-timeline: view()) {
+  /* 【ショートハンドを使わないこと】
+     animation: ... の一括指定は animation-timeline と animation-duration を
+     初期値へ巻き戻す。書く順で救われることもあるが壊れやすいので、
+     この節では最後までロングハンドで書く。
+     duration は書かない ── 進捗を決めるのはスクロール量であって時間ではない。 */
+
+  /* ---- ヒーロー（範囲は画面1つぶんのスクロール）---- */
+
+  /* 背景の巨大タイポが横に流れ続ける。この面でいちばん大きな動き。 */
+  .stage-ready .hero-bg-word {
+    animation-name: parallax-word;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 100vh;
+  }
+
+  @keyframes parallax-word {
+    /* 既定の translateY(-52%)（天地の中央合わせ）を保ったまま横へ送る */
+    to { transform: translateY(-52%) translateX(-10vw); }
+  }
+
+  /* 本文は上へ抜けながら薄くなる。スクロールで「離陸する」感じを出す。 */
+  .stage-ready .hero-body {
+    animation-name: parallax-hero-body;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 100vh;
+  }
+
+  @keyframes parallax-hero-body {
+    to { transform: translateY(-14vh); opacity: 0.15; }
+  }
+
+  /* ロゴだけは逆に少し下がる。本文と別の速さで動くことで層の差が出る。 */
+  .stage-ready .hero-game-logo {
+    animation-name: parallax-logo;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 100vh;
+  }
+
+  @keyframes parallax-logo {
+    to { transform: translateY(6vh); }
+  }
+
+  /* 少しスクロールしたら、下への誘導は役目を終える */
+  .stage-ready .hero-scroll {
+    animation-name: parallax-scroll-hint;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 25vh;
+  }
+
+  @keyframes parallax-scroll-hint {
+    to { opacity: 0; transform: translateY(1.2rem); }
+  }
+
+  /* ---- 各ブロック（cover = その要素が画面と重なっているあいだ全部）----
+     ここは overflow の囲いの外なので view() がそのまま使える。 */
+
+  /* 英字ラベルが横に滑る */
+  .stage-ready .stage .page-eyebrow {
+    animation-name: parallax-eyebrow;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: view();
+    animation-range: cover 0% cover 100%;
+  }
+
+  @keyframes parallax-eyebrow {
+    from { transform: translateX(-1.6rem); }
+    to   { transform: translateX(1.6rem); }
+  }
+
+  /* 01 / 02 / 03 が本文と別の速さで縦に流れる */
+  .stage-ready .stage .home-step-num {
+    animation-name: parallax-num;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: view();
+    animation-range: cover 0% cover 100%;
+  }
+
+  @keyframes parallax-num {
+    from { transform: translateY(2.2rem); }
+    to   { transform: translateY(-2.2rem); }
+  }
+
+  /* 数字と章番号は控えめに。桁が動きすぎると読み取れなくなる。 */
+  .stage-ready .stage .stat-num,
+  .stage-ready .stage .guide-chapter-num {
+    animation-name: parallax-num-soft;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: view();
+    animation-range: cover 0% cover 100%;
+  }
+
+  @keyframes parallax-num-soft {
+    from { transform: translateY(1.1rem); }
+    to   { transform: translateY(-1.1rem); }
+  }
+}
+
+/* ---------------------------------------------------------------------------
    動きを止めている人への最後の受け皿
    --------------------------------------------------------------------------- */
 
-/* 通常はここへ来ない（.stage-ready が付かないので、そもそも透明にならない）。
+/* 通常はここへ来ない（.stage-ready が付かないので、透明にも視差にもならない）。
    OSの設定を表示中に切り替えた場合の受け皿として、確実に見える状態へ戻す。 */
 @media (prefers-reduced-motion: reduce) {
   .stage-ready .reveal,
   .stage-ready .reveal.is-in,
-  .stage-ready .reveal-chars .stage-char {
+  .stage-ready .reveal-chars .stage-char,
+  .stage-ready [data-mask] .stage-mask-body {
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  .stage-ready .showcase-thumb,
+  .stage-ready .hero-game {
+    clip-path: none !important;
+  }
+
+  /* 【重要】スクロール連動アニメーションは duration を見ない（進捗はスクロール量が
+     決める）ので、このファイル冒頭寄りにある一括停止＝ animation-duration を
+     0.01ms に潰す指定では止まらない。名前ごと外して確実に止める。 */
+  .stage-ready .hero-bg-word,
+  .stage-ready .hero-body,
+  .stage-ready .hero-game-logo,
+  .stage-ready .hero-scroll,
+  .stage-ready .stage .page-eyebrow,
+  .stage-ready .stage .home-step-num,
+  .stage-ready .stage .stat-num,
+  .stage-ready .stage .guide-chapter-num {
+    animation: none !important;
   }
 
   ::view-transition-old(root),

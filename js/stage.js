@@ -41,12 +41,19 @@ function getRevealObserver() {
   revealObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (!entry.isIntersecting) return;
-      entry.target.classList.add('is-in');
+      const el = entry.target;
+
+      // マスク開きの見出しには class を足さない。'is-in' を付けてしまうと
+      // class 属性が生えて、既存の main h3:not([class]) 系の字組みが外れる。
+      // 印は data 属性で持つ（値を 'on' から 'in' へ進めるだけ）。
+      if (el.dataset.mask) el.dataset.mask = 'in';
+      else el.classList.add('is-in');
+
       // 一度出したものは二度と観測しない。Realtimeの更新でホームが描き直されても、
       // 既に出ているものが跳ね直さないようにするため（お知らせが1件増えるたびに
       // 画面全体が再生されると、見ている人には不具合に見える）。
-      revealObserver.unobserve(entry.target);
-      startCountUp(entry.target);
+      revealObserver.unobserve(el);
+      startCountUp(el);
     });
   }, {
     // 画面の下端ちょうどではなく、少し入ってから出す。端でちらつくのを防ぐ。
@@ -57,7 +64,7 @@ function getRevealObserver() {
   return revealObserver;
 }
 
-// root の中の、まだ出ていない .reveal を観測に加える。
+// root の中の、まだ出ていないもの（.reveal と、マスクを掛けた見出し）を観測に加える。
 // 同じ要素を二重に渡しても IntersectionObserver 側で無視されるので、
 // 何度呼んでも構わない。
 function observeReveals(root) {
@@ -66,7 +73,7 @@ function observeReveals(root) {
   if (prefersReducedMotion()) return;
 
   const observer = getRevealObserver();
-  root.querySelectorAll('.reveal:not(.is-in)').forEach((el) => observer.observe(el));
+  root.querySelectorAll('.reveal:not(.is-in), [data-mask="on"]').forEach((el) => observer.observe(el));
 }
 
 /* ---------------------------------------------------------------------------
@@ -103,6 +110,37 @@ function splitChars(el) {
 
   el.textContent = '';
   el.appendChild(frag);
+}
+
+/* ---------------------------------------------------------------------------
+   見出しのマスク開き
+   --------------------------------------------------------------------------- */
+
+// 帯の下から文字が立ち上がってくる形にする。
+//
+// 仕組みは「親を overflow:hidden にして、中身を包んだ箱を下から押し上げる」だけ。
+// 包む箱が要るのでJSで挟むが、動きそのものはCSSが受け持つ。
+//
+// 印を class ではなく data 属性で持つのは、見出しに class を生やすと
+// main h3:not([class]) 系の字組み（左の縦線・余白）が外れてしまうため。
+//
+// 掛けてはいけない見出しがあることに注意（css の「ステージ」節に一覧がある）。
+//   * 擬似要素で下線や光を持つもの … overflow:hidden で切り落とされる
+//   * display:flex で番号と並んでいるもの … 包むと横並びが崩れる
+const MASK_SELECTOR = '.page-head h2, .home-step-body h3';
+
+function wrapMask(el) {
+  if (el.dataset.mask) return;
+
+  const body = document.createElement('span');
+  body.className = 'stage-mask-body';
+  // textContent ではなく子ノードごと移す。見出しの中にリンクや
+  // <span>（固定の印など）が入っていることがある。
+  while (el.firstChild) body.appendChild(el.firstChild);
+  el.appendChild(body);
+
+  // 'on' = 掛けたが、まだ画面に入っていない。observeReveals がこれを拾う。
+  el.dataset.mask = 'on';
 }
 
 /* ---------------------------------------------------------------------------
@@ -284,6 +322,12 @@ export function initStage(viewEl) {
 
   if (!prefersReducedMotion()) {
     viewEl.querySelectorAll('[data-split]').forEach(splitChars);
+
+    // マスク開きは見出しの形で拾うが、その形は大会一覧など「使う面」にもある。
+    // .stage が付いた画面（ホーム・はじめに・規約類・お知らせ）だけを対象にする。
+    if (viewEl.classList.contains('stage')) {
+      viewEl.querySelectorAll(MASK_SELECTOR).forEach(wrapMask);
+    }
   }
 
   observeReveals(viewEl);
