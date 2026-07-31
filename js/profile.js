@@ -4,7 +4,6 @@
 import { escapeHtml, safeUrl, initialOf } from './util.js';
 import { keepFormDraft, clearFormDraft } from './formDraft.js';
 import { createCharacterField } from './characterPicker.js';
-import { characterListHtml } from './characters.js';
 
 // SNS欄に入れられるドメインの白名簿。
 //
@@ -352,9 +351,9 @@ export function profileSectionHtml(player) {
     html += `<dl class="tournament-info-grid profile-grid">${rows.join('')}</dl>`;
   }
 
-  // 使用キャラクターは表の1行ではなく、絵のまとまりとして独立させる。
-  // 名前を並べただけの行だったころは、他の項目に埋もれて読み飛ばされていた。
-  html += characterListHtml(player.mainCharacters);
+  // 使用キャラクターは項目としては出さない。選手ページの背景に大きく敷いているので
+  // （js/app.js の playerArtHtml）、札を並べると同じ絵が2度出ることになる。
+  // 登録そのものは残っていて、この背景と一覧の行の絵がその表示先になる。
   if (player.bio) {
     html += `<p class="player-bio">${escapeHtml(player.bio)}</p>`;
   }

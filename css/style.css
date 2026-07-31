@@ -4105,17 +4105,19 @@ dialog h3 {
    キャラクター
 
    配布素材から作った切り抜き（img/characters/。作り方は
-   scripts/build-characters.mjs）を、次の3つの役目で使う。
+   scripts/build-characters.mjs）を、次の2つの役目で使う。
 
      1. 選ぶ ── プロフィールの「使用キャラクター」欄と、そこから開く一覧
-     2. 示す ── 選手ページ・マイページに出す「このプレイヤーのキャラ」
-     3. 敷く ── 選手ページの背景に、メインキャラクターを大きく薄く置く
+     2. 敷く ── 選手ページの背景と、ランキング・選手検索の行
+
+   選んだキャラクターを名前と絵の札にして並べる項目は置いていない。
+   選手ページには背景として大きく出ているので、札を並べると同じ絵が2度出る。
 
    【色を足さない】このサイトは黒＋アシッドグリーンの2色で通していて、
    キャラクターの絵はそこに初めて入る「色の塊」になる。放っておくと画面の
    主役を奪うので、敷くときは必ず暗く落として（opacity と mask）背景に留め、
    緑のアクセントより前に出さない。絵をそのままの明度で出すのは、
-   本人が選んだものを見せる 1. と 2. の場面だけ。
+   本人が選ぶ 1. の場面だけ。
    --------------------------------------------------------------------------- */
 
 /* ---- 入力フォームの「使用キャラクター」欄 ---- */
@@ -4402,91 +4404,6 @@ dialog.char-picker { max-width: 56rem; }
   font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-}
-
-/* ---- 選手ページ・マイページに出す並び ---- */
-
-/* メインだけが大きい並びなので、揃えるのは上端。stretch にすると、
-   小さい札までメインの高さまで引き伸ばされて、中身が浮いた空箱になる。 */
-.char-cells {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 0 0 1.25rem;
-  padding: 0;
-  list-style: none;
-  align-items: flex-start;
-}
-
-.char-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.45rem 0.85rem 0.45rem 0.45rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--r);
-  background: var(--surface);
-}
-
-/* メインだけを大きく、縦組みにする。残りは横組みの小さな札にして、
-   1人目とそれ以外の差がひと目で付くようにする。 */
-.char-cell.is-main {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.4rem;
-  padding: 0.75rem;
-  border-color: var(--accent-ring);
-  background:
-    radial-gradient(120% 90% at 50% 0%, var(--accent-soft), transparent 70%),
-    var(--surface);
-}
-
-.char-cell-art {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  width: 3.25rem;
-  height: 3.25rem;
-  flex: none;
-}
-
-.char-cell.is-main .char-cell-art {
-  width: 9rem;
-  height: 9rem;
-}
-
-.char-cell-art img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.char-cell-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
-.char-cell-tag {
-  font-family: var(--font-display);
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  color: var(--accent-bright);
-}
-
-.char-cell-name {
-  font-weight: 700;
-  font-size: 0.92rem;
-  overflow-wrap: anywhere;
-}
-
-.char-cell.is-main .char-cell-name { font-size: 1.05rem; }
-
-.char-cell-skin {
-  font-size: 0.74rem;
-  color: var(--text-faint);
 }
 
 /* ---- 一覧の行に敷くメインキャラクター（ランキング・選手検索）----

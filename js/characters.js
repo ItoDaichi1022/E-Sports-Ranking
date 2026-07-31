@@ -93,32 +93,9 @@ export function searchCharacters(query) {
 // 選ぶ画面（js/characterPicker.js）とは分けてある。一覧に絵を敷くだけの場所から
 // あのダイアログ一式を読み込ませないため。
 
-// 選手ページ・マイページに出す使用キャラクターの並び。
-// 先頭（メイン）だけを大きく出し、残りは小さく添える。
-export function characterListHtml(refs) {
-  const parsed = (refs ?? []).map(parseCharacterRef).filter(Boolean);
-  if (!parsed.length) return '';
-
-  const cell = (item, main) => {
-    const url = characterImageUrl(item, main ? 'large' : 'thumb');
-    const img = url ? `<img src="${url}" alt="" loading="lazy" decoding="async">` : '';
-    const skin = item.known
-      ? `<span class="char-cell-skin">${escapeHtml(item.skinLabel)}${item.color ? `・${escapeHtml(item.color)}` : ''}</span>`
-      : '';
-    // 名前は一覧から来るので安全だが、読めなかった文字列には選手が入力した
-    // ものがそのまま入っている。必ず通してから埋める。
-    return `<li class="char-cell${main ? ' is-main' : ''}">
-      <span class="char-cell-art">${img}</span>
-      <span class="char-cell-body">
-        ${main ? '<span class="char-cell-tag">MAIN</span>' : ''}
-        <span class="char-cell-name">${escapeHtml(item.known ? item.name : item.label)}</span>
-        ${skin}
-      </span>
-    </li>`;
-  };
-
-  return `<ul class="char-cells">${parsed.map((p, i) => cell(p, i === 0)).join('')}</ul>`;
-}
+// 選手ページに、名前と絵を並べた「使用キャラクター」の項目は出さない。
+// 選んだキャラクターの見せ場は背景（js/app.js の playerArtHtml）と
+// 一覧の行（下の characterRowArtHtml）の2つで、札を並べると同じ絵が重なる。
 
 // 一覧の行（ランキング・選手検索）の右端に敷く、その人のメインキャラクター。
 //
