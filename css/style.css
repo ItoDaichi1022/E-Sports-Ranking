@@ -4288,3 +4288,502 @@ dialog h3 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ===========================================================================
+   ステージ（見せる面）
+
+   ホームと読み物ページだけが使う層。大会・対戦表・エントリー・チャットといった
+   「使う面」には及ばせない ── スクロールに連動して要素が動く演出は、密度と即応が
+   要る画面ではただの邪魔になるため。
+
+   ここで足すのは 構図・余白・動き の3つだけで、色は足さない。面は無彩色のまま、
+   緑は操作できる場所だけ、という このファイル冒頭の役割分担を崩さない。
+
+   【この層の要】.stage-ready が付いていないときは、何も透明にしない
+     登場アニメは「最初は透明 → 見えたら不透明」で作る。その透明を素で書くと、
+     動きを止めている人の画面で中身が永久に見えなくなる（すぐ上の一括停止は
+     animation を潰すだけで、opacity は戻してくれない）。
+     そこで初期状態はすべて .stage-ready の下にだけ置き、その印は index.html の
+     <head> の1行が「動きを許す人」にだけ付ける。
+   =========================================================================== */
+
+/* ---- スクロールに合わせた登場 ----
+   少し下から、わずかに傾いて起き上がる。js/stage.js が画面に入った順に
+   .is-in を付ける。一度付いたら外れないので、背景の自動更新で描き直されても
+   再生し直さない。 */
+.stage-ready .reveal {
+  opacity: 0;
+  transform: translateY(22px) rotate(0.35deg);
+  transition: opacity 0.65s ease-out, transform 0.65s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.stage-ready .reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* 帯に並ぶカードは、左から順に出す */
+.stage-ready .showcase-card:nth-child(2) { transition-delay: 0.06s; }
+.stage-ready .showcase-card:nth-child(3) { transition-delay: 0.12s; }
+.stage-ready .showcase-card:nth-child(4) { transition-delay: 0.18s; }
+
+.stage-ready .stat-item:nth-child(2) { transition-delay: 0.08s; }
+.stage-ready .stat-item:nth-child(3) { transition-delay: 0.16s; }
+
+/* ---- 見出しの1文字送り ----
+   塊ごとではなく1文字ずつ動かす見出し。js/stage.js が文字を span に割り、
+   --char-i に何番目かを入れる。読み上げは親の aria-label が受け持つので、
+   字が分かれても語は割れない。 */
+.stage-ready .reveal-chars {
+  opacity: 1;
+  transform: none;
+}
+
+.stage-char {
+  display: inline-block;
+  transition: opacity 0.5s ease-out, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.stage-ready .reveal-chars .stage-char {
+  opacity: 0;
+  transform: translateY(0.45em);
+}
+
+.stage-ready .reveal-chars.is-in .stage-char {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--char-i, 0) * 45ms);
+}
+
+/* ---------------------------------------------------------------------------
+   ホームのヒーロー（画面いっぱいの名乗り）
+   --------------------------------------------------------------------------- */
+
+/* 最初の1画面をロゴと名乗りだけで占める。ここに情報を足さないことが効き目の源
+   ── 読ませるのではなく「ここが何の場所か」を一目で置いていく面にする。
+   高さはヘッダー（約3.6rem）とその下の余白（1.5rem）を引いた残り全部。
+   svh を使うのは、スマートフォンでアドレスバーが伸縮しても跳ねないようにするため。 */
+.hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: calc(100vh - 5.2rem);
+  min-height: calc(100svh - 5.2rem);
+  padding: 2rem 0 4.5rem;
+  margin-bottom: 5.5rem;
+}
+
+/* ヒーローの中身は背景タイポより手前に置く */
+.hero-body {
+  position: relative;
+  z-index: 1;
+  max-width: 46rem;
+}
+
+/* 読ませない大きさで薄く敷く英字。写真素材を持たないぶん、字そのものを絵にする。
+   .hero が overflow:hidden なので、画面からはみ出したぶんは切り落とされる
+   （切れていること自体が、面の広さを感じさせる）。 */
+.hero-bg-word {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: -0.05em;
+  transform: translateY(-52%);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(5rem, 21vw, 14rem);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(147, 213, 0, 0.14);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 下にまだ続きがあることの合図。線が伸び縮みするだけの、静かな誘導にする
+   （矢印を出すと押せるものに見えてしまう）。 */
+.hero-scroll {
+  position: absolute;
+  left: 0;
+  bottom: 1.75rem;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.hero-scroll::after {
+  content: '';
+  width: 3.5rem;
+  height: 1px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--accent-bright), transparent);
+  animation: hero-scroll-line 2.6s ease-in-out infinite;
+}
+
+@keyframes hero-scroll-line {
+  0%, 100% { transform: scaleX(0.3); opacity: 0.35; }
+  50%      { transform: scaleX(1);   opacity: 1; }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    /* スマートフォンでは、画面を丸ごと使うと下のブロックの気配が消えて
+       「ここで終わり」に見える。少しだけ次を覗かせる。 */
+    min-height: calc(100svh - 9rem);
+    margin-bottom: 3.5rem;
+  }
+
+  .hero-scroll { bottom: 1rem; }
+  .hero-scroll::after { width: 2.5rem; }
+}
+
+/* ---------------------------------------------------------------------------
+   ホーム：これまでの大会（サムネイルの帯）
+   --------------------------------------------------------------------------- */
+
+/* 横に流して見せる。全部を並べて見せるのではなく「まだ右に続く」ことを
+   見せたいので、端で切れる形にしている。中身は js/stage.js が作り、
+   画像付きの大会が無いあいだはブロックごと出ない。 */
+.showcase-rail {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  /* スクロールバーのぶんだけ下に空きを作り、外側の余白からは差し引く */
+  padding-bottom: 0.9rem;
+  margin-bottom: -0.9rem;
+}
+
+.showcase-card {
+  flex: 0 0 clamp(15rem, 62vw, 20rem);
+  scroll-snap-align: start;
+  text-decoration: none;
+  color: inherit;
+}
+
+.showcase-thumb {
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.showcase-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* 一覧のカード（.card-thumb）は全体を収めるが、ここは大きく見せる場所なので
+     切り抜いて枠を埋める。並んだときに高さが揃い、帯として読める。 */
+  object-fit: cover;
+  /* 黒い面に置いた写真は実際より強く見えるので、少しだけ落ち着かせる */
+  filter: saturate(0.88);
+  transition: transform 0.5s ease, filter 0.3s ease;
+}
+
+.showcase-card:hover .showcase-thumb img,
+.showcase-card:focus-visible .showcase-thumb img {
+  transform: scale(1.05);
+  filter: saturate(1);
+}
+
+.showcase-body { padding: 0.85rem 0.1rem 0; }
+
+.showcase-meta {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.showcase-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.showcase-card:hover .showcase-title { color: var(--accent-bright); }
+
+/* ---------------------------------------------------------------------------
+   ホーム：これまでの積み上げ（数字）
+   --------------------------------------------------------------------------- */
+
+/* 写真が1枚も無くても成立する柱。数字そのものを大きく出し、説明は下に小さく置く。
+   数字は面の色（無彩色）のままにする ── 緑は操作できる場所の印なので、
+   押せないものに使うと印の意味が薄れる。 */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.stat-item {
+  padding: 2rem 1.75rem;
+  border-left: 1px solid var(--border-soft);
+}
+
+.stat-item:first-child {
+  padding-left: 0;
+  border-left: none;
+}
+
+.stat-label {
+  margin: 0 0 0.9rem;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+}
+
+.stat-value {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+}
+
+.stat-num {
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 8vw, 4rem);
+  font-weight: 700;
+  line-height: 1;
+  /* 数えているあいだ桁が揺れないように、等幅の数字にする */
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.stat-unit {
+  font-size: 0.9rem;
+  color: var(--text-faint);
+}
+
+.stat-term {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+}
+
+@media (max-width: 640px) {
+  .stat-item {
+    padding: 1.4rem 0;
+    border-left: none;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .stat-item:first-child { border-top: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   全画面のメニュー
+   --------------------------------------------------------------------------- */
+
+/* ドロップダウンをやめ、画面を丸ごと使う。項目が大きくなるぶん押しやすく、
+   「いまメニューを見ている」ことが疑いなく分かる。
+   開閉の仕組み（.open の付け外し・aria-expanded・Escで閉じる）は
+   これまでのまま。ここで変えるのは見た目だけ。 */
+#main-nav {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  gap: 0;
+  /* 上はヘッダーのぶんだけ空ける。ヘッダーはこの上に重なったまま残るので、
+     ロゴと閉じるボタンが隠れない。 */
+  padding: 5.5rem 1.5rem 3rem;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(5, 5, 5, 0.97);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: none;
+  box-shadow: none;
+}
+
+/* 背景に敷く、読ませない大きさの英字。ヒーローと同じ手で奥行きを作る */
+#main-nav::before {
+  content: 'MENU';
+  position: absolute;
+  right: -0.04em;
+  bottom: -0.12em;
+  font-family: var(--font-display);
+  font-size: clamp(6rem, 28vw, 16rem);
+  font-weight: 800;
+  line-height: 0.8;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(147, 213, 0, 0.1);
+  pointer-events: none;
+  user-select: none;
+}
+
+#main-nav.open { animation: nav-in 0.25s ease-out; }
+
+@keyframes nav-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* 項目は本文と同じ幅（1080px）に収める。画面が広くても字が散らばらない */
+#main-nav a {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0.7rem 0;
+  border-radius: 0;
+  font-size: clamp(1.3rem, 5vw, 1.9rem);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: color 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* 下から順に立ち上がる。区切り線（hr）は数に入らないので nth-of-type で数える */
+#main-nav.open a {
+  animation: nav-item-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+#main-nav.open a:nth-of-type(1) { animation-delay: 0.04s; }
+#main-nav.open a:nth-of-type(2) { animation-delay: 0.08s; }
+#main-nav.open a:nth-of-type(3) { animation-delay: 0.12s; }
+#main-nav.open a:nth-of-type(4) { animation-delay: 0.16s; }
+#main-nav.open a:nth-of-type(5) { animation-delay: 0.20s; }
+#main-nav.open a:nth-of-type(6) { animation-delay: 0.24s; }
+#main-nav.open a:nth-of-type(7) { animation-delay: 0.28s; }
+#main-nav.open a:nth-of-type(8) { animation-delay: 0.32s; }
+#main-nav.open a:nth-of-type(9) { animation-delay: 0.36s; }
+
+@keyframes nav-item-in {
+  from { opacity: 0; transform: translateY(1.1rem); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 全面を塗らず、色と少しの押し出しで示す。面が大きいので、
+   塗るとそこだけ強く光って落ち着かない。 */
+#main-nav a:hover {
+  background: none;
+  color: var(--text);
+  transform: translateX(0.4rem);
+}
+
+#main-nav a.active {
+  background: none;
+  color: var(--text);
+}
+
+/* 現在のページの印。左の縦バーではなく、字の下に短い線を引く */
+#main-nav a.active::before {
+  top: auto;
+  bottom: 0.5rem;
+  width: 2.2ch;
+  height: 2px;
+}
+
+#main-nav .nav-en { font-size: 0.68rem; }
+
+/* 3グループの区切り。開いたときに線が左から伸びる */
+#main-nav .nav-sep {
+  width: 100%;
+  max-width: 1080px;
+  margin: 1rem auto;
+  border-top-color: var(--border-soft);
+}
+
+#main-nav.open .nav-sep {
+  transform-origin: left center;
+  animation: nav-sep-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: 0.1s;
+}
+
+@keyframes nav-sep-in {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+#main-nav .nav-contact {
+  margin-top: 1rem;
+  padding-top: 1.2rem;
+  font-size: 1rem;
+}
+
+/* メニューを開いているあいだ ---------------------------------------------- */
+
+/* 後ろの本文がスクロールしないように止める。body に指定した overflow は
+   ビューポートへ引き継がれるので、sticky なヘッダーはそのまま働く。 */
+body.nav-open { overflow: hidden; }
+
+/* ヘッダーはメニューより手前に残す（ロゴと閉じるボタンを隠さないため）。
+   ただし面と下線は消して、メニューの背景と地続きに見せる。 */
+body.nav-open header {
+  z-index: 40;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+body.nav-open header::after { opacity: 0; }
+
+/* ---------------------------------------------------------------------------
+   画面の切り替え
+   --------------------------------------------------------------------------- */
+
+/* View Transitions が使えるブラウザでは、切り替えの演出は下の
+   ::view-transition が受け持つ。.view の view-in と二重に動かさない
+   （非対応のブラウザでは、これまでどおり view-in だけが働く）。 */
+@supports (view-transition-name: none) {
+  .view { animation: none; }
+}
+
+::view-transition-old(root) {
+  animation: vt-out 0.18s ease-in both;
+}
+
+::view-transition-new(root) {
+  animation: vt-in 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes vt-out {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+@keyframes vt-in {
+  from { opacity: 0; transform: translateY(16px); }
+}
+
+/* ---------------------------------------------------------------------------
+   動きを止めている人への最後の受け皿
+   --------------------------------------------------------------------------- */
+
+/* 通常はここへ来ない（.stage-ready が付かないので、そもそも透明にならない）。
+   OSの設定を表示中に切り替えた場合の受け皿として、確実に見える状態へ戻す。 */
+@media (prefers-reduced-motion: reduce) {
+  .stage-ready .reveal,
+  .stage-ready .reveal.is-in,
+  .stage-ready .reveal-chars .stage-char {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}

@@ -26,6 +26,7 @@ import {
   signInWithProvider, signOut, reloadOwnPlayer,
 } from './auth.js';
 import { isConfigured } from './supabaseClient.js';
+import { initStage, renderShowcase, renderStats, prefersReducedMotion } from './stage.js';
 import { iconSvg, makeIconButton, setButtonIcon } from './icons.js';
 import * as db from './db.js';
 
@@ -153,6 +154,11 @@ const logoutBtn = $('logout-btn');
 const navTournamentLink = $('nav-tournament-link');
 const mainNav = $('main-nav');
 const navToggle = $('nav-toggle');
+
+// ホームの「見せる面」のブロック（js/stage.js が中身を作る）
+const homeShowcaseEl = $('home-showcase');
+const homeShowcaseRailEl = $('home-showcase-rail');
+const homeStatRowEl = $('home-stat-row');
 
 const announcementListEl = $('announcement-list');
 const announcementNewBtn = $('announcement-new-btn');
@@ -318,6 +324,9 @@ function loadStaticPage(viewId) {
       el.innerHTML = html;
       // 二度と取りに行かない印。属性が残っていると、再訪のたびに読み直してしまう。
       delete el.dataset.src;
+      // 中身が入ったいま初めて演出を仕掛けられる（routeFromHash が呼んだ時点では
+      // この器はまだ空で、仕掛ける相手がいなかった）。
+      initStage(el);
     })
     .catch((err) => {
       // 読めなかったときは、白紙のまま放置せず理由を出して読み直せるようにする
@@ -361,54 +370,82 @@ function routeFromHash() {
     target = 'home';
   }
 
-  Object.entries(VIEW_IDS).forEach(([name, id]) => {
-    $(id).hidden = name !== target;
-  });
-
-  // 中身を別ファイルに分けてある読み物ページ（はじめに・利用規約・プライバシーポリシー）。
-  // data-src が付いていないページでは何もしない。
-  loadStaticPage(VIEW_IDS[target]);
-
-  // 別の画面へ移ったときは先頭から見せる。ハッシュだけを書き換える作りなので、
-  // 何もしないとブラウザは前の画面のスクロール位置をそのまま引き継いでしまい、
-  // 長いページから移ると途中や一番下から始まったように見える。
+  // 「別の画面へ移ったのか、同じ画面を描き直しているだけなのか」。
+  // この関数は Realtime の更新のたびにも呼ばれるので、この区別は要になる。
+  //   * 先頭までスクロールを戻すのは、移ったときだけ
+  //   * 画面の切り替えに一枚かぶせるのも、移ったときだけ
+  // ここを見ずに演出を走らせると、チャットや対戦表が更新されるたびに
+  // 画面全体がひらめいて、見ている人には不具合に見える。
   const routeKey = `${target}/${param ?? ''}`;
+  // 最初の1回は「移った」とは数えない。まだ何も描かれていない画面から
+  // かぶせても、白い面が一度ひらめくだけで意味がないため。
+  const isFirstRoute = lastRouteKey === null;
   const routeChanged = routeKey !== lastRouteKey;
   lastRouteKey = routeKey;
 
-  const navPage = NAV_PAGE_OF[target] || target;
-  mainNav.querySelectorAll('a').forEach((a) => {
-    a.classList.toggle('active', a.dataset.page === navPage);
-  });
+  // 画面の入れ替え一式。View Transitions で包めるように、ひとまとまりにしてある。
+  const applyRoute = () => {
+    Object.entries(VIEW_IDS).forEach(([name, id]) => {
+      $(id).hidden = name !== target;
+    });
 
-  // ページによっては、その画面で初めて必要になるデータを取りに行ってから描く
-  // （非同期の描画。中で失敗は拾っているので、ここでは最後の受け皿だけ用意する）。
-  const draw = (result) => Promise.resolve(result).catch((err) => {
-    console.error('画面の描画に失敗しました', err);
-    setStatus(err.message, 'error');
-  });
+    // 中身を別ファイルに分けてある読み物ページ（はじめに・利用規約・プライバシーポリシー）。
+    // data-src が付いていないページでは何もしない。
+    loadStaticPage(VIEW_IDS[target]);
 
-  if (target === 'home') renderHome();
-  else if (target === 'news') draw(renderNewsPage(param));
-  else if (target === 'newslist') draw(renderNewsListPage());
-  else if (target === 'tournaments') renderTournamentsPage(param);
-  else if (target === 'entries') draw(renderEntriesPage());
-  else if (target === 'create') { renderParticipantCheckboxes(); renderSelectedList(); }
-  else if (target === 'tournament') draw(renderTournamentDetail(param));
-  else if (target === 'bracket') draw(renderBracketPage(param));
-  else if (target === 'player') draw(renderPlayerDetail(param));
-  // 選手検索とランキングは同じページ。どちらのハッシュで来ても両方を描く。
-  else if (target === 'players' || target === 'ranking') {
-    refreshPlayerUI();
-    renderRankingPage();
-  } else if (target === 'profile') renderProfilePage();
+    const navPage = NAV_PAGE_OF[target] || target;
+    mainNav.querySelectorAll('a').forEach((a) => {
+      a.classList.toggle('active', a.dataset.page === navPage);
+    });
 
-  // 中身を入れ替えたあとに戻す。先に戻しても、描画で高さが変わると位置がずれる。
-  if (routeChanged) window.scrollTo(0, 0);
+    // ページによっては、その画面で初めて必要になるデータを取りに行ってから描く
+    // （非同期の描画。中で失敗は拾っているので、ここでは最後の受け皿だけ用意する）。
+    const draw = (result) => Promise.resolve(result).catch((err) => {
+      console.error('画面の描画に失敗しました', err);
+      setStatus(err.message, 'error');
+    });
 
-  // 先頭に戻ったので「上へ戻る」も引っ込める。scroll イベント待ちにすると、
-  // 既に先頭にいた場合はイベントが起きず、ボタンが出たまま残る。
-  syncScrollTopBtn();
+    if (target === 'home') renderHome();
+    else if (target === 'news') draw(renderNewsPage(param));
+    else if (target === 'newslist') draw(renderNewsListPage());
+    else if (target === 'tournaments') renderTournamentsPage(param);
+    else if (target === 'entries') draw(renderEntriesPage());
+    else if (target === 'create') { renderParticipantCheckboxes(); renderSelectedList(); }
+    else if (target === 'tournament') draw(renderTournamentDetail(param));
+    else if (target === 'bracket') draw(renderBracketPage(param));
+    else if (target === 'player') draw(renderPlayerDetail(param));
+    // 選手検索とランキングは同じページ。どちらのハッシュで来ても両方を描く。
+    else if (target === 'players' || target === 'ranking') {
+      refreshPlayerUI();
+      renderRankingPage();
+    } else if (target === 'profile') renderProfilePage();
+
+    // 別の画面へ移ったときは先頭から見せる。ハッシュだけを書き換える作りなので、
+    // 何もしないとブラウザは前の画面のスクロール位置をそのまま引き継いでしまい、
+    // 長いページから移ると途中や一番下から始まったように見える。
+    // 中身を入れ替えたあとに戻す。先に戻しても、描画で高さが変わると位置がずれる。
+    if (routeChanged) window.scrollTo(0, 0);
+
+    // 先頭に戻ったので「上へ戻る」も引っ込める。scroll イベント待ちにすると、
+    // 既に先頭にいた場合はイベントが起きず、ボタンが出たまま残る。
+    syncScrollTopBtn();
+
+    // 見せる面（ホーム・読み物ページ）の登場アニメを仕掛ける。スクロール位置を
+    // 戻したあとに呼ぶこと（先に呼ぶと、前の画面の位置で「もう見えている」と
+    // 判定され、上のほうの要素が出た状態から始まってしまう）。
+    // 読み物ページは中身が後から入るので、そちらは loadStaticPage が改めて呼ぶ。
+    initStage($(VIEW_IDS[target]));
+  };
+
+  // 画面が切り替わるときだけ、一枚かぶせて入れ替える（View Transitions）。
+  // 非対応のブラウザと、動きを止めている人には、これまでどおり
+  // .view の view-in（css/style.css）だけが働く。
+  if (routeChanged && !isFirstRoute
+      && typeof document.startViewTransition === 'function' && !prefersReducedMotion()) {
+    document.startViewTransition(applyRoute);
+  } else {
+    applyRoute();
+  }
 }
 
 // ---- ホーム（お知らせ） ----
@@ -451,6 +488,12 @@ function closeAnnouncementForm() {
 const HOME_ANNOUNCEMENT_COUNT = 3;
 
 function renderHome() {
+  // 見せる面のブロック（大会サムネの帯・数字）。中身は js/stage.js が
+  // state から作る。どちらも起動時に読み終えているデータだけを使うので、
+  // ここで通信は増えない。
+  renderShowcase(homeShowcaseEl, homeShowcaseRailEl);
+  renderStats(homeStatRowEl);
+
   renderAnnouncementCards(announcementListEl, state.announcements.slice(0, HOME_ANNOUNCEMENT_COUNT));
 }
 
@@ -2517,10 +2560,25 @@ if (heroGameEl && heroGameLogoEl) {
 // 走るため、そこで閉じると開いた直後に勝手に畳まれてしまう。
 // 実際に画面が変わるとき（hashchange）と、リンクを押したときだけ閉じる。
 
+// メニューは画面全体をふさぐ。開いているあいだは、その後ろにあるものを
+// 「無いもの」として扱う必要がある。
+//   * 後ろの本文がスクロールしてしまわないように、body のスクロールを止める
+//   * 隠れているのに Tab で入れてしまわないように、main とフッターを inert にする
+//     （ヘッダーはメニュー自身と閉じるボタンを持っているので対象外）
+const mainEl = document.querySelector('main');
+const siteFooterEl = document.querySelector('.site-footer');
+
 function setNavOpen(open) {
   mainNav.classList.toggle('open', open);
   navToggle.setAttribute('aria-expanded', String(open));
   navToggle.setAttribute('aria-label', open ? 'メニューを閉じる' : 'メニューを開く');
+
+  document.body.classList.toggle('nav-open', open);
+  [mainEl, siteFooterEl].forEach((el) => { if (el) el.inert = open; });
+
+  // 閉じるときにメニューの中にいたフォーカスは、開くのに使ったボタンへ戻す。
+  // 戻さないと、キーボードだけで操作している人が画面の先頭に飛ばされる。
+  if (!open && mainNav.contains(document.activeElement)) navToggle.focus();
 }
 
 navToggle.addEventListener('click', () => {
