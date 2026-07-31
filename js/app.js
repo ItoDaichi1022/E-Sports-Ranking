@@ -17,7 +17,6 @@ import { renderBracket } from './bracketView.js';
 import { reportChipHtml, syncOpenChat } from './matchChat.js';
 import { computeRankings, computeRankingsForRange, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
-import { downloadRankingCards } from './rankingCard.js';
 import { getPlayerStats, championLabel, placementLabelOf } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
 import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
@@ -146,7 +145,6 @@ const rankingCreateBtn = $('ranking-create-btn');
 const rankingEditorEl = $('ranking-editor');
 const rankingStartInput = $('ranking-start-input');
 const rankingEndInput = $('ranking-end-input');
-const rankingExportBtn = $('ranking-export-btn');
 const rankingPublishBtn = $('ranking-publish-btn');
 const rankingCancelBtn = $('ranking-cancel-btn');
 const rankingPublishedStatusEl = $('ranking-published-status');
@@ -2104,25 +2102,6 @@ rankingStartInput.addEventListener('change', () => {
 });
 rankingEndInput.addEventListener('change', () => {
   if (isAdmin()) renderRankingPage();
-});
-
-rankingExportBtn.addEventListener('click', async () => {
-  const { rankings } = computeRankingsForRange(state, selectedRankingRange());
-  if (rankings.length === 0) {
-    alert('この期間に確定した試合がまだないため、画像を書き出せません。');
-    return;
-  }
-
-  rankingExportBtn.disabled = true;
-  const originalLabel = rankingExportBtn.textContent;
-  try {
-    await downloadRankingCards(rankings, (done, total) => {
-      rankingExportBtn.textContent = `書き出し中... (${done}/${total})`;
-    });
-  } finally {
-    rankingExportBtn.disabled = false;
-    rankingExportBtn.textContent = originalLabel;
-  }
 });
 
 rankingPublishBtn.addEventListener('click', async () => {

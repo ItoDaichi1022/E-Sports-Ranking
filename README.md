@@ -57,7 +57,6 @@ js/
   players.js           選手一覧
   util.js              エスケープ・URL検証・アイコン描画の共通処理
   rankingView.js       ランキング表
-  rankingCard.js       ランキング発表カードのPNG書き出し
   tournamentTier.js    参加人数から大会規模Tierを判定
   vendor/supabase.js   supabase-js（同梱。CDNに依存しないため）
 supabase/
