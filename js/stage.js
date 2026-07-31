@@ -58,7 +58,11 @@ function getRevealObserver() {
   }, {
     // 画面の下端ちょうどではなく、少し入ってから出す。端でちらつくのを防ぐ。
     rootMargin: '0px 0px -10% 0px',
-    threshold: 0.05,
+    // 「どれだけ入ったら」ではなく「入ったら」で出す。
+    // 割合で条件を付けると、まだ高さを持っていない要素（読み込み中の画像を
+    // 抱えた箱など）が割合0のままいつまでも条件を満たさず、開かずに終わる。
+    // 出すのを遅らせる役は、上の rootMargin だけに持たせる。
+    threshold: 0,
   });
 
   return revealObserver;
@@ -344,12 +348,51 @@ export function renderStats(listEl) {
    入口
    --------------------------------------------------------------------------- */
 
+// 導入の演出（開門）が終わるまで、仕掛けるのを控えておく画面。
+// 幕が開いたところで一斉に仕掛けるので、ヒーローの登場はちゃんと見える。
+const pendingViews = new Set();
+let pendingSafetyTimer = null;
+
+function flushPending() {
+  clearTimeout(pendingSafetyTimer);
+  pendingSafetyTimer = null;
+  const views = [...pendingViews];
+  pendingViews.clear();
+  views.forEach(initStage);
+}
+
+// 保険。js/intro.js が 'intro-done' を投げ損ねても、控えたまま消えることはない。
+// （印が残っていると initStage がまた控えに戻すので、そのときは印ごと諦める）
+function armPendingSafety() {
+  if (pendingSafetyTimer !== null) return;
+  pendingSafetyTimer = setTimeout(() => {
+    pendingSafetyTimer = null;
+    document.documentElement.classList.remove('intro-hold');
+    flushPending();
+  }, 5000);
+}
+
+// このリスナーはモジュールを読んだ時点で付く。'intro-done' が飛ぶのは
+// 最短でも1フレーム後なので、取りこぼすことはない。
+document.addEventListener('intro-done', flushPending);
+
 // いま表示している画面に演出を仕掛ける。
 //
 // 何度呼ばれても二重にならない（既に出たものは観測から外れ、分割済みの
 // 見出しは印で弾く）。ルーティングのたび・読み物ページの読み込み後に呼ぶ。
 export function initStage(viewEl) {
   if (!viewEl) return;
+
+  // 導入の演出（js/intro.js）が幕を張っているあいだは仕掛けない。
+  // ここで仕掛けてしまうと、ヒーローの1文字送りが幕の裏で終わってしまい、
+  // 開門したときには静止したホームが出てくる。
+  // 印は intro-playing ではなく intro-hold を見る ── 幕が消えきるのを待つと、
+  // 門が開いていく0.6秒のあいだ、中身が空っぽのホームが見えてしまうため。
+  if (document.documentElement.classList.contains('intro-hold')) {
+    pendingViews.add(viewEl);
+    armPendingSafety();
+    return;
+  }
 
   if (!prefersReducedMotion()) {
     viewEl.querySelectorAll('[data-split]').forEach(splitChars);

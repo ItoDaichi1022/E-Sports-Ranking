@@ -8,13 +8,13 @@
 <title>IgniteArena — どこでも熱く、遊べ。</title>
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。 -->
-<link rel="icon" href="img/icon.png?v=87" type="image/png">
-<link rel="apple-touch-icon" href="img/icon.png?v=87">
+<link rel="icon" href="img/icon.png?v=89" type="image/png">
+<link rel="apple-touch-icon" href="img/icon.png?v=89">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=87">
+<link rel="stylesheet" href="css/style.css?v=89">
 
 <!-- スクロールに合わせた登場アニメの「入れ物」を開ける印。
      登場アニメは「最初は透明 → 見えたら不透明」で作るが、その透明を素で
@@ -26,12 +26,79 @@
      CSSより後・body より前に置くこと（body を描く前に決まっていないと、
      一瞬見えてから消えるちらつきになる）。 -->
 <script>
-  if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    document.documentElement.classList.add('stage-ready');
-  }
+  (function () {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var root = document.documentElement;
+    root.classList.add('stage-ready');
+
+    // 導入の演出「点火 → 開門」を出すかどうかも、ここで決める。
+    // モジュールの読み込みを待って決めると、いつものホームが一瞬見えてから
+    // 幕が被さる。CSSは .intro を既定で display:none にしてあるので、
+    // ここで印が付かなければ一瞬も表示されない。
+    //
+    // 出す条件（3つすべて）:
+    //   1. 動きを止めていない人（上で弾いている）
+    //   2. ホームを開いたとき（#bracket/xxx を直接開いた人には出さない）
+    //   3. そのタブでまだ見ていない
+    var page = location.hash.replace(/^#/, '').split('/')[0];
+    if (page !== '' && page !== 'home') return;
+
+    // 見た印は「終わったとき」ではなく「始める前」に書く。
+    // 終わりに書くと、演出の途中で再読み込みした人にまた最初から出てしまう。
+    // sessionStorage はプライベートモードで例外を投げるので包む（js/formDraft.js と同じ作法）。
+    try {
+      if (sessionStorage.getItem('ignitearena.introSeen') === '1') return;
+      sessionStorage.setItem('ignitearena.introSeen', '1');
+    } catch (e) { /* 使えないブラウザでは「毎回出す」側に倒す */ }
+
+    // 印は2つ。役目が違うので、外れる時機も違う。
+    //   intro-playing … 幕を出す（CSS）。幕が消えるときに外れる
+    //   intro-hold    … ホームの登場アニメを待たせる（js/stage.js）。
+    //                   幕が「開き始めた」ところで外れる。閉じきるまで待つと、
+    //                   開いていく0.6秒のあいだ、中身が空っぽのホームが見えてしまう
+    root.classList.add('intro-playing', 'intro-hold');
+
+    // 保険。js/intro.js が何かの理由で動かなくても、6秒後には必ず幕を下ろす。
+    // 印を外せばCSSの display:none に戻るので、幕が画面を塞いだままになることはない。
+    setTimeout(function () {
+      root.classList.remove('intro-playing', 'intro-hold');
+    }, 6000);
+  })();
 </script>
 </head>
 <body>
+<!-- 導入の演出「点火 → 開門」。動かしているのは css/style.css の
+     「導入の演出（開門）」の節で、js/intro.js は終わらせる役だけを持つ。
+     通信もJSも待たずに最初の描画から動き出す（待ち時間が増えない）。
+
+     左右2枚（.intro-half）はどちらも画面全体を覆い、同じ中身を同じ位置に持つ。
+     clip-path で左半分・右半分だけを見せているので、2枚合わせて1枚の絵に見える。
+     文字や背景がHTML上で2回出てくるのはこのため ── 半分ずつ描き分けるのではなく、
+     「1枚の絵を2枚重ねて、それぞれ半分だけ見せる」形にしないと、
+     左右へ抜けていくときに切り口が動いてしまう。
+     読み上げには一切載せない（aria-hidden と inert）。 -->
+<div class="intro" id="intro" aria-hidden="true" inert>
+  <div class="intro-half intro-half-l">
+    <div class="intro-scene">
+      <span class="intro-grid intro-grid-ceil"></span>
+      <span class="intro-grid intro-grid-floor"></span>
+      <span class="intro-scan"></span>
+      <span class="intro-spark"></span>
+      <p class="intro-line">どこでも熱く、遊べ。</p>
+    </div>
+  </div>
+  <div class="intro-half intro-half-r">
+    <div class="intro-scene">
+      <span class="intro-grid intro-grid-ceil"></span>
+      <span class="intro-grid intro-grid-floor"></span>
+      <span class="intro-scan"></span>
+      <span class="intro-spark"></span>
+      <p class="intro-line">どこでも熱く、遊べ。</p>
+    </div>
+  </div>
+  <!-- 中央の裂け目。左右どちらの器にも属さないので、開いても切り取られない -->
+  <span class="intro-seam"></span>
+</div>
 <header>
   <div class="header-row">
     <!-- 全画面共通のメニューボタン。ナビはここから開くドロップダウンに統一している -->
@@ -219,8 +286,15 @@
                その文字が描画され、画像に差し替わった瞬間に消える
                （＝名前が一瞬ちらつく）。画像が読めなかったときは
                js/app.js がこのブロックごと隠すので、取りこぼす情報は無い。 -->
+          <!-- width/height は「画像の実寸」を書く（表示の大きさはCSSが決める）。
+               これが無いと、画像を読み終えるまで高さが 0 のままになる。
+               このブロックはスクロールで開く演出（clip-path）の対象なので、
+               高さ0のあいだは「画面に入った」と判定されず、開かないまま
+               ロゴが出てこないことがある。場所を先に取らせて、それを防ぐ。
+               画像を差し替えるときは、この2つの数字も実寸に合わせること
+               （img/README.md 参照）。 -->
           <img class="hero-game-logo" id="hero-game-logo"
-               src="img/game-logo.webp?v=87" alt="">
+               src="img/game-logo.webp?v=89" alt="" width="700" height="623">
         </div>
 
         <p class="hero-eyebrow reveal">Tournament &amp; Ranking</p>
@@ -355,7 +429,7 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=87"></section>
+  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=89"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -666,9 +740,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=87"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=89"></section>
 
-  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=87"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=89"></section>
 
 </main>
 
@@ -689,7 +763,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=87"></script>
+<script src="js/vendor/supabase.js?v=89"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -701,29 +775,30 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=87",
-    "./js/bracket.js":        "./js/bracket.js?v=87",
-    "./js/bracketView.js":    "./js/bracketView.js?v=87",
-    "./js/db.js":             "./js/db.js?v=87",
-    "./js/entries.js":        "./js/entries.js?v=87",
-    "./js/formDraft.js":      "./js/formDraft.js?v=87",
-    "./js/icons.js":          "./js/icons.js?v=87",
-    "./js/matchChat.js":      "./js/matchChat.js?v=87",
-    "./js/playerStats.js":    "./js/playerStats.js?v=87",
-    "./js/players.js":        "./js/players.js?v=87",
-    "./js/profile.js":        "./js/profile.js?v=87",
-    "./js/ranking.js":        "./js/ranking.js?v=87",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=87",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=87",
-    "./js/rankingView.js":    "./js/rankingView.js?v=87",
-    "./js/stage.js":          "./js/stage.js?v=87",
-    "./js/state.js":          "./js/state.js?v=87",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=87",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=87",
-    "./js/util.js":           "./js/util.js?v=87"
+    "./js/auth.js":           "./js/auth.js?v=89",
+    "./js/bracket.js":        "./js/bracket.js?v=89",
+    "./js/bracketView.js":    "./js/bracketView.js?v=89",
+    "./js/db.js":             "./js/db.js?v=89",
+    "./js/entries.js":        "./js/entries.js?v=89",
+    "./js/formDraft.js":      "./js/formDraft.js?v=89",
+    "./js/icons.js":          "./js/icons.js?v=89",
+    "./js/intro.js":          "./js/intro.js?v=89",
+    "./js/matchChat.js":      "./js/matchChat.js?v=89",
+    "./js/playerStats.js":    "./js/playerStats.js?v=89",
+    "./js/players.js":        "./js/players.js?v=89",
+    "./js/profile.js":        "./js/profile.js?v=89",
+    "./js/ranking.js":        "./js/ranking.js?v=89",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=89",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=89",
+    "./js/rankingView.js":    "./js/rankingView.js?v=89",
+    "./js/stage.js":          "./js/stage.js?v=89",
+    "./js/state.js":          "./js/state.js?v=89",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=89",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=89",
+    "./js/util.js":           "./js/util.js?v=89"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=87"></script>
+<script type="module" src="js/app.js?v=89"></script>
 </body>
 </html>

@@ -14,9 +14,20 @@
 ## 差し替えるとき
 
 1. 同じ名前で上書きする（参照している場所を変えなくて済む）
-2. `index.html` の `?v=` の数字をまとめて1つ上げる
+2. **`game-logo.webp` を差し替えたときは、`index.html` の `<img id="hero-game-logo">` の
+   `width` / `height` を新しい画像の実寸に書き換える**（現在は 700×623）。
+   ここが実寸と合っていないと、画像を読み終えるまでのあいだ確保される場所の
+   高さがずれる。とくに書き忘れて高さが 0 になると、ホームのロゴが
+   スクロール演出（clip-path）で開かないまま出てこない。
+   実寸は次で確認できる:
+
+   ```bash
+   node -e "const b=require('fs').readFileSync('img/game-logo.webp');console.log((b[24]|b[25]<<8|b[26]<<16)+1,'x',(b[27]|b[28]<<8|b[29]<<16)+1)"
+   ```
+
+3. `index.html` の `?v=` の数字をまとめて1つ上げる
    （上げないと、見ている人のブラウザが古い画像を使い続ける）
-3. `node scripts/check-cache-version.mjs` で数字が揃っているか確認する
+4. `node scripts/check-cache-version.mjs` で数字が揃っているか確認する
 
 ## 用意するときの決まり
 

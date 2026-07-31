@@ -5024,3 +5024,230 @@ body.nav-open header::after { opacity: 0; }
     animation: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   導入の演出（開門）
+   ---------------------------------------------------------------------------
+   ホームに初めて来た人にだけ、いつもの画面の前に約2.5秒の見せ場を置く。
+
+     0.0–0.6s  黒。中央に細い緑の線が横に一閃する（点火）
+     0.35–1.4s 上下から向かい合う遠近格子が立ち上がる（闘技場の床と天井）
+     0.6–1.5s  「どこでも熱く、遊べ。」が字間を詰めながらぼやけて浮かぶ
+     1.5–2.5s  中央に縦の裂け目が走り、緑に強く発光する
+     1.9–2.5s  背景と文字ごと左右に開き、奥からいつものホームが現れる
+
+   【素材は使わない】写真もWebGLも無し。格子・光・走査線はすべてグラデーション。
+
+   【出す・出さないは index.html の <head> が決める】ここは既定を display:none に
+   しておくだけ。印（.intro-playing）が付かなければ一瞬も表示されない。
+   <head> はもう1つ .intro-hold という印も付けるが、そちらはCSSでは使わない
+   （ホームの登場アニメを待たせるための印。js/stage.js が見ている）。
+
+   【スクロールは止めない】止めると縦スクロールバーが消えて本文が横にずれる。
+   代わりに js/intro.js が「スクロールしたら飛ばす」を受け持っている。
+
+   【pointer-events は常に none】終了処理が遅れても、下のリンクを塞がないため。
+   飛ばす操作は js/intro.js が document 側で受けている。
+   --------------------------------------------------------------------------- */
+
+.intro { display: none; }
+
+.intro-playing .intro {
+  display: block;
+  position: fixed;
+  inset: 0;
+  /* ヘッダー（20／メニューを開くと40）とオーバーレイメニュー（30）より上 */
+  z-index: 100;
+  /* 左右へ抜けていく2枚が横スクロールを作らないよう、ここで断ち切る */
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 左右2枚。どちらも画面全体を覆い、clip-path で半分だけを見せる。
+   clip-path は要素と一緒に動くので、切り取った半分をそのまま持って外へ抜ける。 */
+.intro-half {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.intro-half-l {
+  clip-path: inset(0 50% 0 0);
+  animation: intro-open-l 0.62s cubic-bezier(0.7, 0, 0.2, 1) 1.9s both;
+}
+
+.intro-half-r {
+  clip-path: inset(0 0 0 50%);
+  animation: intro-open-r 0.62s cubic-bezier(0.7, 0, 0.2, 1) 1.9s both;
+}
+
+@keyframes intro-open-l {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+
+@keyframes intro-open-r {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+
+/* 1枚ぶんの絵。2枚に同じものが入っている（index.html のコメント参照） */
+.intro-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background-color: var(--bg);
+  /* 会場の照明。body::before と同じ手（緑の光のかたまり） */
+  background-image:
+    radial-gradient(70vw 46vh at 50% 120%, rgba(122, 184, 0, 0.28), transparent 70%),
+    radial-gradient(60vw 40vh at 50% -20%, rgba(195, 245, 60, 0.18), transparent 70%);
+}
+
+/* ---- 遠近格子（床と天井）---- */
+
+.intro-grid {
+  position: absolute;
+  left: -50%;
+  width: 200%;
+  height: 62%;
+  opacity: 0;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(147, 213, 0, 0.55) 0 1px, transparent 1px 64px),
+    repeating-linear-gradient(0deg,  rgba(147, 213, 0, 0.38) 0 1px, transparent 1px 64px);
+  animation:
+    intro-grid-in 1.05s ease-out 0.35s both,
+    intro-grid-run 1.4s linear 0.35s infinite;
+}
+
+/* 地平線に向かって消していく。切りっぱなしだと帯の縁が線として見えてしまう */
+.intro-grid-floor {
+  bottom: 0;
+  transform: perspective(340px) rotateX(64deg);
+  transform-origin: bottom center;
+  -webkit-mask-image: linear-gradient(to top, #000 6%, transparent 92%);
+          mask-image: linear-gradient(to top, #000 6%, transparent 92%);
+}
+
+.intro-grid-ceil {
+  top: 0;
+  transform: perspective(340px) rotateX(-64deg);
+  transform-origin: top center;
+  -webkit-mask-image: linear-gradient(to bottom, #000 6%, transparent 92%);
+          mask-image: linear-gradient(to bottom, #000 6%, transparent 92%);
+}
+
+@keyframes intro-grid-in {
+  from { opacity: 0; }
+  to   { opacity: 0.85; }
+}
+
+/* 横線だけを1マスぶん送る。縦線（90deg）は縦に動かしても見た目が変わらないので据え置き */
+@keyframes intro-grid-run {
+  from { background-position: 0 0, 0 0; }
+  to   { background-position: 0 0, 0 64px; }
+}
+
+/* ---- 走査線 ---- */
+
+.intro-scan {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background-image: repeating-linear-gradient(
+    0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px);
+  animation: intro-scan-in 0.8s ease-out 0.4s both;
+}
+
+@keyframes intro-scan-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ---- 点火（横に一閃する線）---- */
+
+.intro-spark {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  margin-top: -1px;
+  background: linear-gradient(90deg,
+    transparent, var(--accent-2) 25%, #fff 50%, var(--accent-2) 75%, transparent);
+  box-shadow: 0 0 28px 4px var(--glow);
+  transform: scaleX(0);
+  animation: intro-spark 0.6s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+@keyframes intro-spark {
+  0%   { transform: scaleX(0);    opacity: 0; }
+  18%  { transform: scaleX(0.1);  opacity: 1; }
+  55%  { transform: scaleX(1);    opacity: 1; }
+  100% { transform: scaleX(1);    opacity: 0; }
+}
+
+/* ---- 文字 ---- */
+
+/* ヒーローの「IgniteArena」は1文字ずつ送る動きを使っているので、
+   ここは行ごとの動き（字間が詰まりながら、ぼやけから像を結ぶ）にして重ねない。 */
+.intro-line {
+  position: relative;
+  margin: 0;
+  padding: 0 1.5rem;
+  text-align: center;
+  font-size: clamp(1.35rem, 6vw, 3rem);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+  text-shadow: 0 0 32px rgba(147, 213, 0, 0.45);
+  white-space: nowrap;
+  animation: intro-line-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.6s both;
+}
+
+@keyframes intro-line-in {
+  from {
+    opacity: 0;
+    letter-spacing: 0.55em;
+    filter: blur(14px);
+    transform: translateY(0.25em);
+  }
+  60% { opacity: 1; }
+  to {
+    opacity: 1;
+    letter-spacing: 0.08em;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+/* ---- 裂け目 ---- */
+
+.intro-seam {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: linear-gradient(180deg,
+    transparent, var(--accent-2) 12%, #fff 50%, var(--accent-2) 88%, transparent);
+  box-shadow: 0 0 30px 8px var(--glow);
+  transform: scaleY(0);
+  opacity: 0;
+  animation: intro-seam 1s cubic-bezier(0.7, 0, 0.3, 1) 1.5s both;
+}
+
+@keyframes intro-seam {
+  0%   { transform: scaleY(0) scaleX(1); opacity: 0; }
+  32%  { transform: scaleY(1) scaleX(1); opacity: 1; }
+  55%  { transform: scaleY(1) scaleX(4); opacity: 1; }
+  100% { transform: scaleY(1) scaleX(1); opacity: 0; }
+}
+
+/* 動きを止めている人には .intro-playing が付かないので、ここへは来ない。
+   表示中にOSの設定を切り替えた場合の受け皿。 */
+@media (prefers-reduced-motion: reduce) {
+  .intro-playing .intro { display: none !important; }
+}

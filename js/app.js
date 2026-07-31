@@ -1,3 +1,8 @@
+// 導入の演出を終わらせる係。exportを持たず、読み込むだけで働く。
+// 一番上に置くのは、飛ばす操作（クリック・キー・スクロール）を受ける耳を
+// できるだけ早く付けるため。演出そのものはCSSが動かしているので、
+// これが遅れても絵は止まらない。
+import './intro.js';
 import {
   state, newId, getPlayerName, isTeamTournament, getEntrantName, getEntrantMemberIds,
   openChatReports,
