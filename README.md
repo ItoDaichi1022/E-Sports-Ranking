@@ -67,6 +67,8 @@ supabase/
 scripts/
   check-cache-version.mjs デプロイ前にキャッシュ更新の版数を確認する
 doc/design.md          設計ドキュメント
+_headers               Cloudflareが返すキャッシュ指定。?v= の付くものは1年、
+                       index.html は毎回確認。中身に理由を書いてある
 ```
 
 ## ローカルで動かす

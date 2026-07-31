@@ -1949,7 +1949,17 @@ function formatTime(date) {
 }
 
 let loadInFlight = false;
-let refreshQueued = false;
+// 読み込み中に届いた更新の持ち越し。取り直す部位のSet（null = 持ち越し無し）。
+// 「全部」も専用の印ではなく全部位を入れたSetで表すので、あとから部位を足すだけで済む。
+let queuedParts = null;
+
+// 持ち越しに部位を足す。parts が null（＝全部取り直す指示）なら全部位を入れる。
+function mergeParts(held, parts) {
+  const add = parts ?? db.ALL_PARTS;
+  if (!held) return new Set(add);
+  add.forEach((p) => held.add(p));
+  return held;
+}
 
 // 保険の全件取得をどれくらいの間隔で行うか。
 // 判定は「前回DBから読んでからの経過時間」で見るので、Realtimeでの更新や
@@ -1961,16 +1971,23 @@ const REPORT_POLL_MS = 60 * 1000;            // 運営への報告だけは常�
 
 let lastLoadedAt = 0;
 
-async function refreshFromDb({ silent = false } = {}) {
+// parts は取り直す state の部位（db.ALL_PARTS の要素）。省略すると全部位を取り直す。
+// Realtimeからの呼び出しだけが部位を絞り、保存操作のあとの読み直しは全部位のまま
+// （書き込みが何に波及したかを呼び出し側が知っている必要が無いようにする）。
+async function refreshFromDb({ silent = false, parts = null } = {}) {
   // 読み込み中に更新通知が来たら、取りこぼさないよう終わってからもう一度読む
   if (loadInFlight) {
-    refreshQueued = true;
+    queuedParts = mergeParts(queuedParts, parts);
     return;
   }
   loadInFlight = true;
   try {
-    await db.loadAll();
-    lastLoadedAt = Date.now();
+    await db.loadAll(parts);
+    // 保険の照合を先送りしてよいのは、全部位を取り直したときだけ。
+    // 一部だけ取り直したのを「最新になった」と数えると、取り直していない部位が
+    // 15分ぶん古いまま据え置かれてしまう。
+    // 持ち越しが積み重なって結果的に全部位になった場合も、全件取得と同じに数える。
+    if (!parts || db.ALL_PARTS.every((p) => parts.includes(p))) lastLoadedAt = Date.now();
     routeFromHash();
     // 開きっぱなしのチャットは画面の外にあるので、routeFromHash では更新されない。
     // 相手の報告や回戦の開始に追従させる。
@@ -1980,9 +1997,10 @@ async function refreshFromDb({ silent = false } = {}) {
     setStatus(err.message, 'error');
   } finally {
     loadInFlight = false;
-    if (refreshQueued) {
-      refreshQueued = false;
-      await refreshFromDb({ silent: true });
+    if (queuedParts) {
+      const next = [...queuedParts];
+      queuedParts = null;
+      await refreshFromDb({ silent: true, parts: next });
     }
   }
 }
@@ -2007,12 +2025,20 @@ function isUserTyping() {
 // 入力中に届いた更新通知の持ち越し。捨ててしまうと、次の保険の全件取得
 // （Realtime接続中は15分に1回）まで画面が古いまま残る。相手のゲームカウント報告が
 // 「リロードしないと出ない」ように見えていたのはこれが原因。
-let refreshHeldByTyping = false;
+//
+// 取り直す部位のSet（null = 持ち越し無し）。入力しているあいだに複数の通知が
+// 届いたら部位を足していき、手が空いたところで1回にまとめて取りに行く。
+let heldParts = null;
+
+function holdRefresh(parts) {
+  heldParts = mergeParts(heldParts, parts);
+}
 
 function flushHeldRefresh() {
-  if (!refreshHeldByTyping || document.hidden || isUserTyping()) return;
-  refreshHeldByTyping = false;
-  refreshFromDb({ silent: true });
+  if (!heldParts || document.hidden || isUserTyping()) return;
+  const parts = [...heldParts];
+  heldParts = null;
+  refreshFromDb({ silent: true, parts });
 }
 
 // 入力欄からフォーカスが外れた直後に反映する。focusout の時点では次のフォーカス先が
@@ -2615,7 +2641,7 @@ window.addEventListener('hashchange', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   if (isUserTyping()) {
-    refreshHeldByTyping = true;
+    holdRefresh(null);   // 何が進んでいるか分からないので全部位
     return;
   }
   refreshFromDb({ silent: true });
@@ -2650,12 +2676,15 @@ async function start() {
 
   // 10秒ポーリングの置き換え。誰かが勝敗を入力した瞬間に全員の画面へ届く。
   // 入力中は捨てずに持ち越し、手が空いた時点で flushHeldRefresh が反映する。
-  db.subscribeToChanges(() => {
+  //
+  // parts には「変わったテーブルに対応する部位」だけが入る。進行中の大会では
+  // 観戦者全員がこの通知を受けるので、ここで全テーブルを引くと人数分だけ通信が増える。
+  db.subscribeToChanges((parts) => {
     if (isUserTyping()) {
-      refreshHeldByTyping = true;
+      holdRefresh(parts);
       return;
     }
-    refreshFromDb({ silent: true });
+    refreshFromDb({ silent: true, parts });
   });
 
   // 保険の全件取得。WebSocketが切れたまま再接続できていない間も、進行中の大会が

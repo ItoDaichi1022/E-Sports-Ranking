@@ -96,5 +96,58 @@ for (const [, file] of pageRefs) {
 }
 if (pageRefs.length) console.log(`OK   読み物ページ${pageRefs.length}件がすべて存在する`);
 
+// ---- ?v= の付け忘れ ----
+//
+// _headers で js/ css/ img/ pages/ を immutable（1年）にしている。ここに置いた
+// ファイルを ?v= 無しで参照すると、一度配られたきり二度と更新できなくなる
+// （版数を上げてもURLが変わらないため。名前を変えるしか手が無くなる）。
+// 画像を足すときにいちばん踏みやすいので、デプロイ前にここで弾く。
+//
+// fonts/ は _headers 側で immutable から外してある（理由はそのファイルに記載）ので、
+// ?v= が無くてよい ── ここでも見に行かない。
+
+const IMMUTABLE_DIRS = ['js', 'css', 'img', 'pages'];
+
+// href="..." / src="..." / data-src="..." / CSSの url(...) から、
+// 上のディレクトリを指すローカルな参照を拾う。
+function localRefs(source) {
+  const found = [];
+  const patterns = [
+    /(?:href|src|data-src)="(?!https?:|\/\/|data:|#)([^"]+)"/g,
+    /url\(\s*['"]?(?!https?:|\/\/|data:)([^'")]+)['"]?\s*\)/g,
+  ];
+  for (const re of patterns) {
+    for (const m of source.matchAll(re)) found.push(m[1]);
+  }
+  return found;
+}
+
+const scanned = [
+  ['index.html', html],
+  ['css/style.css', readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8')],
+  ...readdirSync(path.join(ROOT, 'pages')).map(
+    (n) => [`pages/${n}`, readFileSync(path.join(ROOT, 'pages', n), 'utf8')],
+  ),
+];
+
+let refCount = 0;
+let refProblems = 0;
+for (const [where, source] of scanned) {
+  for (const ref of localRefs(source)) {
+    // 先頭の ./ ../ / を落として、どのディレクトリ配下かだけを見る
+    const dir = ref.replace(/^(\.\.?\/)+/, '').replace(/^\//, '').split('/')[0];
+    if (!IMMUTABLE_DIRS.includes(dir)) continue;
+    refCount += 1;
+    if (!/\?v=\d+/.test(ref)) {
+      refProblems += 1;
+      fail(`${where} の "${ref}" に ?v= がありません`
+        + '（_headers で1年キャッシュされる場所なので、更新できなくなります）');
+    }
+  }
+}
+if (refCount && refProblems === 0) {
+  console.log(`OK   1年キャッシュされる${refCount}件の参照すべてに ?v= がある`);
+}
+
 console.log(problems === 0 ? '\nすべて通りました。' : `\n${problems}件の問題があります。`);
 process.exit(problems === 0 ? 0 : 1);
