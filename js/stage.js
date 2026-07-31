@@ -172,79 +172,110 @@ function startCountUp(root) {
 }
 
 /* ---------------------------------------------------------------------------
-   ホーム：大会サムネイルの帯
+   ホーム：注目の大会
    --------------------------------------------------------------------------- */
 
-// ホームに並べる大会の数。多く出すほど1枚あたりが小さくなって印象が薄れるので、
-// 「最近どんな大会をやっている場所なのか」が伝わる枚数で止める。
-const SHOWCASE_MAX = 8;
+// どこまで遡って選ぶか。ここを長くすると、何年も前の大きな大会が居座って
+// 「いま動いている場所だ」という印象が出なくなる。
+const FEATURED_MONTHS = 3;
 
-// 開催日の新しい順。日付が未定のものは末尾に送る
-// （state.tournaments は日付の古い順で入っている）。
-function byDateDesc(a, b) {
-  if (!a.date && !b.date) return 0;
-  if (!a.date) return 1;
-  if (!b.date) return -1;
-  if (a.date === b.date) return 0;
-  return a.date < b.date ? 1 : -1;
+// 「直近Nか月」の始まりの日を 'YYYY-MM-DD' で返す。
+//
+// t.date は日付だけの文字列なので、こちらも同じ形に揃えて文字列のまま比べる。
+// Date に変換して比べると、時刻と時差の扱いを持ち込むことになる。
+// toISOString() を使わないのも同じ理由 ── あれはUTCに寄せるので、日本時間の
+// 朝に開くと1日前の日付になり、境目の大会が入ったり落ちたりする。
+function monthsAgo(months) {
+  const d = new Date();
+  // 3月31日から3か月引くと「12月31日」になる。月末の繰り上がりは Date に任せる。
+  d.setMonth(d.getMonth() - months);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// 画像を持つ大会だけを大きく見せる帯。ホームで唯一の「写真」の場所になる。
-//
-// 画像付きの大会が1件も無いあいだは、ブロックごと出さない。空の枠や頭文字だけの
-// タイルを並べると、大会がまだ無いことがそのまま貧相さに見えるため
-// （画像が読めないときにブロックごと隠す .hero-game と同じ考え方）。
-export function renderShowcase(blockEl, railEl) {
-  if (!blockEl || !railEl) return;
+// 出場した「人」の数。2v2ではチーム数ではなくメンバー全員を数える
+// （js/state.js の entrantIds と participantIds の説明を参照）。
+// 一覧用にDB側で数えた値が loadAll で入っているので、追加の通信はいらない。
+const peopleIn = (t) => t.participantCount || 0;
 
-  const items = state.tournaments
+// 直近3か月でいちばん出場人数が多かった大会を1つだけ大きく見せる。
+//
+// 「画像を持っているか」では選ばない。絵があるという理由でより小さな大会を
+// 選ぶと、この枠が示すはずの「いちばん大きかった大会」という意味が崩れるため。
+// 画像が無い大会が選ばれたときは、写真の代わりに出場人数を大きく出す
+// （素材が無くても成立させる、というホーム全体の作りに合わせる）。
+//
+// 直近3か月に大会が1つも無いあいだは、ブロックごと出さない。
+export function renderFeatured(blockEl, slotEl) {
+  if (!blockEl || !slotEl) return;
+
+  const since = monthsAgo(FEATURED_MONTHS);
+
+  const candidates = state.tournaments.filter((t) => (
     // 準備中はまだ公開していない大会。DBの読み取りは誰にでも開いているので、
     // ここで必ず落とす（運営の下書きがホームの一番目立つ場所に出てしまう）。
-    .filter((t) => t.status !== 'draft' && safeUrl(t.imageUrl))
-    .sort(byDateDesc)
-    .slice(0, SHOWCASE_MAX);
+    t.status !== 'draft'
+    // 開催日が入っていない大会は「直近3か月かどうか」を判断できないので外す
+    && t.date
+    && t.date >= since
+  ));
 
-  if (items.length === 0) {
+  // 出場人数の多い順。同数なら新しいほうを採る。
+  // filter が新しい配列を返しているので、ここでの sort は state を壊さない。
+  candidates.sort((a, b) => peopleIn(b) - peopleIn(a) || (a.date < b.date ? 1 : -1));
+
+  const pick = candidates[0];
+
+  if (!pick) {
     blockEl.hidden = true;
-    railEl.replaceChildren();
+    slotEl.replaceChildren();
     return;
   }
 
-  const frag = document.createDocumentFragment();
+  const imageUrl = safeUrl(pick.imageUrl);
 
-  items.forEach((t) => {
-    const card = document.createElement('a');
-    card.className = 'showcase-card reveal';
-    card.href = `#tournament/${encodeURIComponent(t.id)}`;
+  const card = document.createElement('a');
+  card.className = `featured-card reveal${imageUrl ? '' : ' is-textonly'}`;
+  card.href = `#tournament/${encodeURIComponent(pick.id)}`;
 
+  if (imageUrl) {
     const thumb = document.createElement('div');
-    thumb.className = 'showcase-thumb';
+    thumb.className = 'featured-thumb';
     const img = document.createElement('img');
-    // safeUrl は上のフィルタで通しているので、ここで null にはならない
-    img.src = safeUrl(t.imageUrl);
+    img.src = imageUrl;
     img.alt = '';
     img.loading = 'lazy';
     thumb.appendChild(img);
+    card.appendChild(thumb);
+  }
 
-    const body = document.createElement('div');
-    body.className = 'showcase-body';
+  const body = document.createElement('div');
+  body.className = 'featured-body';
 
-    const meta = document.createElement('p');
-    meta.className = 'showcase-meta';
-    meta.textContent = `${t.date || '開催日未定'}・${STATUS_LABELS[t.status] ?? ''}`;
+  const meta = document.createElement('p');
+  meta.className = 'featured-meta';
+  meta.textContent = `${pick.date}・${STATUS_LABELS[pick.status] ?? ''}`;
 
-    const title = document.createElement('h3');
-    title.className = 'showcase-title';
-    title.textContent = t.name;
+  const title = document.createElement('h3');
+  title.className = 'featured-title';
+  title.textContent = pick.name;
 
-    body.append(meta, title);
-    card.append(thumb, body);
-    frag.appendChild(card);
-  });
+  const count = document.createElement('p');
+  count.className = 'featured-count';
+  const num = document.createElement('span');
+  num.className = 'featured-count-num';
+  num.textContent = String(peopleIn(pick));
+  const unit = document.createElement('span');
+  unit.className = 'featured-count-unit';
+  unit.textContent = '人が出場';
+  count.append(num, unit);
 
-  railEl.replaceChildren(frag);
+  body.append(meta, title, count);
+  card.appendChild(body);
+
+  slotEl.replaceChildren(card);
   blockEl.hidden = false;
-  observeReveals(railEl);
+  observeReveals(slotEl);
 }
 
 /* ---------------------------------------------------------------------------
@@ -332,3 +363,19 @@ export function initStage(viewEl) {
 
   observeReveals(viewEl);
 }
+
+// 最初の画面には、読み込んだ直後に自分から仕掛ける。
+//
+// 通常の入口は js/app.js の routeFromHash() だが、そこへ辿り着くまでに
+// initAuth() がセッションの確認と選手行の取得を await する（js/auth.js）。
+// つまり通信1往復ぶん待つことになり、そのあいだヒーローは伏せられたまま
+// 空っぽに見え、見出しは「素の文字が出てから割られて消える」ちらつきになる。
+//
+// index.html の時点で開いている画面（＝ホーム）はDOMを読み終えた時点で
+// 分かるので、通信を待たずにここで仕掛けてしまう。
+// initStage は何度呼んでも二重にならないので、後から routeFromHash が
+// 同じ画面に対して呼び直しても構わない。
+//
+// モジュールスクリプトは defer 扱いなので、ここが動く時点でDOMは揃っている。
+const firstStageView = document.querySelector('.view.stage:not([hidden])');
+if (firstStageView) initStage(firstStageView);

@@ -8,13 +8,13 @@
 <title>IgniteArena — どこでも熱く、遊べ。</title>
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。 -->
-<link rel="icon" href="img/icon.png?v=85" type="image/png">
-<link rel="apple-touch-icon" href="img/icon.png?v=85">
+<link rel="icon" href="img/icon.png?v=87" type="image/png">
+<link rel="apple-touch-icon" href="img/icon.png?v=87">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=85">
+<link rel="stylesheet" href="css/style.css?v=87">
 
 <!-- スクロールに合わせた登場アニメの「入れ物」を開ける印。
      登場アニメは「最初は透明 → 見えたら不透明」で作るが、その透明を素で
@@ -212,8 +212,15 @@
              入っているので、大きさは抑えて「名乗りの前置き」の位置に留める。
              画像が無いときは js/app.js がこのブロックごと隠す。 -->
         <div class="hero-game reveal" id="hero-game">
+          <!-- alt を空にしてあるのは、この絵が「飾り」だから。
+               すぐ下の <h2> が同じ「IgniteArena」を名乗っているので、ここに
+               代替テキストを置くと読み上げが同じ名前を2回言うことになる。
+               表示の面でも、alt に文字を入れると画像を読み終えるまでのあいだ
+               その文字が描画され、画像に差し替わった瞬間に消える
+               （＝名前が一瞬ちらつく）。画像が読めなかったときは
+               js/app.js がこのブロックごと隠すので、取りこぼす情報は無い。 -->
           <img class="hero-game-logo" id="hero-game-logo"
-               src="img/game-logo.webp?v=85" alt="IgniteArena">
+               src="img/game-logo.webp?v=87" alt="">
         </div>
 
         <p class="hero-eyebrow reveal">Tournament &amp; Ranking</p>
@@ -235,21 +242,21 @@
       <p class="hero-scroll" aria-hidden="true"><span>Scroll</span></p>
     </div>
 
-    <!-- これまでの大会を、画像で見せる帯。ホームで唯一の「写真」の場所。
-         中身は js/stage.js が state.tournaments から作る。画像付きの大会が
-         1件も無いあいだは、このブロックごと出さない（空の枠を並べると、
-         大会がまだ無いことがそのまま貧相さに見えるため）。 -->
-    <div class="home-section" id="home-showcase" hidden>
+    <!-- 直近3か月でいちばん出場人数が多かった大会を1つだけ大きく見せる。
+         中身は js/stage.js が state.tournaments から選んで作る。
+         直近3か月に大会が1つも無いあいだは、このブロックごと出さない
+         （空の枠を置くと、大会がまだ無いことがそのまま貧相さに見えるため）。 -->
+    <div class="home-section" id="home-featured" hidden>
       <div class="page-head reveal">
         <div class="home-section-head">
           <div>
-            <p class="page-eyebrow">Tournaments</p>
-            <h2>これまでの大会</h2>
+            <p class="page-eyebrow">Featured</p>
+            <h2>注目の大会</h2>
           </div>
           <a class="see-all-link" href="#tournaments">すべて見る →</a>
         </div>
       </div>
-      <div class="showcase-rail" id="home-showcase-rail"></div>
+      <div id="home-featured-slot"></div>
     </div>
 
     <!-- 初めて来た人が数秒で「何のサイトか・自分は対象か」を掴むための短い紹介。
@@ -348,7 +355,7 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=85"></section>
+  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=87"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -659,9 +666,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=85"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=87"></section>
 
-  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=85"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=87"></section>
 
 </main>
 
@@ -682,7 +689,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=85"></script>
+<script src="js/vendor/supabase.js?v=87"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -694,29 +701,29 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=85",
-    "./js/bracket.js":        "./js/bracket.js?v=85",
-    "./js/bracketView.js":    "./js/bracketView.js?v=85",
-    "./js/db.js":             "./js/db.js?v=85",
-    "./js/entries.js":        "./js/entries.js?v=85",
-    "./js/formDraft.js":      "./js/formDraft.js?v=85",
-    "./js/icons.js":          "./js/icons.js?v=85",
-    "./js/matchChat.js":      "./js/matchChat.js?v=85",
-    "./js/playerStats.js":    "./js/playerStats.js?v=85",
-    "./js/players.js":        "./js/players.js?v=85",
-    "./js/profile.js":        "./js/profile.js?v=85",
-    "./js/ranking.js":        "./js/ranking.js?v=85",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=85",
-    "./js/rankingCard.js":    "./js/rankingCard.js?v=85",
-    "./js/rankingView.js":    "./js/rankingView.js?v=85",
-    "./js/stage.js":          "./js/stage.js?v=85",
-    "./js/state.js":          "./js/state.js?v=85",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=85",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=85",
-    "./js/util.js":           "./js/util.js?v=85"
+    "./js/auth.js":           "./js/auth.js?v=87",
+    "./js/bracket.js":        "./js/bracket.js?v=87",
+    "./js/bracketView.js":    "./js/bracketView.js?v=87",
+    "./js/db.js":             "./js/db.js?v=87",
+    "./js/entries.js":        "./js/entries.js?v=87",
+    "./js/formDraft.js":      "./js/formDraft.js?v=87",
+    "./js/icons.js":          "./js/icons.js?v=87",
+    "./js/matchChat.js":      "./js/matchChat.js?v=87",
+    "./js/playerStats.js":    "./js/playerStats.js?v=87",
+    "./js/players.js":        "./js/players.js?v=87",
+    "./js/profile.js":        "./js/profile.js?v=87",
+    "./js/ranking.js":        "./js/ranking.js?v=87",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=87",
+    "./js/rankingCard.js":    "./js/rankingCard.js?v=87",
+    "./js/rankingView.js":    "./js/rankingView.js?v=87",
+    "./js/stage.js":          "./js/stage.js?v=87",
+    "./js/state.js":          "./js/state.js?v=87",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=87",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=87",
+    "./js/util.js":           "./js/util.js?v=87"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=85"></script>
+<script type="module" src="js/app.js?v=87"></script>
 </body>
 </html>

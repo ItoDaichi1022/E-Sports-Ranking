@@ -4322,19 +4322,21 @@ dialog h3 {
   transform: none;
 }
 
-/* 帯に並ぶカードは、左から順に出す */
-.stage-ready .showcase-card:nth-child(2) { transition-delay: 0.06s; }
-.stage-ready .showcase-card:nth-child(3) { transition-delay: 0.12s; }
-.stage-ready .showcase-card:nth-child(4) { transition-delay: 0.18s; }
-
 .stage-ready .stat-item:nth-child(2) { transition-delay: 0.08s; }
 .stage-ready .stat-item:nth-child(3) { transition-delay: 0.16s; }
 
 /* ---- 見出しの1文字送り ----
    塊ごとではなく1文字ずつ動かす見出し。js/stage.js が文字を span に割り、
    --char-i に何番目かを入れる。読み上げは親の aria-label が受け持つので、
-   字が分かれても語は割れない。 */
-.stage-ready .reveal-chars {
+   字が分かれても語は割れない。
+
+   【data-split-done が付くまで伏せておくこと】
+   この解除を無条件に書くと、JSが文字を割る前の「素のままの見出し」が
+   一瞬表示され、割った瞬間に消えて、そのあと1文字ずつ出直す ── という
+   ちらつきになる（.stage-char の側は opacity:0 から始まるため）。
+   分割が済むまでは .reveal の opacity:0 をそのまま活かして伏せておき、
+   済んでから塊としてだけ見せる。出方は .stage-char が受け持つ。 */
+.stage-ready .reveal-chars[data-split-done="1"] {
   opacity: 1;
   transform: none;
 }
@@ -4451,28 +4453,23 @@ dialog h3 {
    ホーム：これまでの大会（サムネイルの帯）
    --------------------------------------------------------------------------- */
 
-/* 横に流して見せる。全部を並べて見せるのではなく「まだ右に続く」ことを
-   見せたいので、端で切れる形にしている。中身は js/stage.js が作り、
-   画像付きの大会が無いあいだはブロックごと出ない。 */
-.showcase-rail {
-  display: flex;
-  gap: 1rem;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x proximity;
-  /* スクロールバーのぶんだけ下に空きを作り、外側の余白からは差し引く */
-  padding-bottom: 0.9rem;
-  margin-bottom: -0.9rem;
-}
-
-.showcase-card {
-  flex: 0 0 clamp(15rem, 62vw, 20rem);
-  scroll-snap-align: start;
+/* 1件だけを大きく見せる。何枚も並べるのをやめて1枚に絞ったので、
+   小さなカードのままだと広い面に取り残されて弱く見える。
+   画像を左、文字を右に置き、狭い画面では縦に積む。 */
+.featured-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 1.75rem;
+  align-items: center;
   text-decoration: none;
   color: inherit;
 }
 
-.showcase-thumb {
+/* 画像を持たない大会が選ばれることもある（選ぶ基準は出場人数であって、
+   絵の有無ではない）。そのときは文字だけで組む。 */
+.featured-card.is-textonly { grid-template-columns: minmax(0, 1fr); }
+
+.featured-thumb {
   overflow: hidden;
   aspect-ratio: 16 / 10;
   border: 1px solid var(--border-soft);
@@ -4480,12 +4477,12 @@ dialog h3 {
   background: var(--surface-2);
 }
 
-.showcase-thumb img {
+.featured-thumb img {
   display: block;
   width: 100%;
   height: 100%;
   /* 一覧のカード（.card-thumb）は全体を収めるが、ここは大きく見せる場所なので
-     切り抜いて枠を埋める。並んだときに高さが揃い、帯として読める。 */
+     切り抜いて枠を埋める。 */
   object-fit: cover;
   /* 黒い面に置いた写真は実際より強く見えるので、少しだけ落ち着かせる */
   filter: saturate(0.88);
@@ -4495,16 +4492,14 @@ dialog h3 {
   transition: transform 0.6s ease, filter 0.3s ease;
 }
 
-.showcase-card:hover .showcase-thumb img,
-.showcase-card:focus-visible .showcase-thumb img {
+.featured-card:hover .featured-thumb img,
+.featured-card:focus-visible .featured-thumb img {
   --thumb-scale: 1.05;
   filter: saturate(1);
 }
 
-.showcase-body { padding: 0.85rem 0.1rem 0; }
-
-.showcase-meta {
-  margin: 0 0 0.3rem;
+.featured-meta {
+  margin: 0 0 0.6rem;
   font-family: var(--font-display);
   font-size: 0.68rem;
   font-weight: 600;
@@ -4513,15 +4508,47 @@ dialog h3 {
   font-variant-numeric: tabular-nums;
 }
 
-.showcase-title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.5;
+.featured-title {
+  margin: 0 0 1.1rem;
+  font-size: clamp(1.3rem, 3.4vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1.4;
   color: var(--text);
 }
 
-.showcase-card:hover .showcase-title { color: var(--accent-bright); }
+.featured-card:hover .featured-title { color: var(--accent-bright); }
+
+/* この枠が「なぜこの大会なのか」を言う一行。選んだ理由そのものなので、
+   題名の次に強く出す。写真が無いときは、ここが唯一の絵になる。 */
+.featured-count {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.featured-count-num {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 7vw, 3.2rem);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.featured-count-unit {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+@media (max-width: 720px) {
+  .featured-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.1rem;
+  }
+}
 
 /* ---------------------------------------------------------------------------
    ホーム：これまでの積み上げ（数字）
@@ -4809,20 +4836,18 @@ body.nav-open header::after { opacity: 0; }
 
    拡大率をカスタムプロパティに逃がしているのは、ホバーの拡大と喧嘩させないため。
    transform を直接上書きし合うと、詳細度の勝った側がホバーを殺してしまう。 */
-.showcase-thumb img { --thumb-scale: 1; }
-
-.stage-ready .showcase-thumb,
+.stage-ready .featured-thumb,
 .stage-ready .hero-game {
   clip-path: inset(0 0 100% 0);
   transition: clip-path 0.9s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.stage-ready .showcase-card.is-in .showcase-thumb,
+.stage-ready .featured-card.is-in .featured-thumb,
 .stage-ready .hero-game.is-in {
   clip-path: inset(0 0 0 0);
 }
 
-.stage-ready .showcase-card:not(.is-in) .showcase-thumb img { --thumb-scale: 1.12; }
+.stage-ready .featured-card:not(.is-in) .featured-thumb img { --thumb-scale: 1.12; }
 
 /* ロゴは開く動きだけに任せ、塊ごとのフェードは打ち消す（二重に動かさない） */
 .stage-ready .hero-game {
@@ -4845,8 +4870,8 @@ body.nav-open header::after { opacity: 0; }
    .hero は overflow:hidden を持つスクロール容器なので、その中の要素に view() を
    書いても進捗が永久に0のまま動かない。ヒーローの中だけは、文書全体のスクロールを
    直接見る scroll(root block) を使い、範囲を画面1つぶんに切る。
-   .showcase-rail も overflow-x:auto でスクロール容器になるため、帯の中のカードには
-   視差を掛けず、上のマスク開きだけに任せている。
+   注目の大会のカードにも視差は掛けず、上のマスク開きだけに任せている
+   （写真が開くのと同時に中身までずれると、何を見せたいのか散る）。
 
    すべて .stage-ready の下に置く。動きを止めている人にはこの印が付かないので、
    視差はそもそも1行も適用されない。 */
@@ -4975,7 +5000,7 @@ body.nav-open header::after { opacity: 0; }
     transform: none !important;
   }
 
-  .stage-ready .showcase-thumb,
+  .stage-ready .featured-thumb,
   .stage-ready .hero-game {
     clip-path: none !important;
   }

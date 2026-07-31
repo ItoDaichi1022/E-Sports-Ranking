@@ -26,7 +26,7 @@ import {
   signInWithProvider, signOut, reloadOwnPlayer,
 } from './auth.js';
 import { isConfigured } from './supabaseClient.js';
-import { initStage, renderShowcase, renderStats, prefersReducedMotion } from './stage.js';
+import { initStage, renderFeatured, renderStats, prefersReducedMotion } from './stage.js';
 import { iconSvg, makeIconButton, setButtonIcon } from './icons.js';
 import * as db from './db.js';
 
@@ -156,8 +156,8 @@ const mainNav = $('main-nav');
 const navToggle = $('nav-toggle');
 
 // ホームの「見せる面」のブロック（js/stage.js が中身を作る）
-const homeShowcaseEl = $('home-showcase');
-const homeShowcaseRailEl = $('home-showcase-rail');
+const homeFeaturedEl = $('home-featured');
+const homeFeaturedSlotEl = $('home-featured-slot');
 const homeStatRowEl = $('home-stat-row');
 
 const announcementListEl = $('announcement-list');
@@ -488,10 +488,10 @@ function closeAnnouncementForm() {
 const HOME_ANNOUNCEMENT_COUNT = 3;
 
 function renderHome() {
-  // 見せる面のブロック（大会サムネの帯・数字）。中身は js/stage.js が
+  // 見せる面のブロック（注目の大会・数字）。中身は js/stage.js が
   // state から作る。どちらも起動時に読み終えているデータだけを使うので、
   // ここで通信は増えない。
-  renderShowcase(homeShowcaseEl, homeShowcaseRailEl);
+  renderFeatured(homeFeaturedEl, homeFeaturedSlotEl);
   renderStats(homeStatRowEl);
 
   renderAnnouncementCards(announcementListEl, state.announcements.slice(0, HOME_ANNOUNCEMENT_COUNT));
