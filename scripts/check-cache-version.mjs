@@ -11,7 +11,7 @@
 //   存在しないexportを参照して起動に失敗する。
 //   import文の解決先はインポートマップで差し替えているので、そこに漏れがないかを見る。
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -147,6 +147,72 @@ for (const [where, source] of scanned) {
 }
 if (refCount && refProblems === 0) {
   console.log(`OK   1年キャッシュされる${refCount}件の参照すべてに ?v= がある`);
+}
+
+// ---- キャラクターの画像 ----
+//
+// 一覧（js/characterData.js）は配布素材から自動生成される。生成が途中で
+// 止まっていると、一覧には載っているのに画像が無い状態になり、プロフィールの
+// 選ぶ画面に穴が開く。ここでしか気づけないので、実在するかを突き合わせる。
+//
+// 版数（ASSET_VERSION）は index.html の ?v= とは別に持つ。画像は毎回の
+// デプロイで変わるものではないため。ずれていてよいので、そろっているかは見ない。
+
+const catalogPath = path.join(ROOT, 'js', 'characterData.js');
+if (!existsSync(catalogPath)) {
+  fail('js/characterData.js がありません（node scripts/build-characters.mjs を実行してください）');
+} else {
+  const catalog = readFileSync(catalogPath, 'utf8');
+  const assetVersion = /export const ASSET_VERSION = (\d+)/.exec(catalog)?.[1];
+  if (!assetVersion) fail('js/characterData.js に ASSET_VERSION がありません');
+
+  // 一覧を読み込まずに、必要な情報だけを字面から拾う。JSとして import すると
+  // このスクリプトがブラウザ用モジュールの都合に引きずられる。
+  let missingArt = 0;
+  let artCount = 0;
+  for (const block of catalog.split(/\n  \{\n/).slice(1)) {
+    const charId = /id: '([^']+)'/.exec(block)?.[1];
+    if (!charId) continue;
+    for (const [, variantId] of block.matchAll(/\{ id: '([^']+)'/g)) {
+      artCount += 1;
+      for (const suffix of ['', '@lg']) {
+        const file = path.join(ROOT, 'img', 'characters', charId, `${variantId}${suffix}.webp`);
+        if (!existsSync(file)) {
+          missingArt += 1;
+          if (missingArt <= 5) fail(`img/characters/${charId}/${variantId}${suffix}.webp がありません`);
+        }
+      }
+    }
+  }
+  if (missingArt > 5) fail(`...ほか${missingArt - 5}件の画像がありません`);
+  if (artCount && missingArt === 0) {
+    console.log(`OK   キャラクター画像${artCount}件がすべて存在する（版数 ${assetVersion}）`);
+  }
+}
+
+// ---- img/ に重い形式が混ざっていないか ----
+//
+// リポジトリに入れる画像はWebPに統一している（img/README.md）。PNGやJPEGを1枚
+// 置き忘れるだけで数百KB増え、_headers で1年キャッシュされるぶん取り返しも効かない。
+// 例外は icon.png ── iOSのホーム画面のアイコンだけWebPを読まないので置いている。
+
+const ALLOWED_NON_WEBP = new Set(['img/icon.png']);
+const IMAGE_EXT = /\.(png|jpe?g|gif|bmp|tiff?|avif)$/i;
+
+function walkImages(dir, found = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walkImages(full, found);
+    else if (IMAGE_EXT.test(entry.name)) found.push(path.relative(ROOT, full).replace(/\\/g, '/'));
+  }
+  return found;
+}
+
+const imgDir = path.join(ROOT, 'img');
+if (existsSync(imgDir)) {
+  const strays = walkImages(imgDir).filter((f) => !ALLOWED_NON_WEBP.has(f));
+  for (const f of strays) fail(`${f} がWebPではありません（img/README.md を参照）`);
+  if (strays.length === 0) console.log('OK   img/ の画像はWebPにそろっている（icon.png のみ例外）');
 }
 
 console.log(problems === 0 ? '\nすべて通りました。' : `\n${problems}件の問題があります。`);

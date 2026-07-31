@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { escapeHtml, avatarHtml } from './util.js';
 import { rankChangeInfo } from './ranking.js';
+import { characterRowArtHtml } from './characters.js';
 
 function rankChangeCell(r) {
   const { label, className } = rankChangeInfo(r.previousRank, r.rank);
@@ -44,9 +45,14 @@ export function renderRankingTable(containerEl, rankings, emptyMessage, ownPlaye
     tr.className = 'clickable-row'
       + (r.rank <= 3 ? ` rank-${r.rank}` : '')
       + (isOwn ? ' own-row' : '');
+    // 公開済みランキングは公開時点の名前しか持っていないので、キャラクターも
+    // アイコンと同じく「いまの選手の情報」から引く（js/state.js の players）。
+    const current = state.players.find((p) => p.id === r.id);
+
     tr.innerHTML = `
       <td class="rank-cell">${r.rank}</td>
-      <td>
+      <td class="has-row-art">
+        ${characterRowArtHtml(current?.mainCharacters)}
         <div class="player-identity">
           ${rankingAvatar(r)}
           <a href="#player/${encodeURIComponent(r.id)}">${escapeHtml(r.name)}</a>

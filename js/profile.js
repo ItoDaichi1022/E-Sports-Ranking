@@ -3,11 +3,8 @@
 
 import { escapeHtml, safeUrl, initialOf } from './util.js';
 import { keepFormDraft, clearFormDraft } from './formDraft.js';
-
-// 使用キャラは配列で持つが、入力はカンマ区切りの1行で受ける。
-function parseCharacters(text) {
-  return text.split(',').map((s) => s.trim()).filter(Boolean);
-}
+import { createCharacterField } from './characterPicker.js';
+import { characterListHtml } from './characters.js';
 
 // SNS欄に入れられるドメインの白名簿。
 //
@@ -59,7 +56,6 @@ const FIELDS = [
   { key: 'currentName', label: '表示名', required: true, placeholder: '例: Gyu',
     note: '変更すると、以前の名前は「過去名」として選手ページに残ります。' },
   { key: 'gameAccountId', label: 'ゲームアカウントID', placeholder: '例: SW-1234-5678-9012' },
-  { key: 'mainCharacters', label: '使用キャラクター', placeholder: '例: シビ, ソフィア（カンマ区切り）' },
   { key: 'snsX', label: 'X', optional: true, placeholder: '@handle または https://x.com/...' },
   { key: 'snsYoutube', label: 'YouTube', optional: true, placeholder: '@handle または https://youtube.com/...' },
 ];
@@ -111,9 +107,7 @@ export function renderProfileForm(
     input.name = field.key;
     input.placeholder = field.placeholder ?? '';
     if (field.required) input.required = true;
-    input.value = field.key === 'mainCharacters'
-      ? (player?.mainCharacters ?? []).join(', ')
-      : (player?.[field.key] ?? '');
+    input.value = player?.[field.key] ?? '';
 
     label.appendChild(input);
     if (field.note) {
@@ -124,6 +118,53 @@ export function renderProfileForm(
     }
     form.appendChild(label);
   });
+
+  // ---- 使用キャラクター ----
+  //
+  // 選んだ内容は、見えない入力欄（name="mainCharacters"）に文字列として持たせる。
+  // 部品の中だけで持つと下書き（js/formDraft.js）の対象から外れ、スマートフォンで
+  // 他のアプリへ移って戻ったときに選び直しになってしまう。あの仕組みは
+  // form.elements を見て控えるので、フォームの部品として置いておけばそのまま乗る。
+  const charLabel = document.createElement('label');
+  charLabel.className = 'char-picker-field';
+  charLabel.appendChild(buildLabelHeading('使用キャラクター'));
+
+  const charInput = document.createElement('input');
+  charInput.type = 'text';
+  charInput.name = 'mainCharacters';
+  charInput.hidden = true;
+  charInput.value = (player?.mainCharacters ?? []).join(',');
+
+  let charField = null;
+  // 自分で書き戻したときにも input が飛ぶので、それで作り直しが二重に走らないようにする
+  let writingBack = false;
+
+  const setCharValue = (refs) => {
+    writingBack = true;
+    charInput.value = refs.join(',');
+    // 下書きに拾ってもらうために合図を出す（値を入れるだけでは控えられない）
+    charInput.dispatchEvent(new Event('input', { bubbles: true }));
+    writingBack = false;
+  };
+
+  const buildCharField = () => {
+    const refs = charInput.value.split(',').map((s) => s.trim()).filter(Boolean);
+    const next = createCharacterField(refs, { onChange: setCharValue });
+    if (charField) charField.element.replaceWith(next.element);
+    else charLabel.appendChild(next.element);
+    charField = next;
+  };
+
+  // 下書きの書き戻しは値を入れて input を投げてくる（js/formDraft.js の apply）。
+  // 選んだ絵はそのままでは戻らないので、値が変わったら並びを作り直す。
+  charInput.addEventListener('input', () => {
+    if (writingBack) return;
+    buildCharField();
+  });
+
+  charLabel.appendChild(charInput);
+  buildCharField();
+  form.appendChild(charLabel);
 
   // ---- アイコン ----
   // ファイルを選んだ時点ではまだアップロードせず、保存時にまとめて送る。
@@ -261,7 +302,7 @@ export function renderProfileForm(
       await onSubmit({
         currentName: name,
         gameAccountId: form.elements.gameAccountId.value.trim(),
-        mainCharacters: parseCharacters(form.elements.mainCharacters.value),
+        mainCharacters: charField.get(),
         snsX,
         snsYoutube,
         bio: bio.value.trim(),
@@ -305,14 +346,15 @@ export function profileSectionHtml(player) {
   if (player.gameAccountId) {
     rows.push(`<div><dt>ゲームアカウントID</dt><dd><code>${escapeHtml(player.gameAccountId)}</code></dd></div>`);
   }
-  if (player.mainCharacters?.length) {
-    rows.push(`<div><dt>使用キャラクター</dt><dd>${escapeHtml(player.mainCharacters.join('、'))}</dd></div>`);
-  }
 
   let html = '';
   if (rows.length) {
     html += `<dl class="tournament-info-grid profile-grid">${rows.join('')}</dl>`;
   }
+
+  // 使用キャラクターは表の1行ではなく、絵のまとまりとして独立させる。
+  // 名前を並べただけの行だったころは、他の項目に埋もれて読み飛ばされていた。
+  html += characterListHtml(player.mainCharacters);
   if (player.bio) {
     html += `<p class="player-bio">${escapeHtml(player.bio)}</p>`;
   }

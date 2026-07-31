@@ -22,6 +22,7 @@ import { getPlayerStats, championLabel, placementLabelOf } from './playerStats.j
 import { tournamentTier } from './tournamentTier.js';
 import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
 import { renderProfileForm, profileSectionHtml, isProfileFormMounted } from './profile.js';
+import { characterImageUrl } from './characters.js';
 import { keepFormDraft, clearFormDraft } from './formDraft.js';
 import {
   renderRecruitPage, renderTournamentActions, STATUS_LABELS, entrantUnit,
@@ -924,7 +925,11 @@ function renderOwnProfileView() {
 
   const details = profileSectionHtml(player);
 
+  // 選手ページと同じ見え方にする（ここが「他の人からどう見えるか」の確認場所）。
+  // 背景の絵も同じ部品を使う。
   profileViewEl.innerHTML = `
+    <div class="player-detail-stage">
+    ${playerArtHtml(player)}
     <div class="player-detail-header">
       <div class="player-identity">
         ${avatarHtml(player, 'lg')}
@@ -939,6 +944,7 @@ function renderOwnProfileView() {
       </div>
     </div>
     ${details || '<p class="empty-hint">まだ表示名だけです。鉛筆アイコンからアイコン・使用キャラ・自己紹介などを追加できます。</p>'}
+    </div>
   `;
 
   profileViewEl.querySelector('.profile-edit-btn').addEventListener('click', () => {
@@ -1823,6 +1829,21 @@ const VISIBLE_TOURNAMENTS = 3;
 // 読んでいる最中に勝手に畳まれてしまう。
 let expandedTournamentsFor = null;
 
+// 選手ページの背景に、その人のメインキャラクターを大きく薄く敷く。
+//
+// 使うのは先頭の1人だけ。順番には意味があり（js/characterPicker.js）、
+// 先頭が本人の名乗りだからで、複数枚を重ねると誰の場所か分からなくなる。
+// キャラクターを登録していない人には何も出さない ── 代わりの絵を置くと、
+// 選んでいない人まで選んだように見えてしまう。
+//
+// 絵は装飾なので読み上げから外す（名前も戦績も文字で出ている）。
+function playerArtHtml(player) {
+  const url = characterImageUrl(player.mainCharacters?.[0], 'large');
+  if (!url) return '';
+  return `<div class="player-art" aria-hidden="true">`
+    + `<img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async"></div>`;
+}
+
 // 戦績はこの選手のぶんだけ取りに行く（全選手の試合は手元に持っていない。
 // js/db.js の loadPlayerRecord を参照）。
 async function renderPlayerDetail(playerId) {
@@ -1853,6 +1874,8 @@ async function renderPlayerDetail(playerId) {
   const isOwn = auth.player?.id === playerId;
 
   let html = `
+    <div class="player-detail-stage">
+    ${playerArtHtml(player)}
     <div class="player-detail-header">
       <div class="player-identity">
         ${avatarHtml(player, 'lg')}
@@ -1870,6 +1893,7 @@ async function renderPlayerDetail(playerId) {
     <div class="stat-cards">
       <div class="stat-card"><span class="stat-value">${rankLabel}${rankChangeHtml}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>
       <div class="stat-card"><span class="stat-value">${stats.tournaments.length}</span><span class="stat-label">出場大会数</span></div>
+    </div>
     </div>
   `;
 

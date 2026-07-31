@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { avatarHtml } from './util.js';
+import { characterRowArtHtml } from './characters.js';
 import { makeIconButton } from './icons.js';
 import * as db from './db.js';
 
@@ -105,6 +106,8 @@ export function renderPlayerTable(containerEl, options = {}) {
     if (ownPlayerId && p.id === ownPlayerId) tr.className = 'own-row';
 
     const nameTd = document.createElement('td');
+    nameTd.className = 'has-row-art';
+    nameTd.innerHTML = characterRowArtHtml(p.mainCharacters);
     const nameCell = document.createElement('div');
     nameCell.className = 'player-identity';
     nameCell.innerHTML = avatarHtml(p, 'sm');

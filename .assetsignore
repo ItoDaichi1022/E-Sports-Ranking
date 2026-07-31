@@ -13,6 +13,15 @@
 
 node_modules
 
+# キャラクターの配布素材。1枚が最大145MBあり、Cloudflareの25MiB上限を超えるので
+# 上げるとデプロイそのものが失敗する。サイトが読むのは、ここから作った
+# img/characters/ の軽い複製（角240px・長辺480pxのWebP、合計10MB）だけ。
+# 作り直し方は scripts/build-characters.mjs の先頭を参照。
+#
+# 【img/characters は除外しないこと】名前が1文字違いなので取り違えやすい。
+# あちらを外すと、選ぶ画面もプロフィールの絵も全部出なくなる。
+img/character
+
 # サイトの表示には使わない開発・運用用のファイル
 .git
 .gitignore
