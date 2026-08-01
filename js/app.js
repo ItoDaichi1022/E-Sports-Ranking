@@ -1889,7 +1889,10 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}
         <div class="player-hero-id">
           ${avatarHtml(player, 'hero')}
           <div class="player-hero-names">
-            <${nameTag} class="player-hero-name">${escapeHtml(player.currentName)}</${nameTag}>
+            <!-- title は、長い名前が「…」で切られたときに全体を読むための保険。
+                 切らずに折り返すと2行になり、下のランクの位置とカードの高さが
+                 名前の長さで動いてしまう（CSSの .player-hero-name を参照）。 -->
+            <${nameTag} class="player-hero-name" title="${escapeHtml(player.currentName)}">${escapeHtml(player.currentName)}</${nameTag}>
             ${player.pastNames.length
               ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>`
               : ''}

@@ -4366,58 +4366,60 @@ dialog.char-picker { max-width: 56rem; }
 
 /* ---- プロフィールのヒーロー（選手名・ランク・メインキャラクター）----
 
-   【面を取り合わせない】以前はキャラクターを背景として敷き、その上に戦歴も
-   ランクも登録情報も重ねていた。同じ面積を「絵を見せる」役と「数字を読ませる」役で
-   取り合う形で、どちらも果たせていなかった ── 顔と上半身は戦歴カードの裏に隠れ、
-   透けた絵のせいで数字も読みにくかった。
-   いまは面そのものを分ける。絵は .player-hero-art の升だけを使い、文字は
-   .player-hero-main の升だけを使う。重ならないので絵を透かす必要がなく、
-   文字は無地の上に乗る。
+   【絵を主役にする】キャラクターはカードからわずかにはみ出す大きさで、文字より
+   手前に置く。名前やランクが少し絵の後ろに回るのは承知のうえ ── 絵を小さくして
+   全部を避けるより、絵が主役として立っているほうがこのページの目的に合う。
 
-   【顔の安全領域】切り抜きは頭が必ず上端にある。絵の升は
-     * grid の独立した列で、他の要素は一切入らない（position:absolute も使わない）
-     * 中身は上詰め（align-items: flex-start）
-     * 升の上に --art-safe の余白を取り、カードの縁が頭に触れない
-   この3つで「顔に何も重ならない」ことを、座標の調整ではなく構造として保証する。
+   【大きさを画像の実寸から切り離す】絵は position:absolute で流れから外し、
+   高さも幅も「カードに対する割合」だけで決める。以前は max-width/max-height と
+   width:auto の組み合わせで、実寸が分かって初めて大きさが決まっていた。そのため
+   読み込みの前後でカードの中身が動き、スマートフォンでは再読み込みのたびに
+   絵の大きさが変わって見えていた。割合だけで決めれば、読み込みが済んでいようが
+   いまいが、どの切り抜きだろうが、レイアウトは一定になる。
 
-   絵は装飾なので読み上げには載せない（aria-hidden を付けて出す）。 */
+   はみ出す量は --art-bleed。top と bottom の両方に負の値を置いて高さを auto に
+   するので、この1つを変えれば上下の見切れ量が揃って変わる。
+
+   絵は装飾なので読み上げには載せない（aria-hidden を付けて出す）。
+   pointer-events も切る ── 文字の上に乗るので、掛けたままだと下のリンクを押せない。 */
 .player-hero {
-  --art-w: 15rem;    /* 絵の升の幅。ここを変えれば文字の幅も自動で決まる */
-  /* 絵の背丈。縦横比がばらついても、これで頭の大きさが揃う。
-     カードの高さはここで決まるので、伸ばしすぎると文字側に空白の帯ができる。 */
-  --art-h: 13rem;
-  --art-safe: 1.5rem;/* 頭とカードの縁のあいだに必ず残す余白 */
+  --art-w: 17rem;      /* 絵が占める右側の幅 */
+  --art-bleed: 15%;    /* カードの上下からはみ出させる量＝見切れる量 */
 
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--art-w);
-  gap: 1.25rem;
-  align-items: stretch;
+  position: relative;
+  min-height: 14rem;   /* 絵の背丈のもと。カードが低いと絵も小さくなる */
   margin-bottom: 1.5rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--r);
   background: var(--surface);
-  overflow: hidden;
+  overflow: hidden;    /* はみ出した絵はここで切られる＝見切れになる */
 }
 
-/* キャラクターを登録していない人は升ごと畳む。空けても誰も立っていない床が残るだけ */
-.player-hero.has-no-art { grid-template-columns: minmax(0, 1fr); }
-
-/* 文字の面。無地のまま保つ ── ここに装飾を足すと、結局また可読性を削ることになる */
+/* 文字の面。絵の下をくぐらせたくないものは、この余白の内側に収まる */
 .player-hero-main {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 1.35rem 0 1.35rem 1.35rem;
-  min-width: 0;
+  min-height: inherit;
+  padding: 1.35rem;
+  padding-right: calc(var(--art-w) * 0.72);
 }
 
+.player-hero.has-no-art { min-height: 0; }
 .player-hero.has-no-art .player-hero-main { padding-right: 1.35rem; }
 
+/* 名前だけは余白より右へ伸ばす。ここで切ってしまうと、少し長い名前が
+   まだ絵に届いてもいないのに「…」になる。絵の後ろへ回るのは許容している。 */
 .player-hero-id {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  margin-right: calc(var(--art-w) * -0.42);
 }
+
+.player-hero.has-no-art .player-hero-id { margin-right: 0; }
 
 .player-hero-names { min-width: 0; }
 
@@ -4428,13 +4430,19 @@ dialog.char-picker { max-width: 56rem; }
   border: 1px solid var(--border);
 }
 
-/* 一番格上。画面の中でここが最初に目に入るようにする */
+/* 一番格上。画面の中でここが最初に目に入るようにする。
+   【必ず1行】折り返させない。2行になると下のランクの位置が動き、
+   フォントの読み込みが済む前と後でカードの高さまで変わる。
+   収まらない名前は末尾を「…」にして、全体は title 属性から読めるようにしてある
+   （js/app.js の playerHeroHtml）。 */
 .player-hero-name {
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(1.35rem, 1.05rem + 1.2vw, 2rem);
   line-height: 1.2;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ランクは数字を主役にする。eスポーツらしさはここで出す ── 数字を大きく、
@@ -4474,31 +4482,42 @@ dialog.char-picker { max-width: 56rem; }
   color: var(--text-faint);
 }
 
-/* 絵の升。ここには絵しか入らない ── 何かを足したくなったら .player-hero-main へ */
+/* 絵の面。文字より手前（z-index: 2）に置く。
+   背景は足元の淡い光だけにして、面としては透明のままにする ── ここに地色を敷くと、
+   絵ではなく四角い板が文字を覆うことになって、ただ読めなくなるだけになる。 */
 .player-hero-art {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: var(--art-safe);
-  height: calc(var(--art-h) + var(--art-safe));
-  background:
-    radial-gradient(70% 50% at 50% 100%, var(--accent-soft), transparent 70%),
-    var(--surface-2);
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--art-w);
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(62% 42% at 50% 94%, var(--accent-soft), transparent 72%);
 }
 
-/* 【高さで決める】切り抜きの縦横比は 0.75〜2.73 とばらつく（225枚の実測）。
-   幅だけを決めると細長いキャラクターが升の3倍近い高さになって顔から下が切れる。
-   高さと幅の両方を上限にして中に収めると、どの人も同じ大きさの頭で並ぶ。 */
+/* 上下に --art-bleed ずつはみ出した箱を作り、その中に絵を収める。
+   箱の大きさは幅100% × 高さ(100% + はみ出し×2) で、画像の実寸に一切依存しない。
+   だから読み込みの前後でも、どの切り抜きでも、位置と大きさが動かない。
+   object-fit: contain なので縦横比は保たれ、箱いっぱいに伸びた縦長の切り抜きは
+   上下が .player-hero の overflow:hidden で切られて「少し見切れた」状態になる。
+   横長の切り抜きは箱の幅で頭打ちになり、見切れずに中央へ収まる。
+
+   【width/height を auto にしないこと】img は置換要素なので、auto は
+   「left/right いっぱいに広げる」ではなく「実寸のまま」を意味する。
+   auto にすると 291×480 の実寸がそのまま出て、カードから大きくはみ出す。 */
 .player-hero-art img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  position: absolute;
+  left: 0;
+  top: calc(var(--art-bleed) * -1);
+  width: 100%;
+  height: calc(100% + var(--art-bleed) * 2);
   display: block;
-  /* 足元だけをわずかに溶かす。素材によっては足首で切れており、
-     そのままだと直線の切り口が「貼った画像」に見える。頭側には掛けない。 */
-  mask-image: linear-gradient(to bottom, #000 90%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 90%, transparent 100%);
+  object-fit: contain;
+  /* 見切れない（＝縦に余る）切り抜きだけ、足元をわずかに溶かす。
+     素材によっては足首で切れており、直線の切り口が「貼った画像」に見えるため。 */
+  mask-image: linear-gradient(to bottom, #000 94%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 94%, transparent 100%);
 }
 
 /* ---- 2段目: 直近の戦績 ---- */
@@ -4797,18 +4816,16 @@ dialog.char-picker { max-width: 56rem; }
      「メインにする」と「×」が隣り合って押し間違える。 */
   .char-chip { flex: 1 1 100%; }
 
-  /* 【狭い画面でも升は隣に残す】下に積み替えると、絵の帯のぶんだけ
-     一番格上の選手名が下へ押し出される。375px でも横並びのまま、
-     絵の升を細くして文字に幅を譲る。顔の安全領域は升そのものなので、
-     幅が変わっても保証は変わらない。 */
+  /* 狭い画面でも絵は右に残す。下へ積み替えると、絵の帯のぶんだけ
+     一番格上の選手名が画面の外へ押し出される。
+     幅の取り分だけを絞り、見切れ量（--art-bleed）は変えない ── ここを変えると
+     広い画面と狭い画面で切り取られ方が変わり、同じ絵に見えなくなる。 */
   .player-hero {
-    --art-w: 7.5rem;
-    --art-h: 9.5rem;
-    --art-safe: 0.9rem;
-    gap: 0.75rem;
+    --art-w: 11.5rem;
+    min-height: 12.5rem;
   }
 
-  .player-hero-main { padding: 1rem 0 1rem 1rem; }
+  .player-hero-main { padding: 1rem; padding-right: calc(var(--art-w) * 0.62); }
   .player-hero.has-no-art .player-hero-main { padding-right: 1rem; }
 
   .avatar-hero {
