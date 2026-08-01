@@ -1867,8 +1867,8 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}
   const rankEntry = state.publishedRanking?.rankings.find((r) => r.id === player.id);
 
   // ランクは公開済みランキングから引くので、戦歴の通信を待たずに出せる。
-  let rankValue = '未公開';
-  let rankNote = 'ランキング未公開';
+  let rankValue = 'ランキング対象外';
+  let rankNote = '対象の大会に参加していません';
   if (state.publishedRanking) {
     if (rankEntry) {
       rankValue = `${rankEntry.rank}<span class="rank-unit">位</span>`;
@@ -1879,7 +1879,7 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}
       }
     } else {
       rankValue = '—';
-      rankNote = 'ランキング対象外';
+      rankNote = '対象の大会に参加していません';
     }
   }
 
