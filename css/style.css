@@ -4395,13 +4395,13 @@ dialog.char-picker { max-width: 56rem; }
      折り返さないランク表記（「ランキング対象外」）が入ると左の列が押し広がり、
      半々でなくなって絵の場所まで削られる。 */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto auto;
+  grid-template-rows: auto 1fr;
   grid-template-areas:
     "name name"
     "body art";
-  /* 【高さは文字が決める】min-height は置かない。名前とランクを書いた高さが
-     そのままカードの高さで、絵はそこで空いた右側に収まるぶんだけ大きくなる。
-     絵の背丈でカードを伸ばすと、文字側に用の無い空白の帯ができる。 */
+  /* 絵の背丈のもと。全身を収める決まりなので、カードが低いとそのぶん絵も小さくなる。
+     絵を大きくしたいときに動かすのはここ。 */
+  min-height: 18rem;
   margin-bottom: 1.5rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--r);
@@ -4436,17 +4436,10 @@ dialog.char-picker { max-width: 56rem; }
 .player-hero.has-no-art {
   grid-template-columns: 1fr;
   grid-template-areas: "name" "body";
+  min-height: 0;
 }
 
 .player-hero.has-no-art .player-hero-main { padding-right: 1.35rem; }
-
-/* 編集への入口。カードの外、すぐ下に右寄せで置く。
-   カードは「この選手が何者か」を見せる場所なので、操作はその外に出す。 */
-.player-hero-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin: -1rem 0 1.5rem;
-}
 
 .player-hero.has-no-art .player-hero-id { margin-right: 0; }
 
@@ -4848,8 +4841,10 @@ dialog.char-picker { max-width: 56rem; }
   .char-chip { flex: 1 1 100%; }
 
   /* 狭い画面でも段の組み方は同じ（上に名前、下段を左右に）。
-     割合で割ってあるので列の指定はそのまま。余白だけを絞る
-     （高さは文字が決めるので、ここで指定するものは無い）。 */
+     割合で割ってあるので列の指定はそのまま。余白と高さだけを絞る
+     （全身を収める決まりは変えないので、頭や足が切れることはない）。 */
+  .player-hero { min-height: 15rem; }
+
   .player-hero-id { padding: 1rem 1rem 0; }
   .player-hero-main { padding: 0.75rem 0 1rem 1rem; }
   .player-hero.has-no-art .player-hero-main { padding-right: 1rem; }

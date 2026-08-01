@@ -1887,16 +1887,6 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}
   // 下段を左右に割って 左＝ランク・右＝キャラクター にする（CSSの grid-template-areas）。
   // 絵を下段に置くのは「名前にかぶらない位置」を段で決めるため ── 座標で避けると、
   // 過去名の有無で名前の高さが変わったときにずれる。
-  //
-  // カードの高さを決めるのは名前とランクの文字だけ。絵はそこで空いた右側に
-  // 収まるぶんだけ大きくなる（絵の背丈でカードを伸ばさない）。
-  //
-  // 編集ボタン（action）はカードの中に入れない。カードは「この選手が何者か」を
-  // 見せる場所で、操作はその外。中に置くと名前の右隣にボタンが並び、
-  // 一番格上のはずの名前と同じ高さで競り合う。
-  //
-  // 過去名は直近の1つだけ。ここは「前はこの名前だった」と気づかせるための一言で、
-  // 履歴を並べる場所ではない。増やすと名前より行数が多くなって主従が逆転する。
   return `
     <section class="player-hero${artUrl ? '' : ' has-no-art'}">
       <div class="player-hero-id">
@@ -1907,9 +1897,10 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}
                名前の長さで動いてしまう（CSSの .player-hero-name を参照）。 -->
           <${nameTag} class="player-hero-name" title="${escapeHtml(player.currentName)}">${escapeHtml(player.currentName)}</${nameTag}>
           ${player.pastNames.length
-            ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames[player.pastNames.length - 1])}</p>`
+            ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>`
             : ''}
         </div>
+        ${action}
       </div>
       <div class="player-hero-main">
         <div class="player-rank">
@@ -1923,8 +1914,7 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}
              <img src="${escapeHtml(artUrl)}" alt="" decoding="async">
            </div>`
         : ''}
-    </section>
-    ${action ? `<div class="player-hero-actions">${action}</div>` : ''}`;
+    </section>`;
 }
 
 // 2段目。直近の大会3件を、順位を主役にした札で並べる。
