@@ -215,5 +215,58 @@ if (existsSync(imgDir)) {
   if (strays.length === 0) console.log('OK   img/ の画像はWebPにそろっている（icon.png のみ例外）');
 }
 
+// ---- 版数を過去に使った値へ戻していないか ----
+//
+// 【一度配ったURLは二度と別の中身にできない】_headers で /js/ /css/ /img/ /pages/ を
+// immutable（1年）にしている。これは「URLが同じなら中身も同じ」という宣言なので、
+// 同じ ?v= を別の中身で配り直すと、以前その番号を見た端末は取り直してくれない。
+// index.html だけは毎回取り直すため、
+//
+//     新しい index.html ＋ キャッシュに残った古い js/app.js
+//
+// という食い違った組み合わせで動き、消したはずの要素を触って落ちる。
+// 実際に起きた: 版数を93へ戻して94から振り直したところ、旧94を見ていた端末だけが
+// `null is not an object (evaluating 'profileLinksEl.innerHTML=...')` で止まった。
+//
+// 戻して作り直すこと自体は問題ない。**番号だけは過去の最大値より先へ飛ばすこと。**
+
+import { execFileSync } from 'node:child_process';
+
+function versionsInHistory() {
+  // index.html を変更したコミットだけを見る（全コミットを開くと遅くなる）
+  const shas = execFileSync('git', ['rev-list', '--all', '--max-count=300', '--', 'index.html'],
+    { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
+
+  const seen = new Map(); // 版数 → その番号を持つコミット
+  for (const sha of shas) {
+    const old = execFileSync('git', ['show', `${sha}:index.html`], { cwd: ROOT, encoding: 'utf8' });
+    const v = /\?v=(\d+)/.exec(old)?.[1];
+    if (v && !seen.has(Number(v))) seen.set(Number(v), sha.slice(0, 7));
+  }
+  return seen;
+}
+
+try {
+  const version = Number([...versions][0]);
+  const history = versionsInHistory();
+  const highest = Math.max(0, ...history.keys());
+
+  if (history.size === 0) {
+    console.log('OK   版数の履歴が読めないので照合は省略した');
+  } else if (version < highest) {
+    fail(`版数 ${version} は過去に使った番号（最大 ${highest}、${history.get(highest)}）より小さい。`
+      + `\n     同じ ?v= を別の中身で配ると、その番号を見たことがある端末が`
+      + `\n     古いJSを使い続けて壊れる（index.html だけ新しくなるため）。`
+      + `\n     ${highest} より大きい番号にすること。`);
+  } else if (history.has(version)) {
+    fail(`版数 ${version} は ${history.get(version)} で既に配信済み。中身が違うなら別の番号にすること。`);
+  } else {
+    console.log(`OK   版数 ${version} は未使用（過去の最大は ${highest}）`);
+  }
+} catch (err) {
+  // Gitが無い環境や、履歴を持たない複製で動かすこともある。そこは止めない。
+  console.log(`OK   版数の履歴を照合できなかったので省略した（${err.message.split('\n')[0]}）`);
+}
+
 console.log(problems === 0 ? '\nすべて通りました。' : `\n${problems}件の問題があります。`);
 process.exit(problems === 0 ? 0 : 1);

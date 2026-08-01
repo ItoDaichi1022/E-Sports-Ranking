@@ -2734,15 +2734,28 @@ async function start() {
   }
 
   // ログイン状態が変わるたびに、UIの出し分けと表示中ページの描画をやり直す
-  await initAuth(() => {
+  //
+  // ここで例外を外へ逃がさないこと。逃がすと start() ごと止まり、この下の
+  // refreshFromDb も Realtime の購読も走らないまま、ヘッダーだけが出た画面で
+  // 固まる ── ログアウトボタンも効かないので、利用者には手の打ちようがなくなる。
+  // 認証が確かめられなくても、閲覧だけならログイン無しで成立する作りなので、
+  // 未ログインとして先へ進めたほうがましになる。
+  try {
+    await initAuth(() => {
+      applyAuthUI();
+      routeFromHash();
+
+      // ログインしたのに選手行が無い＝新規登録がまだ。そのまま登録フォームへ案内する。
+      if (needsOnboarding() && parseHash().page !== 'profile') {
+        location.hash = '#profile';
+      }
+    });
+  } catch (err) {
+    console.error('[start] 認証の初期化に失敗', err);
+    setStatus(`ログイン状態を確認できませんでした（${err.message}）。未ログインとして表示します。`, 'error');
     applyAuthUI();
     routeFromHash();
-
-    // ログインしたのに選手行が無い＝新規登録がまだ。そのまま登録フォームへ案内する。
-    if (needsOnboarding() && parseHash().page !== 'profile') {
-      location.hash = '#profile';
-    }
-  });
+  }
 
   await refreshFromDb();
 

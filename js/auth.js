@@ -71,8 +71,18 @@ let onChange = () => {};
 export async function initAuth(handler) {
   onChange = handler ?? (() => {});
 
-  const { data } = await supabase.auth.getSession();
-  auth.user = data.session?.user ?? null;
+  // セッションの読み直しが失敗するのは、保存してある更新トークンがもう通らないとき
+  // （アカウントが消された・失効した）。放っておくと「ログイン中の表示のまま何もできない」
+  // 状態になるので、その場で捨てて未ログインとして始める。
+  // 消してからでないと、次に開いたときも同じところで詰まる。
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    console.warn('[auth] 保存されていたセッションが使えないので破棄します', error);
+    clearStoredSession();
+    auth.user = null;
+  } else {
+    auth.user = data.session?.user ?? null;
+  }
   await refreshOwnPlayer();
   auth.ready = true;
 
@@ -141,7 +151,47 @@ export async function signInWithProvider(provider) {
   if (error) throw new Error(`ログインに失敗しました: ${error.message}`);
 }
 
+// 端末に保存されたセッションを、ライブラリを通さずに直接消す。
+//
+// supabase-js は localStorage の `sb-<プロジェクトref>-auth-token` に入れている。
+// 鍵の名前を組み立てずに前方一致で消すのは、プロジェクトを移したときや
+// ライブラリが鍵の付け方を変えたときに取りこぼさないため。
+function clearStoredSession() {
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('sb-')) localStorage.removeItem(key);
+    }
+  } catch {
+    // プライベートモードなどで localStorage に触れないことがある。
+    // その場合はそもそもセッションが保存されていないので、消すものが無い。
+  }
+}
+
+// ログアウト。
+//
+// 【必ず端末から消えること】supabase-js の signOut() は、まず保存中のセッションを
+// 読み直そうとする。アカウントがサーバー側から消えている・更新トークンが失効している
+// といった場合、この読み直しに失敗した時点でエラーを返して**保存を消さずに**戻る。
+// その状態のブラウザは「ログイン中の表示のまま、押しても二度とログアウトできない」
+// ところで固まる（DBの中身を消したあとに実際に起きた）。
+// そこで、ライブラリが失敗したときは自分で消してから終わる。サーバー側の後始末は
+// できなくても、この端末が解放されることのほうが大事。
 export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw new Error(`ログアウトに失敗しました: ${error.message}`);
+  let failure = null;
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) failure = error;
+  } catch (err) {
+    failure = err;
+  }
+
+  if (!failure) return;
+
+  clearStoredSession();
+  auth.user = null;
+  auth.player = null;
+
+  // 手で消した場合 onAuthStateChange は飛ばない。ライブラリ内の状態も
+  // 残ったままなので、再読み込みして作り直す（呼び出し側の再描画では足りない）。
+  location.reload();
 }
