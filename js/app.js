@@ -920,19 +920,20 @@ function renderOwnProfileView() {
   profileViewEl.hidden = false;
 
   const bio = profileBioHtml(player);
-  const foot = profileFooterHtml(player);
+  const chips = profileFooterHtml(player);
 
   // 選手ページとまったく同じ部品で組む（ここが「他の人からどう見えるか」の確認場所
   // なので、見た目が少しでも違うと確認にならない）。戦歴だけは通信が要るので、
   // 先に枠を出しておいて後から差し込む（下の fillOwnRecord）。
+  // 直近の戦績は島の中（.player-record）、全件の表は島の外（.player-history）。
   profileViewEl.innerHTML = playerHeroHtml(player, {
     nameTag: 'h3',
     action: `<button type="button" class="profile-edit-link profile-edit-btn"
               title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</button>`,
+    foot: bio + '<div class="player-record"></div>',
   })
-    + bio
-    + '<div class="player-record"></div>'
-    + (foot || (bio ? '' : '<p class="empty-hint">まだ表示名だけです。鉛筆アイコンからアイコン・使用キャラ・自己紹介などを追加できます。</p>'));
+    + '<div class="player-history"></div>'
+    + (chips || (bio ? '' : '<p class="empty-hint">まだ表示名だけです。鉛筆アイコンからアイコン・使用キャラ・自己紹介などを追加できます。</p>'));
 
   profileViewEl.querySelector('.profile-edit-btn').addEventListener('click', () => {
     setProfileEditing(true);
@@ -962,7 +963,11 @@ async function fillOwnRecord(playerId) {
   if (!box || auth.player?.id !== playerId) return;
 
   const stats = getPlayerStats(playerId, record);
-  box.innerHTML = recentResultsHtml(stats) + historyTableHtml(stats);
+  box.innerHTML = recentResultsHtml(stats);
+
+  // 全件の表は島の外。枠が無いのは描き直された後なので、その時は何もしない。
+  const history = profileViewEl.querySelector('.player-history');
+  if (history) history.innerHTML = historyTableHtml(stats);
 }
 
 // ---- エントリー状況 ----
@@ -1862,7 +1867,7 @@ const RECENT_RESULTS = 3;
 // 先頭が本人の名乗りだからで、複数枚を並べると誰の場所か分からなくなる。
 // 登録していない人には何も出さない ── 代わりの絵を置くと、選んでいない人まで
 // 選んだように見えてしまう。絵は装飾なので読み上げから外す。
-function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}) {
+function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '', foot = '' } = {}) {
   const artUrl = characterImageUrl(player.mainCharacters?.[0], 'large');
   const rankEntry = state.publishedRanking?.rankings.find((r) => r.id === player.id);
 
@@ -1883,10 +1888,14 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}
     }
   }
 
-  // 3つのかたまりを .player-hero の grid に直接置く。名前は上段で横いっぱい、
-  // 下段を左右に割って 左＝ランク・右＝キャラクター にする（CSSの grid-template-areas）。
-  // 絵を下段に置くのは「名前にかぶらない位置」を段で決めるため ── 座標で避けると、
+  // かたまりを .player-hero の grid に直接置く。名前は上段で横いっぱい、
+  // 中段を左右に割って 左＝ランク・右＝キャラクター にする（CSSの grid-template-areas）。
+  // 絵を中段に置くのは「名前にかぶらない位置」を段で決めるため ── 座標で避けると、
   // 過去名の有無で名前の高さが変わったときにずれる。
+  //
+  // foot は下段（横いっぱい）。自己紹介と直近の戦績が入る ── 名前・ランクと同じ人の
+  // 話なので同じ島に収める。ここだけは区切り線を引く。上の絵は背景として敷いてあり
+  // 線を引くと板に見えるが、下段は文字と文字の境目なので、線があるほうが段が分かる。
   return `
     <section class="player-hero${artUrl ? '' : ' has-no-art'}">
       <div class="player-hero-id">
@@ -1914,6 +1923,7 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}
              <img src="${escapeHtml(artUrl)}" alt="" decoding="async">
            </div>`
         : ''}
+      ${foot ? `<div class="player-hero-foot">${foot}</div>` : ''}
     </section>`;
 }
 
@@ -2013,9 +2023,11 @@ async function renderPlayerDetail(playerId) {
     extra: !isOwn && isAdmin()
       ? '<p class="meta-line"><button type="button" class="btn-secondary admin-rename-btn">表示名を変更</button></p>'
       : '',
+    // 自己紹介と直近の戦績はヒーローの下段に入れる（同じ島）。
+    // 全件の表だけは外に出す ── 開くと何十行にもなるので、島の中で伸ばすと
+    // 名前とランクが画面の外へ流れていく。
+    foot: profileBioHtml(player) + recentResultsHtml(stats),
   })
-    + profileBioHtml(player)
-    + recentResultsHtml(stats)
     + historyTableHtml(stats)
     + profileFooterHtml(player);
 

@@ -4381,13 +4381,15 @@ dialog.char-picker { max-width: 56rem; }
 
    絵は装飾なので読み上げには載せない（aria-hidden を付けて出す）。 */
 .player-hero {
-  /* 上段は名前が横いっぱい、下段を左右に割って 左＝ランク・右＝キャラクター。
+  /* 上段は名前が横いっぱい、中段を左右に割って 左＝ランク・右＝キャラクター、
+     下段は自己紹介と直近の戦績が横いっぱい。
      絵が名前にかぶらないのは「段が違う」からで、座標で避けているのではない ──
      過去名の有無で名前の高さが変わっても、段の関係は崩れない。
 
-     【線は引かない】左右の境目に境界線も地色の切り替わりも置かない。線を引くと
+     【左右の境目には線を引かない】境界線も地色の切り替わりも置かない。線を引くと
      「2つの箱を並べた」ように見えて、絵が背景であることが伝わらなくなる。
-     絵の面が持つのは足元の淡い光だけで、それも縁に届く前に消える。 */
+     絵の面が持つのは足元の淡い光だけで、それも縁に届く前に消える。
+     下段との境目は別（.player-hero-foot）── あちらは文字と文字の境なので線を引く。 */
   --art-inset: 0.75rem;  /* 絵と升の縁のすき間。全身を収めるための余白 */
 
   display: grid;
@@ -4395,12 +4397,17 @@ dialog.char-picker { max-width: 56rem; }
      折り返さないランク表記（「ランキング対象外」）が入ると左の列が押し広がり、
      半々でなくなって絵の場所まで削られる。 */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
+  /* 中段に下限を敷く。絵は position: absolute なので中身としての背丈が 0 ──
+     素の 1fr のままだと、下段（自己紹介・戦績）が伸びたぶんだけ中段が
+     min-height の中で削られ、文章の長い人ほど絵が縮む。
+     下限があれば、下段が何行になっても絵の大きさは変わらない。 */
+  grid-template-rows: auto minmax(12rem, 1fr) auto;
   grid-template-areas:
     "name name"
-    "body art";
+    "body art"
+    "foot foot";
   /* 絵の背丈のもと。全身を収める決まりなので、カードが低いとそのぶん絵も小さくなる。
-     絵を大きくしたいときに動かすのはここ。 */
+     絵を大きくしたいときに動かすのはここ（と上の 12rem）。 */
   min-height: 18rem;
   margin-bottom: 1.5rem;
   border: 1px solid var(--border-soft);
@@ -4432,10 +4439,12 @@ dialog.char-picker { max-width: 56rem; }
   padding: 0.9rem 0 1.35rem 1.35rem;
 }
 
-/* キャラクターがいない人は下段を割らない。空けても誰も立っていない床が残るだけ */
+/* キャラクターがいない人は中段を割らない。空けても誰も立っていない床が残るだけ。
+   絵が無いので中段の下限も要らない（あると空白がそのぶん残る）。 */
 .player-hero.has-no-art {
   grid-template-columns: 1fr;
-  grid-template-areas: "name" "body";
+  grid-template-rows: auto auto auto;
+  grid-template-areas: "name" "body" "foot";
   min-height: 0;
 }
 
@@ -4544,7 +4553,42 @@ dialog.char-picker { max-width: 56rem; }
   object-fit: contain;
 }
 
-/* ---- 2段目: 直近の戦績 ---- */
+/* 島の下段。自己紹介と直近の戦績が入る。
+   名前・ランクと同じ人の話なので同じ島に収める ── 別のカードに分けると、
+   間の隙間のぶんだけ「別の話」に見える。
+
+   【ここは線を引く】上の絵との境目とは事情が違う。左右の境目に線を引くと絵が
+   板に見えてしまうが、ここは文字と文字の境なので、線があるほうが段の変わり目が分かる。
+   線は左右に少し引っ込める ── 端まで届かせるとカードを2枚に割ったように見える。 */
+.player-hero-foot {
+  grid-area: foot;
+  position: relative;
+  z-index: 1;  /* 絵より前。中段の絵がここまで伸びてきても文字が負けない */
+  display: grid;
+  /* 列を明示する。省略して暗黙の auto 列にすると、長い自己紹介が折り返さず
+     max-content（測ったときは1035pxの枠に対して5259px）まで伸びる。
+     日本語は単語の区切りが無いので、一度伸びると一行のまま横へ流れていく。 */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin: 1.35rem 1.35rem 0;
+  padding: 1.1rem 0 1.35rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* 戦歴は後から差し込まれる（js/app.js の fillOwnRecord）。読み込み中の空の枠を
+   そのまま置くと、gap のぶんだけ意味のない隙間が空く。 */
+.player-hero-foot .player-record:empty { display: none; }
+
+/* 中身が何も無いなら段ごと消す。自己紹介も戦績も無い人に、線と余白だけが残らないように。
+   .player-record は空でも要素として在るので、:empty ではなく中身の有無で見る。 */
+.player-hero-foot:not(:has(.player-bio, .profile-block, .empty-hint)) { display: none; }
+
+/* 島の中では、外側の余白は段の gap が持つ */
+.player-hero-foot .player-bio { margin: 0; }
+
+.player-hero-foot .profile-block { margin-bottom: 0; }
+
+/* ---- 直近の戦績 ---- */
 
 .profile-block { margin-bottom: 1.5rem; }
 
@@ -4843,11 +4887,20 @@ dialog.char-picker { max-width: 56rem; }
   /* 狭い画面でも段の組み方は同じ（上に名前、下段を左右に）。
      割合で割ってあるので列の指定はそのまま。余白と高さだけを絞る
      （全身を収める決まりは変えないので、頭や足が切れることはない）。 */
-  .player-hero { min-height: 15rem; }
+  .player-hero {
+    min-height: 15rem;
+    grid-template-rows: auto minmax(9.5rem, 1fr) auto;
+  }
 
   .player-hero-id { padding: 1rem 1rem 0; }
   .player-hero-main { padding: 0.75rem 0 1rem 1rem; }
   .player-hero.has-no-art .player-hero-main { padding-right: 1rem; }
+
+  .player-hero-foot {
+    gap: 0.85rem;
+    margin: 1rem 1rem 0;
+    padding: 0.9rem 0 1rem;
+  }
 
   .avatar-hero {
     width: 2.75rem;
