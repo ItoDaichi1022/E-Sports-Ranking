@@ -3998,7 +3998,8 @@ dialog h3 {
 
 .avatar-sm { width: 1.75rem; height: 1.75rem; font-size: 0.75rem; }
 .avatar-md { width: 3rem;    height: 3rem;    font-size: 1.15rem; }
-/* hero は選手カード専用。大きさは「キャラクター編」の .avatar-hero で決める */
+/* 選手カードのアイコンは丸く抜かず面いっぱいに置くので、ここは使わない
+   （.player-hero-photo を参照） */
 
 /* 名前とアイコンを横に並べる（選手一覧・ランキング・選手ページ） */
 .player-identity {
@@ -4414,29 +4415,29 @@ dialog.char-picker { max-width: 56rem; }
 
 /* ---- 選手カード（選手ページ・マイページの上部）----
 
-   絵の面と文字の面を左右に分ける。
+   3つの面に分ける。左＝順位と使用キャラクター、中央＝素性と戦績、右＝アイコン。
 
-     ┌─────────────────────┬────────────────┐
-     │ アイコン  キャラクター  │ 名前            │
-     │                      │ ID・SNS         │
-     │                      │ 戦歴            │
-     └─────────────────────┴────────────────┘
+     ┌──────────┬────────────────────────┬────────────┐
+     │ ランク 8  │ 名前（背景にメインキャラ）│            │
+     │ ───────  │ ID・SNS                 │  アイコン   │
+     │ メイン[絵]│ ──────────              │ （大きく）  │
+     │ サブ [絵] │ 出場大会の戦績           │            │
+     └──────────┴────────────────────────┴────────────┘
 
-   【重ねない】以前は名前も項目もキャラクターの絵の上に重ねていた。絵を薄くしても
-   直らない ── ゲームIDの表も自己紹介も成績カードも、枠と塗りを持つ不透明な箱で、
-   薄い絵の上にそのまま乗るからで、狭い画面では表示名と絵がちょうど同じ場所に来て
-   名前が読み取れなくなっていた。面を分ければ、どの幅でも文字が絵に乗らない。
-   重なりが無くなったので、絵はもう薄めない（ここは「敷く」ではなく「見せる」）。
+   【面ごとに役割を1つに絞る】以前はアイコンとキャラクターを同じ面に立たせ、
+   文字の面に順位カードも入れていた。見るものが混ざると、どこから読めばよいか
+   目が迷う。面を割れば、順位を見たい人は左、戦績を見たい人は中央だけを見ればよい。
 
-   絵は装飾なので読み上げには載せない（aria-hidden を付けて出す）。 */
-/* 絵の面は割合ではなく実寸で決める。割合にすると、画面が広いほど絵の面だけが
-   間延びして、アイコンとキャラクターの間に誰も居ない床が広がる。
-   中身（アイコン8.5rem＋キャラクター）がちょうど収まる幅で固定し、
-   余った幅は文字の面に渡す。 */
+   【重ねるのは背景の1枚だけ】中央に敷くメインキャラクターは、名前の後ろに
+   うっすら流す。以前は名前も項目も絵の上に重ねていて、狭い画面で表示名と絵が
+   同じ場所に来て読めなくなっていた。敷く絵は右上へ寄せ、左へ向かって溶かす
+   （＝文字が乗る側には出さない）ことで、その問題を持ち込まずに絵を見せる。
+
+   左右の柱は実寸で決める。割合にすると、画面が広いほど柱だけが間延びして、
+   順位の数字とアイコンの周りに誰も居ない床が広がる。 */
 .player-hero {
   display: grid;
-  grid-template-columns: 22rem minmax(0, 1fr);
-  gap: 1.25rem;
+  grid-template-columns: 11rem minmax(0, 1fr) 16rem;
   align-items: stretch;
   margin-bottom: 1.5rem;
   border: 1px solid var(--border-soft);
@@ -4445,84 +4446,142 @@ dialog.char-picker { max-width: 56rem; }
   overflow: hidden;
 }
 
-/* キャラクターを登録していない人は、アイコンだけのために面の半分を渡さない。
-   空けたところで誰も立っていない床が残るだけなので、細く短く畳む。 */
-.player-hero.has-no-char {
-  grid-template-columns: 9.5rem minmax(0, 1fr);
-}
+/* アイコンを登録していない人の右の柱は畳む。頭文字だけを大きく引き伸ばしても、
+   誰の顔でもない床が広がるだけなので、そのぶんを中央に渡す。 */
+.player-hero.has-no-photo { grid-template-columns: 11rem minmax(0, 1fr); }
 
-.player-hero.has-no-char .player-hero-visual {
-  min-height: 0;
-  align-items: center;
-  justify-content: center;
-}
-
-.player-hero.has-no-char .avatar-hero {
-  width: 6rem;
-  height: 6rem;
-  font-size: 2.2rem;
-}
-
-/* 絵の面。アイコンが左、キャラクターがその右（＝カードの中ほど）に立つ。
-   床のあたりを明るくして、切り抜きが宙に浮いて見えないようにする。 */
-.player-hero-visual {
-  position: relative;
+/* ---- 左の柱 ---- */
+.player-hero-rail {
   display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
-  /* キャラクターの背丈（15rem）＋上下の余白。ここを縮めると、背の高い
-     キャラクターが余白を食い潰して面の上端に頭をぶつける。 */
-  min-height: 17.5rem;
-  padding: 1.1rem;
-  background:
-    radial-gradient(80% 55% at 45% 100%, var(--accent-soft), transparent 70%),
-    var(--surface-2);
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.15rem 0.85rem;
+  border-right: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  text-align: center;
 }
 
-/* アイコンは縦の中ほど。キャラクターと同じ下端に揃えると、
-   丸いアイコンだけが取り残されて見える。 */
-.player-hero-visual .avatar { align-self: center; }
-
-.avatar-hero {
-  width: 8.5rem;
-  height: 8.5rem;
-  font-size: 3rem;
-  border: 1px solid var(--border);
-}
-
-/* 【高さで決める】切り抜きの縦横比は 0.75〜2.73 とばらばらで（225枚の実測）、
-   幅だけを決めると、細長いキャラクターが枠の3倍近い高さになって下が切れる。
-   高さと幅の両方を上限にして中に収める。縦長の人は細く、横長の人は幅いっぱいに
-   なるが、どの人も同じ床に同じ背丈で立つ。 */
-.player-hero-char {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 15rem;
-  pointer-events: none;
-}
-
-.player-hero-char img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+/* 柱の中の小さな見出し（ランク／メイン／サブ）。字間を空けた札にして、
+   下に来る中身（数字・絵）より前に出ないようにする。 */
+.hero-rail-label {
   display: block;
-  /* 足元だけをわずかに溶かす。素材によっては足首で切れているものがあり、
-     そのままだと直線の切り口が「貼った画像」に見える。 */
-  mask-image: linear-gradient(to bottom, #000 92%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 92%, transparent 100%);
+  margin-bottom: 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text-faint);
 }
 
-/* 文字の面 */
+/* 順位はカードでいちばん大きな数字。ここが「何位の人か」の答えになる。 */
+.hero-rank-value {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 2rem + 1.6vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* 上位3人は、ランキングの表と同じ金・銀・銅で示す（別の場所でも同じ色になる） */
+.hero-rank-value.is-1 { color: var(--gold); }
+.hero-rank-value.is-2 { color: var(--silver); }
+.hero-rank-value.is-3 { color: var(--bronze); }
+
+.hero-rank-note {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+}
+
+.hero-chars {
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* メインとサブのあいだだけ空ける（柱の末尾に余りが出ないよう、間にだけ足す） */
+.hero-char-row + .hero-rail-label { margin-top: 0.7rem; }
+
+.hero-char-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+/* 切り抜きの縦横比は 0.75〜2.73 とばらばら（225枚の実測）。枠を決めて上端で
+   切る（cover + top）と、どの絵も顔から胸のあたりが同じ大きさで並ぶ ── 全身を
+   収める（contain）と、細長いキャラクターだけが豆粒になって見分けがつかない。 */
+.hero-char {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+}
+
+.hero-char img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+/* サブは柱の幅にちょうど3つ並ぶ大きさ（上限6人 ＝ サブ5人が2段に収まる） */
+.hero-char.is-main { width: 100%; height: 6.5rem; }
+.hero-char.is-sub { width: 2.8rem; height: 2.8rem; }
+
+/* 絵から選ぶ前に文字で登録された使用キャラクター（js/characters.js） */
+.hero-char.is-text {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+/* ---- 中央の面 ---- */
 .player-hero-body {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 1.25rem 1.25rem 1.25rem 0;
+  padding: 1.25rem;
   min-width: 0;
+  overflow: hidden;
+}
+
+/* 名前の後ろに敷くメインキャラクター。右上に寄せ、左下へ向かって溶かす
+   （＝名前が始まる左と、戦績が並ぶ下には出ない）。溶かす向きを斜めにするのは、
+   マスクを1枚で済ませるため ── 左と下で2枚重ねると mask-composite が要る。
+   濃さは「あることは分かるが、上に乗る文字は普通に読める」ところで止める。
+   全身を収める（contain）。切って寄せる（cover）と、顔だけが巨大に映って
+   名前の裏で目が合う。 */
+.player-hero-art {
+  position: absolute;
+  top: 0;
+  right: 0;
+  /* 高さは面の上寄り（名前と札のあたり）まで。下まで伸ばすと、戦績の行が
+     絵を横切って「切れ目」に見える。 */
+  height: 72%;
+  width: 55%;
+  pointer-events: none;
+  opacity: 0.17;
+  mask-image: linear-gradient(205deg, #000 8%, transparent 72%);
+  -webkit-mask-image: linear-gradient(205deg, #000 8%, transparent 72%);
+}
+
+.player-hero-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right top;
+}
+
+/* 敷いた絵より前に出す（絵は position:absolute で同じ面に居る） */
+.player-hero-body > *:not(.player-hero-art) {
+  position: relative;
+  z-index: 1;
 }
 
 .player-hero-name {
@@ -4531,6 +4590,106 @@ dialog.char-picker { max-width: 56rem; }
   font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.25rem);
   line-height: 1.15;
   overflow-wrap: anywhere;
+}
+
+/* ---- 中央の下段（戦績）---- */
+.player-hero-results {
+  margin-top: auto;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.hero-block-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text-faint);
+}
+
+.hero-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 順位の札・大会名・規模を3列に固定する。大会名の長さでほかの列が動くと、
+   上から下へ順位だけを追うことができない。 */
+.hero-result {
+  display: grid;
+  grid-template-columns: 4.4rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.hero-result-place {
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.hero-result-place.is-1 { color: var(--gold); }
+.hero-result-place.is-2 { color: var(--silver); }
+.hero-result-place.is-3 { color: var(--bronze); }
+
+/* 大会名は1行に収めて、長ければ末尾を省く（折り返すと札との行がずれる） */
+.hero-result-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.hero-result-name:hover { color: var(--accent-bright); }
+
+.hero-result-meta {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hero-result-total {
+  margin: 0.45rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+/* カードの中では、点線の大きな空箱は場所を取りすぎる。1行の断り書きに縮める */
+.player-hero-results .empty-hint {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+/* ---- 右の柱（アイコン）----
+   丸く抜かず、面いっぱいに置く。カードの高さは中央の面が決めるので、
+   ここは絶対配置で「余った縦をすべて埋める」側に回る。 */
+.player-hero-photo {
+  position: relative;
+  min-height: 13rem;
+  border-left: 1px solid var(--border-soft);
+  background: var(--surface-2);
+}
+
+.player-hero-photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* 名前の下に並べる短い札（ゲームID・SNS） */
@@ -4567,13 +4726,6 @@ dialog.char-picker { max-width: 56rem; }
 .player-chip.is-link:hover {
   color: var(--text);
   border-color: var(--border-strong);
-}
-
-/* 戦歴は名前と同じ面の下側に置く。カードの高さは絵の面が決めるので、
-   ここは余った縦を使って下に沈める。 */
-.player-hero-body .stat-cards {
-  margin: auto 0 0;
-  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
 }
 
 /* ---------------------------------------------------------------------------
@@ -4732,32 +4884,56 @@ dialog.char-picker { max-width: 56rem; }
      「メインにする」と「×」が隣り合って押し間違える。 */
   .char-chip { flex: 1 1 100%; }
 
-  /* 選手カードは左右をやめて上下に積む。横に並べたままだと、絵も文字も
-     どちらも半端な幅になり、長い表示名が数文字ごとに折り返す。
-     積んでも上下の関係は変わらない（絵が上、名前と戦歴が下）ので、
-     文字が絵に乗らないという肝心のところは保たれる。 */
+  /* 選手カードは3つの柱をやめて上下に積む。横に並べたままだと、どの面も
+     半端な幅になり、長い表示名が数文字ごとに折り返す。
+     並びは アイコン → 順位と使用キャラクター → 名前と戦績。アイコンを先頭に
+     持ってくるのは、狭い画面で最初に目に入るものが「誰か」であってほしいため。 */
   .player-hero,
-  .player-hero.has-no-char {
+  .player-hero.has-no-photo {
     grid-template-columns: minmax(0, 1fr);
-    gap: 0;
   }
 
-  .player-hero-visual {
+  .player-hero-photo {
+    order: -1;
+    height: 13rem;
     min-height: 0;
-    padding: 0.9rem 1rem;
+    border-left: 0;
+    border-bottom: 1px solid var(--border-soft);
   }
 
-  /* 縦に積むと絵の面は横長になる。背丈を詰めて、名前が画面の外へ
-     押し出されないようにする。 */
-  .player-hero-char { height: 9.5rem; }
-
-  .avatar-hero {
-    width: 5.5rem;
-    height: 5.5rem;
-    font-size: 2rem;
+  /* 縦に積むと左の柱は横長の帯になる。順位とキャラクターを横に並べ、
+     背丈を詰めて、名前が画面の外へ押し出されないようにする。 */
+  .player-hero-rail {
+    flex-direction: row;
+    align-items: center;
+    gap: 1.1rem;
+    padding: 0.8rem 1rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-soft);
+    text-align: left;
   }
+
+  .hero-rank { flex: none; }
+
+  .hero-chars {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-top: 0;
+    padding-left: 1.1rem;
+    border-top: 0;
+    border-left: 1px solid var(--border-soft);
+  }
+
+  .hero-char-row + .hero-rail-label { margin-top: 0.45rem; }
+  .hero-char-row { justify-content: flex-start; }
+  .hero-char.is-main { width: 3.6rem; height: 3.6rem; }
+  .hero-char.is-sub { width: 2.6rem; height: 2.6rem; }
 
   .player-hero-body { padding: 1rem; }
+
+  /* 大会名を守るため、規模（32人など）は落とす */
+  .hero-result { grid-template-columns: 4.2rem minmax(0, 1fr); }
+  .hero-result-meta { display: none; }
 
   /* 一覧の行の絵も、狭い画面では名前の真後ろに来てしまう。細く薄くする */
   .row-art {
