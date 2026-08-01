@@ -112,9 +112,6 @@ export function getPlayerStats(playerId, record) {
         wins: tm.filter((m) => m.winnerId === playerId).length,
         losses: tm.filter((m) => m.loserId === playerId).length,
         placement: placementLabelOf(t.id, placementByTournament.get(t.id) ?? null),
-        // 勝ち上がりの深さ（優勝=1、準優勝=2、ベストN=N）。表示用のラベルからは
-        // 良し悪しの順序が読めないので、並べ替えたい側（選手カードの戦績）のために生の値も渡す。
-        depth: placementByTournament.get(t.id) ?? null,
         // チーム戦のときだけ、どのチームで出たか
         teamName: teamNameByTournament.get(t.id) ?? null,
       };
