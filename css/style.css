@@ -4381,7 +4381,11 @@ dialog.char-picker { max-width: 56rem; }
 
    絵は装飾なので読み上げには載せない（aria-hidden を付けて出す）。 */
 .player-hero {
-  --art-w: 17rem;        /* 絵が占める右側の幅 */
+  /* カードを左右に二分する。左＝選手名とランク、右＝キャラクター。
+     【線は引かない】境目に境界線も背景の切り替わりも置かない。線を引くと
+     「2つの箱を並べた」ように見えて、絵が背景であることが伝わらなくなる。
+     絵の面が持つのは足元の淡い光だけで、それも縁に届く前に消える。 */
+  --art-w: 50%;
   --art-inset: 0.75rem;  /* 絵とカードの縁のすき間。全身を収めるための余白 */
 
   position: relative;
@@ -4395,7 +4399,7 @@ dialog.char-picker { max-width: 56rem; }
   overflow: hidden;
 }
 
-/* 文字の面。絵の下をくぐらせたくないものは、この余白の内側に収まる */
+/* 文字の面。左半分だけを使う（右は絵の場所）。 */
 .player-hero-main {
   position: relative;
   z-index: 1;
@@ -4404,20 +4408,24 @@ dialog.char-picker { max-width: 56rem; }
   gap: 0.75rem;
   min-height: inherit;
   padding: 1.35rem;
-  padding-right: calc(var(--art-w) * 0.72);
+  padding-right: var(--art-w);
 }
 
 .player-hero.has-no-art { min-height: 0; }
 .player-hero.has-no-art .player-hero-main { padding-right: 1.35rem; }
 
-/* 名前だけは余白より右へ伸ばす。ここで切ってしまうと、少し長い名前が
-   まだ絵に届いてもいないのに「…」になる。絵の後ろへ回るのは許容している。 */
+/* 名前だけは、半分の境目をわずかに越えてよい。
+   ここできっちり切ると、ありふれた長さの名前（「ぎゅー（プレイヤー）」程度）でも
+   狭い画面で「…」になってしまう。越えた先にあるのは背景の絵だけで、
+   名前は絵より手前に出るので読める。 */
 .player-hero-id {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-right: calc(var(--art-w) * -0.42);
+  margin-right: -20%;
 }
+
+.player-hero.has-no-art .player-hero-id { margin-right: 0; }
 
 .player-hero.has-no-art .player-hero-id { margin-right: 0; }
 
@@ -4438,7 +4446,9 @@ dialog.char-picker { max-width: 56rem; }
 .player-hero-name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.35rem, 1.05rem + 1.2vw, 2rem);
+  /* 下限を低めに取る。左半分しか使えないので、ここを高くすると
+     ありふれた長さの名前でも「…」になる。 */
+  font-size: clamp(1.15rem, 0.95rem + 1.1vw, 2rem);
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -4454,6 +4464,7 @@ dialog.char-picker { max-width: 56rem; }
 .player-rank {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;  /* 中身の1行に合わせて縮む。左半分より広がることはある */
   gap: 0.1rem;
   margin-top: auto;
   max-width: 20rem;
@@ -4463,12 +4474,18 @@ dialog.char-picker { max-width: 56rem; }
   background: linear-gradient(90deg, var(--accent-soft), transparent 90%);
 }
 
+/* 【折り返さない】順位も、その下の但し書き（「ランキング対象外」「ランキング未公開」）も
+   1行に保つ。左半分は狭いので、放っておくと「ランキング対」「象外」のように
+   語の途中で割れる ── 日本語は単語の区切りが無く、既定では文字と文字の間で
+   いくらでも改行できるため。
+   はみ出した先にあるのは背景の絵だけなので、あふれさせるほうが読める。 */
 .player-rank-value {
   font-family: var(--font-display);
   font-size: 2.1rem;
   font-weight: 700;
   line-height: 1;
   color: var(--accent-bright);
+  white-space: nowrap;
 }
 
 .player-rank-value .rank-unit {
@@ -4480,6 +4497,7 @@ dialog.char-picker { max-width: 56rem; }
 .player-rank-note {
   font-size: 0.78rem;
   color: var(--text-faint);
+  white-space: nowrap;
 }
 
 /* 絵の面。文字より後ろ（z-index: 0）に置く。
@@ -4814,16 +4832,13 @@ dialog.char-picker { max-width: 56rem; }
      「メインにする」と「×」が隣り合って押し間違える。 */
   .char-chip { flex: 1 1 100%; }
 
-  /* 狭い画面でも絵は右に残す。下へ積み替えると、絵の帯のぶんだけ
+  /* 狭い画面でも二分したまま。下へ積み替えると、絵の帯のぶんだけ
      一番格上の選手名が画面の外へ押し出される。
-     幅の取り分と高さだけを絞る。全身を収める決まりは変えないので、
-     狭い画面でも頭や足が切れることはない。 */
-  .player-hero {
-    --art-w: 11.5rem;
-    min-height: 15rem;
-  }
+     割合で決めてあるので --art-w はそのまま。高さだけを絞る
+     （全身を収める決まりは変えないので、頭や足が切れることはない）。 */
+  .player-hero { min-height: 15rem; }
 
-  .player-hero-main { padding: 1rem; padding-right: calc(var(--art-w) * 0.62); }
+  .player-hero-main { padding: 1rem; padding-right: var(--art-w); }
   .player-hero.has-no-art .player-hero-main { padding-right: 1rem; }
 
   .avatar-hero {
