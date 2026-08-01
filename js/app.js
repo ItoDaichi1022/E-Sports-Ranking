@@ -1883,22 +1883,26 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}
     }
   }
 
+  // 3つのかたまりを .player-hero の grid に直接置く。名前は上段で横いっぱい、
+  // 下段を左右に割って 左＝ランク・右＝キャラクター にする（CSSの grid-template-areas）。
+  // 絵を下段に置くのは「名前にかぶらない位置」を段で決めるため ── 座標で避けると、
+  // 過去名の有無で名前の高さが変わったときにずれる。
   return `
     <section class="player-hero${artUrl ? '' : ' has-no-art'}">
-      <div class="player-hero-main">
-        <div class="player-hero-id">
-          ${avatarHtml(player, 'hero')}
-          <div class="player-hero-names">
-            <!-- title は、長い名前が「…」で切られたときに全体を読むための保険。
-                 切らずに折り返すと2行になり、下のランクの位置とカードの高さが
-                 名前の長さで動いてしまう（CSSの .player-hero-name を参照）。 -->
-            <${nameTag} class="player-hero-name" title="${escapeHtml(player.currentName)}">${escapeHtml(player.currentName)}</${nameTag}>
-            ${player.pastNames.length
-              ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>`
-              : ''}
-          </div>
-          ${action}
+      <div class="player-hero-id">
+        ${avatarHtml(player, 'hero')}
+        <div class="player-hero-names">
+          <!-- title は、長い名前が「…」で切られたときに全体を読むための保険。
+               切らずに折り返すと2行になり、下の段の位置とカードの高さが
+               名前の長さで動いてしまう（CSSの .player-hero-name を参照）。 -->
+          <${nameTag} class="player-hero-name" title="${escapeHtml(player.currentName)}">${escapeHtml(player.currentName)}</${nameTag}>
+          ${player.pastNames.length
+            ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>`
+            : ''}
         </div>
+        ${action}
+      </div>
+      <div class="player-hero-main">
         <div class="player-rank">
           <span class="player-rank-value">${rankValue}</span>
           <span class="player-rank-note">${rankNote}</span>
