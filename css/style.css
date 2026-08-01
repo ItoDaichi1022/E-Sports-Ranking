@@ -4435,12 +4435,13 @@ dialog.char-picker { max-width: 56rem; }
 
    左右の柱は実寸で決める。割合にすると、画面が広いほど柱だけが間延びして、
    順位の数字とアイコンの周りに誰も居ない床が広がる。 */
-/* 右の柱はカードの4割強を渡す（割合で決める数少ない場所）。ここだけ実寸に
+/* 右の柱はカードの半分を渡す（割合で決める数少ない場所）。ここだけ実寸に
    しないのは、アイコンは「大きく見せる」ことそのものが役割だから ── 実寸で
-   固定すると、画面が広いほど本人の顔だけが相対的に小さくなっていく。 */
+   固定すると、画面が広いほど本人の顔だけが相対的に小さくなっていく。
+   そのぶん中央の文字は一回り小さくする（下の .player-hero-body 以下）。 */
 .player-hero {
   display: grid;
-  grid-template-columns: 11rem minmax(0, 1fr) minmax(16rem, 45%);
+  grid-template-columns: 11rem minmax(0, 1fr) minmax(16rem, 50%);
   align-items: stretch;
   margin-bottom: 1.5rem;
   border: 1px solid var(--border-soft);
@@ -4588,17 +4589,29 @@ dialog.char-picker { max-width: 56rem; }
   z-index: 1;
 }
 
+/* 中央は柱にほとんどの幅を渡したぶん、一回り小さい組みにする。
+   大きいままだと、表示名が数文字ごとに折り返し、札や戦績の行も詰まって読めない。 */
 .player-hero-name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.25rem);
+  font-size: clamp(1.25rem, 0.95rem + 1.1vw, 1.75rem);
   line-height: 1.15;
   overflow-wrap: anywhere;
 }
 
+.player-hero .player-chip {
+  padding: 0.22rem 0.55rem;
+  font-size: 0.74rem;
+}
+
+.player-hero .player-chip code { font-size: 0.74rem; }
+
 /* ---- 中央の下段（戦績）---- */
+/* 名前・札のすぐ下に続ける。カードの高さはアイコンの柱（正方形）が決めるので、
+   ここを下端に貼り付ける（margin-top:auto）と、登録の少ない人のカードでは
+   札と戦績のあいだに大きな空白が居座ってしまう。余りは下にまとめて逃がす。 */
 .player-hero-results {
-  margin-top: auto;
+  margin-top: 0.35rem;
   padding-top: 0.9rem;
   border-top: 1px solid var(--border-soft);
 }
@@ -4626,17 +4639,18 @@ dialog.char-picker { max-width: 56rem; }
    上から下へ順位だけを追うことができない。 */
 .hero-result {
   display: grid;
-  grid-template-columns: 4.4rem minmax(0, 1fr) auto;
+  grid-template-columns: 3.9rem minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.35rem 0.6rem;
+  gap: 0.45rem;
+  padding: 0.3rem 0.5rem;
   border-radius: var(--r-sm);
   background: var(--surface-2);
+  font-size: 0.88rem;
 }
 
 .hero-result-place {
   font-family: var(--font-display);
-  font-size: 0.74rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-align: center;
   color: var(--text-dim);
@@ -4658,7 +4672,7 @@ dialog.char-picker { max-width: 56rem; }
 .hero-result-name:hover { color: var(--accent-bright); }
 
 .hero-result-meta {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -4686,15 +4700,18 @@ dialog.char-picker { max-width: 56rem; }
    丸く抜かず、面いっぱいに置く。カードの高さは中央の面が決めるので、
    ここは絶対配置で「余った縦をすべて埋める」側に回る。
 
-   【下限の高さ】切らずに収める（contain）ので、画像の見える大きさは柱の幅と
-   高さの小さいほうで決まる。柱を広げても高さが足りなければ画像は大きくならない
-   ので、下限もあわせて上げておく（戦績がまだ無い人はカードが低くなる）。
+   【高さは幅に合わせる】切らずに収める（contain）ので、画像の見える大きさは
+   柱の幅と高さの小さいほうで決まる。柱を半分に広げても、カードの高さが足りなければ
+   画像はそこで頭打ちになり、幅を渡した意味がない。正方形（aspect-ratio: 1）に
+   すると、カードの高さが柱の幅まで伸びて、正方形の画像は柱の幅いっぱいに出る。
+   中央の面のほうが高いときは、その高さまで引き伸ばされる（画像は中央に置かれる）。
 
    地はカードと同じ色。縦横比しだいで縁が余るので、そこは「空いた面」ではなく
    「画像のまわりの余白」に見えるほうがよい。 */
 .player-hero-photo {
   position: relative;
-  min-height: 19rem;
+  aspect-ratio: 1 / 1;
+  min-height: 16rem;
   border-left: 1px solid var(--border-soft);
   background: var(--surface);
 }
