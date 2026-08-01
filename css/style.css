@@ -4511,11 +4511,12 @@ dialog.char-picker { max-width: 56rem; }
   gap: 0.35rem;
 }
 
-/* 切り抜きの縦横比は 0.75〜2.73 とばらばら（225枚の実測）。枠を決めて上端で
-   切る（cover + top）と、どの絵も顔から胸のあたりが同じ大きさで並ぶ ── 全身を
-   収める（contain）と、細長いキャラクターだけが豆粒になって見分けがつかない。 */
+/* 切り抜きの縦横比は 0.75〜2.73 とばらばら（225枚の実測）。枠に合わせて切ると
+   横長のキャラクターは左右が落ちるので、全身を枠の中に収める（contain）。
+   どのキャラクターも「立ち姿がまるごと1枚」で並ぶ。 */
 .hero-char {
   display: block;
+  padding: 0.2rem;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -4525,12 +4526,12 @@ dialog.char-picker { max-width: 56rem; }
 .hero-char img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center top;
+  object-fit: contain;
 }
 
-/* サブは柱の幅にちょうど3つ並ぶ大きさ（上限6人 ＝ サブ5人が2段に収まる） */
-.hero-char.is-main { width: 100%; height: 6.5rem; }
+/* サブは柱の幅にちょうど3つ並ぶ大きさ（上限6人 ＝ サブ5人が2段に収まる）。
+   メインは全身が入るよう縦を長めに取る。 */
+.hero-char.is-main { width: 100%; height: 7.5rem; }
 .hero-char.is-sub { width: 2.8rem; height: 2.8rem; }
 
 /* 絵から選ぶ前に文字で登録された使用キャラクター（js/characters.js） */
@@ -4685,21 +4686,24 @@ dialog.char-picker { max-width: 56rem; }
    【下限の高さ】戦績がまだ無い人のカードは中央の面が短く、そのままだと
    アイコンが横長の細い帯に切り縮められて、誰の顔なのか分からなくなる。
    柱の幅（16rem）に近い高さを下限にして、どのカードでも正方形に近い面を保つ。 */
+/* 地はカードと同じ色。切らずに収めると縦横比しだいで縁が余るので、そこは
+   「空いた面」ではなく「画像のまわりの余白」に見えるほうがよい。 */
 .player-hero-photo {
   position: relative;
   min-height: 15.5rem;
   border-left: 1px solid var(--border-soft);
-  background: var(--surface-2);
+  background: var(--surface);
 }
 
-/* 顔は写真の上寄りにあることが多いので、切る位置も上に合わせる */
+/* 【切らない】面に合わせて切る（cover）と、横長の画像は上下が、縦長の画像は
+   左右が落ちる。本人が選んだ1枚なので、縦横比のいかんに関わらず全体を出す。
+   余った縁は柱の地の色で埋まる。 */
 .player-hero-photo img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center top;
+  object-fit: contain;
 }
 
 /* 名前の下に並べる短い札（ゲームID・SNS） */
