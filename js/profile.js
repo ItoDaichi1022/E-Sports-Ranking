@@ -333,39 +333,35 @@ export function renderProfileForm(
   if (draftKey) keepFormDraft(form, draftKey);
 }
 
-// 選手ページに出すプロフィール部分（自己紹介・使用キャラ・ゲームID・SNS）。
-// 何も登録されていなければ空文字を返す。
-export function profileSectionHtml(player) {
-  const links = [
+// 名前のすぐ下に並べる短い情報（ゲームID・SNS）。
+//
+// もとは ゲームIDが定義リストの1行、SNSがページの一番下 ── と別々の場所にあった。
+// 選手カードの形（js/app.js の playerHeroHtml）にしてからは、どちらも
+// 「この人が誰か」を1行で言う札なので、名前の直下にまとめている。
+// 何も登録されていなければ空文字を返す（空の器を置くと名前の下に隙間だけが残る）。
+export function profileMetaHtml(player) {
+  const chips = [];
+
+  if (player.gameAccountId) {
+    chips.push(`<span class="player-chip"><span class="player-chip-label">ID</span>`
+      + `<code>${escapeHtml(player.gameAccountId)}</code></span>`);
+  }
+
+  // 外部へ出ていくリンクなので、本人の情報の後ろに置く。
+  for (const [label, url] of [
     ['X', socialUrl('x', player.snsX)],
     ['YouTube', socialUrl('youtube', player.snsYoutube)],
-  ].filter(([, url]) => url);
-
-  const rows = [];
-  if (player.gameAccountId) {
-    rows.push(`<div><dt>ゲームアカウントID</dt><dd><code>${escapeHtml(player.gameAccountId)}</code></dd></div>`);
+  ]) {
+    if (!url) continue;
+    chips.push(`<a class="player-chip is-link" href="${escapeHtml(url)}"`
+      + ` target="_blank" rel="noopener noreferrer">${label}</a>`);
   }
 
-  let html = '';
-  if (rows.length) {
-    html += `<dl class="tournament-info-grid profile-grid">${rows.join('')}</dl>`;
-  }
+  return chips.length ? `<div class="player-chips">${chips.join('')}</div>` : '';
+}
 
-  // 使用キャラクターは項目としては出さない。選手ページの背景に大きく敷いているので
-  // （js/app.js の playerArtHtml）、札を並べると同じ絵が2度出ることになる。
-  // 登録そのものは残っていて、この背景と一覧の行の絵がその表示先になる。
-  if (player.bio) {
-    html += `<p class="player-bio">${escapeHtml(player.bio)}</p>`;
-  }
-
-  // SNSリンクはプロフィールの一番下にまとめる。
-  // 外部へ出ていく導線なので、先に本人の紹介を読ませてから見せる。
-  if (links.length) {
-    const linkHtml = links
-      .map(([label, url]) =>
-        `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`)
-      .join('');
-    html += `<div class="sns-links">${linkHtml}</div>`;
-  }
-  return html;
+// 自己紹介。選手カードの外（カードの下）に置く ── 長さが人によって数十倍違うので、
+// カードの中に入れると隣の絵との高さが釣り合わなくなる。
+export function profileBioHtml(player) {
+  return player.bio ? `<p class="player-bio">${escapeHtml(player.bio)}</p>` : '';
 }

@@ -94,7 +94,7 @@ export function searchCharacters(query) {
 // あのダイアログ一式を読み込ませないため。
 
 // 選手ページに、名前と絵を並べた「使用キャラクター」の項目は出さない。
-// 選んだキャラクターの見せ場は背景（js/app.js の playerArtHtml）と
+// 選んだキャラクターの見せ場は選手カード（js/app.js の playerHeroHtml）と
 // 一覧の行（下の characterRowArtHtml）の2つで、札を並べると同じ絵が重なる。
 
 // 一覧の行（ランキング・選手検索）の右端に敷く、その人のメインキャラクター。
