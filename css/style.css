@@ -4366,9 +4366,11 @@ dialog.char-picker { max-width: 56rem; }
 
 /* ---- プロフィールのヒーロー（選手名・ランク・メインキャラクター）----
 
-   【絵を主役にする】キャラクターはカードからわずかにはみ出す大きさで、文字より
-   手前に置く。名前やランクが少し絵の後ろに回るのは承知のうえ ── 絵を小さくして
-   全部を避けるより、絵が主役として立っているほうがこのページの目的に合う。
+   【絵は背景。ただし全身を見せる】キャラクターは右側に、文字より後ろ（z-index: 0）に
+   置く。切り取らず、全身がカードに収まる大きさにする ── 頭や足が切れていると、
+   背景として流し見たときに「見切れた画像」の違和感だけが残る。
+   文字の面は右に余白を取ってあるので、実際に絵の上へ乗るのは長い名前くらい。
+   その名前は絵より手前に出るので読める。
 
    【大きさを画像の実寸から切り離す】絵は position:absolute で流れから外し、
    高さも幅も「カードに対する割合」だけで決める。以前は max-width/max-height と
@@ -4377,22 +4379,20 @@ dialog.char-picker { max-width: 56rem; }
    絵の大きさが変わって見えていた。割合だけで決めれば、読み込みが済んでいようが
    いまいが、どの切り抜きだろうが、レイアウトは一定になる。
 
-   はみ出す量は --art-bleed。top と bottom の両方に負の値を置いて高さを auto に
-   するので、この1つを変えれば上下の見切れ量が揃って変わる。
-
-   絵は装飾なので読み上げには載せない（aria-hidden を付けて出す）。
-   pointer-events も切る ── 文字の上に乗るので、掛けたままだと下のリンクを押せない。 */
+   絵は装飾なので読み上げには載せない（aria-hidden を付けて出す）。 */
 .player-hero {
-  --art-w: 17rem;      /* 絵が占める右側の幅 */
-  --art-bleed: 15%;    /* カードの上下からはみ出させる量＝見切れる量 */
+  --art-w: 17rem;        /* 絵が占める右側の幅 */
+  --art-inset: 0.75rem;  /* 絵とカードの縁のすき間。全身を収めるための余白 */
 
   position: relative;
-  min-height: 14rem;   /* 絵の背丈のもと。カードが低いと絵も小さくなる */
+  /* 絵の背丈のもと。全身を収める決まりなので、カードが低いとそのぶん絵も小さくなる。
+     絵を大きくしたいときに動かすのはここ。 */
+  min-height: 18rem;
   margin-bottom: 1.5rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--r);
   background: var(--surface);
-  overflow: hidden;    /* はみ出した絵はここで切られる＝見切れになる */
+  overflow: hidden;
 }
 
 /* 文字の面。絵の下をくぐらせたくないものは、この余白の内側に収まる */
@@ -4482,26 +4482,28 @@ dialog.char-picker { max-width: 56rem; }
   color: var(--text-faint);
 }
 
-/* 絵の面。文字より手前（z-index: 2）に置く。
-   背景は足元の淡い光だけにして、面としては透明のままにする ── ここに地色を敷くと、
-   絵ではなく四角い板が文字を覆うことになって、ただ読めなくなるだけになる。 */
+/* 絵の面。文字より後ろ（z-index: 0）に置く。
+   地色は敷かず、足元の淡い光だけ ── 面を敷くと四角い板が背景に浮いて、
+   絵ではなく板が見えてしまう。
+   背景なので透かす。ただし 0.16 まで落とすと、選んだキャラクターが何なのか
+   分からなくなる（以前それで「もったいない」状態になっていた）。
+   文字とはほとんど重ならない配置なので、判別できる濃さまで戻してある。 */
 .player-hero-art {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   width: var(--art-w);
-  z-index: 2;
+  z-index: 0;
   pointer-events: none;
+  opacity: 0.55;
   background: radial-gradient(62% 42% at 50% 94%, var(--accent-soft), transparent 72%);
 }
 
-/* 上下に --art-bleed ずつはみ出した箱を作り、その中に絵を収める。
-   箱の大きさは幅100% × 高さ(100% + はみ出し×2) で、画像の実寸に一切依存しない。
+/* カードの内側に --art-inset だけ余白を取った箱を作り、その中に絵を収める。
+   箱の大きさは幅100% × 高さ(100% - 余白×2) で、画像の実寸に一切依存しない。
    だから読み込みの前後でも、どの切り抜きでも、位置と大きさが動かない。
-   object-fit: contain なので縦横比は保たれ、箱いっぱいに伸びた縦長の切り抜きは
-   上下が .player-hero の overflow:hidden で切られて「少し見切れた」状態になる。
-   横長の切り抜きは箱の幅で頭打ちになり、見切れずに中央へ収まる。
+   object-fit: contain なので縦横比は保たれ、縦長でも横長でも全身が箱に収まる。
 
    【width/height を auto にしないこと】img は置換要素なので、auto は
    「left/right いっぱいに広げる」ではなく「実寸のまま」を意味する。
@@ -4509,15 +4511,11 @@ dialog.char-picker { max-width: 56rem; }
 .player-hero-art img {
   position: absolute;
   left: 0;
-  top: calc(var(--art-bleed) * -1);
+  top: var(--art-inset);
   width: 100%;
-  height: calc(100% + var(--art-bleed) * 2);
+  height: calc(100% - var(--art-inset) * 2);
   display: block;
   object-fit: contain;
-  /* 見切れない（＝縦に余る）切り抜きだけ、足元をわずかに溶かす。
-     素材によっては足首で切れており、直線の切り口が「貼った画像」に見えるため。 */
-  mask-image: linear-gradient(to bottom, #000 94%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 94%, transparent 100%);
 }
 
 /* ---- 2段目: 直近の戦績 ---- */
@@ -4818,11 +4816,11 @@ dialog.char-picker { max-width: 56rem; }
 
   /* 狭い画面でも絵は右に残す。下へ積み替えると、絵の帯のぶんだけ
      一番格上の選手名が画面の外へ押し出される。
-     幅の取り分だけを絞り、見切れ量（--art-bleed）は変えない ── ここを変えると
-     広い画面と狭い画面で切り取られ方が変わり、同じ絵に見えなくなる。 */
+     幅の取り分と高さだけを絞る。全身を収める決まりは変えないので、
+     狭い画面でも頭や足が切れることはない。 */
   .player-hero {
     --art-w: 11.5rem;
-    min-height: 12.5rem;
+    min-height: 15rem;
   }
 
   .player-hero-main { padding: 1rem; padding-right: calc(var(--art-w) * 0.62); }
