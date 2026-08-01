@@ -2006,8 +2006,10 @@ function heroResultsHtml(stats) {
 // 勝敗数・勝率・対戦ごとの記録は出さない（プロフィールは戦績表ではなく
 // 「どの大会に出て、どこまで勝ち上がったか」を見る場所という位置づけ）。
 function tournamentHistoryHtml(playerId, stats) {
-  if (!stats) return '<p class="empty-hint">戦歴を読み込んでいます…</p>';
-  if (stats.tournaments.length === 0) return '<p class="empty-hint">まだ大会に出場していません。</p>';
+  // 読み込み中と0件は選手カードの戦績（heroResultsHtml）が言っているので、
+  // ここでは何も出さない。同じ断り書きが上下に2つ並ぶと、そのぶんカードが
+  // 押し下げられるだけで、読む人には何も足されない。
+  if (!stats || stats.tournaments.length === 0) return '';
 
   const entries = [...stats.tournaments].reverse();
   const expanded = expandedTournamentsFor === playerId;

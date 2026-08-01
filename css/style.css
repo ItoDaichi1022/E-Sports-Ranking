@@ -4666,30 +4666,40 @@ dialog.char-picker { max-width: 56rem; }
   color: var(--text-faint);
 }
 
-/* カードの中では、点線の大きな空箱は場所を取りすぎる。1行の断り書きに縮める */
+/* カードの中では、点線の大きな空箱は場所を取りすぎる。1行の断り書きに縮める。
+   幅は中身ぶんで止める（inline-block）── 段落のまま置くと中央の欄いっぱいまで
+   伸びて、1行の文にカードの半分を明け渡すことになる。 */
 .player-hero-results .empty-hint {
+  display: inline-block;
+  max-width: 100%;
   margin: 0;
-  padding: 0.55rem 0.7rem;
+  padding: 0.5rem 0.75rem;
   text-align: left;
   font-size: 0.8rem;
 }
 
 /* ---- 右の柱（アイコン）----
    丸く抜かず、面いっぱいに置く。カードの高さは中央の面が決めるので、
-   ここは絶対配置で「余った縦をすべて埋める」側に回る。 */
+   ここは絶対配置で「余った縦をすべて埋める」側に回る。
+
+   【下限の高さ】戦績がまだ無い人のカードは中央の面が短く、そのままだと
+   アイコンが横長の細い帯に切り縮められて、誰の顔なのか分からなくなる。
+   柱の幅（16rem）に近い高さを下限にして、どのカードでも正方形に近い面を保つ。 */
 .player-hero-photo {
   position: relative;
-  min-height: 13rem;
+  min-height: 15.5rem;
   border-left: 1px solid var(--border-soft);
   background: var(--surface-2);
 }
 
+/* 顔は写真の上寄りにあることが多いので、切る位置も上に合わせる */
 .player-hero-photo img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center top;
 }
 
 /* 名前の下に並べる短い札（ゲームID・SNS） */
