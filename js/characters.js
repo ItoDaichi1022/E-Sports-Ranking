@@ -112,3 +112,30 @@ export function characterRowArtHtml(mainCharacters) {
   return `<span class="row-art" aria-hidden="true">`
     + `<img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async"></span>`;
 }
+
+// 対戦表の選手行（js/bracketView.js）に敷く、その枠のメインキャラクター。
+// 考え方は上の行と同じ ── 情報ではなく「その行の地模様」で、名前とゲームカウントの
+// 読みやすさは崩さない（濃さと帯の位置はCSSの .match-art）。
+//
+// 違いは2つ。対戦表は要素を組み立てて作っているので文字列ではなく要素を返すことと、
+// チーム戦ではメンバーそれぞれのキャラクターを並べること（チームの枠に出るのは
+// 2人なので、片方だけ敷くと「この人だけが出ている」ように見えてしまう）。
+// refs は出場枠のメンバーと同じ並び。登録していない人は詰めて飛ばす。
+export function characterRowArtElement(refs) {
+  const urls = (refs ?? []).map((ref) => characterImageUrl(ref, 'thumb')).filter(Boolean);
+  if (urls.length === 0) return null;
+
+  const wrap = document.createElement('span');
+  wrap.className = 'match-art';
+  wrap.setAttribute('aria-hidden', 'true');
+  // 3人以上のチームは想定していないが、増えても行が絵だらけにならないよう2枚で止める
+  urls.slice(0, 2).forEach((url) => {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    wrap.appendChild(img);
+  });
+  return wrap;
+}

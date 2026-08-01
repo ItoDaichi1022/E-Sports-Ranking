@@ -3,6 +3,7 @@ import {
   pendingResultReport, entrantIdOfPlayer, roundState, isRoundStarted, isStreamedMatch,
 } from './state.js';
 import { thirdPlaceMatchOf } from './bracket.js';
+import { characterRowArtElement } from './characters.js';
 import { auth, isAdmin } from './auth.js';
 import { canUseMatchChat, openMatchChat } from './matchChat.js';
 import { makeIconButton } from './icons.js';
@@ -98,6 +99,17 @@ function buildPlayerRow({ seed, name, members = [], memberIds = [], isWinner }) 
   scoreSpan.className = 'player-score';
 
   row.append(seedBadge, nameEl, scoreSpan);
+
+  // 誰と当たるのかは名前だけでは掴みにくい。ランキングの行と同じように、その枠の
+  // メインキャラクターを地模様として敷いておく（登録していない枠には何も出さない）。
+  const art = characterRowArtElement(
+    memberIds.map((pid) => state.players.find((p) => p.id === pid)?.mainCharacters?.[0]),
+  );
+  if (art) {
+    row.classList.add('has-match-art');
+    row.appendChild(art);
+  }
+
   return { row, scoreSpan, nameEl };
 }
 
