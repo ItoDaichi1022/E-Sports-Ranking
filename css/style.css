@@ -2641,10 +2641,14 @@ a.card:hover {
   padding: 1rem 0;
 }
 
+/* 列（＝対戦カード）の幅。
+   選手名を左から読ませ、メインキャラクターを右に敷く（.match-art）ための幅を取る。
+   220pxだと名前が伸びた時点で絵の下に潜ってしまい、どちらも中途半端になっていた。
+   横は元々スクロールする作りなので、広げても表そのものは壊れない。 */
 .round-column {
   display: flex;
   flex-direction: column;
-  width: 220px;
+  width: 300px;
   flex-shrink: 0;
 }
 
@@ -2822,12 +2826,17 @@ a.card:hover {
   right: 0;
   z-index: -1;
   display: flex;
-  width: 7rem;
+  width: 9rem;
   pointer-events: none;
   opacity: 0.25;
   mask-image: linear-gradient(to left, transparent, #000 2rem, #000 60%, transparent);
   -webkit-mask-image: linear-gradient(to left, transparent, #000 2rem, #000 60%, transparent);
 }
+
+/* 絵がある行だけ、名前の右に絵のぶんの場所を空ける。名前は左から、絵は右から。
+   場所を空けるのは名前の側（padding）で、ゲームカウントは動かさない ── 片方だけ
+   キャラクターを登録している対戦もあり、行ごとに数字の位置がずれると表に見えない。 */
+.match-player.has-match-art .player-name { padding-right: 3.5rem; }
 
 /* チーム戦は2枚を等分に並べる。顔の位置がそろうよう、どちらも上端で切る。 */
 .match-art img {
@@ -2907,7 +2916,34 @@ a.card:hover {
   color: var(--text-dim);
 }
 
+/* ゲームカウントが入った行だけ、数字を島の右端に付く区画として切り出す。
+   :empty で分けているのは、入っていない行に空の箱が並ぶのを避けるため
+   （まだ始まっていない対戦のカードは、名前と絵だけの静かな見た目のままにする）。
+
+   負のマージンで行の余白を食い、行の高さいっぱい・カードの右端まで届かせる。
+   数字が「行の中の右寄せの文字」から「カードに付いた区画」に変わることで、
+   結果が入った対戦かどうかが、数字を読む前に形で分かる。 */
+.player-score:not(:empty) {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  margin: -0.4rem -0.55rem -0.4rem 0;
+  padding: 0 0.4rem;
+  border-left: 1px solid var(--border-soft);
+  background: var(--surface-3);
+  font-weight: 700;
+}
+
 .match-player.winner .player-score { color: var(--accent-bright); }
+
+/* 勝った側の区画はアクセント色で塗る。カードを離れて見たとき、どちらが上がったのかが
+   区画の色だけで分かる（行の帯・太字と同じことを、右端でももう一度言っている）。 */
+.match-player.winner .player-score:not(:empty) {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
 
 .score-num-input {
   width: 3rem;
