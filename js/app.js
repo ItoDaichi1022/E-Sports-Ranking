@@ -20,7 +20,7 @@ import { renderRankingTable } from './rankingView.js';
 import { getPlayerStats, championLabel, placementLabelOf } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
 import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
-import { renderProfileForm, profileSectionHtml, isProfileFormMounted } from './profile.js';
+import { renderProfileForm, profileMetaHtml, profileBioHtml, isProfileFormMounted } from './profile.js';
 import { characterImageUrl } from './characters.js';
 import { keepFormDraft, clearFormDraft } from './formDraft.js';
 import {
@@ -132,7 +132,6 @@ const profileTitleEl = $('profile-title');
 const profileNoteEl = $('profile-note');
 const profileViewEl = $('profile-view');
 const profileFormContainer = $('profile-form-container');
-const profileLinksEl = $('profile-links');
 const profileLoginPanel = $('profile-login-panel');
 const profileLoginErrorEl = $('profile-login-error');
 const profileGoogleBtn = $('profile-google-btn');
@@ -815,7 +814,6 @@ function setProfileEditing(on) {
 }
 
 function renderProfilePage() {
-  profileLinksEl.innerHTML = '';
   profileViewEl.innerHTML = '';
   profileViewEl.hidden = true;
 
@@ -921,40 +919,50 @@ function renderOwnProfileView() {
   const player = auth.player;
   profileViewEl.hidden = false;
 
-  const details = profileSectionHtml(player);
+  const bio = profileBioHtml(player);
+  const foot = profileFooterHtml(player);
 
-  // 選手ページと同じ見え方にする（ここが「他の人からどう見えるか」の確認場所）。
-  // 背景の絵も同じ部品を使う。
-  profileViewEl.innerHTML = `
-    <div class="player-detail-stage">
-    ${playerArtHtml(player)}
-    <div class="player-detail-header">
-      <div class="player-identity">
-        ${avatarHtml(player, 'lg')}
-        <div>
-          <h3 class="profile-view-name">
-            ${escapeHtml(player.currentName)}
-            <button type="button" class="profile-edit-link profile-edit-btn"
-                    title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</button>
-          </h3>
-          ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>` : ''}
-        </div>
-      </div>
-    </div>
-    ${details || '<p class="empty-hint">まだ表示名だけです。鉛筆アイコンからアイコン・使用キャラ・自己紹介などを追加できます。</p>'}
-    </div>
-  `;
+  // 選手ページとまったく同じ部品で組む（ここが「他の人からどう見えるか」の確認場所
+  // なので、見た目が少しでも違うと確認にならない）。戦歴だけは通信が要るので、
+  // 先に枠を出しておいて後から差し込む（下の fillOwnRecord）。
+  profileViewEl.innerHTML = playerHeroHtml(player, {
+    nameTag: 'h3',
+    action: `<button type="button" class="profile-edit-link profile-edit-btn"
+              title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</button>`,
+  })
+    + bio
+    + '<div class="player-record"></div>'
+    + (foot || (bio ? '' : '<p class="empty-hint">まだ表示名だけです。鉛筆アイコンからアイコン・使用キャラ・自己紹介などを追加できます。</p>'));
 
   profileViewEl.querySelector('.profile-edit-btn').addEventListener('click', () => {
     setProfileEditing(true);
     renderProfilePage();
   });
 
-  const link = document.createElement('a');
-  link.className = 'back-link';
-  link.href = `#player/${encodeURIComponent(player.id)}`;
-  link.textContent = '自分の選手ページ（戦歴つき）を見る →';
-  profileLinksEl.appendChild(link);
+  // 戦歴だけはサーバーへ取りに行く（全選手の試合は手元に無い。js/db.js の
+  // loadPlayerRecord）。待たずに先へ進む ── ヒーローも自己紹介も手元のデータだけで
+  // 描けるので、通信のあいだ空白のマイページを見せる理由がない。
+  fillOwnRecord(player.id);
+}
+
+// 読み終えた戦歴を、先に描いておいた枠へ差し込む。
+async function fillOwnRecord(playerId) {
+  let record;
+  try {
+    record = await db.loadPlayerRecord(playerId);
+  } catch (err) {
+    const failed = profileViewEl.querySelector('.player-record');
+    if (failed) failed.innerHTML = `<p class="empty-hint">${escapeHtml(err.message)}</p>`;
+    return;
+  }
+
+  // 読んでいるあいだに編集へ切り替わった・別のアカウントになったなら捨てる。
+  // 枠は renderProfilePage が毎回消すので、見つからなければ描き直された後。
+  const box = profileViewEl.querySelector('.player-record');
+  if (!box || auth.player?.id !== playerId) return;
+
+  const stats = getPlayerStats(playerId, record);
+  box.innerHTML = recentResultsHtml(stats) + historyTableHtml(stats);
 }
 
 // ---- エントリー状況 ----
@@ -1818,28 +1826,156 @@ function renderRankingPage() {
 
 // ---- 選手個人ページ ----
 
-// 出場した大会は最初この件数だけ見せ、残りは「もっと見る」で開く。
-// 出場数が多い選手でもページが縦に伸びきらないようにするため。
-const VISIBLE_TOURNAMENTS = 3;
+// 「直近の戦績」に札で出す件数。全件は下の「すべての戦歴」が受け持つ。
+const RECENT_RESULTS = 3;
 
-// 「もっと見る」で開いたかどうかを覚えておく（対象の選手ID）。
-// 背景の自動更新でも renderPlayerDetail は走るので、覚えておかないと
-// 読んでいる最中に勝手に畳まれてしまう。
-let expandedTournamentsFor = null;
+// ---------------------------------------------------------------------------
+// プロフィール（選手ページ・マイページ）
+// ---------------------------------------------------------------------------
+//
+// 【面を取り合わせない】以前はキャラクターの絵を「背景」として敷き、その上に
+// 戦歴・ランク・登録情報を重ねていた。同じ面積を「絵を見せる」役と「数字を読ませる」役で
+// 取り合う形になり、どちらも果たせていなかった ── 顔と上半身は戦歴カードの裏に隠れ、
+// 透けた絵のせいで表の数字も読みにくかった。
+// いまは面そのものを分けている。絵には絵だけの領域を渡し、文字はその外側にしか置かない。
+// 重なりが無いので絵は透かす必要がなく、文字は無地の上に乗る。
+//
+// 【読む順を4段に決める】上から順に格が下がるよう並べ、格ごとに面を変える。
+//
+//   1. ヒーロー   選手名・ランク・メインキャラクター … 一番大きく、一番上
+//   2. 直近の戦績 最新3件を札で                     … 数字より「何をした人か」
+//   3. すべての戦歴 全件の表（畳んである）             … 調べたい人だけ開く
+//   4. 設定・連絡先 編集ボタン・ID・SNS               … 小さく、色を落として
+//
+// マイページと選手ページは同じ部品で組む。マイページは「他の人からどう見えるか」の
+// 確認場所なので、見た目が少しでも違うと確認にならない。
 
-// 選手ページの背景に、その人のメインキャラクターを大きく薄く敷く。
+// ヒーロー。絵の領域と文字の領域を隣り合わせに置き、決して重ねない。
 //
-// 使うのは先頭の1人だけ。順番には意味があり（js/characterPicker.js）、
-// 先頭が本人の名乗りだからで、複数枚を重ねると誰の場所か分からなくなる。
-// キャラクターを登録していない人には何も出さない ── 代わりの絵を置くと、
-// 選んでいない人まで選んだように見えてしまう。
+// 【顔の安全領域】切り抜きは頭が必ず上端にある。絵を専用の升（.player-hero-art）に
+// 入れて上詰めで置き、その升には他の要素を一切入れないことで、顔に何も重ならないことを
+// 位置の計算ではなく構造として保証する。升の上には余白（--art-safe）を取って、
+// カードの縁が頭に触れることも防ぐ。狭い画面でも升は隣に残す（下に積むと
+// 一番格上の選手名が画面の外へ押し出されるため）。
 //
-// 絵は装飾なので読み上げから外す（名前も戦績も文字で出ている）。
-function playerArtHtml(player) {
-  const url = characterImageUrl(player.mainCharacters?.[0], 'large');
-  if (!url) return '';
-  return `<div class="player-art" aria-hidden="true">`
-    + `<img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async"></div>`;
+// キャラクターは先頭の1人だけ。順番には意味があり（js/characterPicker.js）、
+// 先頭が本人の名乗りだからで、複数枚を並べると誰の場所か分からなくなる。
+// 登録していない人には何も出さない ── 代わりの絵を置くと、選んでいない人まで
+// 選んだように見えてしまう。絵は装飾なので読み上げから外す。
+function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '' } = {}) {
+  const artUrl = characterImageUrl(player.mainCharacters?.[0], 'large');
+  const rankEntry = state.publishedRanking?.rankings.find((r) => r.id === player.id);
+
+  // ランクは公開済みランキングから引くので、戦歴の通信を待たずに出せる。
+  let rankValue = '未公開';
+  let rankNote = 'ランキング未公開';
+  if (state.publishedRanking) {
+    if (rankEntry) {
+      rankValue = `${rankEntry.rank}<span class="rank-unit">位</span>`;
+      rankNote = `スコア ${rankEntry.score.toFixed(1)}`;
+      if (rankEntry.previousRank !== undefined) {
+        const { label, className } = rankChangeInfo(rankEntry.previousRank, rankEntry.rank);
+        rankNote += ` <span class="rank-change ${className}">${label}</span>`;
+      }
+    } else {
+      rankValue = '—';
+      rankNote = 'ランキング対象外';
+    }
+  }
+
+  return `
+    <section class="player-hero${artUrl ? '' : ' has-no-art'}">
+      <div class="player-hero-main">
+        <div class="player-hero-id">
+          ${avatarHtml(player, 'hero')}
+          <div class="player-hero-names">
+            <${nameTag} class="player-hero-name">${escapeHtml(player.currentName)}</${nameTag}>
+            ${player.pastNames.length
+              ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>`
+              : ''}
+          </div>
+          ${action}
+        </div>
+        <div class="player-rank">
+          <span class="player-rank-value">${rankValue}</span>
+          <span class="player-rank-note">${rankNote}</span>
+        </div>
+        ${extra}
+      </div>
+      ${artUrl
+        ? `<div class="player-hero-art" aria-hidden="true">
+             <img src="${escapeHtml(artUrl)}" alt="" decoding="async">
+           </div>`
+        : ''}
+    </section>`;
+}
+
+// 2段目。直近の大会3件を、順位を主役にした札で並べる。
+//
+// 表より先にこれを置くのは、プロフィールを開いた人がまず知りたいのが
+// 「いま何位か」の次に「最近どこまで勝ったか」だから。表は全件を等しく並べるので、
+// 一番新しい1件を探すのに目が要る。
+function recentResultsHtml(stats) {
+  if (!stats || stats.tournaments.length === 0) return '';
+
+  const recent = [...stats.tournaments].reverse().slice(0, RECENT_RESULTS);
+  const cards = recent.map((entry) => {
+    // 優勝・準優勝・3位は金銀銅にする（ランキング表と同じ配色の考え方）。
+    const rankClass = { 優勝: ' is-1st', 準優勝: ' is-2nd', '3位': ' is-3rd' }[entry.placement] ?? '';
+    return `
+      <a class="result-card${rankClass}" href="#tournament/${encodeURIComponent(entry.tournament.id)}">
+        <span class="result-place">${escapeHtml(entry.placement || '—')}</span>
+        <span class="result-body">
+          <span class="result-name">${escapeHtml(entry.tournament.name)}</span>
+          <span class="result-meta">${escapeHtml(entry.tournament.date || '日付未定')}${
+            entry.teamName ? `・${escapeHtml(entry.teamName)}` : ''}</span>
+        </span>
+      </a>`;
+  }).join('');
+
+  return `
+    <section class="profile-block">
+      <h3 class="profile-block-title">直近の戦績</h3>
+      <div class="result-cards">${cards}</div>
+    </section>`;
+}
+
+// 3段目。全件の表。既定で畳んである ── ここまで見に来る人は少数で、
+// 開いたままだと下の「設定」までが遠くなる。
+// <details> を使うのは、開閉の状態も見た目も素のHTMLで足りるため。
+function historyTableHtml(stats) {
+  if (!stats) return '<p class="empty-hint">戦歴を読み込んでいます…</p>';
+  if (stats.tournaments.length === 0) return '<p class="empty-hint">まだ大会に出場していません。</p>';
+
+  const entries = [...stats.tournaments].reverse();
+  return `
+    <details class="profile-block history-block">
+      <summary class="profile-block-title">すべての戦歴（${entries.length}件）</summary>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>大会</th><th>日付</th><th>結果</th></tr></thead>
+          <tbody>
+            ${entries.map((entry) => `
+              <tr>
+                <td>
+                  <a href="#tournament/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a>
+                  ${entry.teamName ? `<div class="meta-line">${escapeHtml(entry.teamName)}</div>` : ''}
+                </td>
+                <td>${escapeHtml(entry.tournament.date || '—')}</td>
+                <td>${escapeHtml(entry.placement || '—')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </details>`;
+}
+
+// 4段目。連絡先と、自分のページなら編集への入口。
+// 一番格が低いので、区切り線を引いて本文から離す。
+function profileFooterHtml(player) {
+  const meta = profileMetaHtml(player);
+  return meta ? `<section class="profile-foot">${meta}</section>` : '';
 }
 
 // 戦績はこの選手のぶんだけ取りに行く（全選手の試合は手元に持っていない。
@@ -1861,87 +1997,20 @@ async function renderPlayerDetail(playerId) {
   if (!isCurrentRoute('player', playerId)) return;
 
   const stats = getPlayerStats(playerId, record);
-  const rankEntry = state.publishedRanking?.rankings.find((r) => r.id === playerId);
-  const rankLabel = state.publishedRanking ? (rankEntry ? `${rankEntry.rank}位` : '対象外') : '未公開';
-  const rankChangeHtml = rankEntry && rankEntry.previousRank !== undefined
-    ? (() => {
-        const { label, className } = rankChangeInfo(rankEntry.previousRank, rankEntry.rank);
-        return ` <span class="rank-change ${className}">${label}</span>`;
-      })()
-    : '';
   const isOwn = auth.player?.id === playerId;
 
-  let html = `
-    <div class="player-detail-stage">
-    ${playerArtHtml(player)}
-    <div class="player-detail-header">
-      <div class="player-identity">
-        ${avatarHtml(player, 'lg')}
-        <div>
-          <h2>
-            ${escapeHtml(player.currentName)}
-            ${isOwn ? `<a href="#profile" class="profile-edit-link" title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</a>` : ''}
-          </h2>
-          ${player.pastNames.length ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>` : ''}
-          ${!isOwn && isAdmin() ? '<p class="meta-line"><button type="button" class="btn-secondary admin-rename-btn">表示名を変更</button></p>' : ''}
-        </div>
-      </div>
-    </div>
-    ${profileSectionHtml(player)}
-    <div class="stat-cards">
-      <div class="stat-card"><span class="stat-value">${rankLabel}${rankChangeHtml}</span><span class="stat-label">現在ランク${rankEntry ? `（スコア ${rankEntry.score.toFixed(1)}）` : ''}</span></div>
-      <div class="stat-card"><span class="stat-value">${stats.tournaments.length}</span><span class="stat-label">出場大会数</span></div>
-    </div>
-    </div>
-  `;
-
-  // 出場した大会と、その大会での順位だけを並べる。
-  // 勝敗数・勝率・対戦ごとの記録は出さない（プロフィールは戦績表ではなく
-  // 「どの大会に出て、どこまで勝ち上がったか」を見る場所という位置づけ）。
-  if (stats.tournaments.length > 0) {
-    const entries = [...stats.tournaments].reverse();
-    const expanded = expandedTournamentsFor === playerId;
-    const hiddenCount = expanded ? 0 : Math.max(0, entries.length - VISIBLE_TOURNAMENTS);
-
-    html += `
-      <h3>出場した大会</h3>
-      <div class="table-scroll">
-        <table>
-          <thead><tr><th>大会</th><th>日付</th><th>結果</th></tr></thead>
-          <tbody>
-            ${entries.map((entry, i) => `
-              <tr${!expanded && i >= VISIBLE_TOURNAMENTS ? ' class="extra-row" hidden' : ''}>
-                <td>
-                  <a href="#tournament/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a>
-                  ${entry.teamName ? `<div class="meta-line">${escapeHtml(entry.teamName)}</div>` : ''}
-                </td>
-                <td>${escapeHtml(entry.tournament.date || '—')}</td>
-                <td>${escapeHtml(entry.placement || '—')}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-      ${hiddenCount > 0
-        ? `<button type="button" class="btn-secondary show-more-btn">もっと見る（残り${hiddenCount}件）</button>`
-        : ''}
-    `;
-  } else {
-    html += '<p class="empty-hint">まだ大会に出場していません。</p>';
-  }
-
-  playerDetailEl.innerHTML = html;
-
-  // 「もっと見る」。開いたことを覚えてから残りの行を出す
-  // （覚えないと、次の自動更新で描き直されたときに畳まれてしまう）。
-  const showMoreBtn = playerDetailEl.querySelector('.show-more-btn');
-  if (showMoreBtn) {
-    showMoreBtn.addEventListener('click', () => {
-      expandedTournamentsFor = playerId;
-      playerDetailEl.querySelectorAll('.extra-row').forEach((row) => { row.hidden = false; });
-      showMoreBtn.remove();
-    });
-  }
+  playerDetailEl.innerHTML = playerHeroHtml(player, {
+    action: isOwn
+      ? `<a href="#profile" class="profile-edit-link" title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</a>`
+      : '',
+    extra: !isOwn && isAdmin()
+      ? '<p class="meta-line"><button type="button" class="btn-secondary admin-rename-btn">表示名を変更</button></p>'
+      : '',
+  })
+    + profileBioHtml(player)
+    + recentResultsHtml(stats)
+    + historyTableHtml(stats)
+    + profileFooterHtml(player);
 
   // 表示名の変更。選手一覧の表からは外したので、運営はここから直す。
   // 代理登録された選手（本人のアカウントが無い人）を直せる唯一の経路でもある。

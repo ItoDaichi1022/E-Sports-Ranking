@@ -3725,12 +3725,6 @@ dialog.dialog-chat {
    選手個人ページ
    --------------------------------------------------------------------------- */
 
-.player-detail-header h2 {
-  margin-bottom: 0.25rem;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
 /* 自分の名前の横に置く「プロフィールを編集」への入口。名前のすぐ隣なので、
    ボタンの塗り（発光グラデ）は名前より目立ってしまう。線画だけの控えめな入口にする。 */
 .profile-edit-link {
@@ -3771,57 +3765,8 @@ dialog.dialog-chat {
   filter: none;
 }
 
-.profile-view-name {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  margin: 0 0 0.25rem;
-  font-size: 1.3rem;
-  overflow-wrap: anywhere;
-}
-
-.stat-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 0.75rem;
-  margin: 1.25rem 0 1.75rem;
-}
-
-.stat-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 1.1rem 0.75rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--r);
-  background: var(--surface-2);
-}
-
-.stat-value {
-  font-size: 1.5rem;
-  font-weight: 800;
-  line-height: 1.1;
-  color: var(--text);
-}
-
-.stat-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
 /* 出場した大会の続きを開くボタン。表の続きであることが分かるよう、
    表のすぐ下に幅いっぱいで置く。 */
-.show-more-btn {
-  width: 100%;
-  margin-top: 0.6rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
 .player-bio {
   margin: 0.75rem 0 1.25rem;
   padding: 0.9rem 1.1rem;
@@ -3831,31 +3776,6 @@ dialog.dialog-chat {
   color: var(--text-dim);
   line-height: 1.75;
   white-space: pre-wrap;
-}
-
-.profile-grid { margin-bottom: 1rem; }
-
-/* プロフィールの一番下に置く外部リンク。上に余白を取って本文と切り離す。 */
-.sns-links {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin-top: 1rem;
-}
-
-.sns-links a {
-  padding: 0.35rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: var(--surface-2);
-  color: var(--text-dim);
-  font-size: 0.85rem;
-  text-decoration: none;
-}
-
-.sns-links a:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
 }
 
 /* マイページ下部のアカウント操作（ログアウトなど） */
@@ -4036,8 +3956,6 @@ dialog h3 {
 
 .avatar-sm { width: 1.75rem; height: 1.75rem; font-size: 0.75rem; }
 .avatar-md { width: 3rem;    height: 3rem;    font-size: 1.15rem; }
-.avatar-lg { width: 5rem;    height: 5rem;    font-size: 1.9rem; }
-
 /* 名前とアイコンを横に並べる（選手一覧・ランキング・選手ページ） */
 .player-identity {
   display: flex;
@@ -4404,91 +4322,6 @@ dialog.char-picker { max-width: 56rem; }
   letter-spacing: 0.08em;
 }
 
-/* ---- 選手ページ・マイページに出す並び ---- */
-
-/* メインだけが大きい並びなので、揃えるのは上端。stretch にすると、
-   小さい札までメインの高さまで引き伸ばされて、中身が浮いた空箱になる。 */
-.char-cells {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 0 0 1.25rem;
-  padding: 0;
-  list-style: none;
-  align-items: flex-start;
-}
-
-.char-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.45rem 0.85rem 0.45rem 0.45rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--r);
-  background: var(--surface);
-}
-
-/* メインだけを大きく、縦組みにする。残りは横組みの小さな札にして、
-   1人目とそれ以外の差がひと目で付くようにする。 */
-.char-cell.is-main {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.4rem;
-  padding: 0.75rem;
-  border-color: var(--accent-ring);
-  background:
-    radial-gradient(120% 90% at 50% 0%, var(--accent-soft), transparent 70%),
-    var(--surface);
-}
-
-.char-cell-art {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  width: 3.25rem;
-  height: 3.25rem;
-  flex: none;
-}
-
-.char-cell.is-main .char-cell-art {
-  width: 9rem;
-  height: 9rem;
-}
-
-.char-cell-art img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.char-cell-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
-.char-cell-tag {
-  font-family: var(--font-display);
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  color: var(--accent-bright);
-}
-
-.char-cell-name {
-  font-weight: 700;
-  font-size: 0.92rem;
-  overflow-wrap: anywhere;
-}
-
-.char-cell.is-main .char-cell-name { font-size: 1.05rem; }
-
-.char-cell-skin {
-  font-size: 0.74rem;
-  color: var(--text-faint);
-}
-
 /* ---- 一覧の行に敷くメインキャラクター（ランキング・選手検索）----
 
    行の高さは絶対に変えない（絵の有無で表がガタつくと、順位が読み取りにくくなる）。
@@ -4531,42 +4364,282 @@ dialog.char-picker { max-width: 56rem; }
 /* 自分の行は緑で強調されている。ここも絵を薄くして、強調を鈍らせない */
 .own-row .row-art { opacity: 0.2; }
 
-/* ---- 選手ページの背景に敷くメインキャラクター ----
+/* ---- プロフィールのヒーロー（選手名・ランク・メインキャラクター）----
 
-   絵そのものを見せる場所ではないので、次の3つで必ず背景に留める。
-     * 右端に寄せる（左から読む本文と重ならない）
-     * 下へ向かって消す（mask）。切り抜きの足元が直線で切れると
-       「貼った画像」に見えてしまう
-     * 透かす。文字の読みやすさを壊さない明度まで落とす
-   読み上げには載せない（装飾なので aria-hidden を付けて出す）。 */
-.player-art {
-  position: absolute;
-  top: -1.5rem;
-  right: -1rem;
-  width: min(22rem, 42%);
-  pointer-events: none;
-  opacity: 0.16;
-  mask-image: linear-gradient(to bottom, #000 35%, transparent 92%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 35%, transparent 92%);
-  z-index: 0;
-}
+   【面を取り合わせない】以前はキャラクターを背景として敷き、その上に戦歴も
+   ランクも登録情報も重ねていた。同じ面積を「絵を見せる」役と「数字を読ませる」役で
+   取り合う形で、どちらも果たせていなかった ── 顔と上半身は戦歴カードの裏に隠れ、
+   透けた絵のせいで数字も読みにくかった。
+   いまは面そのものを分ける。絵は .player-hero-art の升だけを使い、文字は
+   .player-hero-main の升だけを使う。重ならないので絵を透かす必要がなく、
+   文字は無地の上に乗る。
 
-.player-art img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
+   【顔の安全領域】切り抜きは頭が必ず上端にある。絵の升は
+     * grid の独立した列で、他の要素は一切入らない（position:absolute も使わない）
+     * 中身は上詰め（align-items: flex-start）
+     * 升の上に --art-safe の余白を取り、カードの縁が頭に触れない
+   この3つで「顔に何も重ならない」ことを、座標の調整ではなく構造として保証する。
 
-/* 絵を敷く器。中身は絵より前に出す（絵は z-index:0 なので、
-   位置指定を持つ子が後ろに回らないよう明示しておく）。 */
-.player-detail-stage {
-  position: relative;
+   絵は装飾なので読み上げには載せない（aria-hidden を付けて出す）。 */
+.player-hero {
+  --art-w: 15rem;    /* 絵の升の幅。ここを変えれば文字の幅も自動で決まる */
+  /* 絵の背丈。縦横比がばらついても、これで頭の大きさが揃う。
+     カードの高さはここで決まるので、伸ばしすぎると文字側に空白の帯ができる。 */
+  --art-h: 13rem;
+  --art-safe: 1.5rem;/* 頭とカードの縁のあいだに必ず残す余白 */
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--art-w);
+  gap: 1.25rem;
+  align-items: stretch;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface);
   overflow: hidden;
 }
 
-.player-detail-stage > *:not(.player-art) {
-  position: relative;
-  z-index: 1;
+/* キャラクターを登録していない人は升ごと畳む。空けても誰も立っていない床が残るだけ */
+.player-hero.has-no-art { grid-template-columns: minmax(0, 1fr); }
+
+/* 文字の面。無地のまま保つ ── ここに装飾を足すと、結局また可読性を削ることになる */
+.player-hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.35rem 0 1.35rem 1.35rem;
+  min-width: 0;
+}
+
+.player-hero.has-no-art .player-hero-main { padding-right: 1.35rem; }
+
+.player-hero-id {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.player-hero-names { min-width: 0; }
+
+.avatar-hero {
+  width: 3.5rem;
+  height: 3.5rem;
+  font-size: 1.4rem;
+  border: 1px solid var(--border);
+}
+
+/* 一番格上。画面の中でここが最初に目に入るようにする */
+.player-hero-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 1.05rem + 1.2vw, 2rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* ランクは数字を主役にする。eスポーツらしさはここで出す ── 数字を大きく、
+   単位と補足を小さく落とす。塗りや光ではなく大きさの対比で作るので、読みやすさは減らない。 */
+/* カードの下端に置く。名前が上、ランクが下で「見出しと台座」の関係になり、
+   絵の背丈で決まるカードの高さも埋まる。
+   幅は頭打ちにする ── 画面が広いときに端まで伸ばすと、短い数字ひとつのために
+   長い帯が引かれることになって、かえって何の数字か分からなくなる。 */
+.player-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: auto;
+  max-width: 20rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--r) var(--r) 0;
+  background: linear-gradient(90deg, var(--accent-soft), transparent 90%);
+}
+
+.player-rank-value {
+  font-family: var(--font-display);
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-bright);
+}
+
+.player-rank-value .rank-unit {
+  margin-left: 0.1em;
+  font-size: 0.5em;
+  color: var(--text-dim);
+}
+
+.player-rank-note {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+/* 絵の升。ここには絵しか入らない ── 何かを足したくなったら .player-hero-main へ */
+.player-hero-art {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: var(--art-safe);
+  height: calc(var(--art-h) + var(--art-safe));
+  background:
+    radial-gradient(70% 50% at 50% 100%, var(--accent-soft), transparent 70%),
+    var(--surface-2);
+}
+
+/* 【高さで決める】切り抜きの縦横比は 0.75〜2.73 とばらつく（225枚の実測）。
+   幅だけを決めると細長いキャラクターが升の3倍近い高さになって顔から下が切れる。
+   高さと幅の両方を上限にして中に収めると、どの人も同じ大きさの頭で並ぶ。 */
+.player-hero-art img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+  /* 足元だけをわずかに溶かす。素材によっては足首で切れており、
+     そのままだと直線の切り口が「貼った画像」に見える。頭側には掛けない。 */
+  mask-image: linear-gradient(to bottom, #000 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 90%, transparent 100%);
+}
+
+/* ---- 2段目: 直近の戦績 ---- */
+
+.profile-block { margin-bottom: 1.5rem; }
+
+.profile-block-title {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+.result-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.6rem;
+}
+
+/* 順位を左端の帯に置いて、大会名より先に目に入るようにする。
+   「何位だったか」が戦績の主語で、大会名はその補足。 */
+.result-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: inherit;
+  text-decoration: none;
+}
+
+.result-card:hover {
+  border-color: var(--border-strong);
+  border-left-color: var(--accent);
+}
+
+.result-place {
+  flex: none;
+  min-width: 3.5rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+/* 金銀銅はランキング表と同じ考え方で色を分ける（順位の印が情報として上） */
+.result-card.is-1st { border-left-color: #b8860b; }
+.result-card.is-2nd { border-left-color: #708090; }
+.result-card.is-3rd { border-left-color: #a0522d; }
+.result-card.is-1st .result-place { color: #d4a017; }
+.result-card.is-2nd .result-place { color: #9aa7b4; }
+.result-card.is-3rd .result-place { color: #c1743f; }
+
+.result-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.result-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.result-meta {
+  font-size: 0.76rem;
+  color: var(--text-faint);
+}
+
+/* ---- 3段目: すべての戦歴（畳んである）---- */
+
+.history-block > summary {
+  cursor: pointer;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  list-style: none;
+}
+
+.history-block > summary::-webkit-details-marker { display: none; }
+
+.history-block > summary::before {
+  content: '▸ ';
+  color: var(--accent);
+}
+
+.history-block[open] > summary::before { content: '▾ '; }
+
+.history-block > summary:hover { color: var(--text); }
+
+.history-block .table-scroll { margin-top: 0.6rem; }
+
+/* ---- 4段目: 連絡先（一番格が低い）---- */
+
+.profile-foot {
+  margin-top: 1.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.player-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.player-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+
+.player-chip-label {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text-faint);
+}
+
+.player-chip code { font-size: 0.82rem; }
+
+.player-chip.is-link:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
 /* ---------------------------------------------------------------------------
@@ -4686,7 +4759,6 @@ dialog.char-picker { max-width: 56rem; }
 
   th, td { padding: 0.6rem 0.7rem; }
 
-  .stat-cards { gap: 0.6rem; }
   .stat-value { font-size: 1.3rem; }
 
   .setup-columns { gap: 1.25rem; }
@@ -4725,11 +4797,31 @@ dialog.char-picker { max-width: 56rem; }
      「メインにする」と「×」が隣り合って押し間違える。 */
   .char-chip { flex: 1 1 100%; }
 
-  /* 背景に敷く絵は、狭い画面では本文と重なりやすい。さらに薄くして小さくする */
-  .player-art {
-    width: 55%;
-    opacity: 0.1;
+  /* 【狭い画面でも升は隣に残す】下に積み替えると、絵の帯のぶんだけ
+     一番格上の選手名が下へ押し出される。375px でも横並びのまま、
+     絵の升を細くして文字に幅を譲る。顔の安全領域は升そのものなので、
+     幅が変わっても保証は変わらない。 */
+  .player-hero {
+    --art-w: 7.5rem;
+    --art-h: 9.5rem;
+    --art-safe: 0.9rem;
+    gap: 0.75rem;
   }
+
+  .player-hero-main { padding: 1rem 0 1rem 1rem; }
+  .player-hero.has-no-art .player-hero-main { padding-right: 1rem; }
+
+  .avatar-hero {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.1rem;
+  }
+
+  .player-rank { padding: 0.55rem 0.7rem; }
+  .player-rank-value { font-size: 1.7rem; }
+
+  /* 戦績の札は1列。2列に詰めると大会名が数文字ごとに折り返す */
+  .result-cards { grid-template-columns: minmax(0, 1fr); }
 
   /* 一覧の行の絵も、狭い画面では名前の真後ろに来てしまう。細く薄くする */
   .row-art {

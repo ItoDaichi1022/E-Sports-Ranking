@@ -4,7 +4,6 @@
 import { escapeHtml, safeUrl, initialOf } from './util.js';
 import { keepFormDraft, clearFormDraft } from './formDraft.js';
 import { createCharacterField } from './characterPicker.js';
-import { characterListHtml } from './characters.js';
 
 // SNS欄に入れられるドメインの白名簿。
 //
@@ -334,39 +333,35 @@ export function renderProfileForm(
   if (draftKey) keepFormDraft(form, draftKey);
 }
 
-// 選手ページに出すプロフィール部分（自己紹介・使用キャラ・ゲームID・SNS）。
-// 何も登録されていなければ空文字を返す。
-export function profileSectionHtml(player) {
-  const links = [
+// 名前のすぐ下に置く短い札（ゲームID・SNS）。
+//
+// もとは ゲームIDが定義リストの1行、SNSがページの一番下 ── と離れた場所にあった。
+// どちらも「この人に連絡を取る／見つける」ための同じ用途なので、名前の直下に集める。
+// 情報の格としては選手名・ランク・戦績より下なので、字も小さく色も落とす。
+// 何も登録されていなければ空文字を返す（空の器を置くと名前の下に隙間だけが残る）。
+export function profileMetaHtml(player) {
+  const chips = [];
+
+  if (player.gameAccountId) {
+    chips.push(`<span class="player-chip"><span class="player-chip-label">ID</span>`
+      + `<code>${escapeHtml(player.gameAccountId)}</code></span>`);
+  }
+
+  // 外部へ出ていくリンクなので、本人の情報の後ろに置く。
+  for (const [label, url] of [
     ['X', socialUrl('x', player.snsX)],
     ['YouTube', socialUrl('youtube', player.snsYoutube)],
-  ].filter(([, url]) => url);
-
-  const rows = [];
-  if (player.gameAccountId) {
-    rows.push(`<div><dt>ゲームアカウントID</dt><dd><code>${escapeHtml(player.gameAccountId)}</code></dd></div>`);
+  ]) {
+    if (!url) continue;
+    chips.push(`<a class="player-chip is-link" href="${escapeHtml(url)}"`
+      + ` target="_blank" rel="noopener noreferrer">${label}</a>`);
   }
 
-  let html = '';
-  if (rows.length) {
-    html += `<dl class="tournament-info-grid profile-grid">${rows.join('')}</dl>`;
-  }
+  return chips.length ? `<div class="player-chips">${chips.join('')}</div>` : '';
+}
 
-  // 使用キャラクターは表の1行ではなく、絵のまとまりとして独立させる。
-  // 名前を並べただけの行だったころは、他の項目に埋もれて読み飛ばされていた。
-  html += characterListHtml(player.mainCharacters);
-  if (player.bio) {
-    html += `<p class="player-bio">${escapeHtml(player.bio)}</p>`;
-  }
-
-  // SNSリンクはプロフィールの一番下にまとめる。
-  // 外部へ出ていく導線なので、先に本人の紹介を読ませてから見せる。
-  if (links.length) {
-    const linkHtml = links
-      .map(([label, url]) =>
-        `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`)
-      .join('');
-    html += `<div class="sns-links">${linkHtml}</div>`;
-  }
-  return html;
+// 自己紹介。ヒーローの中ではなく下に置く ── 長さが人によって数十倍違うので、
+// 中に入れると隣の絵と高さが釣り合わなくなる。
+export function profileBioHtml(player) {
+  return player.bio ? `<p class="player-bio">${escapeHtml(player.bio)}</p>` : '';
 }
