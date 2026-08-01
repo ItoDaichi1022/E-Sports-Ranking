@@ -4435,9 +4435,12 @@ dialog.char-picker { max-width: 56rem; }
 
    左右の柱は実寸で決める。割合にすると、画面が広いほど柱だけが間延びして、
    順位の数字とアイコンの周りに誰も居ない床が広がる。 */
+/* 右の柱はカードの4割強を渡す（割合で決める数少ない場所）。ここだけ実寸に
+   しないのは、アイコンは「大きく見せる」ことそのものが役割だから ── 実寸で
+   固定すると、画面が広いほど本人の顔だけが相対的に小さくなっていく。 */
 .player-hero {
   display: grid;
-  grid-template-columns: 11rem minmax(0, 1fr) 16rem;
+  grid-template-columns: 11rem minmax(0, 1fr) minmax(16rem, 45%);
   align-items: stretch;
   margin-bottom: 1.5rem;
   border: 1px solid var(--border-soft);
@@ -4683,14 +4686,15 @@ dialog.char-picker { max-width: 56rem; }
    丸く抜かず、面いっぱいに置く。カードの高さは中央の面が決めるので、
    ここは絶対配置で「余った縦をすべて埋める」側に回る。
 
-   【下限の高さ】戦績がまだ無い人のカードは中央の面が短く、そのままだと
-   アイコンが横長の細い帯に切り縮められて、誰の顔なのか分からなくなる。
-   柱の幅（16rem）に近い高さを下限にして、どのカードでも正方形に近い面を保つ。 */
-/* 地はカードと同じ色。切らずに収めると縦横比しだいで縁が余るので、そこは
-   「空いた面」ではなく「画像のまわりの余白」に見えるほうがよい。 */
+   【下限の高さ】切らずに収める（contain）ので、画像の見える大きさは柱の幅と
+   高さの小さいほうで決まる。柱を広げても高さが足りなければ画像は大きくならない
+   ので、下限もあわせて上げておく（戦績がまだ無い人はカードが低くなる）。
+
+   地はカードと同じ色。縦横比しだいで縁が余るので、そこは「空いた面」ではなく
+   「画像のまわりの余白」に見えるほうがよい。 */
 .player-hero-photo {
   position: relative;
-  min-height: 15.5rem;
+  min-height: 19rem;
   border-left: 1px solid var(--border-soft);
   background: var(--surface);
 }
