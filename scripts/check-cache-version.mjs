@@ -188,6 +188,43 @@ if (!existsSync(catalogPath)) {
   if (artCount && missingArt === 0) {
     console.log(`OK   キャラクター画像${artCount}件がすべて存在する（版数 ${assetVersion}）`);
   }
+
+  // ---- 顔の位置の表（js/characterFocus.js）----
+  //
+  // 対戦表や一覧の行に敷く絵は、顔のあたりだけを切り出して見せている。その位置は
+  // 目で読み取った表で持っていて、自動生成されない。キャラクターやスキンを足すと
+  // ここだけ取り残され、既定値（当て推量）で切られて顔が窓の外に落ちる。
+  // 画面を見ても「なんとなく変な絵」にしか見えず気付けないので、ここで数を突き合わせる。
+
+  const focusPath = path.join(ROOT, 'js', 'characterFocus.js');
+  if (!existsSync(focusPath)) {
+    fail('js/characterFocus.js がありません');
+  } else {
+    const focusSrc = readFileSync(focusPath, 'utf8');
+    const focusKeys = new Set(
+      [...focusSrc.matchAll(/^\s*'([^']+)': \[\d+, \d+\],/gm)].map((m) => m[1]),
+    );
+
+    const artKeys = [];
+    for (const block of catalog.split(/\n  \{\n/).slice(1)) {
+      const charId = /id: '([^']+)'/.exec(block)?.[1];
+      if (!charId) continue;
+      for (const [, variantId] of block.matchAll(/\{ id: '([^']+)'/g)) {
+        artKeys.push(`${charId}:${variantId}`);
+      }
+    }
+
+    const noFocus = artKeys.filter((k) => !focusKeys.has(k));
+    const strayFocus = [...focusKeys].filter((k) => !artKeys.includes(k));
+    noFocus.slice(0, 5).forEach((k) => fail(
+      `js/characterFocus.js に "${k}" の顔の位置がありません（既定値で切られて顔が外れます）`,
+    ));
+    if (noFocus.length > 5) fail(`...ほか${noFocus.length - 5}件の顔の位置がありません`);
+    strayFocus.forEach((k) => fail(`js/characterFocus.js の "${k}" は存在しない画像を指しています`));
+    if (noFocus.length === 0 && strayFocus.length === 0) {
+      console.log(`OK   顔の位置${focusKeys.size}件が画像と1対1で対応している`);
+    }
+  }
 }
 
 // ---- img/ に重い形式が混ざっていないか ----

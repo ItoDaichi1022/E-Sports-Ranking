@@ -11,6 +11,7 @@
 // 消さないため。読めない文字列は「絵の無いキャラクター」として、文字だけ出す。
 
 import { CHARACTERS, ASSET_VERSION } from './characterData.js';
+import { CHARACTER_FOCUS, DEFAULT_FOCUS } from './characterFocus.js';
 import { escapeHtml } from './util.js';
 
 export { CHARACTERS };
@@ -93,6 +94,33 @@ export function searchCharacters(query) {
 // 選ぶ画面（js/characterPicker.js）とは分けてある。一覧に絵を敷くだけの場所から
 // あのダイアログ一式を読み込ませないため。
 
+// 行に敷く絵の「顔（目のあたり）」の位置を、CSSに渡せる形で返す。
+//
+// 行の高さしか無い細長い窓から絵を覗くので、どこを窓の中心に持ってくるかで
+// 出来がまるで変わる。素材のポーズはバラバラで顔の位置に規則が無いため、
+// 1枚ずつ持っている表（js/characterFocus.js）を引く。
+//
+// 端に寄りすぎた値は詰める。窓のほうが絵より小さいとはいえ、顔が絵の隅にある
+// 素材（Mr.5 のグレースーツなど）をそのまま中心に置くと、窓の反対側が
+// 絵の外＝透明になり、行の途中で地模様が切れて見える。
+//
+// ただし詰めすぎないこと。窓の高さは絵のおよそ1/4で、上下の余裕は12%ほどしかない。
+// ここを厚く取ると、顔が上のほうにある素材（全身像はたいていそう）で顔が
+// 窓の上へ押し出され、顔を出すためにこの表を作った意味が無くなる。
+const FOCUS_MIN_X = 24;
+const FOCUS_MAX_X = 76;
+const FOCUS_MIN_Y = 12;
+const FOCUS_MAX_Y = 88;
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function focusStyle(ref) {
+  const [x, y] = CHARACTER_FOCUS[ref] ?? DEFAULT_FOCUS;
+  return `--fx:${clamp(x, FOCUS_MIN_X, FOCUS_MAX_X)}%;--fy:${clamp(y, FOCUS_MIN_Y, FOCUS_MAX_Y)}%`;
+}
+
 // 名前と絵を並べた「使用キャラクター」の札は置いていない。
 // 選んだキャラクターの見せ場はプロフィールのヒーロー（js/app.js の playerHeroHtml）と
 // 一覧の行（下の characterRowArtHtml）の2つで、札を並べると同じ絵が二重になる。
@@ -107,10 +135,12 @@ export function searchCharacters(query) {
 // <img> で置くのは、画面に入るまで読み込ませないため（CSSの背景画像にすると、
 // 60人並ぶランキングで全員ぶんを一度に取りに行ってしまう）。
 export function characterRowArtHtml(mainCharacters) {
-  const url = characterImageUrl(mainCharacters?.[0], 'thumb');
+  const ref = mainCharacters?.[0];
+  const url = characterImageUrl(ref, 'thumb');
   if (!url) return '';
   return `<span class="row-art" aria-hidden="true">`
-    + `<img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async"></span>`;
+    + `<img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async"`
+    + ` style="${focusStyle(ref)}"></span>`;
 }
 
 // 対戦表の選手行（js/bracketView.js）に敷く、その枠のメインキャラクター。
@@ -122,20 +152,28 @@ export function characterRowArtHtml(mainCharacters) {
 // 2人なので、片方だけ敷くと「この人だけが出ている」ように見えてしまう）。
 // refs は出場枠のメンバーと同じ並び。登録していない人は詰めて飛ばす。
 export function characterRowArtElement(refs) {
-  const urls = (refs ?? []).map((ref) => characterImageUrl(ref, 'thumb')).filter(Boolean);
-  if (urls.length === 0) return null;
+  const shown = (refs ?? [])
+    .map((ref) => ({ ref, url: characterImageUrl(ref, 'thumb') }))
+    .filter((item) => item.url);
+  if (shown.length === 0) return null;
 
   const wrap = document.createElement('span');
   wrap.className = 'match-art';
   wrap.setAttribute('aria-hidden', 'true');
   // 3人以上のチームは想定していないが、増えても行が絵だらけにならないよう2枚で止める
-  urls.slice(0, 2).forEach((url) => {
+  shown.slice(0, 2).forEach(({ ref, url }) => {
+    // 絵は枠より大きく引き伸ばして顔だけを見せるので、1枚ずつ切り抜く枠に入れる
+    // （枠を挟まないと、はみ出した分が隣の絵や行の外にまで出てしまう）。
+    const cell = document.createElement('span');
+    cell.className = 'match-art-cell';
     const img = document.createElement('img');
     img.src = url;
     img.alt = '';
     img.loading = 'lazy';
     img.decoding = 'async';
-    wrap.appendChild(img);
+    img.style.cssText = focusStyle(ref);
+    cell.appendChild(img);
+    wrap.appendChild(cell);
   });
   return wrap;
 }

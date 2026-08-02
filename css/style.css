@@ -2840,13 +2840,38 @@ a.card:hover {
    キャラクターを登録している対戦もあり、行ごとに数字の位置がずれると表に見えない。 */
 .match-player.has-match-art .player-name { padding-right: 3.5rem; }
 
-/* チーム戦は2枚を等分に並べる。顔の位置がそろうよう、どちらも上端で切る。 */
-.match-art img {
+/* チーム戦は2枚を等分に並べる。1枚ずつ枠に入れるのは、絵を枠より大きくして
+   顔だけを見せるため（はみ出しはこの枠で切る）。 */
+.match-art-cell {
+  --art-zoom: 420%;
+  position: relative;
   flex: 1;
   min-width: 0;
-  height: 100%;
-  object-fit: cover;
-  object-position: center top;
+  overflow: hidden;
+}
+
+/* ---- 行に敷く絵の見せ方（対戦表の .match-art と 一覧の .row-art で共通）----
+
+   どちらも「行の高さしか無い細長い窓」から絵を覗く形になる。素材は全身の切り抜きで、
+   ポーズも構図もバラバラ ── 上端で切ると（object-position: center top）武器や帽子や
+   手だけが並び、肝心の顔が窓の外へ落ちることが多い。
+
+   そこで絵を窓より大きく引き伸ばし（--art-zoom は行の高さに対する倍率）、
+   顔の位置が窓の真ん中に来るように置く。顔の位置は1枚ずつ js/characterFocus.js に
+   持っていて、--fx / --fy として要素に入る（無いときは既定値で上のほうを見る）。
+
+   left/top で絵の左上角を窓の中心へ置き、translate で絵自身の (--fx, --fy) の点まで
+   戻す。translate の百分率は「その要素自身の大きさ」に対する割合なので、
+   倍率をいくつにしても顔は窓の中心から動かない。 */
+.match-art-cell img,
+.row-art img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: auto;
+  height: var(--art-zoom, 300%);
+  max-width: none;
+  transform: translate(calc(var(--fx, 50%) * -1), calc(var(--fy, 20%) * -1));
 }
 
 /* 勝者の行にはアクセント色の帯が既に敷いてある。そこに絵を重ねると色が濁るので、
@@ -4415,25 +4440,21 @@ dialog.char-picker { max-width: 56rem; }
 
 /* 行の高さいっぱいに立てて、右端から左へ溶かす。
    全身を小さく収める（contain）と、行の中に小さな絵が1つ浮かんでいるように
-   見えてしまう。上端を合わせて切る（cover + top）と、顔から胸のあたりが
-   帯として出て、行の地模様になる。 */
+   見えてしまう。顔のあたりを大きく切り出すと、顔から胸のあたりが帯として出て、
+   行の地模様になる。切り出し方は .match-art-cell img と共通（上の対戦表の節を見ること）。
+   はみ出しをここで切るので overflow: hidden が要る。 */
 .row-art {
+  --art-zoom: 420%;
   position: absolute;
   top: 0;
   bottom: 0;
   right: 0;
   width: 8rem;
+  overflow: hidden;
   pointer-events: none;
   opacity: 0.3;
   mask-image: linear-gradient(to left, #000 30%, transparent);
   -webkit-mask-image: linear-gradient(to left, #000 30%, transparent);
-}
-
-.row-art img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center top;
 }
 
 /* 上位3行は金・銀・銅の帯が既に敷いてある。そこに絵を重ねると色が濁るので、
