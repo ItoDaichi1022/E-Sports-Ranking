@@ -15,7 +15,7 @@ import { escapeHtml } from './util.js';
 
 export { CHARACTERS };
 
-// id から引く索引。一覧は25人・225枚しかないので、起動時に一度作れば足りる。
+// id から引く索引。一覧は26人・226枚しかないので、起動時に一度作れば足りる。
 const BY_ID = new Map(CHARACTERS.map((c) => [c.id, c]));
 
 // 画像1枚（色違いまで確定したもの）を、キャラクターとスキンごと引けるようにする。

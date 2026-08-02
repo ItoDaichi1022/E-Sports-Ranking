@@ -315,6 +315,21 @@ export const CHARACTERS = [
     ],
   },
   {
+    id: 'goshion',
+    name: 'ゴウシオン',
+    nameEn: 'Goshion',
+    representative: 'default',
+    skins: [
+      {
+        key: 'default',
+        label: 'デフォルト',
+        variants: [
+        { id: 'default' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'gwynn',
     name: 'グウェン',
     nameEn: 'Gwynn',

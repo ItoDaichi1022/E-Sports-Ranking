@@ -207,7 +207,7 @@ function buildTile(ref, { title, note, selectedIndex }) {
     const img = document.createElement('img');
     img.src = url;
     img.alt = '';
-    // 225枚あるので、画面に入ったものだけ読み込ませる。
+    // 226枚あるので、画面に入ったものだけ読み込ませる。
     // ここを外すと選ぶ画面を開いた瞬間に全部取りに行ってしまう。
     img.loading = 'lazy';
     img.decoding = 'async';
@@ -285,7 +285,7 @@ export function openCharacterPicker(initial = []) {
       drawBody();
     };
 
-    // 一覧はキャラクター → スキンの2段。225枚を最初から全部並べると、
+    // 一覧はキャラクター → スキンの2段。226枚を最初から全部並べると、
     // 目当てのキャラクターにたどり着く前に力尽きる。
     const drawBody = () => {
       bodyEl.innerHTML = '';

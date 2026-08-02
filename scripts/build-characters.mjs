@@ -53,6 +53,7 @@ const ALIASES = {
   cupid: ['cupid'],
   drake: ['drake', 'derek'],
   foxx: ['foxx', 'doctor'],
+  goshion: ['goshion', 'ゴウシオン'],
   gwynn: ['gwynn', '格温'],
   heracles: ['heracles'],
   icey: ['icey'],

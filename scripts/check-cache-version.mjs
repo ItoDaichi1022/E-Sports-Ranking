@@ -195,13 +195,19 @@ if (!existsSync(catalogPath)) {
 // リポジトリに入れる画像はWebPに統一している（img/README.md）。PNGやJPEGを1枚
 // 置き忘れるだけで数百KB増え、_headers で1年キャッシュされるぶん取り返しも効かない。
 // 例外は icon.png ── iOSのホーム画面のアイコンだけWebPを読まないので置いている。
+//
+// img/character/（単数）は見ない。あそこはPNGの配布素材を置く場所で、.gitignore と
+// .assetsignore の両方で外してあるためGitにも配信にも載らない。普段は手元に無いので
+// 気付きにくいが、キャラクターを足すときだけ置くことになり、そのとき必ず引っかかる。
 
+const SKIP_DIRS = new Set([path.join(ROOT, 'img', 'character')]);
 const ALLOWED_NON_WEBP = new Set(['img/icon.png']);
 const IMAGE_EXT = /\.(png|jpe?g|gif|bmp|tiff?|avif)$/i;
 
 function walkImages(dir, found = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
+    if (SKIP_DIRS.has(full)) continue;
     if (entry.isDirectory()) walkImages(full, found);
     else if (IMAGE_EXT.test(entry.name)) found.push(path.relative(ROOT, full).replace(/\\/g, '/'));
   }

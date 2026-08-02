@@ -4232,7 +4232,7 @@ dialog h3 {
 /* 要素名まで書くのは、既定の dialog と dialog.dialog-wide が同じ max-width を
    持っているため。クラスだけでは詳細度が足りず、560px のまま効かない。
    絵を並べる画面なので、他のダイアログより広く取る（狭いと1行に3〜4人しか
-   並ばず、25人の中から探すのに延々スクロールすることになる）。 */
+   並ばず、26人の中から探すのに延々スクロールすることになる）。 */
 dialog.char-picker { max-width: 56rem; }
 
 /* 選んだものを上に貼り付けておく。下の一覧を延々とたどっている間も、
@@ -4471,6 +4471,15 @@ dialog.char-picker { max-width: 56rem; }
      下段との境目は別（.player-hero-foot）── あちらは文字と文字の境なので線を引く。 */
   --art-inset: 0.75rem;  /* 絵と升の縁のすき間。全身を収めるための余白 */
 
+  /* 【島の幅はどの画面でも同じ】iPhone 13 mini の縦（375px）から本文の左右余白
+     1rem ずつを引いた 343px ＝ ここでの上限。この幅のときに、名前・ランクの数字・
+     キャラクターの絵・下段の文字の釣り合いがいちばん良く出る。
+     以前は器（main）の 1080px まで伸びていたが、幅だけが3倍になっても中身の
+     大きさは変わらないので、広い画面ほど間延びして見えていた。
+     下の余白・文字の大きさも、この幅に合わせた一組の値として基準側に置いてある
+     （画面幅で切り替えない ── 島の幅が変わらないのに中身だけ変える理由が無い）。 */
+  max-width: 21.5rem;
+
   display: grid;
   /* minmax(0, 1fr) にする。素の 1fr は「中身より狭くならない」ので、
      折り返さないランク表記（「ランキング対象外」）が入ると左の列が押し広がり、
@@ -4480,14 +4489,14 @@ dialog.char-picker { max-width: 56rem; }
      素の 1fr のままだと、下段（自己紹介・戦績）が伸びたぶんだけ中段が
      min-height の中で削られ、文章の長い人ほど絵が縮む。
      下限があれば、下段が何行になっても絵の大きさは変わらない。 */
-  grid-template-rows: auto minmax(12rem, 1fr) auto;
+  grid-template-rows: auto minmax(9.5rem, 1fr) auto;
   grid-template-areas:
     "name name"
     "body art"
     "foot foot";
   /* 絵の背丈のもと。全身を収める決まりなので、カードが低いとそのぶん絵も小さくなる。
-     絵を大きくしたいときに動かすのはここ（と上の 12rem）。 */
-  min-height: 18rem;
+     絵を大きくしたいときに動かすのはここ（と上の 9.5rem）。 */
+  min-height: 15rem;
   margin-bottom: 1.5rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--r);
@@ -4504,7 +4513,7 @@ dialog.char-picker { max-width: 56rem; }
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 1.35rem 1.35rem 0;
+  padding: 1rem 1rem 0;
 }
 
 /* 下段の左。ランクはこちら半分に収める。 */
@@ -4515,7 +4524,7 @@ dialog.char-picker { max-width: 56rem; }
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 0.9rem 0 1.35rem 1.35rem;
+  padding: 0.75rem 0 1rem 1rem;
 }
 
 /* キャラクターがいない人は中段を割らない。空けても誰も立っていない床が残るだけ。
@@ -4527,16 +4536,16 @@ dialog.char-picker { max-width: 56rem; }
   min-height: 0;
 }
 
-.player-hero.has-no-art .player-hero-main { padding-right: 1.35rem; }
+.player-hero.has-no-art .player-hero-main { padding-right: 1rem; }
 
 .player-hero.has-no-art .player-hero-id { margin-right: 0; }
 
 .player-hero-names { min-width: 0; }
 
 .avatar-hero {
-  width: 3.5rem;
-  height: 3.5rem;
-  font-size: 1.4rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 1.1rem;
   border: 1px solid var(--border);
 }
 
@@ -4548,9 +4557,10 @@ dialog.char-picker { max-width: 56rem; }
 .player-hero-name {
   margin: 0;
   font-family: var(--font-display);
-  /* 下限を低めに取る。左半分しか使えないので、ここを高くすると
-     ありふれた長さの名前でも「…」になる。 */
-  font-size: clamp(1.15rem, 0.95rem + 1.1vw, 2rem);
+  /* 画面幅には連動させない。島の幅が 21.5rem で固定なので、画面が広いからと
+     文字だけ大きくすると、同じ名前が広い画面でだけ「…」で切れることになる。
+     低めに取ってあるのは、左半分しか使えないため。 */
+  font-size: 1.15rem;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -4567,7 +4577,7 @@ dialog.char-picker { max-width: 56rem; }
   align-items: flex-start;
   gap: 0.1rem;
   margin-top: auto;
-  padding: 0.7rem 0.9rem;
+  padding: 0.55rem 0.7rem;
   border-left: 3px solid var(--accent);
   border-radius: 0 var(--r) var(--r) 0;
   background: linear-gradient(90deg, var(--accent-soft), transparent 90%);
@@ -4580,7 +4590,7 @@ dialog.char-picker { max-width: 56rem; }
    はみ出した先にあるのは背景の絵だけなので、あふれさせるほうが読める。 */
 .player-rank-value {
   font-family: var(--font-display);
-  font-size: 2.1rem;
+  font-size: 1.7rem;
   font-weight: 700;
   line-height: 1;
   color: var(--accent-bright);
@@ -4648,9 +4658,9 @@ dialog.char-picker { max-width: 56rem; }
      max-content（測ったときは1035pxの枠に対して5259px）まで伸びる。
      日本語は単語の区切りが無いので、一度伸びると一行のまま横へ流れていく。 */
   grid-template-columns: minmax(0, 1fr);
-  gap: 1rem;
-  margin: 1.35rem 1.35rem 0;
-  padding: 1.1rem 0 1.35rem;
+  gap: 0.85rem;
+  margin: 1rem 1rem 0;
+  padding: 0.9rem 0 1rem;
   border-top: 1px solid var(--border-soft);
 }
 
@@ -4681,9 +4691,11 @@ dialog.char-picker { max-width: 56rem; }
   text-transform: uppercase;
 }
 
+/* 島の下段に入るので、幅は島の内側（21.5rem − 左右の余白）しかない。
+   2列に詰めると大会名が数文字ごとに折り返すため、どの画面でも1列にする。 */
 .result-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.6rem;
 }
 
@@ -4963,35 +4975,10 @@ dialog.char-picker { max-width: 56rem; }
      「メインにする」と「×」が隣り合って押し間違える。 */
   .char-chip { flex: 1 1 100%; }
 
-  /* 狭い画面でも段の組み方は同じ（上に名前、下段を左右に）。
-     割合で割ってあるので列の指定はそのまま。余白と高さだけを絞る
-     （全身を収める決まりは変えないので、頭や足が切れることはない）。 */
-  .player-hero {
-    min-height: 15rem;
-    grid-template-rows: auto minmax(9.5rem, 1fr) auto;
-  }
-
-  .player-hero-id { padding: 1rem 1rem 0; }
-  .player-hero-main { padding: 0.75rem 0 1rem 1rem; }
-  .player-hero.has-no-art .player-hero-main { padding-right: 1rem; }
-
-  .player-hero-foot {
-    gap: 0.85rem;
-    margin: 1rem 1rem 0;
-    padding: 0.9rem 0 1rem;
-  }
-
-  .avatar-hero {
-    width: 2.75rem;
-    height: 2.75rem;
-    font-size: 1.1rem;
-  }
-
-  .player-rank { padding: 0.55rem 0.7rem; }
-  .player-rank-value { font-size: 1.7rem; }
-
-  /* 戦績の札は1列。2列に詰めると大会名が数文字ごとに折り返す */
-  .result-cards { grid-template-columns: minmax(0, 1fr); }
+  /* プロフィールの島（.player-hero）はここに何も書かない。狭い画面向けだった
+     余白・文字の大きさは、そのまま基準側の値になっている ── 島の幅を
+     21.5rem（＝iPhone 13 mini 縦の本文幅）で固定し、どの画面でも同じ見え方に
+     揃えたため、画面幅で切り替えるものが無くなった。 */
 
   /* 一覧の行の絵も、狭い画面では名前の真後ろに来てしまう。細く薄くする */
   .row-art {
