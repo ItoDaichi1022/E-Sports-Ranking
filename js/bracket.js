@@ -343,9 +343,11 @@ export function editMatch(tournamentId, matchId) {
   return { ok: true };
 }
 
-// 大会の基本情報（名前・日付・対戦方法・定員・ルール）を修正する。募集中でも変更できる。
+// 大会の基本情報（名前・日付・対戦方法・ランキング反映・定員・ルール）を修正する。
+// 募集中でも変更できる。
 export function updateTournament(
-  tournamentId, { name, date, matchType, matchTypeNote, rules, streamUrl, capacity },
+  tournamentId,
+  { name, date, matchType, matchTypeNote, rankingOptIn, rules, streamUrl, capacity },
 ) {
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) return { ok: false, error: '対象の大会が見つかりません。' };
@@ -372,6 +374,12 @@ export function updateTournament(
     tournament.matchType = matchType || null;
     // 説明は「その他」のときだけ意味を持つ。選び直したら残骸を残さない。
     tournament.matchTypeNote = matchType === 'other' ? (matchTypeNote ?? '').trim() : '';
+  }
+
+  // ランキングに反映させるか。あとから切り替えても公開済みのランキングは
+  // 作り直されない（あれは集計時点の写し）。次に作成したときから効く。
+  if (rankingOptIn !== undefined) {
+    tournament.rankingOptIn = Boolean(rankingOptIn);
   }
 
   if (capacity !== undefined) {

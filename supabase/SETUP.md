@@ -174,6 +174,8 @@ URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デ�
 | [`migration-013.sql`](migration-013.sql) | ゲスト閲覧が42501で失敗する不具合の修正（`is_match_participant` の実行権限） |
 | [`migration-014.sql`](migration-014.sql) | ランキング公開の集計期間をカレンダーの開始日・終了日で選べるようにする（`published_rankings.period_start` / `period_end`） |
 | [`migration-015.sql`](migration-015.sql) | 大会の配信元URL（`tournaments.stream_url`） |
+| [`migration-016.sql`](migration-016.sql) | 三位決定戦を行うか（`tournaments.third_place_match`） |
+| [`migration-017.sql`](migration-017.sql) | ランキングに反映させるかを運営が選べるようにする（`tournaments.ranking_opt_in`） |
 
 補足:
 
@@ -188,6 +190,11 @@ URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デ�
 - **006 の `match_type`** — 参加16人以上かつ1v1／リレーの大会だけをランキングのスコアに
   反映するための列です。既存の大会は対戦方法が分からないため `null`（＝反映対象外）で
   入ります。反映させたい大会は、大会詳細の「大会情報を編集」から対戦方法を選び直してください。
+- **017 の `ranking_opt_in`** — 条件（16人以上・1v1／リレー）を満たしていても、運営が
+  大会ごとに「ランキングに反映しない」を選べるようにする列です。エキシビションや練習会の
+  ためのもので、既定は真 ── 既存の大会はこれまでどおり条件だけで決まり、この列が
+  入ったせいで黙って対象外になることはありません。切り替えても公開済みのランキングは
+  作り直されず、次にランキングを作成したときから効きます。
 - **007 の 2v2 対応** — チーム戦ではブラケットの枠に入るのがチームになるため、
   `tournament_teams` テーブルと、チーム単位でエントリーするRPCを追加します。
   `matches` の選手列を `null` 許容にし、チーム用の列を足します（どちらか一方だけが

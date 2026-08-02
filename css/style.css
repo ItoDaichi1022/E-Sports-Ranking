@@ -1097,7 +1097,8 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
 }
 
 .entry-mode,
-.third-place-field {
+.third-place-field,
+.ranking-opt-field {
   flex: 1 1 100%;
   margin: 0;
   padding: 0.9rem 1rem;
@@ -1107,7 +1108,8 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
 }
 
 .entry-mode legend,
-.third-place-field legend {
+.third-place-field legend,
+.ranking-opt-field legend {
   padding: 0 0.4rem;
   font-size: 0.78rem;
   font-weight: 600;
@@ -4460,48 +4462,64 @@ dialog.char-picker { max-width: 56rem; }
 
    絵は装飾なので読み上げには載せない（aria-hidden を付けて出す）。 */
 .player-hero {
-  /* 上段は名前が横いっぱい、中段を左右に割って 左＝ランク・右＝キャラクター、
-     下段は自己紹介と直近の戦績が横いっぱい。
-     絵が名前にかぶらないのは「段が違う」からで、座標で避けているのではない ──
-     過去名の有無で名前の高さが変わっても、段の関係は崩れない。
-
-     【左右の境目には線を引かない】境界線も地色の切り替わりも置かない。線を引くと
-     「2つの箱を並べた」ように見えて、絵が背景であることが伝わらなくなる。
-     絵の面が持つのは足元の淡い光だけで、それも縁に届く前に消える。
-     下段との境目は別（.player-hero-foot）── あちらは文字と文字の境なので線を引く。 */
-  --art-inset: 0.75rem;  /* 絵と升の縁のすき間。全身を収めるための余白 */
-
-  /* 【島の幅はどの画面でも同じ】iPhone 13 mini の縦（375px）から本文の左右余白
-     1rem ずつを引いた 343px ＝ ここでの上限。この幅のときに、名前・ランクの数字・
-     キャラクターの絵・下段の文字の釣り合いがいちばん良く出る。
-     以前は器（main）の 1080px まで伸びていたが、幅だけが3倍になっても中身の
-     大きさは変わらないので、広い画面ほど間延びして見えていた。
-     下の余白・文字の大きさも、この幅に合わせた一組の値として基準側に置いてある
-     （画面幅で切り替えない ── 島の幅が変わらないのに中身だけ変える理由が無い）。 */
+  /* カードは「島（.player-hero-core）」と「自己紹介・直近の戦績（.player-hero-foot）」の
+     2つでできている。狭い画面では縦に積み、広い画面では横に並べる（下の min-width: 721px）。
+     どちらでも島の中の釣り合いは変わらない ── 島は自分の幅だけで中身を決めるため。 */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  /* 縦に積んでいるあいだは 13 mini の縦（375px − 本文の左右余白 ＝ 343px）で頭打ち。
+     島は幅がそのまま大きさになるので、これが無いと 700px 幅あたりで島だけが
+     見出しより大きく育ち、すぐ下に続く自己紹介と釣り合わなくなる。
+     横に並べ始める 721px では島が 336px（カードの半分）なので、
+     切り替わりの前後で大きさはほとんど変わらない。 */
   max-width: 21.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* 選手名と順位の島。
+   上段は名前が横いっぱい、中段を左右に割って 左＝ランク・右＝キャラクター。
+   絵が名前にかぶらないのは「段が違う」からで、座標で避けているのではない ──
+   過去名の有無で名前の高さが変わっても、段の関係は崩れない。
+
+   【左右の境目には線を引かない】境界線も地色の切り替わりも置かない。線を引くと
+   「2つの箱を並べた」ように見えて、絵が背景であることが伝わらなくなる。
+   絵の面が持つのは足元の淡い光だけで、それも縁に届く前に消える。
+   自己紹介・戦績との境目は別（.player-hero-foot）── あちらは文字と文字の境なので線を引く。
+
+   【中の寸法はすべて cqw で持つ】container-type を置くと 1cqw ＝ この升の幅の1%。
+   余白も文字も絵の升も全部この単位で書いてあるので、島は幅が変わっても
+   「拡大・縮小しただけ」になり、並びの釣り合いは決して崩れない。
+   基準は iPhone 13 mini の縦（375px − 本文の左右余白1rem ＝ 343px）で見たときの姿で、
+   数値はどれも「そのときの実寸 ÷ 3.43」。ここの並びがいちばん良く見えたため。
+   直したいときは、13 mini での見え方を実寸で決めてから 3.43 で割ること
+   （rem のまま足すと、その値だけが画面幅について行かなくなる）。 */
+.player-hero-core {
+  container-type: inline-size;
+
+  --art-inset: 3.5cqw;  /* 絵と升の縁のすき間（12px）。全身を収めるための余白 */
 
   display: grid;
   /* minmax(0, 1fr) にする。素の 1fr は「中身より狭くならない」ので、
      折り返さないランク表記（「ランキング対象外」）が入ると左の列が押し広がり、
      半々でなくなって絵の場所まで削られる。 */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  /* 中段に下限を敷く。絵は position: absolute なので中身としての背丈が 0 ──
-     素の 1fr のままだと、下段（自己紹介・戦績）が伸びたぶんだけ中段が
-     min-height の中で削られ、文章の長い人ほど絵が縮む。
-     下限があれば、下段が何行になっても絵の大きさは変わらない。 */
-  grid-template-rows: auto minmax(9.5rem, 1fr) auto;
+  /* 段は名前と中段の2つ。高さはどちらも中身なり ── 中段の高さは絵の升
+     （.player-hero-art）が持つ。
+     【この升の中では cqw を使えない】cqw が指すのは「いちばん近い“先祖”の
+     コンテナ」なので、自分がコンテナである .player-hero-core 自身の指定に書くと、
+     自分の幅ではなく画面幅を見に行ってしまう（それで中段だけが画面の広さに
+     つれて伸び、名前と順位の間が間延びしていた）。cqw は中の要素にだけ書く。 */
   grid-template-areas:
     "name name"
-    "body art"
-    "foot foot";
-  /* 絵の背丈のもと。全身を収める決まりなので、カードが低いとそのぶん絵も小さくなる。
-     絵を大きくしたいときに動かすのはここ（と上の 9.5rem）。 */
-  min-height: 15rem;
-  margin-bottom: 1.5rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--r);
-  background: var(--surface);
-  overflow: hidden;
+    "body art";
+  /* 【必ず start】既定の stretch のままだと、島の横に並べた自己紹介・戦績のほうが
+     背が高いとき、余った高さを auto の名前の段が吸って伸びる ── 名前とランクの
+     間だけが間延びして、13 mini で見た並びが崩れる。余りは島の下に残す。 */
+  align-content: start;
 }
 
 /* 名前の段。左右いっぱいを使う ── ここだけは半分に縛らない。
@@ -4512,40 +4530,55 @@ dialog.char-picker { max-width: 56rem; }
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1rem 0;
+  gap: 3.5cqw;
+  padding: 4.66cqw 4.66cqw 0;
 }
 
-/* 下段の左。ランクはこちら半分に収める。 */
+/* 中段の左。ランクはこちら半分に収める。 */
 .player-hero-main {
   grid-area: body;
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.75rem 0 1rem 1rem;
+  gap: 3.5cqw;
+  padding: 3.5cqw 0 4.66cqw 4.66cqw;
 }
 
 /* キャラクターがいない人は中段を割らない。空けても誰も立っていない床が残るだけ。
-   絵が無いので中段の下限も要らない（あると空白がそのぶん残る）。 */
-.player-hero.has-no-art {
-  grid-template-columns: 1fr;
-  grid-template-rows: auto auto auto;
-  grid-template-areas: "name" "body" "foot";
-  min-height: 0;
+   絵が無いので中段の高さも要らない（あると空白がそのぶん残る）。 */
+.player-hero.has-no-art .player-hero-core {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  grid-template-areas: "name" "body";
 }
 
-.player-hero.has-no-art .player-hero-main { padding-right: 1rem; }
-
-.player-hero.has-no-art .player-hero-id { margin-right: 0; }
+.player-hero.has-no-art .player-hero-main { padding-right: 4.66cqw; }
 
 .player-hero-names { min-width: 0; }
 
+/* 過去名。島の中の文字なので、ここだけは島の幅について行かせる */
+.player-hero-names .meta-line {
+  margin: 0.93cqw 0;
+  font-size: 3.97cqw;
+}
+
+/* 編集アイコンも島の一部。ここだけ実寸のままだと、島が大きいほど小さく見える */
+.player-hero-id .profile-edit-link {
+  width: 7.46cqw;
+  height: 7.46cqw;
+  margin-left: 1.4cqw;
+}
+
+.player-hero-id .profile-edit-link svg {
+  width: 4.43cqw;
+  height: 4.43cqw;
+}
+
 .avatar-hero {
-  width: 2.75rem;
-  height: 2.75rem;
-  font-size: 1.1rem;
+  width: 12.83cqw;
+  height: 12.83cqw;
+  font-size: 5.13cqw;
   border: 1px solid var(--border);
 }
 
@@ -4557,10 +4590,10 @@ dialog.char-picker { max-width: 56rem; }
 .player-hero-name {
   margin: 0;
   font-family: var(--font-display);
-  /* 画面幅には連動させない。島の幅が 21.5rem で固定なので、画面が広いからと
-     文字だけ大きくすると、同じ名前が広い画面でだけ「…」で切れることになる。
-     低めに取ってあるのは、左半分しか使えないため。 */
-  font-size: 1.15rem;
+  /* 島の幅に対する割合。画面幅（vw）で決めないのは、島の幅と文字の大きさが
+     別々に動くと「同じ名前が、ある画面幅でだけ『…』で切れる」ことになるため。
+     割合で持てば、切れるか切れないかはどの画面でも同じになる。 */
+  font-size: 5.36cqw;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -4575,10 +4608,10 @@ dialog.char-picker { max-width: 56rem; }
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.1rem;
+  gap: 0.47cqw;
   margin-top: auto;
-  padding: 0.55rem 0.7rem;
-  border-left: 3px solid var(--accent);
+  padding: 2.57cqw 3.27cqw;
+  border-left: 0.87cqw solid var(--accent);
   border-radius: 0 var(--r) var(--r) 0;
   background: linear-gradient(90deg, var(--accent-soft), transparent 90%);
 }
@@ -4590,7 +4623,7 @@ dialog.char-picker { max-width: 56rem; }
    はみ出した先にあるのは背景の絵だけなので、あふれさせるほうが読める。 */
 .player-rank-value {
   font-family: var(--font-display);
-  font-size: 1.7rem;
+  font-size: 7.93cqw;
   font-weight: 700;
   line-height: 1;
   color: var(--accent-bright);
@@ -4604,10 +4637,14 @@ dialog.char-picker { max-width: 56rem; }
 }
 
 .player-rank-note {
-  font-size: 0.78rem;
+  font-size: 3.64cqw;
   color: var(--text-faint);
   white-space: nowrap;
 }
+
+/* 順位の増減。島の中では他の但し書きと同じ大きさにそろえる
+   （既定の 0.78rem のままだと、島が大きいほどここだけ小さく見える） */
+.player-rank-note .rank-change { font-size: 1em; }
 
 /* 絵の面。文字より後ろ（z-index: 0）に置く。
    地色は敷かず、足元の淡い光だけ ── 面を敷くと四角い板が背景に浮いて、
@@ -4620,6 +4657,12 @@ dialog.char-picker { max-width: 56rem; }
   position: relative;
   z-index: 0;
   pointer-events: none;
+  /* 中段の高さはここが決める（島の幅の 44.32% ＝ 13 mini で 152px）。絵は
+     position: absolute で中身としての背丈が 0 なので、升に高さを与えないと
+     段ごと潰れる。割合で持つので、島が広がれば絵も同じ割合で大きくなる ──
+     絵を大きくしたいときに動かすのはここ。
+     隣の .player-hero-main（ランク）は同じ段なので、この高さまで引き伸ばされる。 */
+  height: 44.32cqw;
   opacity: 0.55;
   background: radial-gradient(62% 42% at 50% 94%, var(--accent-soft), transparent 72%);
 }
@@ -4642,22 +4685,25 @@ dialog.char-picker { max-width: 56rem; }
   object-fit: contain;
 }
 
-/* 島の下段。自己紹介と直近の戦績が入る。
-   名前・ランクと同じ人の話なので同じ島に収める ── 別のカードに分けると、
-   間の隙間のぶんだけ「別の話」に見える。
+/* 自己紹介と直近の戦績。名前・ランクと同じ人の話なので同じカードに収める ──
+   別のカードに分けると、間の隙間のぶんだけ「別の話」に見える。
+   狭い画面では島の下、広い画面では島の横（下の min-width: 721px）。
 
-   【ここは線を引く】上の絵との境目とは事情が違う。左右の境目に線を引くと絵が
-   板に見えてしまうが、ここは文字と文字の境なので、線があるほうが段の変わり目が分かる。
-   線は左右に少し引っ込める ── 端まで届かせるとカードを2枚に割ったように見える。 */
+   【島とは違って実寸（rem）で持つ】ここは読ませる文章と一覧なので、置き場所が
+   変わっても文字の大きさは変えない。島だけが割合で拡大する。
+
+   【ここは線を引く】島の中の左右の境目とは事情が違う。あちらは線を引くと絵が
+   板に見えてしまうが、ここは文字と文字の境なので、線があるほうが切れ目が分かる。
+   線は少し引っ込める ── 端まで届かせるとカードを2枚に割ったように見える。 */
 .player-hero-foot {
-  grid-area: foot;
   position: relative;
-  z-index: 1;  /* 絵より前。中段の絵がここまで伸びてきても文字が負けない */
+  z-index: 1;
   display: grid;
   /* 列を明示する。省略して暗黙の auto 列にすると、長い自己紹介が折り返さず
      max-content（測ったときは1035pxの枠に対して5259px）まで伸びる。
      日本語は単語の区切りが無いので、一度伸びると一行のまま横へ流れていく。 */
   grid-template-columns: minmax(0, 1fr);
+  align-content: start;  /* 島より背が低いとき、中身を引き伸ばさず上に詰める */
   gap: 0.85rem;
   margin: 1rem 1rem 0;
   padding: 0.9rem 0 1rem;
@@ -4677,6 +4723,41 @@ dialog.char-picker { max-width: 56rem; }
 
 .player-hero-foot .profile-block { margin-bottom: 0; }
 
+/* ---- 広い画面では、島の横に自己紹介と直近の戦績を置く ----
+
+   縦に積んだままだと、島を大きくするほど下の文章が画面の外へ遠のく。横に並べれば
+   島は器の半分ぶんまで大きくなり、それでも文章は同じ高さから読み始められる。
+   区切りの位置が下から横に移るので、線も上辺から左辺へ移す。
+
+   半々（1fr 1fr）で割る。島は割合で中身を決めるので幅がそのまま大きさになり、
+   右側は直近の戦績の札が1列で無理なく収まる幅が要る ── どちらも「半分」で足りる。
+   721px から始めるのは、狭い画面向けの指定（max-width: 720px）の裏返しだから。 */
+@media (min-width: 721px) {
+  .player-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    max-width: none;  /* 縦積み用の頭打ちを外す。ここからは島が器の半分まで育つ */
+  }
+
+  .player-hero-foot {
+    margin: 1.35rem 1.35rem 1.35rem 0;
+    padding: 0 0 0 1.35rem;
+    border-top: 0;
+    border-left: 1px solid var(--border-soft);
+  }
+
+  /* 自己紹介も戦績も無い人は横に並べる相手がいない。1列に戻したうえで、器の半分で
+     頭を打つ ── 伸ばすと、中身が割合で決まっているぶん名前も順位も無闇に大きくなる。
+     半分にするのは、横に並べたときの島とちょうど同じ大きさになるから。
+     .player-hero-foot は空だと display: none になるが、消えても列は残るので
+     「並べる中身があるか」で見る。 */
+  .player-hero:not(:has(.player-hero-foot .player-bio,
+                        .player-hero-foot .profile-block,
+                        .player-hero-foot .empty-hint)) {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 50%;
+  }
+}
+
 /* ---- 直近の戦績 ---- */
 
 .profile-block { margin-bottom: 1.5rem; }
@@ -4691,8 +4772,8 @@ dialog.char-picker { max-width: 56rem; }
   text-transform: uppercase;
 }
 
-/* 島の下段に入るので、幅は島の内側（21.5rem − 左右の余白）しかない。
-   2列に詰めると大会名が数文字ごとに折り返すため、どの画面でも1列にする。 */
+/* どの画面でも1列。置き場所が島の下でも横でも、使えるのはカードの半分ほどの幅で、
+   2列に詰めると大会名が数文字ごとに折り返す。 */
 .result-cards {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -4975,10 +5056,10 @@ dialog.char-picker { max-width: 56rem; }
      「メインにする」と「×」が隣り合って押し間違える。 */
   .char-chip { flex: 1 1 100%; }
 
-  /* プロフィールの島（.player-hero）はここに何も書かない。狭い画面向けだった
-     余白・文字の大きさは、そのまま基準側の値になっている ── 島の幅を
-     21.5rem（＝iPhone 13 mini 縦の本文幅）で固定し、どの画面でも同じ見え方に
-     揃えたため、画面幅で切り替えるものが無くなった。 */
+  /* プロフィールの島（.player-hero-core）はここに何も書かない。中の寸法はすべて
+     島自身の幅に対する割合（cqw）で持っているので、画面幅で切り替えるものが無い。
+     画面の広さで変わるのは自己紹介・戦績の置き場所だけで、そちらは裏返しの
+     指定（min-width: 721px）が受け持つ。 */
 
   /* 一覧の行の絵も、狭い画面では名前の真後ろに来てしまう。細く薄くする */
   .row-art {

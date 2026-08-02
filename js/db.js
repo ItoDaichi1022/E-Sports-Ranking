@@ -111,6 +111,9 @@ function toTournament(row, { entrantIds, participantIds, teams }) {
     // この機能より前に作られた大会は null で、対象外として扱われる。
     matchType: row.match_type,
     matchTypeNote: row.match_type_note ?? '',
+    // ランキングに反映させるかどうかの運営の設定。この列より前に作られた大会は
+    // null で来るので、真に寄せる（これまでどおり条件だけで決まる）。
+    rankingOptIn: row.ranking_opt_in !== false,
     rules: row.rules,
     imageUrl: row.image_url ?? '',
     // 配信元のURL。未設定は空文字（入力欄の value にそのまま渡せる形に揃える）
@@ -829,6 +832,7 @@ export async function createTournament(tournament) {
       format: tournament.format ?? 'single_elim',
       match_type: tournament.matchType || null,
       match_type_note: tournament.matchTypeNote || null,
+      ranking_opt_in: tournament.rankingOptIn !== false,
       rules: tournament.rules || null,
       image_url: tournament.imageUrl || null,
       stream_url: tournament.streamUrl || null,
@@ -852,6 +856,7 @@ export async function saveTournament(tournament) {
       date: tournament.date || null,
       match_type: tournament.matchType || null,
       match_type_note: tournament.matchTypeNote || null,
+      ranking_opt_in: tournament.rankingOptIn !== false,
       rules: tournament.rules || null,
       image_url: tournament.imageUrl || null,
       stream_url: tournament.streamUrl || null,

@@ -64,6 +64,7 @@ const tournamentSubmitBtn = $('tournament-submit-btn');
 const tournamentMatchTypeInput = $('tournament-match-type-input');
 const tournamentMatchTypeNoteField = $('tournament-match-type-note-field');
 const tournamentMatchTypeNoteInput = $('tournament-match-type-note-input');
+const tournamentRankingOptInInput = $('tournament-ranking-opt-in-input');
 const tournamentThirdPlaceInput = $('tournament-third-place-input');
 
 // 大会作成・大会編集・お知らせの画像アップロード。HTML側の入力を配線する。
@@ -113,6 +114,7 @@ const tournamentEditCancelBtn = $('tournament-edit-cancel-btn');
 const tournamentEditMatchTypeInput = $('tournament-edit-match-type-input');
 const tournamentEditMatchTypeNoteField = $('tournament-edit-match-type-note-field');
 const tournamentEditMatchTypeNoteInput = $('tournament-edit-match-type-note-input');
+const tournamentEditRankingOptInInput = $('tournament-edit-ranking-opt-in-input');
 const tournamentInfoEl = $('tournament-info');
 const tournamentActionsEl = $('tournament-actions');
 const tournamentHeroEl = $('tournament-hero');
@@ -1193,11 +1195,15 @@ function renderHero(el, imageUrl) {
   }
 }
 
-// ランキングに反映される大会かどうかの印。条件（16人以上・1v1／リレー）は
+// ランキングに反映される大会かどうかの印。条件（16人以上・1v1／リレー・運営の設定）は
 // 大会の内容で決まるので、満たしていない場合は何が足りないかもそのまま出す。
 // 募集中の大会では人数が増えて条件を満たすことがあるため、見出しの文言を変える。
+//
+// 対象外の理由は2通りあり、言い方を分ける。条件を満たしていないのは「まだ足りない」で、
+// 募集中なら人数が増えて満たされることもある。運営が外しているのは決定事項なので、
+// 足りないものを並べても読む人の役に立たない（増えても対象にはならない）。
 function rankingEligibilityHtml(tournament) {
-  const { ranked, reasons } = rankingEligibility(tournament);
+  const { ranked, reasons, optedOut } = rankingEligibility(tournament);
   const settled = tournament.status === 'finished';
 
   if (ranked) {
@@ -1211,13 +1217,15 @@ function rankingEligibilityHtml(tournament) {
   }
 
   const title = settled ? 'ランキング反映なし' : 'ランキング反映対象外';
+  const note = optedOut
+    ? 'この大会はランキングに反映しない設定です。試合の結果はスコアに影響しません（戦歴には残ります）。'
+    : `条件（参加${RANKED_MIN_PARTICIPANTS}人以上・対戦方法が1v1かリレー）を満たしていません：
+       ${escapeHtml(reasons.join(' / '))}`;
+
   return `
     <div class="ranking-mark ranking-mark-off">
       <span class="ranking-mark-title">${title}</span>
-      <span class="ranking-mark-note">
-        条件（参加${RANKED_MIN_PARTICIPANTS}人以上・対戦方法が1v1かリレー）を満たしていません：
-        ${escapeHtml(reasons.join(' / '))}
-      </span>
+      <span class="ranking-mark-note">${note}</span>
     </div>
   `;
 }
@@ -1888,41 +1896,46 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '', foot 
     }
   }
 
-  // かたまりを .player-hero の grid に直接置く。名前は上段で横いっぱい、
-  // 中段を左右に割って 左＝ランク・右＝キャラクター にする（CSSの grid-template-areas）。
+  // 名前・ランク・キャラクターは .player-hero-core にまとめる。この升が
+  // 「選手名と順位の島」で、中身の並びと大きさの釣り合いは升の幅だけで決まる
+  // （CSSの container-type と cqw。画面が広くなると釣り合いを保ったまま拡大する）。
+  // 升の中は、名前が上段で横いっぱい、中段を左右に割って 左＝ランク・右＝キャラクター。
   // 絵を中段に置くのは「名前にかぶらない位置」を段で決めるため ── 座標で避けると、
   // 過去名の有無で名前の高さが変わったときにずれる。
   //
-  // foot は下段（横いっぱい）。自己紹介と直近の戦績が入る ── 名前・ランクと同じ人の
-  // 話なので同じ島に収める。ここだけは区切り線を引く。上の絵は背景として敷いてあり
-  // 線を引くと板に見えるが、下段は文字と文字の境目なので、線があるほうが段が分かる。
+  // foot は自己紹介と直近の戦績。名前・ランクと同じ人の話なので同じ島に収める。
+  // 置き場所は画面の広さで変わる（狭ければ升の下、広ければ升の横）。どちらでも
+  // 区切り線は引く ── 升の中の左右の境目は線を引くと絵が板に見えるが、
+  // こちらは文字と文字の境目なので、線があるほうが切れ目が分かる。
   return `
     <section class="player-hero${artUrl ? '' : ' has-no-art'}">
-      <div class="player-hero-id">
-        ${avatarHtml(player, 'hero')}
-        <div class="player-hero-names">
-          <!-- title は、長い名前が「…」で切られたときに全体を読むための保険。
-               切らずに折り返すと2行になり、下の段の位置とカードの高さが
-               名前の長さで動いてしまう（CSSの .player-hero-name を参照）。 -->
-          <${nameTag} class="player-hero-name" title="${escapeHtml(player.currentName)}">${escapeHtml(player.currentName)}</${nameTag}>
-          ${player.pastNames.length
-            ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>`
-            : ''}
+      <div class="player-hero-core">
+        <div class="player-hero-id">
+          ${avatarHtml(player, 'hero')}
+          <div class="player-hero-names">
+            <!-- title は、長い名前が「…」で切られたときに全体を読むための保険。
+                 切らずに折り返すと2行になり、下の段の位置とカードの高さが
+                 名前の長さで動いてしまう（CSSの .player-hero-name を参照）。 -->
+            <${nameTag} class="player-hero-name" title="${escapeHtml(player.currentName)}">${escapeHtml(player.currentName)}</${nameTag}>
+            ${player.pastNames.length
+              ? `<p class="meta-line">過去名: ${escapeHtml(player.pastNames.slice(-2).join(', '))}</p>`
+              : ''}
+          </div>
+          ${action}
         </div>
-        ${action}
-      </div>
-      <div class="player-hero-main">
-        <div class="player-rank">
-          <span class="player-rank-value">${rankValue}</span>
-          <span class="player-rank-note">${rankNote}</span>
+        <div class="player-hero-main">
+          <div class="player-rank">
+            <span class="player-rank-value">${rankValue}</span>
+            <span class="player-rank-note">${rankNote}</span>
+          </div>
+          ${extra}
         </div>
-        ${extra}
+        ${artUrl
+          ? `<div class="player-hero-art" aria-hidden="true">
+               <img src="${escapeHtml(artUrl)}" alt="" decoding="async">
+             </div>`
+          : ''}
       </div>
-      ${artUrl
-        ? `<div class="player-hero-art" aria-hidden="true">
-             <img src="${escapeHtml(artUrl)}" alt="" decoding="async">
-           </div>`
-        : ''}
       ${foot ? `<div class="player-hero-foot">${foot}</div>` : ''}
     </section>`;
 }
@@ -2304,6 +2317,9 @@ tournamentForm.addEventListener('submit', async (e) => {
     format: 'single_elim',
     matchType,
     matchTypeNote: matchType === 'other' ? tournamentMatchTypeNoteInput.value.trim() : '',
+    // ランキングに反映させるか。外した場合は条件を満たしていてもスコアに入らない
+    // （js/rankingEligibility.js）。あとから大会情報の編集で変えられる。
+    rankingOptIn: tournamentRankingOptInInput.checked,
     rules: tournamentRulesInput.value.trim() || null,
     streamUrl,
     imageUrl: '',
@@ -2352,6 +2368,7 @@ tournamentForm.addEventListener('submit', async (e) => {
   tournamentDateInput.value = '';
   tournamentMatchTypeInput.value = '';
   tournamentMatchTypeNoteInput.value = '';
+  tournamentRankingOptInInput.checked = true;
   syncMatchTypeNote();
   syncEntryModeForMatchType();
   tournamentCapacityInput.value = '';
@@ -2374,6 +2391,7 @@ tournamentEditBtn.addEventListener('click', () => {
   tournamentEditDateInput.value = tournament.date || '';
   tournamentEditMatchTypeInput.value = tournament.matchType || '';
   tournamentEditMatchTypeNoteInput.value = tournament.matchTypeNote || '';
+  tournamentEditRankingOptInInput.checked = tournament.rankingOptIn !== false;
   syncEditMatchTypeNote();
   tournamentEditCapacityInput.value = tournament.capacity ?? '';
   tournamentEditRulesInput.value = tournament.rules || '';
@@ -2407,6 +2425,7 @@ tournamentEditForm.addEventListener('submit', async (e) => {
     date: tournamentEditDateInput.value,
     matchType: tournamentEditMatchTypeInput.value,
     matchTypeNote: tournamentEditMatchTypeNoteInput.value,
+    rankingOptIn: tournamentEditRankingOptInInput.checked,
     rules: tournamentEditRulesInput.value,
     streamUrl,
     capacity: capacityRaw === '' ? null : Number(capacityRaw),

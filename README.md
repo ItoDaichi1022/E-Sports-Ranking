@@ -50,7 +50,7 @@ js/
   bracketView.js       ブラケットの描画（2v2ではチーム名＋メンバーを出す）
   matchChat.js         対戦カードごとのチャットと運営への報告（当事者と運営だけ）
   ranking.js           ランキング計算（LumiRank軽量版）
-  rankingEligibility.js 大会をランキングに反映するかの条件（16人以上・1v1／リレー）
+  rankingEligibility.js 大会をランキングに反映するかの条件（16人以上・1v1／リレー・運営の設定）
   playerStats.js       選手ごとの戦績集計
   entries.js           募集ページとエントリー（2v2のチーム編成フォームを含む）
   profile.js           プロフィールの入力と表示

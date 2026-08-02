@@ -6,6 +6,11 @@
 //   ② 対戦方法が 1v1 またはリレー（＝個人の勝敗として数えられるもの）
 // の両方を満たす大会だけをスコア計算の対象とする。
 //
+// これに加えて、運営が大会ごとに「反映しない」を選べる（tournaments.ranking_opt_in）。
+// 条件は満たすが順位に混ぜたくない大会 ── エキシビションや練習会 ── のための逃げ道で、
+// 条件の側とは性質が違う。あちらは「数えられないから外れる」、こちらは「数えられるが
+// 数えないと決めた」。画面でも別の言葉で伝える（js/app.js の rankingEligibilityHtml）。
+//
 // 判定は保存せず、そのつど大会の内容から算出する（tournamentTier.js と同じ方針）。
 // 参加人数は募集中に増えるので、値を持たせると実態とずれてしまうため。
 export const RANKED_MIN_PARTICIPANTS = 16;
@@ -33,7 +38,14 @@ export function matchTypeLabel(tournament) {
 }
 
 // 大会がランキング反映の対象かどうかと、対象外ならその理由。
-// 戻り値: { ranked: boolean, reasons: string[] }（ranked が true なら reasons は空）
+//
+// 戻り値:
+//   ranked   スコア計算に入れるか（下の3つすべてを満たすときだけ true）
+//   reasons  条件を満たしていない項目（人数・対戦方法）。満たしていれば空
+//   optedOut 運営が「反映しない」を選んでいるか
+//
+// reasons と optedOut を分けているのは、伝える言葉が違うため。条件は大会の中身で
+// 決まるので「何が足りないか」を出すが、運営の設定は足りないものではない。
 export function rankingEligibility(tournament) {
   const reasons = [];
 
@@ -51,7 +63,12 @@ export function rankingEligibility(tournament) {
     reasons.push(`対戦方法が1v1・リレー以外（${type.label}）`);
   }
 
-  return { ranked: reasons.length === 0, reasons };
+  // 運営が外している大会は、条件を満たしていても対象にしない。
+  // この列より前に作られた大会は undefined で来るので、明示的な false だけを見る
+  // （既定は「反映する」── 増えた設定のせいで過去の大会が黙って外れないように）。
+  const optedOut = tournament.rankingOptIn === false;
+
+  return { ranked: !optedOut && reasons.length === 0, reasons, optedOut };
 }
 
 export function isRankedTournament(tournament) {
