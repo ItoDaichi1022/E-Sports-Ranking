@@ -496,6 +496,59 @@ function adminControls(tournament, onChanged) {
   return wrap;
 }
 
+// エントリー済みの人に、本番までの環境づくり（#setup）を案内する小さな帯。
+//
+// 【エントリーの前には出さない】エントリーはこのページの主目的なので、その手前に
+// 別の誘導を挟むと主導線が濁る。参加が決まったあと、当日まで時間が残っている
+// この瞬間にだけ出す。案内先のページは広告を含むので、なおさら順序を守ること。
+//
+// 【しつこくしない】閉じたら覚えて、その大会では二度と出さない。エントリー済みの
+// 大会は開始までに何度も開かれるので、毎回出ると催促になる。
+const SETUP_PROMPT_KEY = 'ignitearena.setupPrompt.dismissed';
+
+function dismissedSetupPrompts() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SETUP_PROMPT_KEY) ?? '[]'));
+  } catch {
+    return new Set(); // 読めなくても案内が出るだけなので、空で続ける
+  }
+}
+
+function setupPrompt(tournament) {
+  if (!myEntrantId(tournament)) return null; // エントリーした人にだけ
+  if (dismissedSetupPrompts().has(tournament.id)) return null;
+
+  const box = document.createElement('aside');
+  box.className = 'setup-prompt';
+
+  const text = document.createElement('p');
+  text.className = 'setup-prompt-text';
+  text.textContent = '本番までにできることがあります。';
+
+  // 主導線（エントリー）より弱く見せるため、ボタンではなくリンクで置く
+  const link = document.createElement('a');
+  link.className = 'setup-prompt-link';
+  link.href = '#setup';
+  link.textContent = '対戦環境を整える';
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'setup-prompt-close';
+  close.textContent = '×';
+  close.setAttribute('aria-label', 'この案内を閉じる');
+  close.addEventListener('click', () => {
+    const seen = dismissedSetupPrompts();
+    seen.add(tournament.id);
+    try {
+      localStorage.setItem(SETUP_PROMPT_KEY, JSON.stringify([...seen]));
+    } catch { /* 保存できなくても、閉じる動作だけは済ませる */ }
+    box.remove();
+  });
+
+  box.append(text, link, close);
+  return box;
+}
+
 // 大会詳細ページ用の操作。エントリーと、運営の募集操作をまとめて置く。
 //
 // 募集一覧のカードは大会名・画像・開催日だけの入口にしたので、実際に手を動かす
@@ -516,8 +569,14 @@ export function renderTournamentActions(containerEl, tournament, onChanged) {
     if (admin.children.length > 0) row.appendChild(admin);
   }
 
-  if (row.children.length === 0) return;
-  containerEl.appendChild(row);
+  if (row.children.length > 0) containerEl.appendChild(row);
+
+  // 環境づくりの案内は、まだ当日まで間に合う「募集中」のあいだだけ。
+  // 始まってしまえば手の打ちようがなく、出しても広告にしかならない。
+  if (tournament.status === 'recruiting') {
+    const prompt = setupPrompt(tournament);
+    if (prompt) containerEl.appendChild(prompt);
+  }
 }
 
 // 募集ページ。運営には準備中の大会も見せる。

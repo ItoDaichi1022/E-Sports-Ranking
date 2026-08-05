@@ -248,6 +248,7 @@ function applyAuthUI() {
 const VIEW_IDS = {
   home: 'view-home',
   guide: 'view-guide', // はじめに（静的ページ。描画関数は持たない）
+  setup: 'view-setup', // 対戦環境を整える（静的ページ。描画関数は持たない）
   // #news はお知らせ一覧、#news/{id} は詳細。routeFromHash がパラメータの有無で分ける
   news: 'view-news',
   newslist: 'view-news-list',

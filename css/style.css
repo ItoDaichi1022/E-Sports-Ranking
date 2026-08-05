@@ -2440,6 +2440,186 @@ a.card:hover {
 /* 運営の操作は主導線（エントリー）から離し、右端に寄せる */
 .tournament-actions-row .row-actions { margin-left: auto; }
 
+/* エントリー済みの人にだけ出る、対戦環境（#setup）への案内。
+   主導線はあくまでエントリーなので、面も枠も持たせず本文の続きとして置く。
+   ここを .panel やアクセント色の箱にすると広告の帯に見える（js/entries.js 参照）。 */
+.setup-prompt {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+.setup-prompt-text {
+  margin: 0;
+}
+
+/* リンクだと分かる程度の下線だけ。ボタン（.as-link）にはしない */
+.setup-prompt-link {
+  color: var(--accent-bright);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.setup-prompt-link::before {
+  content: '→ ';
+  text-decoration: none;
+}
+
+/* 閉じるボタンは右端へ。押す場所が小さすぎないよう、見た目より広く取る */
+.setup-prompt-close {
+  margin-left: auto;
+  padding: 0.2rem 0.5rem;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.setup-prompt-close:hover {
+  color: var(--text);
+}
+
+/* ---- 「対戦環境を整える」ページ ---- */
+
+/* 冒頭の広告表記。景品表示法（ステマ規制）で要るものなので、
+   目立たせすぎず、しかし読み飛ばされない程度に枠で囲って独立させる。 */
+.setup-pr {
+  margin: 0 0 1.75rem;
+  padding: 0.7rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+/* 商品リンクの置き場所。本文（.guide-step-body）とは別の箱に分けて、
+   どこが解説でどこが広告かを読み手が見分けられるようにする。 */
+.setup-buy {
+  align-self: start;
+  max-width: 560px;
+  padding: 0.9rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+/* 楽天の生成コードは横504pxある。右の図の列（300px）には収まらないので、
+   商品リンクを持つ段だけ1列に落として、本文の下に全幅で置く
+   （.guide-step の図あり・図なしの出し分けと同じ考え方）。 */
+.guide-step:has(> .setup-buy) { grid-template-columns: minmax(0, 1fr); }
+
+/* まだ商品リンクを入れていない枠は出さない。
+   pages/setup.html には貼り付け先の枠を先に全部置いてあるので、これが無いと
+   見出しだけの空の点線ボックスが並ぶ。中身の有無は table（生成コードの外枠）で
+   見る ── 枠の中に残っているのはコメントなので :empty では拾えない。 */
+.setup-buy:not(:has(table)) { display: none; }
+
+.setup-buy-label {
+  margin: 0 0 0.6rem;
+  color: var(--text-faint);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* 1つの枠に商品を複数置くときの1件分。2件目以降は細い線で区切る
+   （枠を分けると「別の話題」に見えてしまうので、同じ枠の中で仕切る）。 */
+.setup-item + .setup-item {
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* 「どういう人向けか」の一言。値段だけ並んでいても選べないので、
+   商品より先に読ませる。 */
+.setup-item-note {
+  margin: 0 0 0.5rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+/* まだ商品リンクを入れていない1件分は出さない。
+   .setup-buy 全体と違い、こちらは中身が入るまで見出しだけが浮くのを防ぐ用
+   （枠自体には他の商品が入っていることがあるので、枠ごとは消せない）。 */
+.setup-item:not(:has(table)) { display: none; }
+
+/* 商品ごとの補足（規格の上限、対応機種の注意など）。
+   買ったあとに気づくと困ることを、リンクの直後に置く。 */
+.setup-item-caveat {
+  margin: 0.6rem 0 0;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+
+.setup-item-caveat strong { color: var(--text-dim); }
+
+/* ---- 楽天の生成コードの打ち消し ----
+   あのコードは幅504px・白背景・黒文字が要素の style 属性に直接書いてある。
+   このサイトは黒基調なので、そのままだと白い箱が1つ浮き、スマートフォンでは
+   画面から横にはみ出す。生成コードは毎回そのまま貼れるようにしておきたいので、
+   コード側を書き換えず、こちらで吸収する（style 属性が相手なので !important が要る）。 */
+
+.setup-buy table {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-collapse: collapse;
+}
+
+/* いちばん外側のカード（幅504px・白背景・灰色の枠）。
+   「楽天で購入」の赤いボタンは <a> の子なので、この td > div には当たらない
+   ＝ 楽天の色を消さずに済む。 */
+.setup-buy table > tbody > tr > td > div {
+  width: auto !important;
+  max-width: 100% !important;
+  background-color: var(--surface-2) !important;
+  border-color: var(--border) !important;
+}
+
+.setup-buy img {
+  max-width: 100%;
+  height: auto;
+}
+
+.setup-buy a {
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.setup-buy a:hover {
+  color: var(--accent-bright);
+}
+
+/* 価格などの地の文。生成コードの黒文字（color:#000000）を暗い面でも読める色へ。
+   table の中だけを狙う ── .setup-buy 直下まで含めると、こちらで書いている
+   .setup-buy-label（薄い色）と .setup-item-note まで塗り替えてしまう。 */
+.setup-buy table p,
+.setup-buy table span {
+  color: var(--text-dim) !important;
+}
+
+/* 楽天ロゴ（rl.svg）は白地向けなので、暗い面ではわずかに明るく起こす */
+.setup-buy img[src$=".svg"] {
+  filter: brightness(1.15);
+}
+
+/* 狭い画面では画像と説明が横に並びきらない。セルを積み上げて1列にする */
+@media (max-width: 640px) {
+  .setup-buy table,
+  .setup-buy tbody,
+  .setup-buy tr,
+  .setup-buy td {
+    display: block !important;
+    width: auto !important;
+  }
+}
+
 /* チーム戦（2v2）のエントリー。チーム名と相方を決めないと登録できないので、
    ボタン1つでは終わらず、押すとその場にフォームが開く。 */
 .team-entry {

@@ -1,0 +1,176 @@
+<!-- 「対戦環境を整える」ページの中身。index.html の <section id="view-setup"> に読み込まれる。
+
+     大会にエントリーした人を主な読み手にした、本番までの環境づくりの案内。
+     大会詳細のエントリー済みパネル（js/entries.js の setupPrompt）から来る。
+
+     【このページの立ち位置】
+     商品を並べる場所ではなく「環境の話をする読み物」として作ってある。
+     項目は商品ではなく困りごとで切り、効果が大きくて安いもの（回線）から
+     順に置く。高いものを先頭に置くと、そこから下が読まれない。
+     見出しを「おすすめギア」の類に変えると、同じ中身でも広告として読まれる。
+
+     入れ子にはしない。1項目＝1つの困りごとで、必要なものをその下にまとめて置く
+     （章＋段の2階層にすると、読む前から長く見える）。
+
+     【広告について】
+     楽天アフィリエイトのリンクを含む。景品表示法（ステマ規制・2023年10月〜）で
+     広告である旨の明示が要るので、冒頭の .setup-pr を消さないこと。
+     リンクは <div class="setup-buy"> の中にだけ置く。本文に混ぜないのは、
+     どこが広告でどこが解説かを読み手が見分けられるようにするため。
+
+     リンクの入れ方: 楽天アフィリエイトで「テキスト＋画像」を選んで生成した
+     コードを、各 .setup-buy の中のコメント行と差し替える。
+     ・rel は sponsored nofollow noopener を付ける（生成コードに無ければ足す）
+     ・<img> には loading="lazy" と width/height を入れる（レイアウトのがたつき防止）
+     ・楽天のCDNから来る画像なので ?v= は要らない（_headers の対象外）
+
+     このファイルを直したら index.html の data-src の ?v= を上げること。 -->
+
+<div class="page-head">
+  <p class="page-eyebrow">Setup</p>
+  <h2>対戦環境を整える</h2>
+</div>
+
+<p class="note setup-pr">
+  ※このページには広告を含みます。
+  紹介しているものは、筆者が実際に使ったり、信頼できる情報源からの推奨をもとに選んでいます。
+</p>
+
+<p class="guide-chapter-lead">
+  大会当日までに整えておきたいものを、まとめました。
+</p>
+
+<ol class="guide-steps">
+  <li class="guide-step reveal">
+    <div class="guide-step-body">
+      <h4><span class="guide-step-num">1</span>Wi-Fiをやめる</h4>
+      <p>
+        Wi-Fiは<strong>ときどき大きく遅れます</strong>。平均が速くても、その一瞬が致命傷になりますが、
+        有線にすればほぼ無くなります。
+      </p>
+      <p>
+        LANケーブルは<strong>Cat6で事足ります。</strong>
+        長さには十分注意しましょう。
+        また差込口が無い端末には変換アダプタが必要になります。
+        <strong>買う前に端子の形を確認してください</strong>
+      </p>
+    </div>
+    <div class="setup-buy">
+      <p class="setup-buy-label">おすすめ</p>
+
+      <div class="setup-item">
+      <p class="setup-item-note">LANケーブル Cat6（0.5m〜30m・長さを測ってから）</p>
+      <table border="0" cellpadding="0" cellspacing="0"><tr><td><div style="border:1px solid #95a5a6;border-radius:.75rem;background-color:#FFFFFF;width:504px;margin:0px;padding:5px;text-align:center;overflow:hidden;"><table><tr><td style="width:240px"><a href="https://hb.afl.rakuten.co.jp/ichiba/565370ba.56172dd6.565370bb.29d967a4/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fgenesis-shop%2F6e-20%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://hbb.afl.rakuten.co.jp/hgb/565370ba.56172dd6.565370bb.29d967a4/?me_id=1279802&item_id=10000137&pc=https%3A%2F%2Fthumbnail.image.rakuten.co.jp%2F%400_mall%2Fgenesis-shop%2Fcabinet%2Fnew-samune%2Fcat6_05-30m_1st.jpg%3F_ex%3D240x240&s=240x240&t=picttext" border="0" loading="lazy" width="240" height="240" style="margin:2px" alt="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]" title="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]"></a></td><td style="vertical-align:top;width:248px;display: block;"><p style="font-size:12px;line-height:1.4em;text-align:left;margin:0px;padding:2px 6px;word-wrap:break-word"><a href="https://hb.afl.rakuten.co.jp/ichiba/565370ba.56172dd6.565370bb.29d967a4/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fgenesis-shop%2F6e-20%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;">LANケーブル cat6 0.5m 1m 1.5m 2m 3m 5m 10m 20m 30m GSPOWER 爪折れ防止付き ストレート 赤 青 白 黒 緑 カバー付き ギガビット対応 イーサネットケーブル 1Gbps</a><br><span >価格：248円～（税込、送料別)</span> <span style="color:#BBB">(2026/8/5時点)</span></p><div style="margin:10px;"><a href="https://hb.afl.rakuten.co.jp/ichiba/565370ba.56172dd6.565370bb.29d967a4/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fgenesis-shop%2F6e-20%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://static.affiliate.rakuten.co.jp/makelink/rl.svg" loading="lazy" style="float:left;max-height:27px;width:auto;margin-top:0" ></a><a href="https://hb.afl.rakuten.co.jp/ichiba/565370ba.56172dd6.565370bb.29d967a4/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fgenesis-shop%2F6e-20%2F%3Fscid%3Daf_pc_bbtn&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ==" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><div style="float:right;width:41%;height:27px;background-color:#bf0000;color:#fff!important;font-size:12px;font-weight:500;line-height:27px;margin-left:1px;padding: 0 12px;border-radius:16px;cursor:pointer;text-align:center;"> 楽天で購入 </div></a></div></td></tr></table></div><br><p style="color:#000000;font-size:12px;line-height:1.4em;margin:5px;word-wrap:break-word"></p></td></tr></table>
+      <p class="setup-item-caveat">爪折れ防止付き</p>
+      </div>
+
+      <div class="setup-item">
+      <p class="setup-item-note">USB-LANアダプタ（ノートPC用・USB-A）</p>
+      <table border="0" cellpadding="0" cellspacing="0"><tr><td><div style="border:1px solid #95a5a6;border-radius:.75rem;background-color:#FFFFFF;width:504px;margin:0px;padding:5px;text-align:center;overflow:hidden;"><table><tr><td style="width:240px"><a href="https://hb.afl.rakuten.co.jp/ichiba/56536bcc.4f6fbff5.56536bcd.2ffbf435/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fauc-prendre%2F1-0126%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://hbb.afl.rakuten.co.jp/hgb/56536bcc.4f6fbff5.56536bcd.2ffbf435/?me_id=1313202&item_id=10000553&pc=https%3A%2F%2Fthumbnail.image.rakuten.co.jp%2F%400_mall%2Fauc-prendre%2Fcabinet%2Fimg-w-01%2F1-0126-w.jpg%3F_ex%3D240x240&s=240x240&t=picttext" border="0" loading="lazy" width="240" height="240" style="margin:2px" alt="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]" title="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]"></a></td><td style="vertical-align:top;width:248px;display: block;"><p style="font-size:12px;line-height:1.4em;text-align:left;margin:0px;padding:2px 6px;word-wrap:break-word"><a href="https://hb.afl.rakuten.co.jp/ichiba/56536bcc.4f6fbff5.56536bcd.2ffbf435/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fauc-prendre%2F1-0126%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;">USB LANアダプタ 変換 10/100Mbps 有線 Windows パソコン LANポート増設 PR-LANADA【メール便 送料無料】</a><br><span >価格：650円（税込、送料無料)</span> <span style="color:#BBB">(2026/8/5時点)</span></p><div style="margin:10px;"><a href="https://hb.afl.rakuten.co.jp/ichiba/56536bcc.4f6fbff5.56536bcd.2ffbf435/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fauc-prendre%2F1-0126%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://static.affiliate.rakuten.co.jp/makelink/rl.svg" loading="lazy" style="float:left;max-height:27px;width:auto;margin-top:0" ></a><a href="https://hb.afl.rakuten.co.jp/ichiba/56536bcc.4f6fbff5.56536bcd.2ffbf435/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fauc-prendre%2F1-0126%2F%3Fscid%3Daf_pc_bbtn&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ==" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><div style="float:right;width:41%;height:27px;background-color:#bf0000;color:#fff!important;font-size:12px;font-weight:500;line-height:27px;margin-left:1px;padding: 0 12px;border-radius:16px;cursor:pointer;text-align:center;"> 楽天で購入 </div></a></div></td></tr></table></div><br><p style="color:#000000;font-size:12px;line-height:1.4em;margin:5px;word-wrap:break-word"></p></td></tr></table>
+      <p class="setup-item-caveat">
+        USB-Aのものはスマホに挿さらないので注意。スマホ用にはUSB-Cなどを用意してください。
+      </div>
+
+      <div class="setup-item">
+      <p class="setup-item-note">USB-LANアダプタ（スマホ用・USB-C・給電対応）</p>
+      <!-- ここに楽天のテキスト＋画像リンク（USB-C LANアダプタ・パススルー給電対応）
+           ※ 上のUSB-Aのものはスマホに挿さらない。必ず別に用意すること -->
+      </div>
+    </div>
+  </li>
+
+  <li class="guide-step reveal">
+    <div class="guide-step-body">
+      <h4><span class="guide-step-num">2</span>スマホで戦う人へ</h4>
+      <p>
+        熱くなると端末が<strong>自動で性能を落とします</strong>。
+        冷却クーラーを備えておくのが良いでしょう。ケースを外す・充電しながら遊ばないだけでも変わります。
+      </p>
+      <p>
+        また、手汗で<strong>引っかかったり滑りすぎたりすることが多いです。</strong>これは指サックで防げます。
+      </p>
+    </div>
+    <div class="setup-buy">
+      <p class="setup-buy-label">おすすめ</p>
+
+      <div class="setup-item">
+      <p class="setup-item-note">スマホ冷却クーラー（ペルチェ式・2WAY）</p>
+      <table border="0" cellpadding="0" cellspacing="0"><tr><td><div style="border:1px solid #95a5a6;border-radius:.75rem;background-color:#FFFFFF;width:504px;margin:0px;padding:5px;text-align:center;overflow:hidden;"><table><tr><td style="width:240px"><a href="https://hb.afl.rakuten.co.jp/ichiba/56572ed4.9a423e2d.56572ed5.6de95e29/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Flabeaura%2Fpcooler%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://hbb.afl.rakuten.co.jp/hgb/56572ed4.9a423e2d.56572ed5.6de95e29/?me_id=1420422&item_id=10000376&pc=https%3A%2F%2Fthumbnail.image.rakuten.co.jp%2F%400_mall%2Flabeaura%2Fcabinet%2F12066952%2Fpcooler.jpg%3F_ex%3D240x240&s=240x240&t=picttext" border="0" loading="lazy" width="240" height="240" style="margin:2px" alt="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]" title="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]"></a></td><td style="vertical-align:top;width:248px;display: block;"><p style="font-size:12px;line-height:1.4em;text-align:left;margin:0px;padding:2px 6px;word-wrap:break-word"><a href="https://hb.afl.rakuten.co.jp/ichiba/56572ed4.9a423e2d.56572ed5.6de95e29/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Flabeaura%2Fpcooler%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;">スマホ冷却ファン 超静音 軽量 小型 取り外し可能 2WAY冷却クーラー USB給電式 LED温度表示 磁気式/クリップ式対応 ペルチェ素子 3秒急速冷却 多機種対応 ゲーム ライブ配信 写真撮影 動画視聴 テレワーク時に最適 熱暴走対策</a><br><span >価格：1,950円（税込、送料無料)</span> <span style="color:#BBB">(2026/8/5時点)</span></p><div style="margin:10px;"><a href="https://hb.afl.rakuten.co.jp/ichiba/56572ed4.9a423e2d.56572ed5.6de95e29/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Flabeaura%2Fpcooler%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://static.affiliate.rakuten.co.jp/makelink/rl.svg" loading="lazy" style="float:left;max-height:27px;width:auto;margin-top:0" ></a><a href="https://hb.afl.rakuten.co.jp/ichiba/56572ed4.9a423e2d.56572ed5.6de95e29/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Flabeaura%2Fpcooler%2F%3Fscid%3Daf_pc_bbtn&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ==" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><div style="float:right;width:41%;height:27px;background-color:#bf0000;color:#fff!important;font-size:12px;font-weight:500;line-height:27px;margin-left:1px;padding: 0 12px;border-radius:16px;cursor:pointer;text-align:center;"> 楽天で購入 </div></a></div></td></tr></table></div><br><p style="color:#000000;font-size:12px;line-height:1.4em;margin:5px;word-wrap:break-word"></p></td></tr></table>
+      <p class="setup-item-caveat">
+        USB給電式なので<strong>別に電源が要ります</strong>。夏場は強く冷やし続けると<strong>結露</strong>することがあるので弱めから。
+      </p>
+      </div>
+
+      <div class="setup-item">
+      <p class="setup-item-note">ゲーム用指サック（消耗品・大会前に新しいものへ）</p>
+      <table border="0" cellpadding="0" cellspacing="0"><tr><td><div style="border:1px solid #95a5a6;border-radius:.75rem;background-color:#FFFFFF;width:504px;margin:0px;padding:5px;text-align:center;overflow:hidden;"><table><tr><td style="width:240px"><a href="https://hb.afl.rakuten.co.jp/ichiba/56572a6e.1d01edb6.56572a6f.de9485ca/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fcasemania55%2Fxa-fingercot-x0001%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://hbb.afl.rakuten.co.jp/hgb/56572a6e.1d01edb6.56572a6f.de9485ca/?me_id=1313270&item_id=11004029&pc=https%3A%2F%2Fthumbnail.image.rakuten.co.jp%2F%400_mall%2Fcasemania55%2Fcabinet%2Fitem_thumb_m7up_6%2Fm7up_6_11173.jpg%3F_ex%3D240x240&s=240x240&t=picttext" border="0" loading="lazy" width="240" height="240" style="margin:2px" alt="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]" title="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]"></a></td><td style="vertical-align:top;width:248px;display: block;"><p style="font-size:12px;line-height:1.4em;text-align:left;margin:0px;padding:2px 6px;word-wrap:break-word"><a href="https://hb.afl.rakuten.co.jp/ichiba/56572a6e.1d01edb6.56572a6f.de9485ca/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fcasemania55%2Fxa-fingercot-x0001%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;">指サック スマホゲーム 用 スマホ用指サック 手汗対策 指カバー 操作性アップ 高感度 反応早い 炭素繊維 カーボンファイバー 誤触減少 スマホ ゲーム 極薄 滑り止め Mobile 音ゲー 上級者 初心者 Anroid iPhone タブレット 対応 送料無料 jgs bgt 互換品</a><br><span >価格：770円（税込、送料別)</span> <span style="color:#BBB">(2026/8/5時点)</span></p><div style="margin:10px;"><a href="https://hb.afl.rakuten.co.jp/ichiba/56572a6e.1d01edb6.56572a6f.de9485ca/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fcasemania55%2Fxa-fingercot-x0001%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://static.affiliate.rakuten.co.jp/makelink/rl.svg" loading="lazy" style="float:left;max-height:27px;width:auto;margin-top:0" ></a><a href="https://hb.afl.rakuten.co.jp/ichiba/56572a6e.1d01edb6.56572a6f.de9485ca/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fcasemania55%2Fxa-fingercot-x0001%2F%3Fscid%3Daf_pc_bbtn&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ==" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><div style="float:right;width:41%;height:27px;background-color:#bf0000;color:#fff!important;font-size:12px;font-weight:500;line-height:27px;margin-left:1px;padding: 0 12px;border-radius:16px;cursor:pointer;text-align:center;"> 楽天で購入 </div></a></div></td></tr></table></div><br><p style="color:#000000;font-size:12px;line-height:1.4em;margin:5px;word-wrap:break-word"></p></td></tr></table>
+      <p class="setup-item-caveat"><strong>当日にいきなり着けないこと</strong>をお勧めします。指の感覚が変わるので、練習で十分慣らしてから。</p>
+      </div>
+    </div>
+  </li>
+
+  <li class="guide-step reveal">
+    <div class="guide-step-body">
+      <h4><span class="guide-step-num">3</span>コントローラー</h4>
+      <p>
+        無線は<strong>入力が遅れることがあります</strong>。大会のときだけでもUSBでつなぐと安定します。
+      </p>
+      <p>
+        スマホでタッチ操作に限界を感じたら、モバイルコントローラという手もあります。
+        慣れが要るので<strong>大会の直前に買い替えないこと</strong>をお勧めします。
+      </p>
+    </div>
+    <div class="setup-buy">
+      <p class="setup-buy-label">おすすめ</p>
+      <!-- 楽天アフィリエイト「テキスト＋画像」の生成コード。
+           手を入れたのは <img> に loading="lazy" と width/height を足した1か所だけ
+           （下まで読まれない画像を先に取りに行かせない・読み込み中に行がずれない）。
+           幅504px・白背景・黒文字はコードの中に直接書かれているので、
+           css/style.css の .setup-buy 側で打ち消している。
+
+           1つの枠に複数を置くときは .setup-item で包み、.setup-item-note に
+           「どういう人向けか」を一言書く。値段だけ並べても選べないため。 -->
+      <div class="setup-item">
+      <p class="setup-item-note">モバイルコントローラ（スマホ用）</p>
+      <!-- ここに楽天のテキスト＋画像リンク（スマホ用コントローラ） -->
+      </div>
+
+      <div class="setup-item">
+      <p class="setup-item-note">安く試すならこれ</p>
+      <table border="0" cellpadding="0" cellspacing="0"><tr><td><div style="border:1px solid #95a5a6;border-radius:.75rem;background-color:#FFFFFF;width:504px;margin:0px;padding:5px;text-align:center;overflow:hidden;"><table><tr><td style="width:240px"><a href="https://hb.afl.rakuten.co.jp/ichiba/5653079e.ddead163.5653079f.24e3584f/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Ffujiwara-corp%2Fuz1025%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://hbb.afl.rakuten.co.jp/hgb/5653079e.ddead163.5653079f.24e3584f/?me_id=1428650&item_id=10000033&pc=https%3A%2F%2Fthumbnail.image.rakuten.co.jp%2F%400_mall%2Ffujiwara-corp%2Fcabinet%2Ftop%2Fuz1025.jpg%3F_ex%3D240x240&s=240x240&t=picttext" border="0" loading="lazy" width="240" height="240" style="margin:2px" alt="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]" title="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]"></a></td><td style="vertical-align:top;width:248px;display: block;"><p style="font-size:12px;line-height:1.4em;text-align:left;margin:0px;padding:2px 6px;word-wrap:break-word"><a href="https://hb.afl.rakuten.co.jp/ichiba/5653079e.ddead163.5653079f.24e3584f/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Ffujiwara-corp%2Fuz1025%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;">Xbox 360 コントローラー PC コントローラー 有線 ゲームパッド 二重振動 人体工学 USB ゲームコントローラー Microsoft Xbox＆Slim 360 PC Windows 7/8/10に対応</a><br><span >価格：2,580円（税込、送料別)</span> <span style="color:#BBB">(2026/8/4時点)</span></p><div style="margin:10px;"><a href="https://hb.afl.rakuten.co.jp/ichiba/5653079e.ddead163.5653079f.24e3584f/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Ffujiwara-corp%2Fuz1025%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ==" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://static.affiliate.rakuten.co.jp/makelink/rl.svg" loading="lazy" style="float:left;max-height:27px;width:auto;margin-top:0" ></a><a href="https://hb.afl.rakuten.co.jp/ichiba/5653079e.ddead163.5653079f.24e3584f/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Ffujiwara-corp%2Fuz1025%2F%3Fscid%3Daf_pc_bbtn&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ==" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><div style="float:right;width:41%;height:27px;background-color:#bf0000;color:#fff!important;font-size:12px;font-weight:500;line-height:27px;margin-left:1px;padding: 0 12px;border-radius:16px;cursor:pointer;text-align:center;"> 楽天で購入 </div></a></div></td></tr></table></div><br><p style="color:#000000;font-size:12px;line-height:1.4em;margin:5px;word-wrap:break-word"></p></td></tr></table>
+      </div>
+
+      <div class="setup-item">
+      <p class="setup-item-note">長く使うならこれ（有線/無線両対応）</p>
+      <table border="0" cellpadding="0" cellspacing="0"><tr><td><div style="border:1px solid #95a5a6;border-radius:.75rem;background-color:#FFFFFF;width:504px;margin:0px;padding:5px;text-align:center;overflow:hidden;"><table><tr><td style="width:240px"><a href="https://hb.afl.rakuten.co.jp/ichiba/56536845.a7b63790.56536846.e65737be/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fsuperdeal%2F15359xboxcontwhep2299212505%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://hbb.afl.rakuten.co.jp/hgb/56536845.a7b63790.56536846.e65737be/?me_id=1363461&item_id=10006094&pc=https%3A%2F%2Fthumbnail.image.rakuten.co.jp%2F%400_mall%2Fsuperdeal%2Fcabinet%2F09061004%2F11661997%2F12053655%2Fimgrc0332105655.jpg%3F_ex%3D240x240&s=240x240&t=picttext" border="0" loading="lazy" width="240" height="240" style="margin:2px" alt="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]" title="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]"></a></td><td style="vertical-align:top;width:248px;display: block;"><p style="font-size:12px;line-height:1.4em;text-align:left;margin:0px;padding:2px 6px;word-wrap:break-word"><a href="https://hb.afl.rakuten.co.jp/ichiba/56536845.a7b63790.56536846.e65737be/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fsuperdeal%2F15359xboxcontwhep2299212505%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;">Xbox ワイヤレス コントローラー (ロボット ホワイト) EP2-29921</a><br><span >価格：8,910円（税込、送料無料)</span> <span style="color:#BBB">(2026/8/5時点)</span></p><div style="margin:10px;"><a href="https://hb.afl.rakuten.co.jp/ichiba/56536845.a7b63790.56536846.e65737be/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fsuperdeal%2F15359xboxcontwhep2299212505%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://static.affiliate.rakuten.co.jp/makelink/rl.svg" loading="lazy" style="float:left;max-height:27px;width:auto;margin-top:0" ></a><a href="https://hb.afl.rakuten.co.jp/ichiba/56536845.a7b63790.56536846.e65737be/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fsuperdeal%2F15359xboxcontwhep2299212505%2F%3Fscid%3Daf_pc_bbtn&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ==" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><div style="float:right;width:41%;height:27px;background-color:#bf0000;color:#fff!important;font-size:12px;font-weight:500;line-height:27px;margin-left:1px;padding: 0 12px;border-radius:16px;cursor:pointer;text-align:center;"> 楽天で購入 </div></a></div></td></tr></table></div><br><p style="color:#000000;font-size:12px;line-height:1.4em;margin:5px;word-wrap:break-word"></p></td></tr></table>
+      </div>
+    </div>
+  </li>
+
+  <li class="guide-step reveal">
+    <div class="guide-step-body">
+      <h4><span class="guide-step-num">4</span>飲み物</h4>
+      <p>
+        <strong>本番の30分前に1本</strong>と決めておくのが無難です。
+        <strong>当日に初めて飲むのはやめてください。</strong>
+      </p>
+    </div>
+    <div class="setup-buy">
+      <p class="setup-buy-label">おすすめ</p>
+
+      <div class="setup-item">
+      <p class="setup-item-note">エナジードリンク（12本・飲み比べ）</p>
+      <table border="0" cellpadding="0" cellspacing="0"><tr><td><div style="border:1px solid #95a5a6;border-radius:.75rem;background-color:#FFFFFF;width:504px;margin:0px;padding:5px;text-align:center;overflow:hidden;"><table><tr><td style="width:240px"><a href="https://hb.afl.rakuten.co.jp/ichiba/5653779b.7a904aa3.5653779c.c1773cc5/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fsoukaidrink%2F4910000001425%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://hbb.afl.rakuten.co.jp/hgb/5653779b.7a904aa3.5653779c.c1773cc5/?me_id=1306273&item_id=10012419&pc=https%3A%2F%2Fthumbnail.image.rakuten.co.jp%2F%400_mall%2Fsoukaidrink%2Fcabinet%2F425%2F4910000001425.jpg%3F_ex%3D240x240&s=240x240&t=picttext" border="0" loading="lazy" width="240" height="240" style="margin:2px" alt="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]" title="[商品価格に関しましては、リンクが作成された時点と現時点で情報が変更されている場合がございます。]"></a></td><td style="vertical-align:top;width:248px;display: block;"><p style="font-size:12px;line-height:1.4em;text-align:left;margin:0px;padding:2px 6px;word-wrap:break-word"><a href="https://hb.afl.rakuten.co.jp/ichiba/5653779b.7a904aa3.5653779c.c1773cc5/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fsoukaidrink%2F4910000001425%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;">モンスター 飲み比べセット( 355ml×12本入)【モンスター】[エナジードリンク]</a><br><span >価格：2,940円（税込、送料別)</span> <span style="color:#BBB">(2026/8/5時点)</span></p><div style="margin:10px;"><a href="https://hb.afl.rakuten.co.jp/ichiba/5653779b.7a904aa3.5653779c.c1773cc5/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fsoukaidrink%2F4910000001425%2F&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ%3D%3D" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><img src="https://static.affiliate.rakuten.co.jp/makelink/rl.svg" loading="lazy" style="float:left;max-height:27px;width:auto;margin-top:0" ></a><a href="https://hb.afl.rakuten.co.jp/ichiba/5653779b.7a904aa3.5653779c.c1773cc5/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fsoukaidrink%2F4910000001425%2F%3Fscid%3Daf_pc_bbtn&link_type=picttext&ut=eyJwYWdlIjoiaXRlbSIsInR5cGUiOiJwaWN0dGV4dCIsInNpemUiOiIyNDB4MjQwIiwibmFtIjoxLCJuYW1wIjoicmlnaHQiLCJjb20iOjEsImNvbXAiOiJkb3duIiwicHJpY2UiOjEsImJvciI6MSwiY29sIjoxLCJiYnRuIjoxLCJwcm9kIjowLCJhbXAiOmZhbHNlfQ==" target="_blank" rel="nofollow sponsored noopener" style="word-wrap:break-word;"><div style="float:right;width:41%;height:27px;background-color:#bf0000;color:#fff!important;font-size:12px;font-weight:500;line-height:27px;margin-left:1px;padding: 0 12px;border-radius:16px;cursor:pointer;text-align:center;"> 楽天で購入 </div></a></div></td></tr></table></div><br><p style="color:#000000;font-size:12px;line-height:1.4em;margin:5px;word-wrap:break-word"></p></td></tr></table>
+      <p class="setup-item-caveat">
+        <strong>カフェインは集中力を高めます。</strong>
+      </p>
+      </div>
+    </div>
+  </li>
+</ol>
+
+<div class="hero-actions guide-cta">
+  <a class="as-link" href="#tournaments">募集中の大会を見る</a>
+  <a class="as-link btn-secondary" href="#entries">エントリー状況を見る</a>
+  <a class="as-link btn-secondary" href="#guide">はじめての方へ</a>
+</div>
