@@ -20,7 +20,7 @@ import {
   computeRankingsForRange, withRankChange, rankChangeInfo, tournamentIdsInRange,
 } from './ranking.js';
 import { topAchievements } from './playerStats.js';
-import { characterImageUrl } from './characters.js';
+import { CHARACTERS, characterImageUrl, representativeRef } from './characters.js';
 import { CHARACTER_FOCUS, DEFAULT_FOCUS } from './characterFocus.js';
 import * as db from './db.js';
 
@@ -36,6 +36,8 @@ const ACHIEVEMENT_COUNT = 3;
 
 const setupEl = $('reveal-setup');
 const statusEl = $('reveal-status');
+const sampleToggle = $('reveal-sample-toggle');
+const sourceControlsEl = $('reveal-source-controls');
 const startInput = $('reveal-start-input');
 const endInput = $('reveal-end-input');
 const playerListEl = $('reveal-player-list');
@@ -51,6 +53,11 @@ const selectedIds = new Set();
 // いま発表中の並び（発表順に並べ替え済み）と、その何人目を出しているか。
 let playing = null;
 
+// ランキング反映対象の大会がまだ無い時期でも、発表画面の見た目とアニメーションだけを
+// 確認できるようにする架空データの表示モード。DBには一切書き込まない。
+// 発表画面には「SAMPLE DATA」の札を出し、収録に紛れ込んでも気付けるようにしてある。
+let sampleMode = false;
+
 function radioValue(name) {
   return document.querySelector(`input[name="${name}"]:checked`)?.value;
 }
@@ -58,6 +65,67 @@ function radioValue(name) {
 function setRevealStatus(text, type) {
   statusEl.textContent = text ?? '';
   statusEl.className = `status-line${type ? ` ${type}` : ''}`;
+}
+
+// ---------------------------------------------------------------------------
+// サンプルデータ（架空のランキング）
+// ---------------------------------------------------------------------------
+//
+// 名前・大会名・順位・スコア・好成績はすべて架空で、実在の選手や大会とは無関係。
+// 立ち絵だけは実在のキャラクター素材を順番に割り当てて使う（架空の絵を用意できないため）。
+// わざと崩れやすい条件を混ぜてある ── とても長い選手名・大会名（1行に収まるか）、
+// 好成績が0件の選手（欄が空でも崩れないか）、順位変動の4パターン全部（▲▼―NEW）。
+const SAMPLE_PLAYERS = [
+  { name: 'サンプル選手A', score: 100.0, previousRank: 2, achievements: [
+    { label: '優勝', tournamentName: 'サンプルカップ #12 サマーシリーズ', participantCount: 32, tier: 'Tier 4' },
+    { label: 'ベスト4', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5' },
+    { label: '準優勝', tournamentName: '月例サンプル大会 #8', participantCount: 24, tier: 'Tier 3' },
+  ] },
+  { name: 'サンプル選手B', score: 96.8, previousRank: 1, achievements: [
+    { label: '準優勝', tournamentName: 'サンプルカップ #12 サマーシリーズ', participantCount: 32, tier: 'Tier 4' },
+    { label: 'ベスト8', tournamentName: '月例サンプル大会 #6', participantCount: 30, tier: 'Tier 3' },
+  ] },
+  { name: 'サンプル選手C', score: 91.2, previousRank: 3, achievements: [
+    { label: 'ベスト4', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5' },
+  ] },
+  { name: 'サンプル選手D', score: 85.0, previousRank: null, achievements: [] },
+  { name: 'とても長い名前の架空プレイヤーです2026', score: 79.4, previousRank: 8, achievements: [
+    { label: 'ベスト8', tournamentName: 'これもとても長い名前の架空トーナメント2026チャンピオンシップ', participantCount: 48, tier: 'Tier 4' },
+  ] },
+  { name: 'サンプル選手F', score: 73.1, previousRank: 4, achievements: [
+    { label: 'ベスト16', tournamentName: '月例サンプル大会 #7', participantCount: 30, tier: 'Tier 3' },
+    { label: 'ベスト8', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5' },
+  ] },
+  { name: 'サンプル選手G', score: 68.5, previousRank: 7, achievements: [
+    { label: 'ベスト16', tournamentName: 'サンプルカップ #11', participantCount: 28, tier: 'Tier 3' },
+  ] },
+  { name: 'サンプル選手H', score: 62.0, previousRank: null, achievements: [] },
+  { name: 'サンプル選手I', score: 57.3, previousRank: 6, achievements: [
+    { label: 'ベスト16', tournamentName: '月例サンプル大会 #5', participantCount: 24, tier: 'Tier 3' },
+  ] },
+  { name: 'サンプル選手J', score: 51.9, previousRank: 11, achievements: [
+    { label: 'ベスト8', tournamentName: 'サンプルカップ #10', participantCount: 26, tier: 'Tier 3' },
+    { label: 'ベスト16', tournamentName: '架空杯 2025', participantCount: 56, tier: 'Tier 5' },
+  ] },
+  { name: 'サンプル選手K', score: 47.2, previousRank: 9, achievements: [
+    { label: 'ベスト16', tournamentName: '月例サンプル大会 #4', participantCount: 20, tier: 'Tier 2' },
+  ] },
+  { name: 'サンプル選手L', score: 42.0, previousRank: 12, achievements: [] },
+];
+
+function sampleEntries() {
+  const refs = CHARACTERS.map((c) => representativeRef(c));
+  return SAMPLE_PLAYERS.map((p, i) => ({
+    id: `sample-${i}`,
+    name: p.name,
+    score: p.score,
+    rank: i + 1,
+    previousRank: p.previousRank,
+    tournamentsPlayed: Math.max(p.achievements.length, 1),
+    achievements: p.achievements,
+    // cardElement はこれを見つけると、実在の選手を探しに行かずこちらを使う。
+    samplePlayer: { currentName: p.name, avatarUrl: null, mainCharacters: [refs[i % refs.length]] },
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +146,7 @@ function currentRange() {
 // 公開中のものはスナップショットをそのまま使う ── 発表するのは「公開した順位」であって、
 // いま計算し直した順位ではない。
 function currentRankings() {
+  if (sampleMode) return sampleEntries();
   if (radioValue('reveal-source') === 'published') {
     return state.publishedRanking?.rankings ?? [];
   }
@@ -193,8 +262,18 @@ function achievementRowHtml(achievement) {
   `;
 }
 
+// 集計期間の出場大会が少ない選手は、好成績が1〜2件しか無いことも0件のこともある。
+// 0件のときに見出しだけ残して欄を空にすると崩れて見えるので、代わりの1行を出す。
+function achievementsListHtml(achievements) {
+  if (achievements.length === 0) {
+    return '<p class="reveal-achievements-empty">この期間の記録はまだありません</p>';
+  }
+  return `<ul>${achievements.map(achievementRowHtml).join('')}</ul>`;
+}
+
 function cardElement(entry) {
-  const player = state.players.find((p) => p.id === entry.id);
+  // サンプルデータ（架空の選手）は実在の選手を探しに行かず、架空の中身をそのまま使う。
+  const player = entry.samplePlayer ?? state.players.find((p) => p.id === entry.id);
   // 公開済みランキングは公開時点の名前しか持っていないので、アイコンとキャラクターは
   // いまの選手の情報から引き、名前はランキングに記録された値を使う
   // （rankingView.js の rankingAvatar と同じ考え方）。
@@ -222,7 +301,7 @@ function cardElement(entry) {
       </p>
       <div class="reveal-achievements">
         <p class="reveal-achievements-head">好成績</p>
-        <ul>${entry.achievements.map(achievementRowHtml).join('')}</ul>
+        ${achievementsListHtml(entry.achievements)}
       </div>
     </div>
   `;
@@ -248,6 +327,7 @@ function closeStage() {
   if (!playing) return;
   playing = null;
   stageEl.hidden = true;
+  stageEl.classList.remove('is-sample');
   setupEl.hidden = false;
   canvasEl.replaceChildren();
   document.body.classList.remove('reveal-playing');
@@ -295,22 +375,24 @@ function onStageKey(e) {
 }
 
 function startPresentation() {
-  const range = currentRange();
-  const tournamentIds = tournamentIdsInRange(state, range);
-
   // 選んだ選手だけを、発表順に並べる。好成績はここで初めて選ぶ
   // （全員ぶんを先に計算しても、出さない人のぶんは捨てるだけ）。
+  // サンプルデータは好成績も作り物を最初から持っているので、選び直さない
+  // （topAchievements は実在の大会・出場記録を見に行くので、架空のIDでは何も引けない）。
   const order = radioValue('reveal-order');
-  const entries = currentRankings()
-    .filter((r) => selectedIds.has(r.id))
-    .sort((a, b) => (order === 'countdown' ? b.rank - a.rank : a.rank - b.rank))
-    .map((r) => ({ ...r, achievements: topAchievements(r.id, tournamentIds, ACHIEVEMENT_COUNT) }));
+  let entries = currentRankings().filter((r) => selectedIds.has(r.id));
+  if (!sampleMode) {
+    const tournamentIds = tournamentIdsInRange(state, currentRange());
+    entries = entries.map((r) => ({ ...r, achievements: topAchievements(r.id, tournamentIds, ACHIEVEMENT_COUNT) }));
+  }
+  entries = entries.sort((a, b) => (order === 'countdown' ? b.rank - a.rank : a.rank - b.rank));
 
   if (entries.length === 0) return;
 
   playing = { entries, index: 0 };
   setupEl.hidden = true;
   stageEl.hidden = false;
+  stageEl.classList.toggle('is-sample', sampleMode);
   document.body.classList.add('reveal-playing');
   document.addEventListener('keydown', onStageKey);
   window.addEventListener('resize', fitStage);
@@ -350,6 +432,15 @@ setupEl.addEventListener('change', (e) => {
 setupEl.addEventListener('click', (e) => {
   const preset = e.target.closest('[data-reveal-preset]')?.dataset.revealPreset;
   if (preset) applyPreset(preset);
+});
+
+// サンプルデータのON/OFF。「発表するランキング」欄（公開中／期間指定）はサンプル中は
+// 意味を持たないので隠す。選択中の選手はどちらの世界でもID体系が違う（sample-0 等）ので、
+// 切り替えるたびに選び直しにして、実在しない選手が選ばれたままになるのを防ぐ。
+sampleToggle.addEventListener('change', () => {
+  sampleMode = sampleToggle.checked;
+  sourceControlsEl.hidden = sampleMode;
+  applyPreset('10');
 });
 
 startBtn.addEventListener('click', startPresentation);

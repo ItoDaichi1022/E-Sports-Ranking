@@ -56,6 +56,29 @@
 /* 日付欄は「期間を指定」を選ぶまで触れない。触れないことが見て分かるようにする */
 .inline-form input[type="date"]:disabled { opacity: 0.45; }
 
+/* サンプルデータの切り替え。普通の設定項目と見分けがつくよう、警告色の破線で囲って
+   はっきり目立たせる ── これは「本番の一部」ではなく「試すためだけの機能」なので。 */
+.reveal-sample-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.7rem;
+  margin: 1rem 0;
+  padding: 0.7rem 1rem;
+  border: 1px dashed var(--warn);
+  border-radius: var(--r);
+  background: rgba(245, 181, 68, 0.08);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reveal-sample-toggle .field-note {
+  flex-basis: 100%;
+  margin: 0;
+  font-weight: 400;
+}
+
 .reveal-picker-head {
   display: flex;
   flex-wrap: wrap;
@@ -176,6 +199,30 @@ body.reveal-playing { overflow: hidden; }
   0%, 60% { opacity: 1; }
   100%    { opacity: 0; }
 }
+
+/* サンプルデータで発表しているあいだだけ出す札。#reveal-stage は画面（ビューポート）に
+   固定されているので、--reveal-scale で画がどれだけ縮んでも常に同じ大きさで読める。
+   ヒントとは違って消さない ── 撮り続ける間ずっと「これは架空データだ」と分かる必要がある。 */
+.reveal-sample-badge {
+  display: none;
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 10px 28px;
+  border-radius: var(--r-pill);
+  background: var(--warn);
+  color: #1a1400;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-size: 1rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  z-index: 5;
+}
+
+#reveal-stage.is-sample .reveal-sample-badge { display: block; }
 
 /* ---------------------------------------------------------------------------
    1人ぶんのカード
@@ -408,6 +455,16 @@ body.reveal-playing { overflow: hidden; }
   font-size: 24px;
   color: var(--text-faint);
   white-space: nowrap;
+}
+
+/* 好成績が0件の選手（集計期間の出場が少ない・新規ランクイン等）は、一覧の代わりにこの
+   1行を出す。見出し「好成績」だけ残して欄を空にすると、レイアウトが崩れて見えるため。 */
+.reveal-achievements-empty {
+  margin: 10px 0 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-soft);
+  font-size: 28px;
+  color: var(--text-faint);
 }
 
 /* ---------------------------------------------------------------------------
