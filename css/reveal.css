@@ -472,7 +472,7 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   display: flex;
   flex-direction: column;
   gap: 28px;
-  padding: 88px 64px 80px;
+  padding: 80px 56px 72px;
 }
 
 .reveal-body > * {
@@ -544,7 +544,7 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
 }
 
 /* 1件ぶんの細長い島。並びは 大会画像 → 大会名 → 順位 → Tier。
@@ -554,14 +554,15 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
    見え方になり、下の映像との境目も柔らかくなる。 */
 .reveal-achievement {
   display: grid;
-  grid-template-columns: 76px minmax(0, 1fr) auto auto;
+  grid-template-columns: 124px minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 22px;
-  padding: 12px 36px 12px 12px;
+  /* 列の間隔は詰めぎみにする。ここを広げるほど大会名に残る幅が減り、
+     字を大きくした意味が無くなる（先に3点リーダで切れてしまう）。 */
+  gap: 16px;
+  padding: 24px 26px 24px 10px;
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.74), rgba(0, 0, 0, 0.52));
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
-  font-size: 30px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
   --rv-dur: 0.5s;
   animation: reveal-step-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
@@ -575,8 +576,8 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
    詰めてしまうと行ごとに大会名の頭がずれて、3件が並びに見えなくなる。
    島が錠剤の形なので、こちらも丸にして角が浮かないようにする。 */
 .reveal-achievement-art {
-  width: 76px;
-  height: 76px;
+  width: 124px;
+  height: 124px;
   overflow: hidden;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.12);
@@ -589,23 +590,30 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   display: block;
 }
 
+/* 3つの文字は大きさと太さで格を分ける。同じ太さで並べると、どれを先に読むのかが
+   決まらず、字を大きくしただけ画がうるさくなる。
+   大会名は読ませる本体なので太くしすぎない（太字の長い日本語は逆に読みにくい）。 */
 .reveal-achievement-name {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-size: 36px;
+  font-weight: 600;
   color: var(--text);
 }
 
-/* 順位（優勝・ベスト4…）。金銀銅の順位色をそのまま使う */
+/* 順位（優勝・ベスト4…）。この行で一番強い要素なので、太く・順位色で置く */
 .reveal-achievement-place {
-  font-weight: 700;
+  font-size: 40px;
+  font-weight: 800;
   white-space: nowrap;
   color: var(--reveal-accent, var(--accent-bright));
 }
 
-/* Tier は添え物なので小さく。順位より目立たせない */
+/* Tier は添え物。小さく細くして、順位と読み違えないようにする */
 .reveal-achievement-meta {
-  font-size: 22px;
+  font-size: 26px;
+  font-weight: 500;
   color: #d8d9d2;
   white-space: nowrap;
 }

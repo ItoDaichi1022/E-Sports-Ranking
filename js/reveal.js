@@ -79,14 +79,17 @@ function setRevealStatus(text, type) {
 // サンプルデータ（架空のランキング）
 // ---------------------------------------------------------------------------
 //
-// 名前・大会名・順位・スコア・好成績はすべて架空で、実在の選手や大会とは無関係。
+// 名前・大会名・順位・スコアはすべて架空で、実在の選手や大会とは無関係。
 // 立ち絵だけは実在のキャラクター素材を順番に割り当てて使う（架空の絵を用意できないため）。
 // わざと崩れやすい条件を混ぜてある ── とても長い選手名・大会名（1行に収まるか）、
-// 好成績が0件の選手（欄が空でも崩れないか）、順位変動の4パターン全部（▲▼―NEW）。
+// 順位変動の4パターン全部（▲▼―NEW）、大会画像が未登録の大会（頭がそろうか）。
+//
+// 【全員ぶん3件そろえてある理由】発表画面は「スコアを押し上げた大会」を3件出す画で、
+// 3件並んだときの見え方こそ確かめたいもの。実データ側も、スコアに効いた大会を
+// 試合から拾うので3件そろうのが普通になっている。件数が足りない選手の見え方
+// （.reveal-achievements-empty の1行）は実データ側にだけ残る道で、ここでは作らない。
 //
 // 大会画像は実在の大会を持てないので、サイトに同梱した画像を借りて充てている。
-// 画像を持たない大会（imageUrl なし）もわざと混ぜてある ── 未登録の大会でも
-// 大会名の頭がそろうか、を確かめるため。
 const SAMPLE_ART_A = 'img/game-logo.webp';
 const SAMPLE_ART_B = 'img/icon.webp';
 
@@ -99,33 +102,58 @@ const SAMPLE_PLAYERS = [
   { name: 'サンプル選手B', score: 96.8, previousRank: 1, achievements: [
     { label: '準優勝', tournamentName: 'サンプルカップ #12 サマーシリーズ', participantCount: 32, tier: 'Tier 4', imageUrl: SAMPLE_ART_A },
     { label: 'ベスト8', tournamentName: '月例サンプル大会 #6', participantCount: 30, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
+    { label: 'ベスト4', tournamentName: '架空杯 2025', participantCount: 56, tier: 'Tier 5', imageUrl: SAMPLE_ART_A },
   ] },
   { name: 'サンプル選手C', score: 91.2, previousRank: 3, achievements: [
     { label: 'ベスト4', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5', imageUrl: SAMPLE_ART_B },
+    { label: '準優勝', tournamentName: '月例サンプル大会 #9', participantCount: 28, tier: 'Tier 3', imageUrl: SAMPLE_ART_A },
+    { label: 'ベスト8', tournamentName: 'サンプルカップ #11', participantCount: 28, tier: 'Tier 3' },
   ] },
-  { name: 'サンプル選手D', score: 85.0, previousRank: null, achievements: [] },
+  { name: 'サンプル選手D', score: 85.0, previousRank: null, achievements: [
+    { label: 'ベスト8', tournamentName: 'サンプルカップ #12 サマーシリーズ', participantCount: 32, tier: 'Tier 4', imageUrl: SAMPLE_ART_A },
+    { label: 'ベスト16', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5', imageUrl: SAMPLE_ART_B },
+    { label: 'ベスト4', tournamentName: '月例サンプル大会 #7', participantCount: 30, tier: 'Tier 3', imageUrl: SAMPLE_ART_A },
+  ] },
   { name: 'とても長い名前の架空プレイヤーです2026', score: 79.4, previousRank: 8, achievements: [
     { label: 'ベスト8', tournamentName: 'これもとても長い名前の架空トーナメント2026チャンピオンシップ', participantCount: 48, tier: 'Tier 4', imageUrl: SAMPLE_ART_A },
+    { label: '準優勝', tournamentName: '月例サンプル大会 #6', participantCount: 30, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
+    { label: 'ベスト16', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5' },
   ] },
   { name: 'サンプル選手F', score: 73.1, previousRank: 4, achievements: [
     { label: 'ベスト16', tournamentName: '月例サンプル大会 #7', participantCount: 30, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
     { label: 'ベスト8', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5', imageUrl: SAMPLE_ART_A },
+    { label: '3位', tournamentName: 'サンプルカップ #10', participantCount: 26, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
   ] },
   { name: 'サンプル選手G', score: 68.5, previousRank: 7, achievements: [
     { label: 'ベスト16', tournamentName: 'サンプルカップ #11', participantCount: 28, tier: 'Tier 3', imageUrl: SAMPLE_ART_A },
+    { label: 'ベスト8', tournamentName: '月例サンプル大会 #5', participantCount: 24, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
+    { label: 'ベスト32', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5', imageUrl: SAMPLE_ART_A },
   ] },
-  { name: 'サンプル選手H', score: 62.0, previousRank: null, achievements: [] },
+  { name: 'サンプル選手H', score: 62.0, previousRank: null, achievements: [
+    { label: 'ベスト16', tournamentName: '架空杯 2025', participantCount: 56, tier: 'Tier 5', imageUrl: SAMPLE_ART_B },
+    { label: 'ベスト8', tournamentName: '月例サンプル大会 #4', participantCount: 20, tier: 'Tier 2', imageUrl: SAMPLE_ART_A },
+    { label: 'ベスト32', tournamentName: 'サンプルカップ #12 サマーシリーズ', participantCount: 32, tier: 'Tier 4' },
+  ] },
   { name: 'サンプル選手I', score: 57.3, previousRank: 6, achievements: [
     { label: 'ベスト16', tournamentName: '月例サンプル大会 #5', participantCount: 24, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
+    { label: 'ベスト32', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5', imageUrl: SAMPLE_ART_A },
+    { label: 'ベスト8', tournamentName: 'サンプルカップ #11', participantCount: 28, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
   ] },
   { name: 'サンプル選手J', score: 51.9, previousRank: 11, achievements: [
     { label: 'ベスト8', tournamentName: 'サンプルカップ #10', participantCount: 26, tier: 'Tier 3', imageUrl: SAMPLE_ART_A },
     { label: 'ベスト16', tournamentName: '架空杯 2025', participantCount: 56, tier: 'Tier 5' },
+    { label: 'ベスト16', tournamentName: '月例サンプル大会 #6', participantCount: 30, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
   ] },
   { name: 'サンプル選手K', score: 47.2, previousRank: 9, achievements: [
     { label: 'ベスト16', tournamentName: '月例サンプル大会 #4', participantCount: 20, tier: 'Tier 2', imageUrl: SAMPLE_ART_B },
+    { label: 'ベスト32', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5', imageUrl: SAMPLE_ART_A },
+    { label: 'ベスト16', tournamentName: 'サンプルカップ #12 サマーシリーズ', participantCount: 32, tier: 'Tier 4', imageUrl: SAMPLE_ART_B },
   ] },
-  { name: 'サンプル選手L', score: 42.0, previousRank: 12, achievements: [] },
+  { name: 'サンプル選手L', score: 42.0, previousRank: 12, achievements: [
+    { label: 'ベスト32', tournamentName: '架空杯 2025', participantCount: 56, tier: 'Tier 5', imageUrl: SAMPLE_ART_A },
+    { label: 'ベスト16', tournamentName: 'サンプルカップ #10', participantCount: 26, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
+    { label: 'ベスト8', tournamentName: '月例サンプル大会 #4', participantCount: 20, tier: 'Tier 2' },
+  ] },
 ];
 
 function sampleEntries() {
