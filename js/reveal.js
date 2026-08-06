@@ -257,7 +257,7 @@ function achievementRowHtml(achievement) {
     <li class="reveal-achievement">
       <span class="reveal-achievement-label">${escapeHtml(achievement.label)}</span>
       <span class="reveal-achievement-name">${escapeHtml(achievement.tournamentName)}</span>
-      <span class="reveal-achievement-meta">${achievement.participantCount}名参加・${escapeHtml(achievement.tier)}</span>
+      <span class="reveal-achievement-meta">${escapeHtml(achievement.tier)}</span>
     </li>
   `;
 }
