@@ -405,6 +405,23 @@ function characterColumnHtml(mainCharacters) {
   `;
 }
 
+// 選手を出す前にはさむ中扉（「第〇位」）。
+//
+// 数字以外は何も置かない。ここで名前や絵を少しでも見せてしまうと、次のカードで
+// めくる意味が無くなる ── 順位だけを先に言い、正体は伏せておくのが発表の作り方で、
+// この画はその「伏せている時間」そのものを受け持つ。
+// 背景も持たない（カードと同じで、下のプレー動画がそのまま透ける）。
+function titleElement(entry) {
+  const title = document.createElement('div');
+  title.className = `reveal-title${entry.rank <= 3 ? ` rank-${entry.rank}` : ''}`;
+  title.innerHTML = `
+    <p class="reveal-title-rank">
+      <span class="reveal-title-prefix">第</span><span class="reveal-title-num">${entry.rank}</span><span class="reveal-title-unit">位</span>
+    </p>
+  `;
+  return title;
+}
+
 function cardElement(entry) {
   // サンプルデータ（架空の選手）は実在の選手を探しに行かず、架空の中身をそのまま使う。
   const player = entry.samplePlayer ?? state.players.find((p) => p.id === entry.id);
@@ -444,13 +461,23 @@ function fitStage() {
   canvasEl.style.setProperty('--reveal-scale', String(scale));
 }
 
-// いま出すべき1人を描く。
+// いま出すべき画を描く。
 //
 // クラスの付け外しではなく要素ごと作り直す。CSSアニメーションは同じ要素に同じ
 // クラスを付け直しても再生されず（reflowを挟む小細工が要る）、「Rでやり直す」が
 // 効かないことがあるため。1枚ぶんの組み立てなので作り直しても軽い。
 function drawCurrent() {
-  canvasEl.replaceChildren(cardElement(playing.entries[playing.index]));
+  // 最初の1枚は空。開始した瞬間から画が出ていると、収録の頭が必ず「1枚目の途中」に
+  // なってしまう（録画ボタンを押すのが人の手である以上、間に合わない）。
+  // 何も無い画で待てるようにしておくと、録画を回してから落ち着いて1枚目をめくれる。
+  if (playing.phase === 'blank') {
+    canvasEl.replaceChildren();
+    return;
+  }
+  const entry = playing.entries[playing.index];
+  canvasEl.replaceChildren(
+    playing.phase === 'title' ? titleElement(entry) : cardElement(entry),
+  );
 }
 
 function closeStage() {
@@ -477,12 +504,23 @@ function onStageKey(e) {
   if (key === 'Escape') { closeStage(); return; }
 
   // 画面をめくる操作。Space はそのままだとページを送ってしまうので止める。
+  //
+  // めくる順は 空 → 第〇位 → その選手のカード → 第〇位 → …。
+  // 1人につき2回めくるのは、実況で「続いて、第3位……」と溜めてから正体を
+  // 出せるようにするため（自動送りにすると、溜めの長さを毎回同じにされてしまう）。
   if (key === ' ' || key === 'Spacebar' || key === 'ArrowRight' || key === 'Enter') {
     e.preventDefault();
-    // 最後の1人でさらに進めても閉じない。発表しきったあとも画を出したまま
-    // 締めの言葉を入れられるようにしておく（終わるのは Esc）。
-    if (playing.index < playing.entries.length - 1) {
+    if (playing.phase === 'blank') {
+      playing.phase = 'title';
+      drawCurrent();
+    } else if (playing.phase === 'title') {
+      playing.phase = 'card';
+      drawCurrent();
+    } else if (playing.index < playing.entries.length - 1) {
+      // 最後の1人でさらに進めても閉じない。発表しきったあとも画を出したまま
+      // 締めの言葉を入れられるようにしておく（終わるのは Esc）。
       playing.index += 1;
+      playing.phase = 'title';
       drawCurrent();
     }
     return;
@@ -490,14 +528,22 @@ function onStageKey(e) {
 
   if (key === 'ArrowLeft') {
     e.preventDefault();
-    if (playing.index > 0) {
+    if (playing.phase === 'card') {
+      playing.phase = 'title';
+      drawCurrent();
+    } else if (playing.phase === 'title' && playing.index > 0) {
       playing.index -= 1;
+      playing.phase = 'card';
+      drawCurrent();
+    } else if (playing.phase === 'title') {
+      // 1人目の中扉から戻ると、始まる前の何も無い画に戻る（撮り直しの入口）。
+      playing.phase = 'blank';
       drawCurrent();
     }
     return;
   }
 
-  // 撮り直し。いまの1人を頭から流し直す。
+  // 撮り直し。いま出ている画を頭から流し直す（中扉なら中扉、カードならカード）。
   if (key === 'r' || key === 'R') {
     e.preventDefault();
     drawCurrent();
@@ -524,7 +570,8 @@ function startPresentation() {
 
   if (entries.length === 0) return;
 
-  playing = { entries, index: 0 };
+  // 何も無い画から始める（理由は drawCurrent のコメント）。
+  playing = { entries, index: 0, phase: 'blank' };
   setupEl.hidden = true;
   stageEl.hidden = false;
   stageEl.classList.toggle('is-sample', sampleMode);

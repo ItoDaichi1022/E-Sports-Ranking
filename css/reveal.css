@@ -183,26 +183,10 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   transform-origin: center center;
 }
 
-/* 操作の案内。収録の邪魔になるので、6秒かけて消える。
-   キーを忘れても準備画面に同じことが書いてある。 */
-#reveal-hint {
-  position: absolute;
-  right: 1.5rem;
-  bottom: 1.2rem;
-  margin: 0;
-  padding: 0.35rem 0.8rem;
-  border-radius: var(--r-pill);
-  background: rgba(0, 0, 0, 0.55);
-  color: var(--text-faint);
-  font-size: 0.8rem;
-  pointer-events: none;
-  animation: reveal-hint-fade 6s ease-in forwards;
-}
-
-@keyframes reveal-hint-fade {
-  0%, 60% { opacity: 1; }
-  100%    { opacity: 0; }
-}
+/* 【操作キーの案内をこの面に置かないこと】以前は右下に数秒で消える案内を出していたが、
+   ここは収録される面なので、消えるまでの数秒がそのまま動画の頭に焼き付いてしまう
+   （「Esc 終了」の文字が入った状態で撮れてしまい、撮り直しになった）。
+   案内は準備画面（index.html の #view-reveal の説明文）だけに置く。 */
 
 /* サンプルデータで発表しているあいだだけ出す札。#reveal-stage は画面（ビューポート）に
    固定されているので、--reveal-scale で画がどれだけ縮んでも常に同じ大きさで読める。
@@ -227,6 +211,86 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 }
 
 #reveal-stage.is-sample .reveal-sample-badge { display: block; }
+
+/* ---------------------------------------------------------------------------
+   中扉（「第〇位」）
+
+   選手のカードを出す前に1枚はさむ画。数字だけを画面の真ん中に置き、それ以外は
+   何も出さない ── 名前も絵もここで見せてしまうと、次のカードでめくる意味が
+   無くなる。順位だけを先に言って正体を伏せておく、その「伏せている時間」を
+   受け持つ画なので、余計なものが1つでも映ると役目を果たさない。
+
+   カードと同じで背景は持たない（下のプレー動画がそのまま透ける）。
+   --------------------------------------------------------------------------- */
+
+.reveal-title {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+}
+
+.reveal-title.rank-1 { --reveal-accent: var(--gold); }
+.reveal-title.rank-2 { --reveal-accent: var(--silver); }
+.reveal-title.rank-3 { --reveal-accent: var(--bronze); }
+
+/* プレー動画からこの画へ切り替わった合図。カードの ::after と同じ帯を使う
+   （切り替えの見え方が2種類あると、動画の中で継ぎ目の意味が読めなくなる）。 */
+.reveal-title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: linear-gradient(100deg,
+    transparent 40%, var(--reveal-accent, var(--accent-bright)) 50%, transparent 60%);
+  opacity: 0;
+  pointer-events: none;
+  --rv-dur: 0.55s;
+  --rv-delay: 0s;
+  animation: reveal-flash var(--rv-dur) ease-out var(--rv-delay) both;
+}
+
+.reveal-title-rank {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  line-height: 0.9;
+  /* 4位以下は白。カードの順位と同じ理由（緑のままだと下の映像に埋もれやすい） */
+  color: var(--reveal-accent, #fff);
+  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.95), 0 0 110px rgba(0, 0, 0, 0.9);
+  --rv-dur: 0.9s;
+  --rv-delay: 0s;
+  animation: reveal-title-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+/* 大きくぼやけた状態から締まって出る。カードの順位（reveal-rank-in）と同じ動きを
+   一回り大きくしたもので、「これから順位を出す」という合図をそろえている。 */
+@keyframes reveal-title-in {
+  from { opacity: 0; transform: scale(1.6); filter: blur(16px); }
+  to   { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+.reveal-title-prefix {
+  font-size: 130px;
+  font-weight: 700;
+}
+
+.reveal-title-num {
+  font-family: var(--font-display);
+  font-size: 440px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.reveal-title-unit {
+  font-size: 150px;
+  font-weight: 700;
+}
 
 /* ---------------------------------------------------------------------------
    1人ぶんのカード
@@ -653,7 +717,10 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   #reveal-canvas .reveal-card,
   #reveal-canvas .reveal-card *,
   #reveal-canvas .reveal-card::before,
-  #reveal-canvas .reveal-card::after {
+  #reveal-canvas .reveal-card::after,
+  #reveal-canvas .reveal-title,
+  #reveal-canvas .reveal-title *,
+  #reveal-canvas .reveal-title::after {
     animation-duration: var(--rv-dur, 0s) !important;
     animation-delay: var(--rv-delay, 0s) !important;
   }
