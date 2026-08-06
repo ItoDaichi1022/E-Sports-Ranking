@@ -9,15 +9,15 @@
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。
      タブはWebP。iOSのホーム画面（apple-touch-icon）だけはWebPを読まないのでPNGを残す。 -->
-<link rel="icon" href="img/icon.webp?v=118" type="image/webp">
-<link rel="apple-touch-icon" href="img/icon.png?v=118">
+<link rel="icon" href="img/icon.webp?v=119" type="image/webp">
+<link rel="apple-touch-icon" href="img/icon.png?v=119">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=118">
+<link rel="stylesheet" href="css/style.css?v=119">
 <!-- 順位発表の画面（#reveal）だけで使う。style.css は既に長いので分けてある。 -->
-<link rel="stylesheet" href="css/reveal.css?v=118">
+<link rel="stylesheet" href="css/reveal.css?v=119">
 
 <!-- スクロールに合わせた登場アニメの「入れ物」を開ける印。
      登場アニメは「最初は透明 → 見えたら不透明」で作るが、その透明を素で
@@ -300,7 +300,7 @@
                画像を差し替えるときは、この2つの数字も実寸に合わせること
                （img/README.md 参照）。 -->
           <img class="hero-game-logo" id="hero-game-logo"
-               src="img/game-logo.webp?v=118" alt="" width="700" height="623">
+               src="img/game-logo.webp?v=119" alt="" width="700" height="623">
         </div>
 
         <p class="hero-eyebrow reveal">Tournament &amp; Ranking</p>
@@ -450,12 +450,12 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=118"></section>
+  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=119"></section>
 
   <!-- 本番までの環境づくり（回線・コントローラ）。中身は pages/setup.html。
        エントリー済みの大会詳細から誘導する（js/entries.js の setupPrompt）。
        楽天アフィリエイトのリンクを含むので、広告である旨の明示がページ冒頭にある。 -->
-  <section id="view-setup" class="view stage" hidden data-src="pages/setup.html?v=118"></section>
+  <section id="view-setup" class="view stage" hidden data-src="pages/setup.html?v=119"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -875,9 +875,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=118"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=119"></section>
 
-  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=118"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=119"></section>
 
 </main>
 
@@ -898,7 +898,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=118"></script>
+<script src="js/vendor/supabase.js?v=119"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -910,34 +910,34 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=118",
-    "./js/bracket.js":        "./js/bracket.js?v=118",
-    "./js/bracketView.js":    "./js/bracketView.js?v=118",
-    "./js/characterData.js":  "./js/characterData.js?v=118",
-    "./js/characterFocus.js": "./js/characterFocus.js?v=118",
-    "./js/characterPicker.js": "./js/characterPicker.js?v=118",
-    "./js/characters.js":     "./js/characters.js?v=118",
-    "./js/db.js":             "./js/db.js?v=118",
-    "./js/entries.js":        "./js/entries.js?v=118",
-    "./js/formDraft.js":      "./js/formDraft.js?v=118",
-    "./js/icons.js":          "./js/icons.js?v=118",
-    "./js/intro.js":          "./js/intro.js?v=118",
-    "./js/matchChat.js":      "./js/matchChat.js?v=118",
-    "./js/playerStats.js":    "./js/playerStats.js?v=118",
-    "./js/players.js":        "./js/players.js?v=118",
-    "./js/profile.js":        "./js/profile.js?v=118",
-    "./js/ranking.js":        "./js/ranking.js?v=118",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=118",
-    "./js/rankingView.js":    "./js/rankingView.js?v=118",
-    "./js/reveal.js":         "./js/reveal.js?v=118",
-    "./js/stage.js":          "./js/stage.js?v=118",
-    "./js/state.js":          "./js/state.js?v=118",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=118",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=118",
-    "./js/util.js":           "./js/util.js?v=118"
+    "./js/auth.js":           "./js/auth.js?v=119",
+    "./js/bracket.js":        "./js/bracket.js?v=119",
+    "./js/bracketView.js":    "./js/bracketView.js?v=119",
+    "./js/characterData.js":  "./js/characterData.js?v=119",
+    "./js/characterFocus.js": "./js/characterFocus.js?v=119",
+    "./js/characterPicker.js": "./js/characterPicker.js?v=119",
+    "./js/characters.js":     "./js/characters.js?v=119",
+    "./js/db.js":             "./js/db.js?v=119",
+    "./js/entries.js":        "./js/entries.js?v=119",
+    "./js/formDraft.js":      "./js/formDraft.js?v=119",
+    "./js/icons.js":          "./js/icons.js?v=119",
+    "./js/intro.js":          "./js/intro.js?v=119",
+    "./js/matchChat.js":      "./js/matchChat.js?v=119",
+    "./js/playerStats.js":    "./js/playerStats.js?v=119",
+    "./js/players.js":        "./js/players.js?v=119",
+    "./js/profile.js":        "./js/profile.js?v=119",
+    "./js/ranking.js":        "./js/ranking.js?v=119",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=119",
+    "./js/rankingView.js":    "./js/rankingView.js?v=119",
+    "./js/reveal.js":         "./js/reveal.js?v=119",
+    "./js/stage.js":          "./js/stage.js?v=119",
+    "./js/state.js":          "./js/state.js?v=119",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=119",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=119",
+    "./js/util.js":           "./js/util.js?v=119"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=118"></script>
+<script type="module" src="js/app.js?v=119"></script>
 </body>
 </html>

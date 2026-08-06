@@ -334,17 +334,18 @@ function achievementsOf(playerId, contributions) {
   });
 }
 
-// 使用キャラクターの列。先頭（メイン）を上に大きく、2人目以降をサブとして
-// その下に小さい札で並べる。3人目以降まで並べると1枚が小さくなりすぎるので、
-// サブは最大2人ぶんまでに絞る（メイン1 + サブ2 = 最大3人ぶん表示）。
+// 使用キャラクターの列。縦に積んで、メインが上から2/3、サブがのこり1/3を
+// 分け合う（サブ1体なら1/3をひとりで、2体なら1/6ずつ。割り振りはCSSの flex）。
+// 3人目以降まで並べると1枚が薄い帯になってしまうので、サブは最大2人ぶんまで。
 //
 // 【メインとサブで絵の見せ方が違う理由】
 // メインは切り取らず全身を枠に収める（CSSの object-fit: contain）。素材のポーズは
 // 1枚ずつ違い、武器を振りかぶっていたり寝そべっていたりするので、「顔がここにある
 // はず」と決めて切ると必ずどれかが崩れる。切らなければ、どんなポーズでも顔と上半身は
 // 必ず映る ── ポーズの違いへの一番確実な対応が「切らないこと」になる。
-// サブは小さいので全身だと顔が豆粒になる。こちらは顔の位置の表（js/characterFocus.js）を
-// 引いて顔だけを大きく切り出す。どちらの道でも「顔は必ず出る」ことは保証される。
+// サブの枠は横長で低く、全身を収めると顔が豆粒になる。こちらは顔の位置の表
+// （js/characterFocus.js）を object-position に入れて顔を枠に寄せる。
+// どちらの道でも「顔は必ず出る」ことは保証される。
 function characterColumnHtml(mainCharacters) {
   const refs = (mainCharacters ?? []).filter(Boolean);
   if (refs.length === 0) return '';
@@ -387,22 +388,20 @@ function cardElement(entry) {
   const card = document.createElement('div');
   card.className = `reveal-card${entry.rank <= 3 ? ` rank-${entry.rank}` : ''}`;
   card.innerHTML = `
-    <div class="reveal-header">
+    <div class="reveal-photo">
+      ${photoUrl
+    ? `<img src="${escapeHtml(photoUrl)}" alt="">`
+    : `<span class="reveal-photo-fallback">${escapeHtml(initialOf(entry.name))}</span>`}
       <p class="reveal-rank"><span class="reveal-rank-num">${entry.rank}</span><span class="reveal-rank-unit">位</span></p>
+    </div>
+    ${characterColumnHtml(player?.mainCharacters)}
+    <div class="reveal-body">
       <p class="reveal-name"><span>${escapeHtml(entry.name)}</span></p>
       <p class="reveal-score">
         <span class="reveal-score-label">SCORE</span>
         <span class="reveal-score-value">${entry.score.toFixed(1)}</span>
         ${changeBadgeHtml(entry, entry.previousRank !== undefined)}
       </p>
-    </div>
-    <div class="reveal-row">
-      <div class="reveal-photo">
-        ${photoUrl
-    ? `<img src="${escapeHtml(photoUrl)}" alt="">`
-    : `<span class="reveal-photo-fallback">${escapeHtml(initialOf(entry.name))}</span>`}
-      </div>
-      ${characterColumnHtml(player?.mainCharacters)}
       <div class="reveal-achievements">
         ${achievementsListHtml(entry.achievements)}
       </div>
