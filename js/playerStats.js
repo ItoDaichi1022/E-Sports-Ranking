@@ -48,36 +48,43 @@ export function championLabel(tournamentId) {
   return championId ? getPlayerName(championId) : null;
 }
 
-// 選手の「好成績」＝出場大会の中から、参加人数で重み付けして最も価値の高い成績を1つ選ぶ。
+// 選手の「好成績」＝出場大会の中から、参加人数で重み付けして価値の高い順に並べる。
 // 例: 32人大会の優勝（32/1=32）は、8人大会の優勝（8/1=8）より高く評価される。
 // 同様に64人大会のベスト4（64/4=16）は8人大会の優勝（8）より高く評価される。
 // tournamentIds を渡すと、その大会（IDのSet）だけを対象にする（ランキングの集計期間と揃えるため）。
-// まだ大会が終わっていない（進行中）・出場していない大会は対象外。該当なしの場合は null を返す。
-export function bestAchievement(playerId, tournamentIds = null) {
+// まだ大会が終わっていない（進行中）・出場していない大会は対象外。
+//
+// limit 件に満たなければ、あるぶんだけ返す（出場が1大会だけの選手もいる）。
+// 順位発表の画面（js/reveal.js）が3件並べるために複数版を使い、
+// ランキングの計算（js/ranking.js）は下の1件版を使う。
+export function topAchievements(playerId, tournamentIds = null, limit = 3) {
   const targets = state.tournaments.filter(
     (t) => (tournamentIds == null || tournamentIds.has(t.id)) && t.status === 'finished',
   );
 
-  let best = null;
+  const found = [];
   targets.forEach((t) => {
     const depth = state.placements[t.id]?.[playerId];
     if (depth == null) return;
     // 規模は出場枠の数で測る。チーム戦の「16チーム大会」を32人大会として扱うと、
     // 表の大きさ（＝勝ち上がりの重み）と釣り合わなくなる。
     const participantCount = t.entrantCount;
-    const value = participantCount / depth;
-    if (!best || value > best.value) {
-      best = {
-        label: depthLabel(depth),
-        tournamentName: t.name,
-        participantCount,
-        tier: tournamentTier(participantCount),
-        value,
-      };
-    }
+    found.push({
+      label: depthLabel(depth),
+      tournamentName: t.name,
+      participantCount,
+      tier: tournamentTier(participantCount),
+      value: participantCount / depth,
+    });
   });
 
-  return best;
+  return found.sort((a, b) => b.value - a.value).slice(0, limit);
+}
+
+// 好成績を1つだけ選ぶ版。ランキングの計算と、公開済みスナップショットに焼き込む
+// bestAchievement はこちら。該当なしの場合は null を返す。
+export function bestAchievement(playerId, tournamentIds = null) {
+  return topAchievements(playerId, tournamentIds, 1)[0] ?? null;
 }
 
 // 選手個人の戦績サマリー（通算・大会別・試合一覧）を、その選手ぶんだけ取ってきた

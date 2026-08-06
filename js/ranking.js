@@ -69,6 +69,25 @@ export function filterMatchesByRange(state, { start = null, end = null } = {}) {
   });
 }
 
+// 開催日が start〜end に入っている大会のIDを集める。
+// 日付の判定は filterMatchesByRange と同じ（日付未設定の大会は入れない）。
+//
+// 順位発表の画面（js/reveal.js）が「集計期間に開かれた大会」だけから好成績を選ぶために使う。
+// 出場したかどうかの絞り込みは playerStats.js の topAchievements 側が
+// state.placements を見て行うので、ここは日付だけを見ればよい。
+export function tournamentIdsInRange(state, { start = null, end = null } = {}) {
+  const ids = new Set();
+  state.tournaments.forEach((t) => {
+    if (start || end) {
+      if (!t.date) return;
+      if (start && t.date < start) return;
+      if (end && t.date > end) return;
+    }
+    ids.add(t.id);
+  });
+  return ids;
+}
+
 // 試合一覧から「選手ID -> 出場した大会IDのSet」を作る。
 //
 // チーム戦の試合は選手列が空なので、チームのメンバー全員に出場を数える。

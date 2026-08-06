@@ -1,0 +1,437 @@
+/* ===========================================================================
+   順位発表の画面（#reveal・運営専用）
+
+   css/style.css とは役目が違う。あちらは「読む・調べる」ための画面の作りで、
+   こちらは収録して動画にするための画。前提が3つ変わる。
+
+     1. 見るのは画面ではなく動画（1920×1080）。ブラウザの幅に合わせて伸び縮み
+        させるのではなく、1920×1080 で組んでから丸ごと縮める（--reveal-scale）。
+        こうすると文字の大きさをpxで直に書けて、収録解像度が変わっても
+        レイアウトが1ピクセルもずれない。
+     2. スクロールしない。1人ぶんが必ず一画面に収まる。
+     3. 動きは飾りではなく本体。順位 → 立ち絵 → 名前 → スコア → 好成績 の順に
+        出すことで「めくって発表している」ことそのものを作っている。
+
+   色は style.css の変数をそのまま使う（金銀銅・勝敗・アクセント）。
+   発表だけ配色が違うと、動画とサイトが別物に見えてしまう。
+   =========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   準備画面（誰を・どの期間で発表するか）
+
+   ここは普通のページ。サイトのヘッダーもナビも出たままで、いつもの操作で戻れる。
+   全画面になるのは「発表を開始する」を押してからで、それは .reveal-playing が担う。
+   --------------------------------------------------------------------------- */
+
+.reveal-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1.2rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+}
+
+.reveal-choice legend {
+  padding: 0 0.4rem;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+/* .inline-form の中の label は「見出しを上、入力を下」に積む作りになっている。
+   ラジオはその形にすると丸だけが上の段に浮くので、この中だけ横並びに戻す。 */
+.reveal-choice label,
+.inline-form .reveal-choice label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* 日付欄は「期間を指定」を選ぶまで触れない。触れないことが見て分かるようにする */
+.inline-form input[type="date"]:disabled { opacity: 0.45; }
+
+.reveal-picker-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+}
+
+.reveal-picker-head h3 { margin: 0; }
+
+.reveal-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.reveal-presets button {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+/* 選手の一覧。人数が多い大会では長くなるので、高さを決めて中だけ送る
+   （下の「発表を開始する」がいつでも押せる位置に残る）。 */
+.reveal-player-list {
+  max-height: 22rem;
+  overflow-y: auto;
+  margin-top: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+}
+
+.reveal-player-row {
+  display: grid;
+  grid-template-columns: auto 2.5rem 1fr auto auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+}
+
+.reveal-player-row:last-child { border-bottom: none; }
+.reveal-player-row:hover { background: var(--surface-2); }
+
+.reveal-player-rank {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-align: right;
+  color: var(--text-dim);
+}
+
+.reveal-player-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.reveal-player-score {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+#reveal-start-btn { margin-top: 1.25rem; }
+
+/* ---------------------------------------------------------------------------
+   発表中は画面からサイトを消す
+
+   ヘッダー・ナビ・フッターが1ピクセルでも映ると、収録した動画に
+   「これはWebサイトの画面です」と書いてあるのと同じことになる。
+   ブラウザ側をF11で全画面にすれば、残るのはこの画だけになる。
+   --------------------------------------------------------------------------- */
+
+body.reveal-playing > *:not(main) { display: none !important; }
+body.reveal-playing main { padding: 0; margin: 0; max-width: none; }
+body.reveal-playing { overflow: hidden; }
+
+#reveal-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  /* 画の外側（縮めたときの帯）は黒。動画の余白として自然に見える色にする */
+  background: #000;
+}
+
+/* 1920×1080 の画そのもの。--reveal-scale は js/reveal.js が画面の大きさから決める。 */
+#reveal-canvas {
+  width: 1920px;
+  height: 1080px;
+  flex: none;
+  transform: scale(var(--reveal-scale, 1));
+  transform-origin: center center;
+}
+
+/* 操作の案内。収録の邪魔になるので、6秒かけて消える。
+   キーを忘れても準備画面に同じことが書いてある。 */
+#reveal-hint {
+  position: absolute;
+  right: 1.5rem;
+  bottom: 1.2rem;
+  margin: 0;
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  pointer-events: none;
+  animation: reveal-hint-fade 6s ease-in forwards;
+}
+
+@keyframes reveal-hint-fade {
+  0%, 60% { opacity: 1; }
+  100%    { opacity: 0; }
+}
+
+/* ---------------------------------------------------------------------------
+   1人ぶんのカード
+
+   面を2つに分ける。左が文字、右が立ち絵。重ねない ── 重ねると、絵を透かして
+   文字を読ませることになり、絵も文字もどちらも果たせなくなる
+   （選手ページのヒーローで一度通った道。js/app.js の playerHeroHtml のコメント）。
+   --------------------------------------------------------------------------- */
+
+.reveal-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 12% 20%, rgba(147, 213, 0, 0.10), transparent 60%),
+    linear-gradient(160deg, #0d0d0d, #050505 60%);
+  color: var(--text);
+}
+
+/* 左端の帯。順位ごとに色が変わるので、金銀銅がひと目で分かる。
+   動画では縮んで映るので、画面で見て太すぎるくらいでちょうどよい */
+.reveal-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 20px;
+  background: var(--reveal-accent, var(--accent));
+  box-shadow: 0 0 40px var(--reveal-accent, var(--accent));
+}
+
+.reveal-card.rank-1 { --reveal-accent: var(--gold); }
+.reveal-card.rank-2 { --reveal-accent: var(--silver); }
+.reveal-card.rank-3 { --reveal-accent: var(--bronze); }
+
+/* ---- 立ち絵（右側）----
+   絵の枠は画面の右半分。顔の位置は素材ごとにばらばらなので、object-position を
+   1枚ずつ持っている表（js/characterFocus.js）から入れる。
+   左端は文字の面へ向けてなだらかに消す（境目に線を引くと、絵が切り抜きに見える）。 */
+.reveal-art {
+  position: absolute;
+  inset: 0 0 0 50%;
+  overflow: hidden;
+}
+
+.reveal-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 顔が上のほうに来る素材が多いので、上寄りに置いたうえで少し大きく見せる */
+  transform: scale(1.06);
+  mask-image: linear-gradient(90deg, transparent, #000 26%, #000 88%, transparent);
+  /* 尺と遅れは必ず --rv-dur / --rv-delay に書く（このファイル末尾の理由による） */
+  --rv-dur: 0.9s;
+  --rv-delay: 0.4s;
+  animation: reveal-art-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+@keyframes reveal-art-in {
+  from { opacity: 0; transform: scale(1.06) translateX(90px); }
+  to   { opacity: 1; transform: scale(1.06) translateX(0); }
+}
+
+/* ---- 文字（左側）---- */
+.reveal-body {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 54%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 26px;
+  /* 右の余白は、文字の面と絵の面がぶつからないための緩衝。ここを詰めると
+     好成績の行の右端（参加人数・Tier）が立ち絵の上に乗って読みにくくなる */
+  padding: 0 72px 0 108px;
+}
+
+.reveal-body > * {
+  margin: 0;
+  /* 段ごとの遅れは下でそれぞれ指定する。backwards で、出番が来るまで
+     最初のフレーム（透明）を保たせる */
+  --rv-dur: 0.55s;
+  --rv-delay: 0s;
+  animation: reveal-step-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+@keyframes reveal-step-in {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- 1段目: 順位 ---- */
+.reveal-rank {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  line-height: 0.9;
+  color: var(--reveal-accent, var(--accent-bright));
+  /* 順位だけは他と違う出方をさせる。大きく現れて定位置に収まる動きが
+     「めくった」という合図になる */
+  --rv-dur: 0.7s;
+  animation: reveal-rank-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+@keyframes reveal-rank-in {
+  from { opacity: 0; transform: scale(1.45); filter: blur(6px); }
+  to   { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+.reveal-rank-num {
+  font-family: var(--font-display);
+  font-size: 220px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
+}
+
+.reveal-rank-unit {
+  font-size: 64px;
+  font-weight: 700;
+}
+
+/* ---- 3段目: アイコンと選手名 ---- */
+.reveal-name {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 76px;
+  font-weight: 700;
+  line-height: 1.15;
+  /* 長い名前でも2行にしない。2行になると下のスコア以下が押し出されて
+     カードごとに位置が変わり、めくったときに画面が跳ねて見える */
+  --rv-delay: 0.9s;
+}
+
+.reveal-name > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.avatar-reveal {
+  width: 108px;
+  height: 108px;
+  font-size: 44px;
+  border: 2px solid var(--border-strong);
+}
+
+/* ---- 4段目: スコアと順位変動 ---- */
+.reveal-score {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  --rv-delay: 1.4s;
+}
+
+.reveal-score-label {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--text-faint);
+}
+
+.reveal-score-value {
+  font-family: var(--font-display);
+  font-size: 84px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent-bright);
+}
+
+/* 変動バッジの色は style.css の .rank-change.up/.down/.same/.new を使う。
+   大きさだけこの画面に合わせる */
+.reveal-score .rank-change {
+  font-family: var(--font-display);
+  font-size: 34px;
+}
+
+/* ---- 5段目: 好成績3件 ---- */
+.reveal-achievements { --rv-delay: 2s; }
+
+.reveal-achievements-head {
+  margin: 0 0 12px;
+  font-size: 24px;
+  letter-spacing: 0.2em;
+  color: var(--text-faint);
+}
+
+.reveal-achievements ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 3件は1件ずつ間を置いて出す。まとめて出すと「上から3つ」に見えるが、
+   ずらすと「1位の実績、次に2位の実績…」と読ませる順ができる */
+.reveal-achievement {
+  display: grid;
+  grid-template-columns: 150px 1fr auto;
+  align-items: baseline;
+  gap: 20px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-soft);
+  font-size: 30px;
+  --rv-dur: 0.5s;
+  animation: reveal-step-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+.reveal-achievement:nth-child(1) { --rv-delay: 2.1s; }
+.reveal-achievement:nth-child(2) { --rv-delay: 2.35s; }
+.reveal-achievement:nth-child(3) { --rv-delay: 2.6s; }
+
+.reveal-achievement-label {
+  font-weight: 700;
+  color: var(--reveal-accent, var(--accent-bright));
+}
+
+.reveal-achievement-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.reveal-achievement-meta {
+  font-size: 24px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   動きを止めている人の設定は、この画面のカードにだけは効かせない。
+
+   style.css には `* { animation-duration: 0.01ms !important }` の一括停止がある。
+   ふだんはそれでいいが、この画面は「1人ずつめくる動き」そのものが目的なので、
+   潰すと発表にならない（順位も名前も好成績も、最初から全部出ている画になる）。
+   運営が収録のために自分で開く画面で、不意に動き出すものではない。
+
+   【なぜ上のルールたちが --rv-dur / --rv-delay を経由しているか】
+   一括停止は !important なので、ここで打ち消すには同じく !important が要る。
+   `revert` では作者スタイルごと巻き戻って 0s になってしまい、値を書き直すしかない。
+   そこで尺と遅れをカスタムプロパティに預けてある ── カスタムプロパティは
+   `*` のルールの影響を受けないので、ここでは「預けた値を !important で戻す」
+   1か所だけで済み、段を足しても増えない。
+   だから新しい段を足すときも、animation-duration / animation-delay を直に書かず
+   必ず --rv-dur / --rv-delay に書くこと。
+   --------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  #reveal-canvas .reveal-card,
+  #reveal-canvas .reveal-card * {
+    animation-duration: var(--rv-dur, 0s) !important;
+    animation-delay: var(--rv-delay, 0s) !important;
+  }
+}

@@ -235,9 +235,18 @@ export function renderProfileForm(
   const bio = document.createElement('textarea');
   bio.name = 'bio';
   bio.rows = 4;
-  bio.placeholder = '選手ページに表示されます。';
+  bio.placeholder = '選手ページに表示されます。例: ランキング動画のBGMは、アップテンポで盛り上がる曲が好きです。';
   bio.value = player?.bio ?? '';
   bioLabel.appendChild(bio);
+  // ランキング発表動画のBGMは著作権フリーの音源から選ぶため、曲名・アーティスト名を
+  // 挙げられると使えない（無断使用になりうる）。「アップテンポ」「穏やか」「陽気」のような
+  // 雰囲気の言葉で書いてもらうよう、ここで先に案内しておく。
+  const bioNote = document.createElement('span');
+  bioNote.className = 'field-note';
+  bioNote.textContent = 'ランキング動画で使うBGMの好みも書いてもらえると嬉しいです。'
+    + '「アップテンポ」「穏やか」「陽気」など雰囲気の言葉でお願いします'
+    + '（著作権の都合上、曲名・アーティスト名は使用できません）。';
+  bioLabel.appendChild(bioNote);
   form.appendChild(bioLabel);
 
   // form-message は flex の中で必ず1行を占有する（.profile-form の flex-basis:100%）。

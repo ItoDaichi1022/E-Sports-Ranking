@@ -17,6 +17,7 @@ import { renderBracket } from './bracketView.js';
 import { reportChipHtml, syncOpenChat } from './matchChat.js';
 import { computeRankings, computeRankingsForRange, withRankChange, rankChangeInfo } from './ranking.js';
 import { renderRankingTable } from './rankingView.js';
+import { renderRevealPage, closeRevealStage } from './reveal.js';
 import { getPlayerStats, championLabel, placementLabelOf } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
 import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
@@ -143,6 +144,7 @@ const profileAccountEmail = $('profile-account-email');
 
 const rankingContainer = $('ranking-container');
 const rankingCreateBtn = $('ranking-create-btn');
+const rankingRevealBtn = $('ranking-reveal-btn');
 const rankingEditorEl = $('ranking-editor');
 const rankingStartInput = $('ranking-start-input');
 const rankingEndInput = $('ranking-end-input');
@@ -223,6 +225,7 @@ function applyAuthUI() {
   navTournamentLink.hidden = !admin;
   announcementNewBtn.hidden = !admin;
   rankingCreateBtn.hidden = !admin;
+  rankingRevealBtn.hidden = !admin;
   tournamentEditBtn.hidden = !admin;
   tournamentDeleteBtn.hidden = !admin;
   if (!admin) tournamentEditForm.hidden = true;
@@ -266,6 +269,9 @@ const VIEW_IDS = {
   // ブックマークから来る人のために、そのまま同じ画面へ通す。
   players: 'view-ranking',
   ranking: 'view-ranking',
+  // 順位発表（運営専用）。ランキングの表とは見せ方も操作もまるで違うので、
+  // 同じページのモードにせず別のページにしてある（js/reveal.js）。
+  reveal: 'view-reveal',
   profile: 'view-profile',
   // 規約類（静的ページ。フッターから開く。描画関数は持たない）
   terms: 'view-terms',
@@ -275,7 +281,7 @@ const VIEW_IDS = {
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
 const NAV_PAGE_OF = {
   tournament: 'tournaments', bracket: 'tournaments', player: 'ranking',
-  players: 'ranking', news: 'newslist',
+  players: 'ranking', reveal: 'ranking', news: 'newslist',
 };
 
 function parseHash() {
@@ -370,8 +376,8 @@ function routeFromHash() {
   // #news はパラメータの有無で一覧と詳細に分かれる（#news=一覧、#news/{id}=詳細）
   if (page === 'news' && !param) target = 'newslist';
 
-  // 大会作成は運営限定。マイページはログアウト中でも開ける（そこからログインする）
-  if (target === 'create' && !isAdmin()) {
+  // 大会作成と順位発表は運営限定。マイページはログアウト中でも開ける（そこからログインする）
+  if ((target === 'create' || target === 'reveal') && !isAdmin()) {
     location.replace('#home');
     target = 'home';
   }
@@ -391,6 +397,10 @@ function routeFromHash() {
 
   // 画面の入れ替え一式。View Transitions で包めるように、ひとまとまりにしてある。
   const applyRoute = () => {
+    // 発表中に別のページへ移ったら、全画面を先に畳む。畳まないと body に
+    // .reveal-playing が残り、移った先でヘッダーもナビも消えたままになる。
+    if (target !== 'reveal') closeRevealStage();
+
     Object.entries(VIEW_IDS).forEach(([name, id]) => {
       $(id).hidden = name !== target;
     });
@@ -424,7 +434,8 @@ function routeFromHash() {
     else if (target === 'players' || target === 'ranking') {
       refreshPlayerUI();
       renderRankingPage();
-    } else if (target === 'profile') renderProfilePage();
+    } else if (target === 'reveal') draw(renderRevealPage());
+    else if (target === 'profile') renderProfilePage();
 
     // 別の画面へ移ったときは先頭から見せる。ハッシュだけを書き換える作りなので、
     // 何もしないとブラウザは前の画面のスクロール位置をそのまま引き継いでしまい、
@@ -2198,6 +2209,7 @@ tournamentForm.addEventListener('change', (e) => {
 
 rankingCreateBtn.addEventListener('click', openRankingEditor);
 rankingCancelBtn.addEventListener('click', closeRankingEditor);
+rankingRevealBtn.addEventListener('click', () => { location.hash = '#reveal'; });
 
 rankingStartInput.addEventListener('change', () => {
   if (isAdmin()) renderRankingPage();
