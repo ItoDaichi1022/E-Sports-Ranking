@@ -115,17 +115,24 @@ const SAMPLE_PLAYERS = [
 
 function sampleEntries() {
   const refs = CHARACTERS.map((c) => representativeRef(c));
-  return SAMPLE_PLAYERS.map((p, i) => ({
-    id: `sample-${i}`,
-    name: p.name,
-    score: p.score,
-    rank: i + 1,
-    previousRank: p.previousRank,
-    tournamentsPlayed: Math.max(p.achievements.length, 1),
-    achievements: p.achievements,
-    // cardElement はこれを見つけると、実在の選手を探しに行かずこちらを使う。
-    samplePlayer: { currentName: p.name, avatarUrl: null, mainCharacters: [refs[i % refs.length]] },
-  }));
+  return SAMPLE_PLAYERS.map((p, i) => {
+    // 何人かはメイン+サブ複数キャラを持たせて、サブキャラクター表示（列の崩れ・
+    // 3人目以降を切り詰める挙動）もサンプルモードで確認できるようにする。
+    // subCount: 0=メインのみ 〜 3=メイン+サブ3人（characterColumnHtml側で2人に切り詰められる）。
+    const subCount = i % 4;
+    const mainCharacters = Array.from({ length: subCount + 1 }, (_, k) => refs[(i + k) % refs.length]);
+    return {
+      id: `sample-${i}`,
+      name: p.name,
+      score: p.score,
+      rank: i + 1,
+      previousRank: p.previousRank,
+      tournamentsPlayed: Math.max(p.achievements.length, 1),
+      achievements: p.achievements,
+      // cardElement はこれを見つけると、実在の選手を探しに行かずこちらを使う。
+      samplePlayer: { currentName: p.name, avatarUrl: null, mainCharacters },
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -271,29 +278,45 @@ function achievementsListHtml(achievements) {
   return `<ul>${achievements.map(achievementRowHtml).join('')}</ul>`;
 }
 
+// 使用キャラクターの列に出す絵。先頭（メイン）は大きく、2人目以降はサブとして
+// 小さい札に並べる。3人目以降まで並べると1枚が小さくなりすぎるので、
+// サブは最大2人ぶんまでに絞る（メイン1 + サブ2 = 最大3人ぶん表示）。
+function characterColumnHtml(mainCharacters) {
+  const refs = (mainCharacters ?? []).filter(Boolean);
+  if (refs.length === 0) return '';
+
+  const [mainRef, ...subRefs] = refs;
+  const mainUrl = characterImageUrl(mainRef, 'large');
+  if (!mainUrl) return '';
+
+  const subsHtml = subRefs.slice(0, 2).map((ref) => {
+    const url = characterImageUrl(ref, 'thumb');
+    if (!url) return '';
+    return `<div class="reveal-chara-sub"><img src="${escapeHtml(url)}" alt="" style="object-position:${focusPosition(ref)}"></div>`;
+  }).join('');
+
+  return `
+    <div class="reveal-chara">
+      <div class="reveal-chara-main">
+        <img src="${escapeHtml(mainUrl)}" alt="" style="object-position:${focusPosition(mainRef)}">
+      </div>
+      ${subsHtml ? `<div class="reveal-chara-subs">${subsHtml}</div>` : ''}
+    </div>
+  `;
+}
+
 function cardElement(entry) {
   // サンプルデータ（架空の選手）は実在の選手を探しに行かず、架空の中身をそのまま使う。
   const player = entry.samplePlayer ?? state.players.find((p) => p.id === entry.id);
   // 公開済みランキングは公開時点の名前しか持っていないので、アイコンとキャラクターは
   // いまの選手の情報から引き、名前はランキングに記録された値を使う
   // （rankingView.js の rankingAvatar と同じ考え方）。
-  const ref = player?.mainCharacters?.[0];
-  const artUrl = characterImageUrl(ref, 'large');
   const photoUrl = safeUrl(player?.avatarUrl);
 
   const card = document.createElement('div');
   card.className = `reveal-card${entry.rank <= 3 ? ` rank-${entry.rank}` : ''}`;
   card.innerHTML = `
-    <div class="reveal-photo">
-      ${photoUrl
-    ? `<img src="${escapeHtml(photoUrl)}" alt="">`
-    : `<span class="reveal-photo-fallback">${escapeHtml(initialOf(entry.name))}</span>`}
-    </div>
-    ${artUrl ? `
-    <div class="reveal-chara">
-      <img src="${escapeHtml(artUrl)}" alt="" style="object-position:${focusPosition(ref)}">
-    </div>` : ''}
-    <div class="reveal-body">
+    <div class="reveal-header">
       <p class="reveal-rank"><span class="reveal-rank-num">${entry.rank}</span><span class="reveal-rank-unit">位</span></p>
       <p class="reveal-name"><span>${escapeHtml(entry.name)}</span></p>
       <p class="reveal-score">
@@ -301,6 +324,14 @@ function cardElement(entry) {
         <span class="reveal-score-value">${entry.score.toFixed(1)}</span>
         ${changeBadgeHtml(entry, entry.previousRank !== undefined)}
       </p>
+    </div>
+    <div class="reveal-row">
+      <div class="reveal-photo">
+        ${photoUrl
+    ? `<img src="${escapeHtml(photoUrl)}" alt="">`
+    : `<span class="reveal-photo-fallback">${escapeHtml(initialOf(entry.name))}</span>`}
+      </div>
+      ${characterColumnHtml(player?.mainCharacters)}
       <div class="reveal-achievements">
         <p class="reveal-achievements-head">好成績</p>
         ${achievementsListHtml(entry.achievements)}

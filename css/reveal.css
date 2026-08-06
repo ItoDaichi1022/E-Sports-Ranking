@@ -156,7 +156,10 @@
 
 body.reveal-playing > *:not(main) { display: none !important; }
 body.reveal-playing main { padding: 0; margin: 0; max-width: none; }
-body.reveal-playing { overflow: hidden; }
+/* style.css の body { background: var(--bg); background-image: ... } は
+   不透明な地模様。OBSの「ブラウザ」ソースで透過合成する前提なので、発表中は
+   打ち消してページ全体を透明にする。 */
+body.reveal-playing { overflow: hidden; background: transparent; background-image: none; }
 
 #reveal-stage {
   position: fixed;
@@ -166,8 +169,9 @@ body.reveal-playing { overflow: hidden; }
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  /* 画の外側（縮めたときの帯）は黒。動画の余白として自然に見える色にする */
-  background: #000;
+  /* 背景は持たない（透過）。OBSのブラウザソースを1920×1080ぴったりで作る運用が
+     前提で、画面比率が合わないときの黒帯は出ない想定。ウィンドウキャプチャで
+     収録する場合はブラウザの外側が素材依存の色になる点に注意。 */
 }
 
 /* 1920×1080 の画そのもの。--reveal-scale は js/reveal.js が画面の大きさから決める。 */
@@ -227,24 +231,29 @@ body.reveal-playing { overflow: hidden; }
 /* ---------------------------------------------------------------------------
    1人ぶんのカード
 
-   横に3つ並べる。左が選手画像、真ん中が使用キャラクター、右が文字。
-   選手画像とキャラクター以外は重ねない ── 文字と絵を重ねると、絵を透かして
-   文字を読ませることになり、絵も文字もどちらも果たせなくなる
-   （選手ページのヒーローで一度通った道。js/app.js の playerHeroHtml のコメント）。
+   このカードはOBSの「ブラウザ」ソース（1920×1080ぴったり）で読み込み、
+   録画済みのプレー動画レイヤーの上に透過で重ねて使う。だから、この画面自身は
+   一切背景を持たない（.reveal-card にも #reveal-stage にも背景色を置かない。
+   body.reveal-playing で style.css の地模様も打ち消す）。
 
-   主役は選手画像。使用キャラクターはそれを補う情報なので、選手画像より
-   小さい札として真ん中に重ねるだけにとどめる ── 「誰が」が主、
-   「何のキャラで」が従、という発表の重心に合わせている。
-   --------------------------------------------------------------------------- */
+   縦に「上段＝順位・名前・スコア」「下段＝アイコン・使用キャラクター・戦績の
+   横並び3列」の2段だけ。以前は使用キャラクターだけ角丸・枠線・影を付けた
+   独立した箱にしていたが、それだと「板を1枚貼った」ように浮いて見え、
+   透過して映像と一体化しない。なので写真・キャラクター・戦績の3つとも
+   同じ面（枠や背景を持たないflexの兄弟要素）に置き、絵の縁は境界線ではなく
+   放射状グラデーションのマスクでにじませて消す。文字の可読性は、要素ごとの
+   背景ではなく文字の周りだけに効くぼかしハイズ（::before）で確保する
+   （放送のロワサードと同じ考え方。カード全体を覆う板は作らない）。 */
 
 .reveal-card {
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background:
-    radial-gradient(120% 90% at 12% 20%, rgba(147, 213, 0, 0.10), transparent 60%),
-    linear-gradient(160deg, #0d0d0d, #050505 60%);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 72px 100px;
   color: var(--text);
 }
 
@@ -259,114 +268,62 @@ body.reveal-playing { overflow: hidden; }
   box-shadow: 0 0 40px var(--reveal-accent, var(--accent));
 }
 
+/* カードが出た瞬間だけ光る帯。「プレー動画からこの画へ切り替わった」と
+   ひと目で分かる合図で、以降の段階演出（順位→写真→キャラ→名前→スコア→戦績）
+   より手前に一瞬だけ重ねる。--rv-dur / --rv-delay を経由する理由は
+   このファイル末尾のコメント参照（*では拾えない疑似要素なので、下の
+   prefers-reduced-motion のセレクタにも ::after を明示で足してある）。 */
+.reveal-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: linear-gradient(100deg,
+    transparent 40%, var(--reveal-accent, var(--accent-bright)) 50%, transparent 60%);
+  opacity: 0;
+  pointer-events: none;
+  --rv-dur: 0.55s;
+  --rv-delay: 0s;
+  animation: reveal-flash var(--rv-dur) ease-out var(--rv-delay) both;
+}
+
+@keyframes reveal-flash {
+  0%   { opacity: 0; transform: translateX(-55%); }
+  35%  { opacity: 0.85; }
+  100% { opacity: 0; transform: translateX(55%); }
+}
+
 .reveal-card.rank-1 { --reveal-accent: var(--gold); }
 .reveal-card.rank-2 { --reveal-accent: var(--silver); }
 .reveal-card.rank-3 { --reveal-accent: var(--bronze); }
 
-/* ---- 選手画像（左側・主役）----
-   枠は画面の左側、画面いっぱい（フチまで）に敷く。丸アイコンにはしない ──
-   小さく切り抜くと主役に見えないので、矩形のまま大きく見せる。
-   アップロードされた写真が無い選手もいるので、その場合も同じ矩形の枠に
-   頭文字を大きく置いた札で埋める（丸くしない。players.js の avatarHtml とは
-   別の専用の組み方）。右端は真ん中の面へ向けてなだらかに消す
-   （境目に線を引くと、絵が切り抜きに見える）。 */
-.reveal-photo {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 44%;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(160deg, #151515, #0a0a0a);
-}
-
-.reveal-photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scale(1.04);
-  mask-image: linear-gradient(90deg, transparent, #000 26%, #000 88%, transparent);
-  /* 尺と遅れは必ず --rv-dur / --rv-delay に書く（このファイル末尾の理由による） */
-  --rv-dur: 0.9s;
-  --rv-delay: 0.4s;
-  animation: reveal-photo-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
-}
-
-@keyframes reveal-photo-in {
-  from { opacity: 0; transform: scale(1.04) translateX(-90px); }
-  to   { opacity: 1; transform: scale(1.04) translateX(0); }
-}
-
-.reveal-photo-fallback {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface-3);
-  color: var(--text-dim);
-  font-family: var(--font-display);
-  font-size: 260px;
-  font-weight: 800;
-  text-transform: uppercase;
-  --rv-dur: 0.9s;
-  --rv-delay: 0.4s;
-  animation: reveal-photo-fallback-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
-}
-
-@keyframes reveal-photo-fallback-in {
-  from { opacity: 0; transform: translateX(-60px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-/* ---- 使用キャラクター（真ん中・やや縦長の中くらいの札）----
-   選手画像より一回り小さい、縦長の枠。左端は選手画像の右端に少し重ねて置き、
-   「選手画像に添えられた札」に見せる。顔の位置は素材ごとにばらばらなので、
-   object-position を1枚ずつ持っている表（js/characterFocus.js）から入れる。 */
-.reveal-chara {
-  position: absolute;
-  left: 790px;
-  top: 260px;
-  width: 340px;
-  height: 560px;
-  overflow: hidden;
-  border-radius: 24px;
-  border: 3px solid var(--reveal-accent, var(--border-strong));
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
-  background: #0a0a0a;
+/* ---- 上段: 順位・名前・スコア ----
+   1行に横並び。順位とスコアは幅を固定し、名前だけ余った幅いっぱいに伸びて
+   長い名前は省略する（2行にしない。2行になると下段が押し出されて
+   カードごとに高さが変わり、めくったときに画面が跳ねて見える）。 */
+.reveal-header {
+  position: relative;
   z-index: 1;
-  --rv-dur: 0.6s;
-  --rv-delay: 1.1s;
-  animation: reveal-chara-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
-}
-
-.reveal-chara img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-@keyframes reveal-chara-in {
-  from { opacity: 0; transform: translateY(40px) scale(0.9); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-/* ---- 文字（右側）---- */
-.reveal-body {
-  position: absolute;
-  inset: 0 0 0 auto;
-  width: 38%;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 26px;
-  /* 左の余白は、文字の面と真ん中の札がぶつからないための緩衝。ここを詰めると
-     好成績の行がキャラクターの札に重なって読みにくくなる */
-  padding: 0 108px 0 72px;
+  align-items: baseline;
+  gap: 36px;
+  margin: 0 0 40px;
+  padding: 12px 26px;
 }
 
-.reveal-body > * {
+/* 文字の後ろだけを軽くぼかして暗くする、板ではないハイズ。カードの背景は
+   持たないままにするための代替の可読性確保。 */
+.reveal-header::before {
+  content: '';
+  position: absolute;
+  inset: -10px -26px;
+  z-index: -1;
+  border-radius: 999px;
+  background: radial-gradient(65% 100% at 24% 50%, rgba(0, 0, 0, 0.55), transparent 78%);
+  filter: blur(6px);
+}
+
+.reveal-header > * {
   margin: 0;
   /* 段ごとの遅れは下でそれぞれ指定する。backwards で、出番が来るまで
      最初のフレーム（透明）を保たせる */
@@ -380,11 +337,11 @@ body.reveal-playing { overflow: hidden; }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ---- 1段目: 順位 ---- */
 .reveal-rank {
+  flex: none;
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
   line-height: 0.9;
   color: var(--reveal-accent, var(--accent-bright));
   /* 順位だけは他と違う出方をさせる。大きく現れて定位置に収まる動きが
@@ -400,51 +357,51 @@ body.reveal-playing { overflow: hidden; }
 
 .reveal-rank-num {
   font-family: var(--font-display);
-  font-size: 220px;
+  font-size: 150px;
   font-weight: 800;
   letter-spacing: -0.04em;
-  text-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 60px rgba(0, 0, 0, 0.8);
 }
 
 .reveal-rank-unit {
-  font-size: 64px;
+  font-size: 44px;
   font-weight: 700;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 60px rgba(0, 0, 0, 0.8);
 }
 
-/* ---- 3段目: 選手名 ----
-   アイコンは右の選手画像が担うので、ここは名前の文字だけ。 */
 .reveal-name {
-  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 76px;
+  font-size: 58px;
   font-weight: 700;
   line-height: 1.15;
-  /* 長い名前でも2行にしない。2行になると下のスコア以下が押し出されて
-     カードごとに位置が変わり、めくったときに画面が跳ねて見える */
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 40px rgba(0, 0, 0, 0.8);
   --rv-delay: 0.9s;
 }
 
-/* ---- 4段目: スコアと順位変動 ---- */
 .reveal-score {
+  flex: none;
   display: flex;
   align-items: baseline;
-  gap: 18px;
+  gap: 16px;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 40px rgba(0, 0, 0, 0.8);
   --rv-delay: 1.4s;
 }
 
 .reveal-score-label {
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: 0.22em;
-  color: var(--text-faint);
+  color: #d8d9d2;
 }
 
 .reveal-score-value {
   font-family: var(--font-display);
-  font-size: 84px;
+  font-size: 56px;
   font-weight: 800;
   line-height: 1;
   color: var(--accent-bright);
@@ -454,17 +411,167 @@ body.reveal-playing { overflow: hidden; }
    大きさだけこの画面に合わせる */
 .reveal-score .rank-change {
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: 26px;
 }
 
-/* ---- 5段目: 好成績3件 ---- */
-.reveal-achievements { --rv-delay: 2s; }
+/* ---- 下段: アイコン → 使用キャラクター → 戦績 の横並び3列 ----
+   絶対配置で重ねるのではなく、flexの兄弟として同じ面に並べる。 */
+.reveal-row {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 56px;
+}
+
+/* ---- 1列目: 選手写真（アイコン） ----
+   矩形のまま大きく見せる（丸くしない）。アップロードされた写真が無い選手は
+   頭文字を大きく置いた札で埋める。縁は境界線ではなく放射状マスクでにじませ、
+   キャラクター列と同じ「箱に見えない」扱いに揃える。 */
+.reveal-photo {
+  flex: 0 0 30%;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reveal-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.04);
+  mask-image: radial-gradient(ellipse 68% 62% at 50% 42%, #000 58%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 68% 62% at 50% 42%, #000 58%, transparent 100%);
+  /* 尺と遅れは必ず --rv-dur / --rv-delay に書く（このファイル末尾の理由による） */
+  --rv-dur: 0.9s;
+  --rv-delay: 0.4s;
+  animation: reveal-photo-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+@keyframes reveal-photo-in {
+  from { opacity: 0; transform: scale(1.04) translateX(-70px); }
+  to   { opacity: 1; transform: scale(1.04) translateX(0); }
+}
+
+.reveal-photo-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: 190px;
+  font-weight: 800;
+  text-transform: uppercase;
+  text-shadow: 0 10px 60px rgba(0, 0, 0, 0.9), 0 0 100px rgba(0, 0, 0, 0.6);
+  --rv-dur: 0.9s;
+  --rv-delay: 0.4s;
+  animation: reveal-photo-fallback-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+@keyframes reveal-photo-fallback-in {
+  from { opacity: 0; transform: translateX(-50px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ---- 2列目: 使用キャラクター（メイン＋サブ） ----
+   js/reveal.js が player.mainCharacters を全件渡してくる。先頭がメインで
+   大きく、2人目以降はサブとして右に縦に並ぶ小さい札にする
+   （表示は最大2人ぶんまで。3人目以降まで並べると1枚あたりが小さくなりすぎる）。
+   顔の位置は素材ごとにばらばらなので、object-position を1枚ずつ持っている表
+   （js/characterFocus.js）から入れる。縁は選手写真と同じ放射状マスク。 */
+.reveal-chara {
+  flex: 0 0 30%;
+  min-width: 0;
+  display: flex;
+  gap: 16px;
+}
+
+.reveal-chara-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.reveal-chara-main img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mask-image: radial-gradient(ellipse 74% 66% at 50% 40%, #000 55%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 74% 66% at 50% 40%, #000 55%, transparent 100%);
+  --rv-dur: 0.6s;
+  --rv-delay: 1.1s;
+  animation: reveal-chara-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+.reveal-chara-subs {
+  flex: 0 0 30%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.reveal-chara-sub {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.reveal-chara-sub img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mask-image: radial-gradient(ellipse 78% 72% at 50% 42%, #000 55%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 78% 72% at 50% 42%, #000 55%, transparent 100%);
+  --rv-dur: 0.5s;
+  --rv-delay: 1.3s;
+  animation: reveal-chara-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+.reveal-chara-sub:nth-child(2) { --rv-delay: 1.45s; }
+
+@keyframes reveal-chara-in {
+  from { opacity: 0; transform: translateY(36px) scale(0.92); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ---- 3列目: 好成績（戦績） ---- */
+.reveal-achievements {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 22px 30px;
+  --rv-delay: 2s;
+}
+
+.reveal-achievements::before {
+  content: '';
+  position: absolute;
+  inset: -24px -16px -24px -32px;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.62) 16%, rgba(0, 0, 0, 0.62) 84%, transparent),
+    linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.62) 16%);
+}
 
 .reveal-achievements-head {
   margin: 0 0 12px;
-  font-size: 24px;
+  font-size: 20px;
   letter-spacing: 0.2em;
-  color: var(--text-faint);
+  color: #d8d9d2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85);
 }
 
 .reveal-achievements ul {
@@ -473,19 +580,22 @@ body.reveal-playing { overflow: hidden; }
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 /* 3件は1件ずつ間を置いて出す。まとめて出すと「上から3つ」に見えるが、
-   ずらすと「1位の実績、次に2位の実績…」と読ませる順ができる */
+   ずらすと「1位の実績、次に2位の実績…」と読ませる順ができる。
+   区切り線は --border-soft（ほぼ黒。不透明な背景の上を前提にした色）だと
+   透過背景では見えなくなるので、ここだけ白の半透明にしている。 */
 .reveal-achievement {
   display: grid;
-  grid-template-columns: 150px 1fr auto;
+  grid-template-columns: 120px 1fr auto;
   align-items: baseline;
-  gap: 20px;
-  padding: 10px 0;
-  border-top: 1px solid var(--border-soft);
-  font-size: 30px;
+  gap: 16px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 24px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85);
   --rv-dur: 0.5s;
   animation: reveal-step-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
 }
@@ -507,8 +617,8 @@ body.reveal-playing { overflow: hidden; }
 }
 
 .reveal-achievement-meta {
-  font-size: 24px;
-  color: var(--text-faint);
+  font-size: 20px;
+  color: #d8d9d2;
   white-space: nowrap;
 }
 
@@ -516,10 +626,11 @@ body.reveal-playing { overflow: hidden; }
    1行を出す。見出し「好成績」だけ残して欄を空にすると、レイアウトが崩れて見えるため。 */
 .reveal-achievements-empty {
   margin: 10px 0 0;
-  padding: 10px 0;
-  border-top: 1px solid var(--border-soft);
-  font-size: 28px;
-  color: var(--text-faint);
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 22px;
+  color: #d8d9d2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85);
 }
 
 /* ---------------------------------------------------------------------------
@@ -542,7 +653,9 @@ body.reveal-playing { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   #reveal-canvas .reveal-card,
-  #reveal-canvas .reveal-card * {
+  #reveal-canvas .reveal-card *,
+  #reveal-canvas .reveal-card::before,
+  #reveal-canvas .reveal-card::after {
     animation-duration: var(--rv-dur, 0s) !important;
     animation-delay: var(--rv-delay, 0s) !important;
   }
