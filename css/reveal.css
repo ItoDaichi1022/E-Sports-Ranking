@@ -227,9 +227,13 @@ body.reveal-playing { overflow: hidden; }
 /* ---------------------------------------------------------------------------
    1人ぶんのカード
 
-   面を2つに分ける。左が文字、右が立ち絵。重ねない ── 重ねると、絵を透かして
+   面を2つに分ける。左が文字、右が選手画像。重ねない ── 重ねると、絵を透かして
    文字を読ませることになり、絵も文字もどちらも果たせなくなる
    （選手ページのヒーローで一度通った道。js/app.js の playerHeroHtml のコメント）。
+
+   主役は選手画像（アバター）。使用キャラクターはそれを補う情報なので、
+   右下に中くらいの札として重ねるだけにとどめる ── 「誰が」が主、
+   「何のキャラで」が従、という発表の重心に合わせている。
    --------------------------------------------------------------------------- */
 
 .reveal-card {
@@ -258,32 +262,91 @@ body.reveal-playing { overflow: hidden; }
 .reveal-card.rank-2 { --reveal-accent: var(--silver); }
 .reveal-card.rank-3 { --reveal-accent: var(--bronze); }
 
-/* ---- 立ち絵（右側）----
-   絵の枠は画面の右半分。顔の位置は素材ごとにばらばらなので、object-position を
-   1枚ずつ持っている表（js/characterFocus.js）から入れる。
+/* ---- 選手画像（右側・主役）----
+   枠は画面の右半分。アップロードされた写真が無い選手もいるので、
+   その場合は頭文字を大きく置いた札で埋める（players.js の avatarHtml と同じ考え方だが、
+   ここは丸アイコンではなく画面いっぱいの矩形なので専用に組む）。
    左端は文字の面へ向けてなだらかに消す（境目に線を引くと、絵が切り抜きに見える）。 */
-.reveal-art {
+.reveal-photo {
   position: absolute;
   inset: 0 0 0 50%;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #151515, #0a0a0a);
 }
 
-.reveal-art img {
+.reveal-photo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* 顔が上のほうに来る素材が多いので、上寄りに置いたうえで少し大きく見せる */
-  transform: scale(1.06);
+  transform: scale(1.04);
   mask-image: linear-gradient(90deg, transparent, #000 26%, #000 88%, transparent);
   /* 尺と遅れは必ず --rv-dur / --rv-delay に書く（このファイル末尾の理由による） */
   --rv-dur: 0.9s;
   --rv-delay: 0.4s;
-  animation: reveal-art-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+  animation: reveal-photo-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
 }
 
-@keyframes reveal-art-in {
-  from { opacity: 0; transform: scale(1.06) translateX(90px); }
-  to   { opacity: 1; transform: scale(1.06) translateX(0); }
+@keyframes reveal-photo-in {
+  from { opacity: 0; transform: scale(1.04) translateX(90px); }
+  to   { opacity: 1; transform: scale(1.04) translateX(0); }
+}
+
+.reveal-photo-fallback {
+  width: 380px;
+  height: 380px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 4px solid var(--border-strong);
+  background: var(--surface-3);
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: 160px;
+  font-weight: 800;
+  text-transform: uppercase;
+  --rv-dur: 0.9s;
+  --rv-delay: 0.4s;
+  animation: reveal-photo-fallback-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+@keyframes reveal-photo-fallback-in {
+  from { opacity: 0; transform: translateX(60px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ---- 使用キャラクター（右下・中くらいの札）----
+   主役の選手画像を邪魔しない大きさで、右下に重ねて出す。顔の位置は素材ごとに
+   ばらばらなので、object-position を1枚ずつ持っている表（js/characterFocus.js）から入れる。 */
+.reveal-chara {
+  position: absolute;
+  right: 64px;
+  bottom: 64px;
+  width: 360px;
+  height: 360px;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 3px solid var(--reveal-accent, var(--border-strong));
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  background: #0a0a0a;
+  z-index: 1;
+  --rv-dur: 0.6s;
+  --rv-delay: 1.1s;
+  animation: reveal-chara-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+.reveal-chara img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@keyframes reveal-chara-in {
+  from { opacity: 0; transform: translateY(40px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ---- 文字（左側）---- */
@@ -345,30 +408,19 @@ body.reveal-playing { overflow: hidden; }
   font-weight: 700;
 }
 
-/* ---- 3段目: アイコンと選手名 ---- */
+/* ---- 3段目: 選手名 ----
+   アイコンは右の選手画像が担うので、ここは名前の文字だけ。 */
 .reveal-name {
-  display: flex;
-  align-items: center;
-  gap: 24px;
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: 76px;
   font-weight: 700;
   line-height: 1.15;
   /* 長い名前でも2行にしない。2行になると下のスコア以下が押し出されて
      カードごとに位置が変わり、めくったときに画面が跳ねて見える */
   --rv-delay: 0.9s;
-}
-
-.reveal-name > span {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.avatar-reveal {
-  width: 108px;
-  height: 108px;
-  font-size: 44px;
-  border: 2px solid var(--border-strong);
 }
 
 /* ---- 4段目: スコアと順位変動 ---- */

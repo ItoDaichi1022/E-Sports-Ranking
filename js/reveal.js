@@ -15,7 +15,7 @@
 // おかげで、いつ公開したスナップショットに対しても同じ3件が出る。
 
 import { state } from './state.js';
-import { escapeHtml, avatarHtml } from './util.js';
+import { escapeHtml, safeUrl, initialOf } from './util.js';
 import {
   computeRankingsForRange, withRankChange, rankChangeInfo, tournamentIdsInRange,
 } from './ranking.js';
@@ -279,21 +279,23 @@ function cardElement(entry) {
   // （rankingView.js の rankingAvatar と同じ考え方）。
   const ref = player?.mainCharacters?.[0];
   const artUrl = characterImageUrl(ref, 'large');
+  const photoUrl = safeUrl(player?.avatarUrl);
 
   const card = document.createElement('div');
   card.className = `reveal-card${entry.rank <= 3 ? ` rank-${entry.rank}` : ''}`;
   card.innerHTML = `
-    <div class="reveal-art">
-      ${artUrl
-    ? `<img src="${escapeHtml(artUrl)}" alt="" style="object-position:${focusPosition(ref)}">`
-    : ''}
+    <div class="reveal-photo">
+      ${photoUrl
+    ? `<img src="${escapeHtml(photoUrl)}" alt="">`
+    : `<span class="reveal-photo-fallback">${escapeHtml(initialOf(entry.name))}</span>`}
     </div>
+    ${artUrl ? `
+    <div class="reveal-chara">
+      <img src="${escapeHtml(artUrl)}" alt="" style="object-position:${focusPosition(ref)}">
+    </div>` : ''}
     <div class="reveal-body">
       <p class="reveal-rank"><span class="reveal-rank-num">${entry.rank}</span><span class="reveal-rank-unit">位</span></p>
-      <p class="reveal-name">
-        ${avatarHtml({ ...player, currentName: entry.name }, 'reveal')}
-        <span>${escapeHtml(entry.name)}</span>
-      </p>
+      <p class="reveal-name"><span>${escapeHtml(entry.name)}</span></p>
       <p class="reveal-score">
         <span class="reveal-score-label">SCORE</span>
         <span class="reveal-score-value">${entry.score.toFixed(1)}</span>
