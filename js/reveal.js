@@ -467,10 +467,17 @@ function fitStage() {
 // クラスを付け直しても再生されず（reflowを挟む小細工が要る）、「Rでやり直す」が
 // 効かないことがあるため。1枚ぶんの組み立てなので作り直しても軽い。
 function drawCurrent() {
-  // 最初の1枚は空。開始した瞬間から画が出ていると、収録の頭が必ず「1枚目の途中」に
-  // なってしまう（録画ボタンを押すのが人の手である以上、間に合わない）。
-  // 何も無い画で待てるようにしておくと、録画を回してから落ち着いて1枚目をめくれる。
-  if (playing.phase === 'blank') {
+  // 何も出さない画が2か所ある。どちらも「この画面は映すものを持たない」ことが
+  // 役目なので、canvas を空にするだけでよい。
+  //
+  //   blank  発表を始める前。開始した瞬間から画が出ていると、収録の頭が必ず
+  //          「1枚目の途中」になる（録画ボタンを押すのが人の手である以上、
+  //          間に合わない）。空の画で待てれば、録画を回してから落ち着いてめくれる。
+  //   gap    「第〇位」を出したあと、その選手のカードを出すまでのあいだ。
+  //          ここに、その選手の大会でのプレー動画を重ねる。編集で足すのではなく
+  //          発表の側に間を用意しておくことで、プレー動画の尺に合わせて
+  //          好きなだけ待ってからカードをめくれる。
+  if (playing.phase === 'blank' || playing.phase === 'gap') {
     canvasEl.replaceChildren();
     return;
   }
@@ -505,15 +512,18 @@ function onStageKey(e) {
 
   // 画面をめくる操作。Space はそのままだとページを送ってしまうので止める。
   //
-  // めくる順は 空 → 第〇位 → その選手のカード → 第〇位 → …。
-  // 1人につき2回めくるのは、実況で「続いて、第3位……」と溜めてから正体を
-  // 出せるようにするため（自動送りにすると、溜めの長さを毎回同じにされてしまう）。
+  // めくる順は　空 →（1人につき）第〇位 → 空 → カード　の繰り返し。
+  // 1人あたり3回めくることになるが、どの間も自動送りにしていない ── 溜めの長さは
+  // 実況の間合いとプレー動画の尺で毎回変わるので、機械に決めさせるところではない。
   if (key === ' ' || key === 'Spacebar' || key === 'ArrowRight' || key === 'Enter') {
     e.preventDefault();
     if (playing.phase === 'blank') {
       playing.phase = 'title';
       drawCurrent();
     } else if (playing.phase === 'title') {
+      playing.phase = 'gap';
+      drawCurrent();
+    } else if (playing.phase === 'gap') {
       playing.phase = 'card';
       drawCurrent();
     } else if (playing.index < playing.entries.length - 1) {
@@ -529,6 +539,9 @@ function onStageKey(e) {
   if (key === 'ArrowLeft') {
     e.preventDefault();
     if (playing.phase === 'card') {
+      playing.phase = 'gap';
+      drawCurrent();
+    } else if (playing.phase === 'gap') {
       playing.phase = 'title';
       drawCurrent();
     } else if (playing.phase === 'title' && playing.index > 0) {
