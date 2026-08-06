@@ -457,18 +457,24 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   to   { opacity: 1; transform: scale(1.04) translateX(0); }
 }
 
+/* 写真が未設定の選手（サンプルデータは全員こちら）に出す頭文字の札。
+   ここだけは背景を持たせて塗りつぶす ── 透過のままだと文字が宙に浮くだけで、
+   アイコンの領域がどこからどこまでなのかが読み取れない。色はサイトの
+   アクセント（緑）で、下に流す映像が何色でも「ここがアイコン」と分かる。 */
 .reveal-photo-fallback {
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-dim);
+  border-radius: 32px;
+  background: linear-gradient(160deg, #a7e017, #4f7a00);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  color: #0c1600;
   font-family: var(--font-display);
   font-size: 190px;
   font-weight: 800;
   text-transform: uppercase;
-  text-shadow: 0 10px 60px rgba(0, 0, 0, 0.9), 0 0 100px rgba(0, 0, 0, 0.6);
   --rv-dur: 0.9s;
   --rv-delay: 0.4s;
   animation: reveal-photo-fallback-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
@@ -480,63 +486,79 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 }
 
 /* ---- 2列目: 使用キャラクター（メイン＋サブ） ----
-   js/reveal.js が player.mainCharacters を全件渡してくる。先頭がメインで
-   大きく、2人目以降はサブとして右に縦に並ぶ小さい札にする
-   （表示は最大2人ぶんまで。3人目以降まで並べると1枚あたりが小さくなりすぎる）。
-   顔の位置は素材ごとにばらばらなので、object-position を1枚ずつ持っている表
-   （js/characterFocus.js）から入れる。縁は選手写真と同じ放射状マスク。 */
+   js/reveal.js が player.mainCharacters を全件渡してくる。先頭がメインで上に大きく、
+   2人目以降はサブとしてその下に小さい札で並ぶ（最大2人ぶん）。
+   サブを横ではなく下に置くのは、横に並べるとメインの枠が細長くなり、
+   顔だけの縦帯のような切り取られ方になってしまうため。 */
 .reveal-chara {
   flex: 0 0 30%;
   min-width: 0;
   display: flex;
-  gap: 16px;
+  flex-direction: column;
+  gap: 18px;
 }
 
 .reveal-chara-main {
   flex: 1 1 auto;
-  min-width: 0;
-  position: relative;
-  overflow: hidden;
-}
-
-.reveal-chara-main img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  mask-image: radial-gradient(ellipse 74% 66% at 50% 40%, #000 55%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 74% 66% at 50% 40%, #000 55%, transparent 100%);
+  min-height: 0;
   --rv-dur: 0.6s;
   --rv-delay: 1.1s;
   animation: reveal-chara-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
 }
 
-.reveal-chara-subs {
-  flex: 0 0 30%;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.reveal-chara-sub {
-  flex: 1 1 0;
-  min-height: 0;
-  position: relative;
-  overflow: hidden;
-}
-
-.reveal-chara-sub img {
+/* メインは切り取らない（contain）。素材のポーズは1枚ずつ違い、武器を振りかぶった
+   ものも寝そべったものもあるので、「顔はこの辺にあるはず」と決めて切ると必ず
+   どれかが崩れる。枠に丸ごと収めれば、どんなポーズでも顔と上半身は必ず映る ──
+   ポーズの違いへの一番確実な対応が「切らないこと」になる。
+   切り抜き素材なので余白は透明で、枠の形も出ない（マスクも要らない）。 */
+.reveal-chara-main img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  mask-image: radial-gradient(ellipse 78% 72% at 50% 42%, #000 55%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 78% 72% at 50% 42%, #000 55%, transparent 100%);
+  object-fit: contain;
+  filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.55));
+}
+
+.reveal-chara-subs {
+  flex: 0 0 140px;
+  display: flex;
+  gap: 16px;
+}
+
+/* サブは小さいので、全身を収めると顔が豆粒になる。こちらは逆に顔だけを大きく
+   切り出す。縁は線ではなく円形のマスクでぼかして消す ── 枠線で囲うと、
+   透過して映像に重ねたときに「板を貼った」ように浮いて見えるため。 */
+.reveal-chara-sub {
+  /* 元は240px角のサムネイル。倍率を上げるほど顔は大きくなるがぼやける。
+     210%（＝枠140pxに対して絵294px）が、顔が十分大きくて粗も出ない釣り合い。 */
+  --art-zoom: 210%;
+  flex: 0 0 140px;
+  position: relative;
+  overflow: hidden;
+  mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 100%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 100%);
   --rv-dur: 0.5s;
   --rv-delay: 1.3s;
   animation: reveal-chara-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
 }
 
 .reveal-chara-sub:nth-child(2) { --rv-delay: 1.45s; }
+
+/* 顔を窓の中心へ持ってくる組み方は style.css の .row-art img と同じ
+   （あちらの節に理由が書いてある）。--fx / --fy は js/reveal.js の focusVars が
+   1枚ずつ入れる。transform をここで使い切るので、出現の動きは枠側（上）に持たせている。 */
+/* top を 50% ではなく 44% にして、顔をわずかに上に置く。理由は2つ。
+   肩から下に余地ができて頭だけが浮かないことと、表の値が「目のあたり」の
+   当て推量で、実測するとどの素材も数%下に出るのを吸収できること
+   （表自身が ±5% のずれを見込んでいる。js/characterFocus.js）。 */
+.reveal-chara-sub img {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: auto;
+  height: var(--art-zoom);
+  max-width: none;
+  transform: translate(calc(var(--fx, 50%) * -1), calc(var(--fy, 20%) * -1));
+}
 
 @keyframes reveal-chara-in {
   from { opacity: 0; transform: translateY(36px) scale(0.92); }
@@ -587,12 +609,14 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
    ずらすと「1位の実績、次に2位の実績…」と読ませる順ができる。
    区切り線は --border-soft（ほぼ黒。不透明な背景の上を前提にした色）だと
    透過背景では見えなくなるので、ここだけ白の半透明にしている。 */
+/* 並びは 大会画像 → 大会名 → 順位 → Tier。左端をそろえたいので画像の幅は固定で、
+   伸び縮みするのは大会名だけ（長い大会名は3点リーダで切る）。 */
 .reveal-achievement {
   display: grid;
-  grid-template-columns: 120px 1fr auto;
-  align-items: baseline;
-  gap: 16px;
-  padding: 8px 0;
+  grid-template-columns: 64px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.16);
   font-size: 24px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85);
@@ -604,9 +628,21 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 .reveal-achievement:nth-child(2) { --rv-delay: 2.35s; }
 .reveal-achievement:nth-child(3) { --rv-delay: 2.6s; }
 
-.reveal-achievement-label {
-  font-weight: 700;
-  color: var(--reveal-accent, var(--accent-bright));
+/* 画像が未登録の大会でも枠だけは残す（js/reveal.js が中身の無い span を出す）。
+   詰めてしまうと行ごとに大会名の頭がずれて、3行が表に見えなくなる。 */
+.reveal-achievement-art {
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.reveal-achievement-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .reveal-achievement-name {
@@ -616,8 +652,16 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   color: var(--text);
 }
 
+/* 順位（優勝・ベスト4…）。金銀銅の順位色をそのまま使う */
+.reveal-achievement-place {
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--reveal-accent, var(--accent-bright));
+}
+
+/* Tier は添え物なので小さく。順位より目立たせない */
 .reveal-achievement-meta {
-  font-size: 20px;
+  font-size: 18px;
   color: #d8d9d2;
   white-space: nowrap;
 }

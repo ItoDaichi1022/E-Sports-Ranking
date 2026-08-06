@@ -75,40 +75,47 @@ function setRevealStatus(text, type) {
 // 立ち絵だけは実在のキャラクター素材を順番に割り当てて使う（架空の絵を用意できないため）。
 // わざと崩れやすい条件を混ぜてある ── とても長い選手名・大会名（1行に収まるか）、
 // 好成績が0件の選手（欄が空でも崩れないか）、順位変動の4パターン全部（▲▼―NEW）。
+//
+// 大会画像は実在の大会を持てないので、サイトに同梱した画像を借りて充てている。
+// 画像を持たない大会（imageUrl なし）もわざと混ぜてある ── 未登録の大会でも
+// 大会名の頭がそろうか、を確かめるため。
+const SAMPLE_ART_A = 'img/game-logo.webp';
+const SAMPLE_ART_B = 'img/icon.webp';
+
 const SAMPLE_PLAYERS = [
   { name: 'サンプル選手A', score: 100.0, previousRank: 2, achievements: [
-    { label: '優勝', tournamentName: 'サンプルカップ #12 サマーシリーズ', participantCount: 32, tier: 'Tier 4' },
-    { label: 'ベスト4', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5' },
+    { label: '優勝', tournamentName: 'サンプルカップ #12 サマーシリーズ', participantCount: 32, tier: 'Tier 4', imageUrl: SAMPLE_ART_A },
+    { label: 'ベスト4', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5', imageUrl: SAMPLE_ART_B },
     { label: '準優勝', tournamentName: '月例サンプル大会 #8', participantCount: 24, tier: 'Tier 3' },
   ] },
   { name: 'サンプル選手B', score: 96.8, previousRank: 1, achievements: [
-    { label: '準優勝', tournamentName: 'サンプルカップ #12 サマーシリーズ', participantCount: 32, tier: 'Tier 4' },
-    { label: 'ベスト8', tournamentName: '月例サンプル大会 #6', participantCount: 30, tier: 'Tier 3' },
+    { label: '準優勝', tournamentName: 'サンプルカップ #12 サマーシリーズ', participantCount: 32, tier: 'Tier 4', imageUrl: SAMPLE_ART_A },
+    { label: 'ベスト8', tournamentName: '月例サンプル大会 #6', participantCount: 30, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
   ] },
   { name: 'サンプル選手C', score: 91.2, previousRank: 3, achievements: [
-    { label: 'ベスト4', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5' },
+    { label: 'ベスト4', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5', imageUrl: SAMPLE_ART_B },
   ] },
   { name: 'サンプル選手D', score: 85.0, previousRank: null, achievements: [] },
   { name: 'とても長い名前の架空プレイヤーです2026', score: 79.4, previousRank: 8, achievements: [
-    { label: 'ベスト8', tournamentName: 'これもとても長い名前の架空トーナメント2026チャンピオンシップ', participantCount: 48, tier: 'Tier 4' },
+    { label: 'ベスト8', tournamentName: 'これもとても長い名前の架空トーナメント2026チャンピオンシップ', participantCount: 48, tier: 'Tier 4', imageUrl: SAMPLE_ART_A },
   ] },
   { name: 'サンプル選手F', score: 73.1, previousRank: 4, achievements: [
-    { label: 'ベスト16', tournamentName: '月例サンプル大会 #7', participantCount: 30, tier: 'Tier 3' },
-    { label: 'ベスト8', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5' },
+    { label: 'ベスト16', tournamentName: '月例サンプル大会 #7', participantCount: 30, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
+    { label: 'ベスト8', tournamentName: '架空杯 2026', participantCount: 64, tier: 'Tier 5', imageUrl: SAMPLE_ART_A },
   ] },
   { name: 'サンプル選手G', score: 68.5, previousRank: 7, achievements: [
-    { label: 'ベスト16', tournamentName: 'サンプルカップ #11', participantCount: 28, tier: 'Tier 3' },
+    { label: 'ベスト16', tournamentName: 'サンプルカップ #11', participantCount: 28, tier: 'Tier 3', imageUrl: SAMPLE_ART_A },
   ] },
   { name: 'サンプル選手H', score: 62.0, previousRank: null, achievements: [] },
   { name: 'サンプル選手I', score: 57.3, previousRank: 6, achievements: [
-    { label: 'ベスト16', tournamentName: '月例サンプル大会 #5', participantCount: 24, tier: 'Tier 3' },
+    { label: 'ベスト16', tournamentName: '月例サンプル大会 #5', participantCount: 24, tier: 'Tier 3', imageUrl: SAMPLE_ART_B },
   ] },
   { name: 'サンプル選手J', score: 51.9, previousRank: 11, achievements: [
-    { label: 'ベスト8', tournamentName: 'サンプルカップ #10', participantCount: 26, tier: 'Tier 3' },
+    { label: 'ベスト8', tournamentName: 'サンプルカップ #10', participantCount: 26, tier: 'Tier 3', imageUrl: SAMPLE_ART_A },
     { label: 'ベスト16', tournamentName: '架空杯 2025', participantCount: 56, tier: 'Tier 5' },
   ] },
   { name: 'サンプル選手K', score: 47.2, previousRank: 9, achievements: [
-    { label: 'ベスト16', tournamentName: '月例サンプル大会 #4', participantCount: 20, tier: 'Tier 2' },
+    { label: 'ベスト16', tournamentName: '月例サンプル大会 #4', participantCount: 20, tier: 'Tier 2', imageUrl: SAMPLE_ART_B },
   ] },
   { name: 'サンプル選手L', score: 42.0, previousRank: 12, achievements: [] },
 ];
@@ -249,21 +256,42 @@ export async function renderRevealPage() {
 // 発表画面
 // ---------------------------------------------------------------------------
 
-// キャラクター立ち絵の「顔（目のあたり）」の位置。
+// キャラクター立ち絵の「顔（目のあたり）」の位置を、CSSに渡せる形で返す。
+//
+// サブキャラクターの札は顔だけを大きく切り出すので、どこを窓の中心に置くかで
+// 出来がまるで変わる（素材のポーズはバラバラで、顔が真ん中にある保証がない）。
+// 組み方は style.css の .row-art img と同じ ── 絵を窓より大きく引き伸ばし、
+// この (--fx, --fy) の点が窓の中心に来るように置く。
 //
 // js/characters.js の focusStyle と同じ表を引くが、あちらの上下左右のクランプは
-// 「行の高さしか無い細長い窓」のためのもので、ここでは要らない。この画面の絵は
-// 画面の高さいっぱいに出すので、顔が絵の端に寄っている素材でも切れない。
-function focusPosition(ref) {
+// 掛けない。あれは「行の高さしか無い細長い窓」のためのもので、こちらの窓は
+// ほぼ正方形なので、顔が絵の端に寄っている素材でもそのまま中心へ持ってこられる。
+function focusVars(ref) {
   const [x, y] = CHARACTER_FOCUS[ref] ?? DEFAULT_FOCUS;
-  return `${x}% ${y}%`;
+  return `--fx:${x}%;--fy:${y}%`;
 }
 
+// 大会の画像。運営が登録した画像は Supabase の絶対URLなので safeUrl がそのまま通す。
+// サンプルデータだけは、実在の大会を持てないのでサイトに同梱した画像を相対パスで指す
+// （safeUrl は絶対URLしか通さないため、こちらだけ別に許す）。
+function achievementImageUrl(value) {
+  if (!value) return null;
+  if (value.startsWith('img/')) return value;
+  return safeUrl(value);
+}
+
+// 好成績の1行。並びは 大会画像 → 大会名 → 順位 → Tier。
+// 画像が未登録の大会でも枠だけは残す ── 詰めると行ごとに大会名の頭がずれて、
+// 3行が表に見えなくなる。
 function achievementRowHtml(achievement) {
+  const artUrl = achievementImageUrl(achievement.imageUrl);
   return `
     <li class="reveal-achievement">
-      <span class="reveal-achievement-label">${escapeHtml(achievement.label)}</span>
+      <span class="reveal-achievement-art">
+        ${artUrl ? `<img src="${escapeHtml(artUrl)}" alt="">` : ''}
+      </span>
       <span class="reveal-achievement-name">${escapeHtml(achievement.tournamentName)}</span>
+      <span class="reveal-achievement-place">${escapeHtml(achievement.label)}</span>
       <span class="reveal-achievement-meta">${escapeHtml(achievement.tier)}</span>
     </li>
   `;
@@ -278,9 +306,17 @@ function achievementsListHtml(achievements) {
   return `<ul>${achievements.map(achievementRowHtml).join('')}</ul>`;
 }
 
-// 使用キャラクターの列に出す絵。先頭（メイン）は大きく、2人目以降はサブとして
-// 小さい札に並べる。3人目以降まで並べると1枚が小さくなりすぎるので、
+// 使用キャラクターの列。先頭（メイン）を上に大きく、2人目以降をサブとして
+// その下に小さい札で並べる。3人目以降まで並べると1枚が小さくなりすぎるので、
 // サブは最大2人ぶんまでに絞る（メイン1 + サブ2 = 最大3人ぶん表示）。
+//
+// 【メインとサブで絵の見せ方が違う理由】
+// メインは切り取らず全身を枠に収める（CSSの object-fit: contain）。素材のポーズは
+// 1枚ずつ違い、武器を振りかぶっていたり寝そべっていたりするので、「顔がここにある
+// はず」と決めて切ると必ずどれかが崩れる。切らなければ、どんなポーズでも顔と上半身は
+// 必ず映る ── ポーズの違いへの一番確実な対応が「切らないこと」になる。
+// サブは小さいので全身だと顔が豆粒になる。こちらは顔の位置の表（js/characterFocus.js）を
+// 引いて顔だけを大きく切り出す。どちらの道でも「顔は必ず出る」ことは保証される。
 function characterColumnHtml(mainCharacters) {
   const refs = (mainCharacters ?? []).filter(Boolean);
   if (refs.length === 0) return '';
@@ -289,16 +325,23 @@ function characterColumnHtml(mainCharacters) {
   const mainUrl = characterImageUrl(mainRef, 'large');
   if (!mainUrl) return '';
 
+  // 【サブだけ thumb を使う理由】顔の位置の表（js/characterFocus.js）は
+  // 240px角のサムネイルを方眼に載せて読み取った百分率で、そのサムネイルは
+  // 正方形に「収めた」もの＝左右に透明の余白が入っている
+  // （scripts/build-characters.mjs の fit: 'contain'）。
+  // 一方 @lg は余白なしで縦横比をそのまま残すので、同じ百分率が別の場所を指す。
+  // @lg に当てると顔が中心から横にずれる。表と組み合わせるときは必ず thumb のこと。
+  // 顔を切り出さないメイン（contain で全身）は、この制約と無関係なので @lg でよい。
   const subsHtml = subRefs.slice(0, 2).map((ref) => {
     const url = characterImageUrl(ref, 'thumb');
     if (!url) return '';
-    return `<div class="reveal-chara-sub"><img src="${escapeHtml(url)}" alt="" style="object-position:${focusPosition(ref)}"></div>`;
+    return `<div class="reveal-chara-sub"><img src="${escapeHtml(url)}" alt="" style="${focusVars(ref)}"></div>`;
   }).join('');
 
   return `
     <div class="reveal-chara">
       <div class="reveal-chara-main">
-        <img src="${escapeHtml(mainUrl)}" alt="" style="object-position:${focusPosition(mainRef)}">
+        <img src="${escapeHtml(mainUrl)}" alt="">
       </div>
       ${subsHtml ? `<div class="reveal-chara-subs">${subsHtml}</div>` : ''}
     </div>

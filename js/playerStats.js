@@ -72,6 +72,9 @@ export function topAchievements(playerId, tournamentIds = null, limit = 3) {
     found.push({
       label: depthLabel(depth),
       tournamentName: t.name,
+      // 大会の画像。順位発表の画面（js/reveal.js）が大会名の左に並べる。
+      // 未登録の大会では空文字のままで、出す側が場所だけ空けて詰めないようにしている。
+      imageUrl: t.imageUrl,
       participantCount,
       tier: tournamentTier(participantCount),
       value: participantCount / depth,
