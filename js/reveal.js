@@ -11,15 +11,23 @@
 // 【好成績3件をどう出しているか】公開済みスナップショット（published_rankings.data）は
 // 好成績を1件しか持っていない。増やすためにデータ形式を変えると過去の公開ぶんが
 // 古い形のまま取り残されるので、ここでは保存済みの値を使わず、集計期間から
-// その場で3件を選び直している（playerStats.js の topAchievements）。
-// おかげで、いつ公開したスナップショットに対しても同じ3件が出る。
+// その場で3件を選び直している。おかげで、いつ公開したスナップショットに対しても
+// 同じ3件が出る。
+//
+// 選ぶ基準は順位（優勝・ベスト4）ではなく「スコアをどれだけ押し上げたか」で、
+// 計算はランキング本体と同じ式を使う（js/ranking.js の scoreContributionsByPlayer）。
+// 発表しているのはスコア順のランキングなので、その根拠になった大会を並べないと
+// 「なぜこの順位なのか」の説明にならない ── 少人数の大会での優勝より、
+// 強豪ぞろいの大会で上位に食い込んだほうがスコアには効いている。
 
-import { state } from './state.js';
+import { state, findTournament } from './state.js';
 import { escapeHtml, safeUrl, initialOf } from './util.js';
 import {
-  computeRankingsForRange, withRankChange, rankChangeInfo, tournamentIdsInRange,
+  computeRankingsForRange, withRankChange, rankChangeInfo,
+  scoreContributionsByPlayer, filterMatchesByRange,
 } from './ranking.js';
-import { topAchievements } from './playerStats.js';
+import { placementLabelOf } from './playerStats.js';
+import { tournamentTier } from './tournamentTier.js';
 import { CHARACTERS, characterImageUrl, representativeRef } from './characters.js';
 import { CHARACTER_FOCUS, DEFAULT_FOCUS } from './characterFocus.js';
 import * as db from './db.js';
@@ -298,12 +306,32 @@ function achievementRowHtml(achievement) {
 }
 
 // 集計期間の出場大会が少ない選手は、好成績が1〜2件しか無いことも0件のこともある。
-// 0件のときに見出しだけ残して欄を空にすると崩れて見えるので、代わりの1行を出す。
+// 0件のときに欄ごと消すと下の段がずれるので、代わりの1行を出す。
 function achievementsListHtml(achievements) {
   if (achievements.length === 0) {
     return '<p class="reveal-achievements-empty">この期間の記録はまだありません</p>';
   }
   return `<ul>${achievements.map(achievementRowHtml).join('')}</ul>`;
+}
+
+// 発表に出す好成績。スコアを押し上げた大会の順（js/ranking.js の
+// scoreContributionsByPlayer）に選び、表示に要る名前・画像・順位・規模を大会から引き直す。
+//
+// 順位は「表が組まれていて結果が確定した大会」でしか出せない（placementLabelOf）。
+// 出せないときは勝敗で代える ── スコアに効いた大会である以上、試合は必ずしているので、
+// 欄が空のまま残ることはない。
+function achievementsOf(playerId, contributions) {
+  const rows = contributions.get(playerId) ?? [];
+  return rows.slice(0, ACHIEVEMENT_COUNT).map((row) => {
+    const tournament = findTournament(row.tournamentId);
+    const depth = state.placements[row.tournamentId]?.[playerId] ?? null;
+    return {
+      label: placementLabelOf(row.tournamentId, depth) ?? `${row.wins}勝${row.losses}敗`,
+      tournamentName: tournament?.name ?? '',
+      imageUrl: tournament?.imageUrl ?? '',
+      tier: tournamentTier(tournament?.entrantCount ?? 0),
+    };
+  });
 }
 
 // 使用キャラクターの列。先頭（メイン）を上に大きく、2人目以降をサブとして
@@ -376,7 +404,6 @@ function cardElement(entry) {
       </div>
       ${characterColumnHtml(player?.mainCharacters)}
       <div class="reveal-achievements">
-        <p class="reveal-achievements-head">好成績</p>
         ${achievementsListHtml(entry.achievements)}
       </div>
     </div>
@@ -451,15 +478,20 @@ function onStageKey(e) {
 }
 
 function startPresentation() {
-  // 選んだ選手だけを、発表順に並べる。好成績はここで初めて選ぶ
+  // 選んだ選手だけを、発表順に並べる。戦績はここで初めて選ぶ
   // （全員ぶんを先に計算しても、出さない人のぶんは捨てるだけ）。
-  // サンプルデータは好成績も作り物を最初から持っているので、選び直さない
-  // （topAchievements は実在の大会・出場記録を見に行くので、架空のIDでは何も引けない）。
+  // サンプルデータは戦績も作り物を最初から持っているので、選び直さない
+  // （寄与の計算は実在の試合を見に行くので、架空のIDでは何も引けない）。
   const order = radioValue('reveal-order');
   let entries = currentRankings().filter((r) => selectedIds.has(r.id));
   if (!sampleMode) {
-    const tournamentIds = tournamentIdsInRange(state, currentRange());
-    entries = entries.map((r) => ({ ...r, achievements: topAchievements(r.id, tournamentIds, ACHIEVEMENT_COUNT) }));
+    // 寄与の計算は全選手ぶんが一度に返るので、選手ごとに呼び直さない
+    // （中でランキングと同じ反復計算を回している）。
+    const contributions = scoreContributionsByPlayer({
+      ...state,
+      matches: filterMatchesByRange(state, currentRange()),
+    });
+    entries = entries.map((r) => ({ ...r, achievements: achievementsOf(r.id, contributions) }));
   }
   entries = entries.sort((a, b) => (order === 'countdown' ? b.rank - a.rank : a.rank - b.rank));
 

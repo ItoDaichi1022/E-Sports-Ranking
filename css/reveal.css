@@ -519,9 +519,9 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 }
 
 .reveal-chara-subs {
-  flex: 0 0 140px;
+  flex: 0 0 180px;
   display: flex;
-  gap: 16px;
+  gap: 18px;
 }
 
 /* サブは小さいので、全身を収めると顔が豆粒になる。こちらは逆に顔だけを大きく
@@ -529,9 +529,9 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
    透過して映像に重ねたときに「板を貼った」ように浮いて見えるため。 */
 .reveal-chara-sub {
   /* 元は240px角のサムネイル。倍率を上げるほど顔は大きくなるがぼやける。
-     210%（＝枠140pxに対して絵294px）が、顔が十分大きくて粗も出ない釣り合い。 */
-  --art-zoom: 210%;
-  flex: 0 0 140px;
+     枠180pxに対して 185%（＝絵333px）が、顔が十分大きくて粗も出ない釣り合い。 */
+  --art-zoom: 185%;
+  flex: 0 0 180px;
   position: relative;
   overflow: hidden;
   mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 100%);
@@ -565,35 +565,17 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ---- 3列目: 好成績（戦績） ---- */
+/* ---- 3列目: 戦績（スコアを押し上げた大会3件） ----
+   欄そのものは背景を持たない。1件ずつが独立した細長い島で、それが3つ縦に並ぶ。
+   ひとつの大きな板にまとめると、透過して映像に重ねたときに画面の右半分が
+   まるごと暗い長方形で覆われてしまい、下の映像が死ぬ。 */
 .reveal-achievements {
-  position: relative;
-  z-index: 1;
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 22px 30px;
   --rv-delay: 2s;
-}
-
-.reveal-achievements::before {
-  content: '';
-  position: absolute;
-  inset: -24px -16px -24px -32px;
-  z-index: -1;
-  background:
-    linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.62) 16%, rgba(0, 0, 0, 0.62) 84%, transparent),
-    linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.62) 16%);
-}
-
-.reveal-achievements-head {
-  margin: 0 0 12px;
-  font-size: 20px;
-  letter-spacing: 0.2em;
-  color: #d8d9d2;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85);
 }
 
 .reveal-achievements ul {
@@ -602,24 +584,29 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
 }
 
 /* 3件は1件ずつ間を置いて出す。まとめて出すと「上から3つ」に見えるが、
    ずらすと「1位の実績、次に2位の実績…」と読ませる順ができる。
    区切り線は --border-soft（ほぼ黒。不透明な背景の上を前提にした色）だと
    透過背景では見えなくなるので、ここだけ白の半透明にしている。 */
-/* 並びは 大会画像 → 大会名 → 順位 → Tier。左端をそろえたいので画像の幅は固定で、
-   伸び縮みするのは大会名だけ（長い大会名は3点リーダで切る）。 */
+/* 1件ぶんの細長い島。並びは 大会画像 → 大会名 → 順位 → Tier。
+   左端をそろえたいので画像の幅は固定で、伸び縮みするのは大会名だけ
+   （長い大会名は3点リーダで切る）。
+   角を高さの半分まで丸めて横長の錠剤の形にすると、板ではなく「札が置いてある」
+   見え方になり、下の映像との境目も柔らかくなる。 */
 .reveal-achievement {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 18px;
-  padding: 10px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 10px 30px 10px 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.74), rgba(0, 0, 0, 0.52));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
   font-size: 24px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
   --rv-dur: 0.5s;
   animation: reveal-step-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
 }
@@ -629,13 +616,14 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 .reveal-achievement:nth-child(3) { --rv-delay: 2.6s; }
 
 /* 画像が未登録の大会でも枠だけは残す（js/reveal.js が中身の無い span を出す）。
-   詰めてしまうと行ごとに大会名の頭がずれて、3行が表に見えなくなる。 */
+   詰めてしまうと行ごとに大会名の頭がずれて、3件が並びに見えなくなる。
+   島が錠剤の形なので、こちらも丸にして角が浮かないようにする。 */
 .reveal-achievement-art {
   width: 64px;
   height: 64px;
   overflow: hidden;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.10);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .reveal-achievement-art img {
@@ -666,15 +654,17 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   white-space: nowrap;
 }
 
-/* 好成績が0件の選手（集計期間の出場が少ない・新規ランクイン等）は、一覧の代わりにこの
-   1行を出す。見出し「好成績」だけ残して欄を空にすると、レイアウトが崩れて見えるため。 */
+/* 戦績が0件の選手（集計期間の出場が少ない・新規ランクイン等）は、一覧の代わりにこの
+   1行を出す。欄ごと消すと下の段がずれるため。形は上の島にそろえる。 */
 .reveal-achievements-empty {
-  margin: 10px 0 0;
-  padding: 8px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  margin: 0;
+  padding: 22px 30px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.74), rgba(0, 0, 0, 0.52));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
   font-size: 22px;
   color: #d8d9d2;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
 }
 
 /* ---------------------------------------------------------------------------
