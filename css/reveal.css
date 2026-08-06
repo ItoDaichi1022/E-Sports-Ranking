@@ -227,12 +227,13 @@ body.reveal-playing { overflow: hidden; }
 /* ---------------------------------------------------------------------------
    1人ぶんのカード
 
-   面を2つに分ける。左が文字、右が選手画像。重ねない ── 重ねると、絵を透かして
+   横に3つ並べる。左が選手画像、真ん中が使用キャラクター、右が文字。
+   選手画像とキャラクター以外は重ねない ── 文字と絵を重ねると、絵を透かして
    文字を読ませることになり、絵も文字もどちらも果たせなくなる
    （選手ページのヒーローで一度通った道。js/app.js の playerHeroHtml のコメント）。
 
-   主役は選手画像（アバター）。使用キャラクターはそれを補う情報なので、
-   右下に中くらいの札として重ねるだけにとどめる ── 「誰が」が主、
+   主役は選手画像。使用キャラクターはそれを補う情報なので、選手画像より
+   小さい札として真ん中に重ねるだけにとどめる ── 「誰が」が主、
    「何のキャラで」が従、という発表の重心に合わせている。
    --------------------------------------------------------------------------- */
 
@@ -262,14 +263,17 @@ body.reveal-playing { overflow: hidden; }
 .reveal-card.rank-2 { --reveal-accent: var(--silver); }
 .reveal-card.rank-3 { --reveal-accent: var(--bronze); }
 
-/* ---- 選手画像（右側・主役）----
-   枠は画面の右半分。アップロードされた写真が無い選手もいるので、
-   その場合は頭文字を大きく置いた札で埋める（players.js の avatarHtml と同じ考え方だが、
-   ここは丸アイコンではなく画面いっぱいの矩形なので専用に組む）。
-   左端は文字の面へ向けてなだらかに消す（境目に線を引くと、絵が切り抜きに見える）。 */
+/* ---- 選手画像（左側・主役）----
+   枠は画面の左側、画面いっぱい（フチまで）に敷く。丸アイコンにはしない ──
+   小さく切り抜くと主役に見えないので、矩形のまま大きく見せる。
+   アップロードされた写真が無い選手もいるので、その場合も同じ矩形の枠に
+   頭文字を大きく置いた札で埋める（丸くしない。players.js の avatarHtml とは
+   別の専用の組み方）。右端は真ん中の面へ向けてなだらかに消す
+   （境目に線を引くと、絵が切り抜きに見える）。 */
 .reveal-photo {
   position: absolute;
-  inset: 0 0 0 50%;
+  inset: 0 auto 0 0;
+  width: 44%;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -290,22 +294,20 @@ body.reveal-playing { overflow: hidden; }
 }
 
 @keyframes reveal-photo-in {
-  from { opacity: 0; transform: scale(1.04) translateX(90px); }
+  from { opacity: 0; transform: scale(1.04) translateX(-90px); }
   to   { opacity: 1; transform: scale(1.04) translateX(0); }
 }
 
 .reveal-photo-fallback {
-  width: 380px;
-  height: 380px;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  border: 4px solid var(--border-strong);
   background: var(--surface-3);
   color: var(--text-dim);
   font-family: var(--font-display);
-  font-size: 160px;
+  font-size: 260px;
   font-weight: 800;
   text-transform: uppercase;
   --rv-dur: 0.9s;
@@ -314,19 +316,20 @@ body.reveal-playing { overflow: hidden; }
 }
 
 @keyframes reveal-photo-fallback-in {
-  from { opacity: 0; transform: translateX(60px); }
+  from { opacity: 0; transform: translateX(-60px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
-/* ---- 使用キャラクター（右下・中くらいの札）----
-   主役の選手画像を邪魔しない大きさで、右下に重ねて出す。顔の位置は素材ごとに
-   ばらばらなので、object-position を1枚ずつ持っている表（js/characterFocus.js）から入れる。 */
+/* ---- 使用キャラクター（真ん中・やや縦長の中くらいの札）----
+   選手画像より一回り小さい、縦長の枠。左端は選手画像の右端に少し重ねて置き、
+   「選手画像に添えられた札」に見せる。顔の位置は素材ごとにばらばらなので、
+   object-position を1枚ずつ持っている表（js/characterFocus.js）から入れる。 */
 .reveal-chara {
   position: absolute;
-  right: 64px;
-  bottom: 64px;
-  width: 360px;
-  height: 360px;
+  left: 790px;
+  top: 260px;
+  width: 340px;
+  height: 560px;
   overflow: hidden;
   border-radius: 24px;
   border: 3px solid var(--reveal-accent, var(--border-strong));
@@ -349,18 +352,18 @@ body.reveal-playing { overflow: hidden; }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ---- 文字（左側）---- */
+/* ---- 文字（右側）---- */
 .reveal-body {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 54%;
+  inset: 0 0 0 auto;
+  width: 38%;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 26px;
-  /* 右の余白は、文字の面と絵の面がぶつからないための緩衝。ここを詰めると
-     好成績の行の右端（参加人数・Tier）が立ち絵の上に乗って読みにくくなる */
-  padding: 0 72px 0 108px;
+  /* 左の余白は、文字の面と真ん中の札がぶつからないための緩衝。ここを詰めると
+     好成績の行がキャラクターの札に重なって読みにくくなる */
+  padding: 0 108px 0 72px;
 }
 
 .reveal-body > * {
