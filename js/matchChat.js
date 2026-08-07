@@ -15,9 +15,9 @@
 
 import {
   state, getEntrantName, getEntrantMemberIds, openChatReports,
-  findTournament, pendingResultReport, isRoundStarted, matchRoomCode,
+  findTournament, isRoundStarted, matchRoomCode,
 } from './state.js';
-import { auth, isAdmin } from './auth.js';
+import { auth, canManageTournament } from './auth.js';
 import { confirmMatch, editMatch } from './bracket.js';
 import { escapeHtml } from './util.js';
 import { iconSvg, setButtonIcon, makeIconButton } from './icons.js';
@@ -73,10 +73,18 @@ function currentMatch() {
   return null;
 }
 
+// いま開いている部屋の大会を管理できるか。
+//
+// 大会は誰でも開けるので、ここで聞きたいのは「サイトの運営か」ではなく
+// 「この大会の運営か」。判定はDBの is_tournament_admin が持つ。
+function roomIsAdmin() {
+  return canManageTournament(room?.tournamentId);
+}
+
 // 未対応の報告がある大会に付ける印。運営にだけ出す（運営に見つけさせるためのもので、
 // 報告した本人には チャットの中に「報告済み」の控えが出る）。
 export function reportChipHtml(tournamentId) {
-  if (!isAdmin()) return '';
+  if (!canManageTournament(tournamentId)) return '';
   const count = openChatReports(tournamentId).length;
   return count > 0
     ? `<span class="status-chip status-reported">⚠ 未対応の報告 ${count}件</span>`
@@ -88,7 +96,7 @@ export function reportChipHtml(tournamentId) {
 export function canUseMatchChat(tournament, match) {
   if (!auth.player || !tournament) return false;
   if (match.isBye || !match.player1Id || !match.player2Id) return false;
-  if (isAdmin()) return true;
+  if (canManageTournament(tournament.id)) return true;
 
   return [match.player1Id, match.player2Id].some((entrantId) =>
     getEntrantMemberIds(tournament.id, entrantId).includes(auth.player.id));
@@ -129,7 +137,7 @@ function renderLog(tournament, match) {
         <div class="chat-message-head">
           <span class="chat-message-name">${escapeHtml(name)}</span>
           <span class="chat-message-time">${escapeHtml(timeLabel(m.createdAt))}</span>
-          ${isAdmin() ? '<button type="button" class="chat-delete-btn" title="この発言を削除">✕</button>' : ''}
+          ${roomIsAdmin() ? '<button type="button" class="chat-delete-btn" title="この発言を削除">✕</button>' : ''}
         </div>
         <p class="chat-message-body">${escapeHtml(m.body)}</p>
       </div>
@@ -175,18 +183,21 @@ tabTalkBtn.addEventListener('click', () => setChatTab('talk'));
 tabResultBtn.addEventListener('click', () => setChatTab('result'));
 
 // ゲームカウント側に用があるか。タブを開くまで気づけないので、印を出す。
+//
+// 用があるのは「回戦が始まっていて、まだ結果が入っていない自分の対戦」だけ。
+// 承認を撤廃したので「相手が入力した、あなたの番です」という状態はもう無く、
+// 残る用事は自分たちで入れることだけになった。
 function resultTabNeedsAttention() {
   const match = currentMatch();
   const tournament = findTournament(room?.tournamentId);
   if (!match || !tournament || match.confirmed) return false;
+  if (!isRoundStarted(room.tournamentId, room.roundIndex)) return false;
 
-  const pending = pendingResultReport(room.tournamentId, room.matchId);
-  if (!pending) return false;
-  if (isAdmin()) return true;
+  // 運営には出さない。運営はいつでも入れられる立場なので、開いているすべての
+  // 対戦に印が付くことになり、印としての意味が無くなる。
+  if (roomIsAdmin()) return false;
 
-  // 自分が承認する番のときだけ。自分が出した報告の待ちでは急かさない。
-  const mySide = myEntrantIdIn(tournament, match);
-  return !!mySide && pending.reportedBy !== mySide;
+  return Boolean(myEntrantIdIn(tournament, match));
 }
 
 // 結果欄の出し分けに合わせてタブを整える。renderResultPanel のあとに呼ぶ。
@@ -342,8 +353,12 @@ function flashRoomCodeSaved() {
 // ---- ゲームカウントの入力 ----
 //
 // 対戦表の枠は狭く、待ち合わせの会話もここで起きているので、入力する場所は
-// チャットに置く。入れただけでは確定せず、相手が承認して初めて対戦表が進む
-// （判定はDB側の report_match_result / approve_match_result が持つ）。
+// チャットに置く。当事者のどちらが入れても、その場で確定して対戦表が進む
+// （判定はDB側の report_match_result が持つ）。
+//
+// 以前は「片方が報告 → 相手が承認」で確定していたが、承認する側が席を外していたり
+// そのまま解散したりで、試合は終わっているのに表が進まないことのほうが多かった。
+// 食い違いや入力ミスは、下の「運営に報告」から運営に伝えてもらって直す。
 
 function scoreSentence(name1, name2, score) {
   const [s1, s2] = score.split('-');
@@ -388,7 +403,7 @@ function resultForm(match, name1, name2) {
 
   const submitBtn = document.createElement('button');
   submitBtn.type = 'submit';
-  submitBtn.textContent = 'この結果を報告する';
+  submitBtn.textContent = 'この結果で確定する';
   form.appendChild(submitBtn);
 
   form.addEventListener('submit', async (e) => {
@@ -411,6 +426,12 @@ function resultForm(match, name1, name2) {
       return;
     }
 
+    // 押した時点で対戦表が進み、自分では取り消せない。相手の承認という
+    // 引き返す機会が無くなったぶん、ここで一度だけ確かめる。
+    if (!confirm(`${scoreSentence(name1, name2, `${s1}-${s2}`)} で確定します。よろしいですか？\n\n入力後の訂正は運営しかできません（間違えたときは下の「運営に報告」から連絡してください）。`)) {
+      return;
+    }
+
     submitBtn.disabled = true;
     showError(null);
     try {
@@ -427,7 +448,7 @@ function resultForm(match, name1, name2) {
   return form;
 }
 
-// 運営だけに出す欄。選手の報告と違い、承認を待たずその場で確定させる
+// 運営だけに出す欄。選手の入力と違い、回戦の開始前でも入れられ、不戦勝も選べる
 // （対戦表の勝敗入力が持っていた権限をそのままここへ移した）。
 function adminConfirmForm(match, name1, name2) {
   const form = document.createElement('form');
@@ -559,7 +580,7 @@ function editConfirmedRow() {
   return row;
 }
 
-// 当事者には自分の対戦の報告欄、運営にはその場で確定できる欄を出す
+// 当事者には自分の対戦の入力欄、運営には不戦勝も選べる確定欄を出す
 // （スペクテーターや無関係の選手には何も出さない）。
 function renderResultPanel() {
   resultEl.innerHTML = '';
@@ -572,7 +593,7 @@ function renderResultPanel() {
   }
 
   const mySide = myEntrantIdIn(tournament, match);
-  if (!mySide && !isAdmin()) {
+  if (!mySide && !roomIsAdmin()) {
     resultEl.hidden = true;
     return;
   }
@@ -583,7 +604,7 @@ function renderResultPanel() {
 
   const heading = document.createElement('h4');
   heading.className = 'chat-result-heading';
-  heading.textContent = isAdmin() ? '結果の確定（運営）' : 'ゲームカウントの報告';
+  heading.textContent = roomIsAdmin() ? '結果の確定（運営）' : 'ゲームカウントの入力';
   resultEl.appendChild(heading);
 
   const note = document.createElement('p');
@@ -595,97 +616,28 @@ function renderResultPanel() {
       : `${scoreSentence(name1, name2, match.score ?? '')} で確定しました。`;
     resultEl.appendChild(note);
     // 確定を解いて入れ直せるのは運営だけ。BYE は編集できない（bracket.js の editMatch）
-    if (isAdmin() && !match.isBye) resultEl.appendChild(editConfirmedRow());
+    if (roomIsAdmin() && !match.isBye) resultEl.appendChild(editConfirmedRow());
     return;
   }
 
-  // 運営はラウンド開始前でも、承認待ちであっても、その場で直接確定できる
+  // 運営はラウンド開始前でも、その場で直接確定できる
   // （対戦表の勝敗入力が持っていた権限をそのまま引き継ぐ）。
-  if (isAdmin()) {
-    const pending = pendingResultReport(room.tournamentId, room.matchId);
-    if (pending) {
-      const pendingNote = document.createElement('p');
-      pendingNote.className = 'chat-result-note pending-note';
-      pendingNote.textContent = `選手からの報告: ${scoreSentence(name1, name2, pending.score)}（承認待ち）`;
-      resultEl.appendChild(pendingNote);
-    }
+  if (roomIsAdmin()) {
     resultEl.appendChild(adminConfirmForm(match, name1, name2));
     return;
   }
 
   if (!isRoundStarted(room.tournamentId, room.roundIndex)) {
-    note.textContent = '運営がこの回戦を開始すると、ここから結果を報告できます。';
+    note.textContent = '運営がこの回戦を開始すると、ここから結果を入力できます。';
     resultEl.appendChild(note);
     return;
   }
 
-  const pending = pendingResultReport(room.tournamentId, room.matchId);
-  if (!pending) {
-    note.textContent = '結果を入力すると、相手の承認を経て確定します。';
-    resultEl.append(note, resultForm(match, name1, name2));
-    return;
-  }
-
-  const mine = pending.reportedBy === mySide;
-  note.textContent = mine
-    ? `${scoreSentence(name1, name2, pending.score)} で報告しました。相手の承認待ちです。`
-    : `相手が ${scoreSentence(name1, name2, pending.score)} と報告しました。`;
-  resultEl.appendChild(note);
-
-  const actions = document.createElement('div');
-  actions.className = 'row-actions';
-
-  if (mine) {
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.className = 'btn-secondary';
-    cancelBtn.textContent = '取り消す';
-    cancelBtn.addEventListener('click', async () => {
-      cancelBtn.disabled = true;
-      showError(null);
-      try {
-        await db.withdrawMatchResult(room.tournamentId, room.matchId);
-      } catch (err) {
-        showError(err.message);
-        cancelBtn.disabled = false;
-        return;
-      }
-      await afterResultChange(cancelBtn);
-    });
-    actions.appendChild(cancelBtn);
-  } else {
-    const approveBtn = document.createElement('button');
-    approveBtn.type = 'button';
-    approveBtn.textContent = '承認して確定';
-    approveBtn.addEventListener('click', async () => {
-      if (!confirm(`${scoreSentence(name1, name2, pending.score)} で確定します。よろしいですか？`)) return;
-      approveBtn.disabled = true;
-      showError(null);
-      try {
-        await db.approveMatchResult(room.tournamentId, room.matchId);
-      } catch (err) {
-        showError(err.message);
-        approveBtn.disabled = false;
-        return;
-      }
-      await afterResultChange(approveBtn);
-    });
-
-    // 承認しない場合は「拒否」ではなく、自分のカウントを出し直してもらう。
-    // 上書きされるので、相手に取り消してもらう往復が要らない。
-    const differBtn = document.createElement('button');
-    differBtn.type = 'button';
-    differBtn.className = 'btn-secondary';
-    differBtn.textContent = '違うカウントを出す';
-    differBtn.addEventListener('click', () => {
-      differBtn.disabled = true;
-      resultEl.appendChild(resultForm(match, name1, name2));
-    });
-
-    actions.append(approveBtn, differBtn);
-  }
-
-  resultEl.appendChild(actions);
+  // 入れるのはどちらか一方でよい。二人で同じ数字を入れ合う必要はないことと、
+  // 入れたら戻せないことを、押す前に読める場所に書いておく。
+  note.textContent = '勝った側・負けた側のどちらが入力しても、その場で確定します。'
+    + '間違えたときや結果に食い違いがあるときは、下の「運営に報告」から運営へ連絡してください。';
+  resultEl.append(note, resultForm(match, name1, name2));
 }
 
 // 大会カードと対戦表の印を出し直してもらう。
@@ -720,7 +672,7 @@ function renderReports(tournament, match) {
           <span class="chat-report-who">${escapeHtml(name)}</span>
         </div>
         <p class="chat-report-body">${escapeHtml(r.body)}</p>
-        ${!done && isAdmin() ? '<button type="button" class="chat-resolve-btn">対応済みにする</button>' : ''}
+        ${!done && roomIsAdmin() ? '<button type="button" class="chat-resolve-btn">対応済みにする</button>' : ''}
       </div>
     `;
   }).join('');
@@ -752,7 +704,7 @@ function syncReportControls(tournament, match) {
 
   reportFormEl.hidden = true;
   reportInputEl.value = '';
-  reportBtn.hidden = isAdmin() || alreadyOpen;
+  reportBtn.hidden = roomIsAdmin() || alreadyOpen;
   reportBtn.disabled = false;
 }
 
@@ -812,10 +764,10 @@ export function closeMatchChat() {
 }
 
 // 確定済みの試合のチャットは読むだけにする（運営は介入できるので書ける）。
-// 承認で試合が確定した直後にも呼ぶので、state から引き直した姿で判断する。
+// 入力で試合が確定した直後にも呼ぶので、state から引き直した姿で判断する。
 function syncWriteState() {
   const match = currentMatch();
-  const canWrite = isAdmin() || !match?.confirmed;
+  const canWrite = roomIsAdmin() || !match?.confirmed;
   formEl.hidden = !canWrite;
   closedNoteEl.hidden = canWrite;
 }
@@ -823,7 +775,7 @@ function syncWriteState() {
 // 対戦カードのチャットを開く。
 //
 // roundIndex は「その回戦が開始されたか」の判定に、onRefresh はゲームカウントを
-// 報告・承認したあとの取り直しに使う（対戦表側と同じもの）。onChanged は運営が
+// 入力したあとの取り直しに使う（対戦表側と同じもの）。onChanged は運営が
 // その場で勝敗を確定させたあと、対戦表をDBへ書き戻すためのもの。
 export async function openMatchChat(tournament, match, roundIndex, onRefresh, onChanged) {
   if (!canUseMatchChat(tournament, match)) return;
@@ -850,8 +802,10 @@ export async function openMatchChat(tournament, match, roundIndex, onRefresh, on
   syncWriteState();
   renderResultPanel();
   renderRoomCode();
-  // 承認を待たせている相手を待たせ続けないよう、用があるときだけ結果側から開く
-  setChatTab(!resultEl.hidden && resultTabNeedsAttention() ? 'result' : 'talk');
+  // 開くのは必ず会話側。ゲームカウントを入れるのは試合が終わってからで、
+  // 部屋を開く用事のほとんどは待ち合わせのやり取りのほうにある
+  // （入力欄に用があることはタブの印で伝える）。
+  setChatTab('talk');
   syncTabs();
   inputEl.value = '';
   logEl.innerHTML = '<p class="empty-hint">読み込んでいます…</p>';

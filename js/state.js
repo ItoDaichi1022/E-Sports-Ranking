@@ -51,9 +51,9 @@ export const state = {
   // 自分が出したものだけが入る（ゲストは空）。新しい順。
   chatReports: [],    // { id, tournamentId, matchId, reporterId, body, createdAt, resolvedAt, resolvedBy }
 
-  // 選手が入力し、相手の承認を待っているゲームカウント。1試合につき1件。
-  // RLSにより、当事者と運営にしか入らない。承認されると消える。
-  resultReports: [],  // { tournamentId, matchId, reportedBy, reporterPlayerId, score, winnerEntrantId, createdAt }
+  // 大会ごとの運営。誰でも読める（大会ページに「運営: ○○」として出す）。
+  // 大会を作った人はDB側のトリガで必ずここに入る。
+  tournamentOrganizers: [],  // { tournamentId, playerId }
 
   // 回戦ごとの開始と配信台。行が無い回戦は「未開始・配信台未定」と同じ。
   rounds: [],         // { tournamentId, roundIndex, streamedMatchIds: [], startedAt, startedBy }
@@ -61,6 +61,15 @@ export const state = {
   // 対戦ごとのルームコード。RLSにより当事者と運営にしか入らない（ゲスト・観戦者は空）。
   roomCodes: [],      // { tournamentId, matchId, code, setBy, updatedAt }
 };
+
+// この大会の運営に指名されている選手のID。
+// 「操作してよいか」の判定は auth.js の canManageTournament を通すこと
+// （サイト全体の運営はここに名前が無くても触れる）。ここは一覧の表示用。
+export function organizerIdsOf(tournamentId) {
+  return state.tournamentOrganizers
+    .filter((o) => o.tournamentId === tournamentId)
+    .map((o) => o.playerId);
+}
 
 // 回戦の状態。まだ触られていない回戦は行が無いので、既定の形を返す。
 export function roundState(tournamentId, roundIndex) {
@@ -77,13 +86,6 @@ export function isRoundStarted(tournamentId, roundIndex) {
 // この試合が配信台に乗っているか。
 export function isStreamedMatch(tournamentId, roundIndex, matchId) {
   return roundState(tournamentId, roundIndex).streamedMatchIds.includes(matchId);
-}
-
-// この試合に出ている承認待ちのゲームカウント（無ければ null）。
-export function pendingResultReport(tournamentId, matchId) {
-  return state.resultReports.find(
-    (r) => r.tournamentId === tournamentId && r.matchId === matchId,
-  ) ?? null;
 }
 
 // この試合のルームコード（無ければ null）。当事者と運営以外は常に null。
@@ -134,7 +136,7 @@ export function findTeam(tournamentId, teamId) {
   return findTournament(tournamentId)?.teams?.find((tm) => tm.id === teamId) ?? null;
 }
 
-// 出場枠の表示名。個人戦は選手名、チーム戦はチーム名。
+// 出場枠の名前。個人戦は選手名、チーム戦はチーム名。
 export function getEntrantName(tournamentId, id) {
   if (!id) return null;
   return findTeam(tournamentId, id)?.name ?? getPlayerName(id);

@@ -48,6 +48,8 @@ const sampleToggle = $('reveal-sample-toggle');
 const sourceControlsEl = $('reveal-source-controls');
 const startInput = $('reveal-start-input');
 const endInput = $('reveal-end-input');
+const publishBtn = $('reveal-publish-btn');
+const publishedStatusEl = $('reveal-published-status');
 const playerListEl = $('reveal-player-list');
 const countEl = $('reveal-count');
 const startBtn = $('reveal-start-btn');
@@ -291,9 +293,93 @@ export async function renderRevealPage() {
   if (!startInput.value && published?.periodStart) startInput.value = published.periodStart;
   if (!endInput.value && published?.periodEnd) endInput.value = published.periodEnd;
 
+  renderPublishedStatus();
+
   // 初めて開いたときだけ、既定として上位10人を選んでおく。
   if (selectedIds.size === 0) applyPreset('10');
   else renderPlayerPicker();
+}
+
+// ---------------------------------------------------------------------------
+// 「前回の順位」の保存
+//
+// サイトにランキングの表は無い（順位はお知らせで発表する）。それでも保存の仕組みが
+// 要るのは、順位変動（▲▼―NEW）と選手ページのランクが「前回の順位」を必要とするため。
+// 集計してから発表するまでの間に上書きすると発表の数字と食い違うので、
+// 押すのは発表を終えたあと、という向きを画面の注記でも書いてある。
+// 書けるのはサイトの持ち主だけ（DBの rankings_write が is_owner() を要求する）。
+// ---------------------------------------------------------------------------
+
+// 'YYYY-MM-DD' をそのまま「〇年〇月〇日」にする。new Date(文字列) を経由すると
+// タイムゾーンの解釈次第で日付がずれかねないので、文字列を直接分解する。
+function jaDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return `${y}年${m}月${d}日`;
+}
+
+function periodRangeLabel(start, end) {
+  if (!start && !end) return '全期間';
+  return `${start ? jaDate(start) : ''}〜${end ? jaDate(end) : ''}`;
+}
+
+function renderPublishedStatus() {
+  const published = state.publishedRanking;
+  if (!published) {
+    publishedStatusEl.textContent = '「前回の順位」はまだ保存されていません。';
+    return;
+  }
+  const label = published.periodStart || published.periodEnd
+    ? periodRangeLabel(published.periodStart, published.periodEnd)
+    : '全期間';
+  const at = new Date(published.publishedAt);
+  publishedStatusEl.textContent = `前回の順位: ${label}`
+    + `（${at.getFullYear()}年${at.getMonth() + 1}月${at.getDate()}日 保存）`;
+}
+
+async function publishCurrentRanking() {
+  if (sampleMode) {
+    setRevealStatus('サンプルデータは保存できません。', 'error');
+    return;
+  }
+  const range = currentRange();
+  if (range.start && range.end && range.start > range.end) {
+    setRevealStatus('開始日が終了日より後になっています。', 'error');
+    return;
+  }
+
+  const { periodStart, periodEnd, rankings } = computeRankingsForRange(state, range);
+  if (rankings.length === 0) {
+    setRevealStatus('この期間に確定した試合がまだないため、保存できません。', 'error');
+    return;
+  }
+  if (!confirm(
+    `${periodRangeLabel(periodStart, periodEnd)}の集計を「前回の順位」として保存します。`
+    + '\n\n次に集計したときの順位変動は、この順位が基準になります。よろしいですか？',
+  )) return;
+
+  // 保存時点の「前回」を各エントリに焼き込んでおく。あとから見ても
+  // 「そのとき何位から動いたのか」が分かるようにするため。
+  const snapshot = {
+    publishedAt: new Date().toISOString(),
+    periodStart,
+    periodEnd,
+    rankings: withRankChange(rankings, state.publishedRanking?.rankings),
+  };
+
+  publishBtn.disabled = true;
+  try {
+    await db.publishRanking(snapshot);
+  } catch (err) {
+    setRevealStatus(err.message, 'error');
+    publishBtn.disabled = false;
+    return;
+  }
+  publishBtn.disabled = false;
+
+  state.publishedRanking = snapshot;
+  setRevealStatus('「前回の順位」を保存しました。', 'success');
+  renderPublishedStatus();
+  renderPlayerPicker();
 }
 
 // ---------------------------------------------------------------------------
@@ -485,13 +571,12 @@ function drawCurrent() {
   //          ここに、その選手の大会でのプレー動画を重ねる。編集で足すのではなく
   //          発表の側に間を用意しておくことで、プレー動画の尺に合わせて
   //          好きなだけ待ってからカードをめくれる。
+  //
+  // なお背景の動画はここでは触らない。開始から終わりまで出しっぱなしで流し続ける
+  // （css/reveal.css の #reveal-bg）。何も出さない画でだけ消すと、めくるたびに
+  // 背景が現れたり消えたりして継ぎ目が目立つ。プレー動画はOBS側でこの面より前に
+  // 重ねるので、背景が流れたままでも塞がらない。
   const showing = playing.phase === 'title' || playing.phase === 'card';
-
-  // 背景の動画は、画があるときだけ出す。何も出さない画で流したままにすると、
-  // プレー動画を重ねる場所が背景で塞がってしまう。
-  // 消すのは表示だけで、再生は止めない ── 止めて掛け直すと毎回頭から流れ直し、
-  // カードをめくるたびに背景が巻き戻って見える。
-  canvasEl.classList.toggle('has-bg', showing);
 
   if (!showing) {
     slotEl.replaceChildren();
@@ -510,10 +595,9 @@ function closeStage() {
   stageEl.classList.remove('is-sample');
   setupEl.hidden = false;
   slotEl.replaceChildren();
-  // 背景動画は消して止める。準備画面に戻ってからも裏で流れ続けると、
-  // 見えないところでフレームを描き続けることになる（読み込み済みのまま止めるので、
-  // 次に発表を始めるときの待ちは増えない）。
-  canvasEl.classList.remove('has-bg');
+  // 背景動画は止める。準備画面に戻ってからも裏で流れ続けると、見えないところで
+  // フレームを描き続けることになる（読み込み済みのまま止めるので、次に発表を
+  // 始めるときの待ちは増えない）。
   bgEl.pause();
   document.body.classList.remove('reveal-playing');
   document.removeEventListener('keydown', onStageKey);
@@ -609,9 +693,12 @@ function startPresentation() {
   setupEl.hidden = true;
   stageEl.hidden = false;
   stageEl.classList.toggle('is-sample', sampleMode);
-  // 背景動画は最初から流しておく（見せるのは「第〇位」からだが、めくった瞬間に
-  // 頭から始まると継ぎ目が目立つ）。muted なので自動再生は止められないが、
-  // 拒否されても発表そのものは続けられるよう握りつぶす。
+  // 背景動画は、何も出さない画のうちから流し始めて最後まで止めない。
+  // currentTime を戻すのは、撮り直したときに前回の続きから流れないようにするため
+  // （何度撮っても同じ画から始まる）。
+  // muted なので自動再生は止められないが、拒否されても発表そのものは続けられるよう
+  // 握りつぶす。
+  bgEl.currentTime = 0;
   bgEl.play().catch(() => {});
   document.body.classList.add('reveal-playing');
   document.addEventListener('keydown', onStageKey);
@@ -653,6 +740,8 @@ setupEl.addEventListener('click', (e) => {
   const preset = e.target.closest('[data-reveal-preset]')?.dataset.revealPreset;
   if (preset) applyPreset(preset);
 });
+
+publishBtn.addEventListener('click', publishCurrentRanking);
 
 // サンプルデータのON/OFF。「発表するランキング」欄（公開中／期間指定）はサンプル中は
 // 意味を持たないので隠す。選択中の選手はどちらの世界でもID体系が違う（sample-0 等）ので、

@@ -1,10 +1,10 @@
 import {
   state, getEntrantName, getEntrantMemberNames, getEntrantMemberIds, openChatReports,
-  pendingResultReport, entrantIdOfPlayer, roundState, isRoundStarted, isStreamedMatch,
+  entrantIdOfPlayer, roundState, isRoundStarted, isStreamedMatch,
 } from './state.js';
 import { thirdPlaceMatchOf } from './bracket.js';
 import { characterRowArtElement } from './characters.js';
-import { auth, isAdmin } from './auth.js';
+import { auth, canManageTournament } from './auth.js';
 import { canUseMatchChat, openMatchChat } from './matchChat.js';
 import { makeIconButton } from './icons.js';
 import * as db from './db.js';
@@ -182,33 +182,17 @@ function chatButton(label, onOpen) {
   return btn;
 }
 
-// 承認待ちのゲームカウントを、どちら側の数字か分かる形の文にする
-// （"3-1" だけでは、上の行と下の行のどちらが3なのか読み取れない）。
-function scoreSentence(name1, name2, score) {
-  const [s1, s2] = score.split('-');
-  return `${name1} ${s1} - ${s2} ${name2}`;
-}
-
 // 当事者に出す1行。入力そのものはチャットの中で行うので、ここは今どうなっているかを
 // 伝えて、チャットへ送り出すだけにする（対戦表の枠は狭く、入力欄には向かない）。
-function resultStatusLine(tournamentId, roundIndex, match, myEntrant, name1, name2) {
+//
+// 開始前だけ一言添える。開始したあとは何も出さない ── ゲームカウントは入れた瞬間に
+// 確定するので、「入力済み・相手待ち」のような途中の状態がそもそも無い。
+function resultStatusLine(tournamentId, roundIndex) {
+  if (isRoundStarted(tournamentId, roundIndex)) return null;
+
   const line = document.createElement('div');
   line.className = 'match-status result-status';
-
-  if (!isRoundStarted(tournamentId, roundIndex)) {
-    line.textContent = '運営の開始待ち';
-    return line;
-  }
-
-  const pending = pendingResultReport(tournamentId, match.id);
-  if (!pending) {
-    return null;
-  }
-
-  line.classList.add('awaiting');
-  line.textContent = pending.reportedBy === myEntrant
-    ? `${scoreSentence(name1, name2, pending.score)}／相手の承認待ち`
-    : `${scoreSentence(name1, name2, pending.score)}／承認してください`;
+  line.textContent = '運営の開始待ち';
   return line;
 }
 
@@ -305,20 +289,12 @@ function ownMatchBar(tournament, tournamentId, bracket, onRefresh, onChanged) {
 
   panel.append(label, roundChip, vs);
 
-  // いま何を待っているのかを一言添える。対戦表のカードにも同じことは出ているが、
-  // ここだけ見て済ませられるようにする。
-  const pending = pendingResultReport(tournamentId, match.id);
-  const statusText = (() => {
-    if (!isRoundStarted(tournamentId, roundIndex)) return '運営の開始待ち';
-    if (!pending) return null;
-    return pending.reportedBy === myEntrant ? '相手の承認待ち' : '承認してください';
-  })();
-  if (statusText) {
+  // 開始を待っている間だけ一言添える。開始したあとは、ここから対戦を開いて
+  // ゲームカウントを入れるだけなので、途中の状態を伝えることが無い。
+  if (!isRoundStarted(tournamentId, roundIndex)) {
     const status = document.createElement('span');
     status.className = 'own-match-status';
-    // 自分が動く番のときだけ強めに出す（待っているだけの状態と区別する）
-    if (pending && pending.reportedBy !== myEntrant) status.classList.add('is-action');
-    status.textContent = statusText;
+    status.textContent = '運営の開始待ち';
     panel.appendChild(status);
   }
 
@@ -398,14 +374,14 @@ function renderMatchBox(
 
   // 対戦カードごとのチャット。入れるのは当事者と運営だけ（判定はDBのポリシーが持ち、
   // ここでの出し分けは押せないものを見せないための便宜）。
-  // 勝敗の入力・確定もここ（対戦チャットのダイアログ）で行う。運営は直接確定、
-  // 選手は報告して相手の承認を待つ（js/matchChat.js）。
+  // 勝敗の入力・確定もここ（対戦チャットのダイアログ）で行う。運営・選手とも、
+  // 入れた時点でその場で確定する（js/matchChat.js）。
   const chatAvailable = canUseMatchChat(tournament, match);
   const openChat = () => openMatchChat(tournament, match, roundIndex, onRefresh, onChanged);
 
   // 未対応の報告がある試合は、運営の画面で枠ごと目立たせる。
   // 報告した本人にも見えるが、印は運営を探させるためのものなので運営にだけ出す。
-  const reportCount = isAdmin() ? openChatReports(tournamentId, match.id).length : 0;
+  const reportCount = canManageTournament(tournamentId) ? openChatReports(tournamentId, match.id).length : 0;
   if (reportCount > 0) {
     box.classList.add('reported');
     const flag = document.createElement('div');
@@ -456,7 +432,7 @@ function renderMatchBox(
     // （js/matchChat.js の renderResultPanel）。名前の隣に鉛筆を置くと、
     // 狙いを外して選手ページへ飛ぶ人がいるので、カードには入口だけを残す。
     if (chatAvailable) {
-      box.appendChild(chatButton(isAdmin() ? 'この対戦を開く' : 'チャットを見る', openChat));
+      box.appendChild(chatButton(canManageTournament(tournamentId) ? 'この対戦を開く' : 'チャットを見る', openChat));
     }
     return box;
   }
@@ -470,15 +446,6 @@ function renderMatchBox(
   }
 
   if (!readOnly) {
-    // 運営向け。承認待ちの報告があれば一言だけ添える。入力・確定は鉛筆から開く画面で行う。
-    const pending = pendingResultReport(tournamentId, match.id);
-    if (pending) {
-      const note = document.createElement('div');
-      note.className = 'match-status pending-note';
-      note.textContent = `選手からの報告: ${scoreSentence(name1, name2, pending.score)}（承認待ち）`;
-      box.appendChild(note);
-    }
-
     // 運営は開始前に配信台を決める。開始後は組み替えさせない
     // （選手には「配信台」と伝わっているので、始まってから動かすと混乱する）。
     if (!isRoundStarted(tournamentId, roundIndex)) {
@@ -492,9 +459,7 @@ function renderMatchBox(
   // （入力はチャットの中）。
   const myEntrant = entrantIdOfPlayer(tournament, auth.player?.id);
   if (myEntrant && (myEntrant === p1 || myEntrant === p2)) {
-    const statusLine = resultStatusLine(
-      tournamentId, roundIndex, match, myEntrant, name1, name2,
-    );
+    const statusLine = resultStatusLine(tournamentId, roundIndex);
     if (statusLine) box.appendChild(statusLine);
   }
 
@@ -543,15 +508,14 @@ function roundControls(tournamentId, roundIndex, round, readOnly, onRefresh) {
   if (btn.disabled) btn.title = '先に配信台にする試合を選んでください。';
 
   btn.addEventListener('click', async () => {
-    const matchIds = round.matches.map((m) => m.id);
     const message = started
-      ? `${round.name} の開始を取り消します。まだ確定していない対戦の入力欄が閉じ、承認待ちの報告も取り消されます。よろしいですか？`
+      ? `${round.name} の開始を取り消します。まだ確定していない対戦の入力欄が閉じます。よろしいですか？`
       : `${round.name} を開始します。選手がゲームカウントを入力できるようになります。よろしいですか？`;
     if (!confirm(message)) return;
 
     btn.disabled = true;
     try {
-      if (started) await db.stopRound(tournamentId, roundIndex, matchIds);
+      if (started) await db.stopRound(tournamentId, roundIndex);
       else await db.startRound(tournamentId, roundIndex, auth.player.id);
       await onRefresh();
     } catch (err) {
@@ -564,7 +528,7 @@ function roundControls(tournamentId, roundIndex, round, readOnly, onRefresh) {
   return wrap;
 }
 
-// options.onRefresh: 選手の操作（ゲームカウントの報告・承認）のあとに呼ぶ再読み込み。
+// options.onRefresh: 選手の操作（ゲームカウントの入力）のあとに呼ぶ再読み込み。
 // onChanged（運営の勝敗入力）とは別にしてある。onChanged は対戦表そのものをDBへ
 // 書き戻すので、選手が呼ぶとRLSで弾かれる。
 export function renderBracket(tournamentId, containerEl, onChanged, options = {}) {

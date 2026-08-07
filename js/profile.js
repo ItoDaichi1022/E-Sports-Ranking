@@ -51,9 +51,16 @@ function socialUrl(kind, value) {
   return service.handleUrl(handle);
 }
 
+// 表示名の注意書きが2文あるのは、この欄だけ「消せない場所に出る」ため。
+// 表示名はランキングの一覧・順位発表の動画・配信の画面に、本人の操作なしで載る。
+// 載せられない名前だと運営が判断したときに何が起きるのかは、名前を決める前に
+// 読める場所に書いておかないと伝わらない（規約の第5条・第7条にも同じことがある）。
 const FIELDS = [
   { key: 'currentName', label: '表示名', required: true, placeholder: '例: Gyu',
-    note: '変更すると、以前の名前は「過去名」として選手ページに残ります。' },
+    note: '変更すると、以前の名前は「過去名」として選手ページに残ります。'
+      + 'ランキングや配信にそのまま表示されるため、公の場に出せない表現'
+      + '（わいせつ・差別的・攻撃的な表現、他人の名前など）は使えません。'
+      + '不適切と判断した場合、ランキングへの掲載や配信台での紹介を見送ることがあります。' },
   { key: 'gameAccountId', label: 'ゲームアカウントID', placeholder: '例: SW-1234-5678-9012' },
   { key: 'snsX', label: 'X', optional: true, placeholder: '@handle または https://x.com/...' },
   { key: 'snsYoutube', label: 'YouTube', optional: true, placeholder: '@handle または https://youtube.com/...' },

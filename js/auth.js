@@ -5,6 +5,7 @@
 // 行がまだ無い＝初回ログインなので、呼び出し側がオンボーディングフォームを出す。
 
 import { supabase, redirectUrl } from './supabaseClient.js';
+import { state } from './state.js';
 
 export const auth = {
   user: null,        // Supabaseのアカウント（未ログインなら null）
@@ -21,8 +22,35 @@ export function needsOnboarding() {
   return Boolean(auth.user) && !auth.player;
 }
 
+// 権限は3段。役割が違うので、判定も分けてある。
+//
+//   owner   サイトの持ち主。1人だけ。ランキングの集計・公開と順位発表の画面を握る
+//   admin   サイト全体の運営。すべての大会を触れる
+//   player  一般の選手。大会は誰でも作れて、作った大会（と運営に指名された大会）を触れる
+//
+// 「この操作をしてよいか」を聞くときは、まず canManageTournament を疑うこと。
+// 大会にぶら下がる操作（対戦表・回戦の開始・結果の確定・チャットの削除）は
+// すべて大会ごとの判定で、サイト全体の運営かどうかを聞く場面ではない。
+// DB側も同じ形で、is_admin() / is_owner() / is_tournament_admin() が対応する。
+
+export function isOwner() {
+  return auth.player?.role === 'owner';
+}
+
 export function isAdmin() {
-  return auth.player?.role === 'admin';
+  return auth.player?.role === 'admin' || auth.player?.role === 'owner';
+}
+
+// この大会を管理できるか。サイト全体の運営か、その大会の運営に入っているか。
+//
+// 画面での出し分けは押せないボタンを見せないための便宜で、防御ではない
+// （実際の判定はDBの is_tournament_admin が持つ）。
+export function canManageTournament(tournamentId) {
+  if (isAdmin()) return true;
+  if (!auth.player || !tournamentId) return false;
+  return state.tournamentOrganizers.some(
+    (o) => o.tournamentId === tournamentId && o.playerId === auth.player.id,
+  );
 }
 
 // 表示用の呼び名。選手登録前はアカウントのメールアドレスで代用する。

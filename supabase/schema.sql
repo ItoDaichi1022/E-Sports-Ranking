@@ -34,7 +34,10 @@ create table if not exists players (
   sns_youtube     text,
   role            text not null default 'player',
   created_at      timestamptz not null default now(),
-  constraint players_role_check check (role in ('player', 'admin')),
+  -- owner はサイトの持ち主で1人だけ（ランキングの公開を握る）。
+  -- admin はサイト全体の運営で、すべての大会を触れる。
+  -- player は一般の選手だが、大会は誰でも作れる（作った大会の運営になる）。
+  constraint players_role_check check (role in ('player', 'admin', 'owner')),
   constraint players_display_name_not_blank check (btrim(display_name) <> '')
 );
 
@@ -72,6 +75,18 @@ create table if not exists tournaments (
   constraint tournaments_match_type_check check (match_type is null or match_type in ('1v1', 'relay', '2v2', 'other')),
   constraint tournaments_capacity_check check (capacity is null or capacity >= 2),
   constraint tournaments_name_not_blank check (btrim(name) <> '')
+);
+
+-- この大会を管理できる選手。
+--
+-- 大会は誰でも作れる（サイト全体の運営権限は要らない）。その代わり、触れるのは
+-- 自分が運営に入っている大会だけになる。作った人は下のトリガで自動的に入る。
+-- 誰が運営かは隠すものではないので、閲覧は全員に開けて大会ページに出す。
+create table if not exists tournament_organizers (
+  tournament_id uuid not null references tournaments(id) on delete cascade,
+  player_id     uuid not null references players(id) on delete cascade,
+  created_at    timestamptz not null default now(),
+  primary key (tournament_id, player_id)
 );
 
 -- 2v2（チーム戦）の大会でブラケットの枠に入る単位。
@@ -194,24 +209,9 @@ create table if not exists match_chat_messages (
   constraint chat_body_length check (char_length(body) <= 500)
 );
 
--- 選手が入力したゲームカウントのうち、相手の承認を待っているもの。
---
--- 片方が報告し、相手が承認して初めて確定する（一方的な入力で勝ち上がれないため）。
--- 確定すると行は消え、結果は brackets と matches に入る。
--- 1試合につき1件で、出し直すと上書きされる（相手からの対案もこれで入る）。
-create table if not exists match_result_reports (
-  tournament_id      uuid not null references tournaments(id) on delete cascade,
-  match_id           uuid not null,
-  -- 報告した側の出場枠（個人戦は選手ID、チーム戦はチームID）
-  reported_by        uuid not null,
-  -- 実際に操作した選手。チーム戦で誰が出したのかを残す
-  reporter_player_id uuid not null references players(id) on delete cascade,
-  -- "3-1" 形式。左が player1Id 側で、brackets / matches の score と同じ向き
-  score              text not null,
-  winner_entrant_id  uuid not null,
-  created_at         timestamptz not null default now(),
-  primary key (tournament_id, match_id)
-);
+-- （ゲームカウントの承認待ちを置くテーブルは廃止した。当事者のどちらが入力しても
+--  その場で確定する ── 経緯は下の report_match_result のコメント、
+--  適用手順は supabase/migration-018.sql）
 
 -- 対戦カードごとのルームコード。
 --
@@ -304,6 +304,22 @@ create index if not exists announcements_order_idx on announcements (pinned desc
 -- 参照させる攻撃を防ぐため。
 -- ---------------------------------------------------------------------------
 
+-- サイトの持ち主か。ランキングの公開と順位発表の画面だけがこれを見る。
+create or replace function is_owner() returns boolean
+  language sql
+  security definer
+  stable
+  set search_path = public
+as $$
+  select exists (
+    select 1 from players
+    where user_id = auth.uid() and role = 'owner'
+  );
+$$;
+
+-- サイト全体の運営か。owner も含む（持ち主が運営でないと、あらゆる画面から
+-- 締め出されてしまう）。大会ごとの判定は下の is_tournament_admin を使うこと ──
+-- これは「すべての大会を触れる人か」という、より強い問いになっている。
 create or replace function is_admin() returns boolean
   language sql
   security definer
@@ -312,7 +328,7 @@ create or replace function is_admin() returns boolean
 as $$
   select exists (
     select 1 from players
-    where user_id = auth.uid() and role = 'admin'
+    where user_id = auth.uid() and role in ('admin', 'owner')
   );
 $$;
 
@@ -325,6 +341,55 @@ create or replace function current_player_id() returns uuid
 as $$
   select id from players where user_id = auth.uid();
 $$;
+
+-- この大会を管理できるか。大会にぶら下がるものの書き込みは、すべてこれで判定する。
+--
+-- サイト全体の運営（admin / owner）はどの大会にも通る。それ以外は
+-- tournament_organizers に名前が入っている大会だけ。
+-- security definer なのは、これを呼ぶポリシー自身が tournament_organizers の
+-- 読み取りポリシーに引っかからないようにするため。
+create or replace function is_tournament_admin(p_tournament_id uuid)
+  returns boolean
+  language sql
+  security definer
+  stable
+  set search_path = public
+as $$
+  select is_admin() or exists (
+    select 1 from tournament_organizers o
+    where o.tournament_id = p_tournament_id
+      and o.player_id = current_player_id()
+  );
+$$;
+
+-- 大会を作った人を必ずその大会の運営にする。
+--
+-- クライアントから2回に分けて書くと、大会だけ出来て運営が入らない状態が
+-- 起こりうる（通信が途中で切れた、など）。そうなると作った本人が自分の大会を
+-- 編集できなくなるので、DB側で必ず同じトランザクションに入れる。
+create or replace function tournaments_add_creator_organizer()
+  returns trigger
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+declare
+  v_me uuid;
+begin
+  v_me := current_player_id();
+  if v_me is not null then
+    insert into tournament_organizers (tournament_id, player_id)
+      values (new.id, v_me)
+      on conflict do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists tournaments_creator_organizer on tournaments;
+create trigger tournaments_creator_organizer
+  after insert on tournaments
+  for each row execute function tournaments_add_creator_organizer();
 
 -- ---------------------------------------------------------------------------
 -- 対戦カードごとのチャットの参加資格
@@ -369,7 +434,7 @@ as $$
   select
     (select j->>'player1Id' is not null and j->>'player2Id' is not null from m)
     and (
-      is_admin()
+      is_tournament_admin(p_tournament_id)
       or exists (
         select 1
         from tournament_entries e, m
@@ -549,11 +614,6 @@ grant select on players, tournaments, tournament_teams, tournament_entries, brac
 -- （ポリシーのどちらの条件も満たさないので、返るのは常に0件）。
 grant select on match_chat_reports to anon, authenticated;
 
--- 承認待ちのゲームカウント。登録と更新は下のRPC経由だけなので、
--- テーブルに与えるのは select と（出した本人の取り消し用の）delete だけ。
-grant select on match_result_reports to anon, authenticated;
-grant delete on match_result_reports to authenticated;
-
 -- ルームコード。anon への select はゲストの読み込みを止めないため
 -- （ポリシーが偽なので返るのは常に0件）。書き込みは当事者と運営（ポリシーで絞る）。
 grant select on match_room_codes to anon, authenticated;
@@ -573,6 +633,10 @@ grant delete on players to authenticated;
 
 grant insert, update, delete on tournaments, tournament_teams, tournament_entries, brackets, matches, tournament_rounds, published_rankings, announcements
   to authenticated;
+
+-- 大会ごとの運営。誰が運営かは大会ページに出すので閲覧は全員に開ける。
+grant select on tournament_organizers to anon, authenticated;
+grant insert, delete on tournament_organizers to authenticated;
 
 -- 対戦カードのチャットだけは anon に何も与えない（当事者と運営に閉じる）
 grant select, insert, delete on match_chat_messages to authenticated;
@@ -597,8 +661,8 @@ alter table published_rankings  enable row level security;
 alter table announcements       enable row level security;
 alter table match_chat_messages enable row level security;
 alter table match_chat_reports  enable row level security;
-alter table match_result_reports enable row level security;
 alter table match_room_codes    enable row level security;
+alter table tournament_organizers enable row level security;
 
 -- ---- players ----
 
@@ -632,11 +696,37 @@ create policy tournaments_select on tournaments
   for select to anon, authenticated
   using (true);
 
-drop policy if exists tournaments_write on tournaments;
-create policy tournaments_write on tournaments
+-- 選手登録さえ済んでいれば誰でも大会を作れる。作った人はトリガで
+-- その大会の運営に入るので、作った直後から編集・削除できる。
+drop policy if exists tournaments_insert on tournaments;
+create policy tournaments_insert on tournaments
+  for insert to authenticated
+  with check (current_player_id() is not null);
+
+drop policy if exists tournaments_update on tournaments;
+create policy tournaments_update on tournaments
+  for update to authenticated
+  using (is_tournament_admin(id))
+  with check (is_tournament_admin(id));
+
+drop policy if exists tournaments_delete on tournaments;
+create policy tournaments_delete on tournaments
+  for delete to authenticated
+  using (is_tournament_admin(id));
+
+-- ---- tournament_organizers ----
+
+drop policy if exists organizers_select on tournament_organizers;
+create policy organizers_select on tournament_organizers
+  for select to anon, authenticated
+  using (true);
+
+-- 運営の付け外しができるのは、その大会の運営自身とサイト全体の運営。
+drop policy if exists organizers_write on tournament_organizers;
+create policy organizers_write on tournament_organizers
   for all to authenticated
-  using (is_admin())
-  with check (is_admin());
+  using (is_tournament_admin(tournament_id))
+  with check (is_tournament_admin(tournament_id));
 
 -- ---- tournament_teams ----
 
@@ -650,8 +740,8 @@ create policy teams_select on tournament_teams
 drop policy if exists teams_write on tournament_teams;
 create policy teams_write on tournament_teams
   for all to authenticated
-  using (is_admin())
-  with check (is_admin());
+  using (is_tournament_admin(tournament_id))
+  with check (is_tournament_admin(tournament_id));
 
 -- ---- tournament_entries ----
 
@@ -667,7 +757,7 @@ drop policy if exists entries_insert on tournament_entries;
 create policy entries_insert on tournament_entries
   for insert to authenticated
   with check (
-    is_admin()
+    is_tournament_admin(tournament_id)
     or (
       player_id = current_player_id()
       and exists (
@@ -682,7 +772,7 @@ drop policy if exists entries_delete on tournament_entries;
 create policy entries_delete on tournament_entries
   for delete to authenticated
   using (
-    is_admin()
+    is_tournament_admin(tournament_id)
     or (
       player_id = current_player_id()
       and exists (
@@ -696,8 +786,8 @@ create policy entries_delete on tournament_entries
 drop policy if exists entries_update on tournament_entries;
 create policy entries_update on tournament_entries
   for update to authenticated
-  using (is_admin())
-  with check (is_admin());
+  using (is_tournament_admin(tournament_id))
+  with check (is_tournament_admin(tournament_id));
 
 -- ---- brackets / matches / published_rankings ----
 
@@ -707,7 +797,9 @@ create policy brackets_select on brackets
 
 drop policy if exists brackets_write on brackets;
 create policy brackets_write on brackets
-  for all to authenticated using (is_admin()) with check (is_admin());
+  for all to authenticated
+  using (is_tournament_admin(tournament_id))
+  with check (is_tournament_admin(tournament_id));
 
 drop policy if exists matches_select on matches;
 create policy matches_select on matches
@@ -715,15 +807,19 @@ create policy matches_select on matches
 
 drop policy if exists matches_write on matches;
 create policy matches_write on matches
-  for all to authenticated using (is_admin()) with check (is_admin());
+  for all to authenticated
+  using (is_tournament_admin(tournament_id))
+  with check (is_tournament_admin(tournament_id));
 
 drop policy if exists rankings_select on published_rankings;
 create policy rankings_select on published_rankings
   for select to anon, authenticated using (true);
 
+-- ランキングの公開はサイトの持ち主だけ。大会は誰でも開けるが、
+-- 全大会を横断して順位を決める操作は持ち主に閉じておく。
 drop policy if exists rankings_write on published_rankings;
 create policy rankings_write on published_rankings
-  for all to authenticated using (is_admin()) with check (is_admin());
+  for all to authenticated using (is_owner()) with check (is_owner());
 
 -- ---- announcements ----
 
@@ -751,7 +847,7 @@ create policy chat_insert on match_chat_messages
   with check (
     player_id = current_player_id()
     and can_use_match_chat(tournament_id, match_id)
-    and (is_admin() or match_chat_is_open(tournament_id, match_id))
+    and (is_tournament_admin(tournament_id) or match_chat_is_open(tournament_id, match_id))
   );
 
 -- 削除は運営だけ（不適切な発言の取り消し）。本人にも消させない。
@@ -759,7 +855,7 @@ create policy chat_insert on match_chat_messages
 drop policy if exists chat_delete on match_chat_messages;
 create policy chat_delete on match_chat_messages
   for delete to authenticated
-  using (is_admin());
+  using (is_tournament_admin(tournament_id));
 
 -- ---- tournament_rounds ----
 --
@@ -774,22 +870,8 @@ create policy rounds_select on tournament_rounds
 drop policy if exists rounds_write on tournament_rounds;
 create policy rounds_write on tournament_rounds
   for all to authenticated
-  using (is_admin())
-  with check (is_admin());
-
--- ---- match_result_reports ----
-
-drop policy if exists result_reports_select on match_result_reports;
-create policy result_reports_select on match_result_reports
-  for select to anon, authenticated
-  using (is_match_participant(tournament_id, match_id));
-
--- 取り消せるのは出した本人と運営。相手が違うと思ったときは、取り消してもらうのではなく
--- 自分のゲームカウントを出し直す（上書きされる）。
-drop policy if exists result_reports_delete on match_result_reports;
-create policy result_reports_delete on match_result_reports
-  for delete to authenticated
-  using (is_admin() or reporter_player_id = current_player_id());
+  using (is_tournament_admin(tournament_id))
+  with check (is_tournament_admin(tournament_id));
 
 -- ---- match_room_codes ----
 --
@@ -825,7 +907,7 @@ create policy room_codes_delete on match_room_codes
 drop policy if exists reports_select on match_chat_reports;
 create policy reports_select on match_chat_reports
   for select to anon, authenticated
-  using (is_admin() or reporter_id = current_player_id());
+  using (is_tournament_admin(tournament_id) or reporter_id = current_player_id());
 
 -- 報告できるのは その試合のチャットを使える人（＝当事者）だけ。自分の名前でのみ。
 drop policy if exists reports_insert on match_chat_reports;
@@ -840,8 +922,8 @@ create policy reports_insert on match_chat_reports
 drop policy if exists reports_update on match_chat_reports;
 create policy reports_update on match_chat_reports
   for update to authenticated
-  using (is_admin())
-  with check (is_admin());
+  using (is_tournament_admin(tournament_id))
+  with check (is_tournament_admin(tournament_id));
 
 -- ---------------------------------------------------------------------------
 -- 運営専用の操作（RPC）
@@ -850,19 +932,33 @@ create policy reports_update on match_chat_reports
 -- 関数内で is_admin() を確認するので、一般ユーザーが呼んでも失敗する。
 -- ---------------------------------------------------------------------------
 
--- 運営権限の付与・剥奪
+-- 運営権限の付与・剥奪。
+-- owner が絡む操作だけは owner にしか許さない（持ち主の権限を運営に降ろされたり、
+-- 運営が自分を持ち主に格上げしたりできないようにする）。
 create or replace function admin_set_player_role(target_player_id uuid, new_role text)
   returns void
   language plpgsql
   security definer
   set search_path = public
 as $$
+declare
+  v_current text;
 begin
   if not is_admin() then
     raise exception '運営権限が必要です。' using errcode = 'insufficient_privilege';
   end if;
-  if new_role not in ('player', 'admin') then
+  if new_role not in ('player', 'admin', 'owner') then
     raise exception '不正な権限です: %', new_role using errcode = 'check_violation';
+  end if;
+
+  select role into v_current from players where id = target_player_id;
+  if not found then
+    raise exception '対象の選手が見つかりません。' using errcode = 'no_data_found';
+  end if;
+
+  if (new_role = 'owner' or v_current = 'owner') and not is_owner() then
+    raise exception 'サイトの持ち主の権限は、持ち主にしか変更できません。'
+      using errcode = 'insufficient_privilege';
   end if;
 
   update players set role = new_role where id = target_player_id;
@@ -1063,7 +1159,7 @@ begin
 
   select status into v_status from tournaments where id = v_tid for update;
 
-  if not is_admin() then
+  if not is_tournament_admin(v_tid) then
     v_me := current_player_id();
     if v_status <> 'recruiting' then
       raise exception '募集が締め切られているため取り消せません。' using errcode = 'check_violation';
@@ -1147,7 +1243,16 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 報告と承認（RPC）
+-- ゲームカウントの入力（RPC）
+--
+-- 当事者のどちらが入力しても、その場で確定する。
+--
+-- かつては片方が報告し、相手が承認して初めて確定する形だった（一方的な入力で
+-- 勝ち上がれないようにするため）。実際には、承認する側が席を外していたり
+-- そのまま解散したりで、試合は終わっているのに表が進まない事態のほうが多く、
+-- 進行を止める理由が「不正の防止」ではなく「片方が画面を見ていない」に
+-- なっていた。食い違いは対戦チャットの「運営に報告」で運営に伝えてもらい、
+-- 運営が結果を編集して直す（誤りが残り続けることはない）。
 -- ---------------------------------------------------------------------------
 
 create or replace function report_match_result(
@@ -1168,11 +1273,18 @@ declare
   v_p2         uuid;
   v_s1         int;
   v_s2         int;
+  v_loser      uuid;
+  v_round      text;
+  v_is_team    boolean;
 begin
   v_me := current_player_id();
   if v_me is null then
-    raise exception '選手登録がまだのため報告できません。' using errcode = 'insufficient_privilege';
+    raise exception '選手登録がまだのため入力できません。' using errcode = 'insufficient_privilege';
   end if;
+
+  -- 両者が同時に入力しても二重に確定させない。対戦表の行を先に押さえてから
+  -- 確定済みかどうかを見る（押さえる前に見ると、二人とも「未確定」を見て通る）。
+  perform 1 from brackets where tournament_id = p_tournament_id for update;
 
   v_m := bracket_match(p_tournament_id, p_match_id);
   if v_m is null then
@@ -1190,7 +1302,7 @@ begin
   v_p1 := (v_m->>'player1Id')::uuid;
   v_p2 := (v_m->>'player2Id')::uuid;
   if v_p1 is null or v_p2 is null then
-    raise exception '対戦カードが確定していないため報告できません。' using errcode = 'check_violation';
+    raise exception '対戦カードが確定していないため入力できません。' using errcode = 'check_violation';
   end if;
 
   v_my_entrant := my_entrant_id(p_tournament_id);
@@ -1214,82 +1326,12 @@ begin
     raise exception 'ゲームカウントと勝者が食い違っています。' using errcode = 'check_violation';
   end if;
 
-  insert into match_result_reports (
-    tournament_id, match_id, reported_by, reporter_player_id, score, winner_entrant_id
-  ) values (
-    p_tournament_id, p_match_id, v_my_entrant, v_me, p_score, p_winner_entrant_id
-  )
-  on conflict (tournament_id, match_id) do update set
-    reported_by        = excluded.reported_by,
-    reporter_player_id = excluded.reporter_player_id,
-    score              = excluded.score,
-    winner_entrant_id  = excluded.winner_entrant_id,
-    created_at         = now();
-end;
-$$;
-
--- 相手の報告を承認して確定させる。自分が出した報告は自分では承認できない。
-create or replace function approve_match_result(p_tournament_id uuid, p_match_id uuid)
-  returns void
-  language plpgsql
-  security definer
-  set search_path = public
-as $$
-declare
-  v_me         uuid;
-  v_my_entrant uuid;
-  v_rep        match_result_reports%rowtype;
-  v_m          jsonb;
-  v_p1         uuid;
-  v_p2         uuid;
-  v_loser      uuid;
-  v_round      text;
-  v_is_team    boolean;
-begin
-  v_me := current_player_id();
-  if v_me is null then
-    raise exception '選手登録がまだのため承認できません。' using errcode = 'insufficient_privilege';
-  end if;
-
-  -- 同じ試合を2人が同時に承認しても、二重に確定させない
-  select * into v_rep from match_result_reports
-    where tournament_id = p_tournament_id and match_id = p_match_id
-    for update;
-  if not found then
-    raise exception 'この対戦にはまだ報告がありません。' using errcode = 'no_data_found';
-  end if;
-
-  v_m := bracket_match(p_tournament_id, p_match_id);
-  if v_m is null then
-    raise exception '対象の試合が見つかりません。' using errcode = 'no_data_found';
-  end if;
-  if coalesce((v_m->>'confirmed')::boolean, false) then
-    raise exception 'この試合は既に確定済みです。' using errcode = 'check_violation';
-  end if;
-
-  if not round_is_started(p_tournament_id, p_match_id) then
-    raise exception 'この回戦はまだ開始されていません。運営の開始をお待ちください。'
-      using errcode = 'check_violation';
-  end if;
-
-  v_p1 := (v_m->>'player1Id')::uuid;
-  v_p2 := (v_m->>'player2Id')::uuid;
-
-  v_my_entrant := my_entrant_id(p_tournament_id);
-  if v_my_entrant is null or v_my_entrant not in (v_p1, v_p2) then
-    raise exception 'この対戦の当事者ではありません。' using errcode = 'insufficient_privilege';
-  end if;
-  if v_my_entrant = v_rep.reported_by then
-    raise exception '自分が出した報告は自分では承認できません。相手の承認を待ってください。'
-      using errcode = 'check_violation';
-  end if;
-
-  v_loser := case when v_rep.winner_entrant_id = v_p1 then v_p2 else v_p1 end;
+  v_loser := case when p_winner_entrant_id = v_p1 then v_p2 else v_p1 end;
   v_round := v_m->>'round';
 
   update brackets
      set data = apply_match_result_json(
-           data, p_match_id, v_rep.winner_entrant_id, v_loser, v_rep.score)
+           data, p_match_id, p_winner_entrant_id, v_loser, p_score)
    where tournament_id = p_tournament_id;
 
   -- 試合の記録。チーム戦はチーム列に入れる（個人の通算成績に混ぜないため）
@@ -1297,17 +1339,13 @@ begin
 
   if v_is_team then
     insert into matches (id, tournament_id, winner_team_id, loser_team_id, score, round)
-      values (p_match_id, p_tournament_id, v_rep.winner_entrant_id, v_loser, v_rep.score, v_round);
+      values (p_match_id, p_tournament_id, p_winner_entrant_id, v_loser, p_score, v_round);
   else
     insert into matches (id, tournament_id, winner_id, loser_id, score, round)
-      values (p_match_id, p_tournament_id, v_rep.winner_entrant_id, v_loser, v_rep.score, v_round);
+      values (p_match_id, p_tournament_id, p_winner_entrant_id, v_loser, p_score, v_round);
   end if;
-
-  delete from match_result_reports
-    where tournament_id = p_tournament_id and match_id = p_match_id;
 end;
 $$;
-
 
 revoke all on function bracket_match(uuid, uuid)       from anon, public;
 revoke all on function is_match_participant(uuid, uuid) from anon, public;
@@ -1317,21 +1355,23 @@ revoke all on function my_entrant_id(uuid)             from anon, public;
 revoke all on function bracket_round_index(uuid, uuid) from anon, public;
 revoke all on function round_is_started(uuid, uuid)    from anon, public;
 revoke all on function report_match_result(uuid, uuid, text, uuid) from anon, public;
-revoke all on function approve_match_result(uuid, uuid)            from anon, public;
+revoke all on function is_owner()                      from anon, public;
+revoke all on function is_tournament_admin(uuid)       from anon, public;
 grant execute on function bracket_match(uuid, uuid)       to authenticated;
--- is_match_participant だけは anon にも許可する。match_result_reports と
--- match_room_codes の select ポリシーは anon にも適用され、その中でこの関数を
--- 呼ぶため、実行権限が無いとゲストの読み込み自体が42501で失敗する
--- （行が0件になるのではなく、エラーになる）。ログインしていなければ
--- 常に偽を返すだけなので、ゲストに見えるデータは増えない。
+grant execute on function is_owner()                      to authenticated;
+-- is_match_participant と is_tournament_admin だけは anon にも許可する。
+-- match_room_codes と match_chat_reports の select ポリシーは anon にも適用され、
+-- その中でこれらの関数を呼ぶため、実行権限が無いとゲストの読み込み自体が
+-- 42501で失敗する（行が0件になるのではなく、エラーになる）。ログインして
+-- いなければ常に偽を返すだけなので、ゲストに見えるデータは増えない。
 grant execute on function is_match_participant(uuid, uuid) to anon, authenticated;
+grant execute on function is_tournament_admin(uuid)        to anon, authenticated;
 grant execute on function can_use_match_chat(uuid, uuid)  to authenticated;
 grant execute on function match_chat_is_open(uuid, uuid)  to authenticated;
 grant execute on function my_entrant_id(uuid)             to authenticated;
 grant execute on function bracket_round_index(uuid, uuid) to authenticated;
 grant execute on function round_is_started(uuid, uuid)    to authenticated;
 grant execute on function report_match_result(uuid, uuid, text, uuid) to authenticated;
-grant execute on function approve_match_result(uuid, uuid)            to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- アイコン画像の保管場所（Storage）
@@ -1375,8 +1415,13 @@ create policy avatars_own_delete on storage.objects
 -- ---------------------------------------------------------------------------
 -- 大会・お知らせの画像の保管場所（Storage）
 --
--- 誰でも見られる（公開バケット）が、書き込めるのは運営だけ。
--- アイコンと違って本人フォルダの制約は不要なので、is_admin() で判定する。
+-- 誰でも見られる（公開バケット）。
+--
+-- 大会は誰でも作れるので、アップロードは選手登録さえ済んでいれば通す
+-- （大会画像を付けられないと大会が作れない）。差し替え・削除は運営のまま ──
+-- 開けてしまうと他人が上げた画像を消せることになる。使われなくなった画像が
+-- 消せずに残ることはあるが、実害は容量だけで、間違って消える事故のほうが
+-- 取り返しがつかない。
 -- ---------------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -1397,7 +1442,7 @@ create policy images_public_read on storage.objects
 drop policy if exists images_admin_insert on storage.objects;
 create policy images_admin_insert on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'images' and is_admin());
+  with check (bucket_id = 'images' and current_player_id() is not null);
 
 drop policy if exists images_admin_update on storage.objects;
 create policy images_admin_update on storage.objects
@@ -1480,12 +1525,10 @@ begin
 exception when duplicate_object then null;
 end $$;
 
--- 承認待ちのゲームカウントは、相手が対戦表を見ながら待つものなので届いた瞬間に出したい。
--- 中身はゲームカウントと出場枠のIDだけで、確定すればどのみち全員に見えるもの
--- （チャットや報告の本文とは性質が違う）。
+-- 大会ごとの運営。指名された人の画面に、開き直さずに操作ボタンを出したい。
 do $$
 begin
-  execute 'alter publication supabase_realtime add table match_result_reports';
+  execute 'alter publication supabase_realtime add table tournament_organizers';
 exception when duplicate_object then null;
 end $$;
 

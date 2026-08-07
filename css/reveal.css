@@ -56,6 +56,21 @@
 /* 日付欄は「期間を指定」を選ぶまで触れない。触れないことが見て分かるようにする */
 .inline-form input[type="date"]:disabled { opacity: 0.45; }
 
+/* 「前回の順位」の保存。集計の設定と地続きに見えないよう、区切り線で切る
+   ── 準備の一部ではなく、発表を終えたあとに押す別の操作なので。 */
+.reveal-publish {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.reveal-publish .meta-line,
+.reveal-publish .note { margin: 0; }
+
 /* サンプルデータの切り替え。普通の設定項目と見分けがつくよう、警告色の破線で囲って
    はっきり目立たせる ── これは「本番の一部」ではなく「試すためだけの機能」なので。 */
 .reveal-sample-toggle {
@@ -187,22 +202,20 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 
 /* 背景の動画。素材も1920×1080なので等倍で収まるが、差し替えたときに縦横比が
    変わっても崩れないよう cover にしてある。
-   既定は非表示。「第〇位」と選手カードのときだけ js/reveal.js が .has-bg を付ける
-   ── 何も出さない画（開始前と、プレー動画を重ねる間）で背景が残っていると、
-   下の映像が塞がって透過合成の意味が無くなる。
-   visibility で消すのは、display:none にすると再生位置が巻き戻る実装があるため。 */
+   発表のあいだは出しっぱなしにする ── 開始前の何も無い画から最後までずっと流し、
+   出したり消したりしない（フェードも掛けない）。画のたびに現れる背景は、
+   めくるたびに「別の映像に切り替わった」ように見えてしまう。
+   そのぶんこれは canvas の最背面に置き、プレー動画はOBS側でこの面より前に重ねる。 */
 #reveal-bg {
   position: absolute;
   inset: 0;
+  /* canvas の中で一番後ろ。#reveal-slot（z-index:1）より必ず後ろに来る */
   z-index: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  visibility: hidden;
   pointer-events: none;
 }
-
-#reveal-canvas.has-bg #reveal-bg { visibility: visible; }
 
 /* 1枚ぶんの画。背景動画より手前に置く */
 #reveal-slot {

@@ -171,18 +171,6 @@ function toRound(row) {
   };
 }
 
-function toResultReport(row) {
-  return {
-    tournamentId: row.tournament_id,
-    matchId: row.match_id,
-    reportedBy: row.reported_by,
-    reporterPlayerId: row.reporter_player_id,
-    score: row.score,
-    winnerEntrantId: row.winner_entrant_id,
-    createdAt: row.created_at,
-  };
-}
-
 function toRoomCode(row) {
   return {
     tournamentId: row.tournament_id,
@@ -278,7 +266,7 @@ export const ALL_PARTS = [
   'ranking',        // state.publishedRanking
   'announcements',  // state.announcements
   'chatReports',    // state.chatReports
-  'resultReports',  // state.resultReports
+  'organizers',     // state.tournamentOrganizers
   'rounds',         // state.rounds
   'roomCodes',      // state.roomCodes
 ];
@@ -297,7 +285,7 @@ const QUERY_LABELS = {
   ranking: 'ランキングの読み込み',
   announcements: 'お知らせの読み込み',
   reports: '報告の読み込み',
-  resultReports: '承認待ちの結果の読み込み',
+  organizers: '大会運営の読み込み',
   rounds: '回戦の読み込み',
   roomCodes: 'ルームコードの読み込み',
 };
@@ -391,9 +379,9 @@ export async function loadAll(parts = null) {
     queries.reports = supabase.from('match_chat_reports').select('*').order('created_at', { ascending: false });
   }
 
-  if (want.has('resultReports')) {
-    // 承認待ちのゲームカウント。当事者と運営にしか返らない
-    queries.resultReports = supabase.from('match_result_reports').select('*');
+  if (want.has('organizers')) {
+    // 大会ごとの運営。誰でも見られる（大会ページに「運営: ○○」として出す）
+    queries.organizers = supabase.from('tournament_organizers').select('*');
   }
 
   if (want.has('rounds')) {
@@ -502,7 +490,12 @@ export async function loadAll(parts = null) {
   }
   if (want.has('announcements')) state.announcements = r.announcements.data.map(toAnnouncement);
   if (want.has('chatReports')) state.chatReports = r.reports.data.map(toChatReport);
-  if (want.has('resultReports')) state.resultReports = r.resultReports.data.map(toResultReport);
+  if (want.has('organizers')) {
+    state.tournamentOrganizers = r.organizers.data.map((row) => ({
+      tournamentId: row.tournament_id,
+      playerId: row.player_id,
+    }));
+  }
   if (want.has('rounds')) state.rounds = r.rounds.data.map(toRound);
   if (want.has('roomCodes')) state.roomCodes = r.roomCodes.data.map(toRoomCode);
 }
@@ -868,6 +861,41 @@ export async function saveTournament(tournament) {
   check(error, '大会の保存');
 }
 
+// この大会の運営を、渡された顔ぶれちょうどに揃える。
+//
+// 消してから入れ直すのではなく差分で当てる。全消しにすると、消した直後の一瞬だけ
+// 運営が0人になり、そのときに走った書き込み（Realtimeで届いた別の操作など）が
+// RLSに弾かれる。作った本人は必ず残す ── 自分を外すと自分の大会を編集できなくなり、
+// サイト全体の運営に頼むしかなくなるため（呼び出し側でも外せないようにしてある）。
+export async function setTournamentOrganizers(tournamentId, playerIds) {
+  const wanted = [...new Set(playerIds.filter(Boolean))];
+
+  const { data, error } = await supabase
+    .from('tournament_organizers')
+    .select('player_id')
+    .eq('tournament_id', tournamentId);
+  check(error, '大会運営の読み込み');
+
+  const current = data.map((r) => r.player_id);
+  const toAdd = wanted.filter((id) => !current.includes(id));
+  const toRemove = current.filter((id) => !wanted.includes(id));
+
+  if (toAdd.length) {
+    const { error: insertError } = await supabase
+      .from('tournament_organizers')
+      .insert(toAdd.map((playerId) => ({ tournament_id: tournamentId, player_id: playerId })));
+    check(insertError, '大会運営の追加');
+  }
+  if (toRemove.length) {
+    const { error: deleteError } = await supabase
+      .from('tournament_organizers')
+      .delete()
+      .eq('tournament_id', tournamentId)
+      .in('player_id', toRemove);
+    check(deleteError, '大会運営の削除');
+  }
+}
+
 export async function setTournamentStatus(tournamentId, status) {
   const { error } = await supabase.from('tournaments').update({ status }).eq('id', tournamentId);
   check(error, '大会状態の変更');
@@ -982,7 +1010,7 @@ export async function replaceEntries(tournamentId, seededPlayerIds) {
 // 読み込んだ時点の brackets.updated_at。
 //
 // 対戦表は運営が手元のコピーを丸ごと書き戻す作りなので、その間に選手が結果を
-// 確定させていると（approve_match_result はDB側で直接反映する）、気づかずに
+// 確定させていると（report_match_result はDB側で直接反映する）、気づかずに
 // 上書きして消してしまう。書き戻す直前にこの版数を突き合わせて、DB側が進んで
 // いれば保存を中断する。
 const bracketVersions = {};   // tournamentId -> updated_at
@@ -1074,22 +1102,6 @@ export async function syncTournamentProgress(tournamentId) {
   if (toDelete.length) {
     const { error: deleteError } = await supabase.from('matches').delete().in('id', toDelete);
     check(deleteError, '試合結果の取り消し');
-  }
-
-  // 運営が自分で結果を入れた試合に、選手からの承認待ちが残っていたら片付ける。
-  // 残しておくと、確定済みの試合に「承認しますか？」が出続ける。
-  const confirmedIds = state.brackets[tournamentId].rounds
-    .flatMap((r) => r.matches)
-    .filter((m) => m.confirmed)
-    .map((m) => m.id);
-
-  if (confirmedIds.length) {
-    const { error: pendingError } = await supabase
-      .from('match_result_reports')
-      .delete()
-      .eq('tournament_id', tournamentId)
-      .in('match_id', confirmedIds);
-    check(pendingError, '承認待ちの片付け');
   }
 }
 
@@ -1222,22 +1234,13 @@ export async function startRound(tournamentId, roundIndex, adminPlayerId) {
 }
 
 // 開始を取り消す。押し間違い用。
-// 残っている承認待ちも消す（開始前に出された報告が生き残らないように）。
-export async function stopRound(tournamentId, roundIndex, matchIds) {
+export async function stopRound(tournamentId, roundIndex) {
   const { error } = await supabase
     .from('tournament_rounds')
     .update({ started_at: null, started_by: null })
     .eq('tournament_id', tournamentId)
     .eq('round_index', roundIndex);
   check(error, '開始の取り消し');
-
-  if (matchIds.length === 0) return;
-  const { error: pendingError } = await supabase
-    .from('match_result_reports')
-    .delete()
-    .eq('tournament_id', tournamentId)
-    .in('match_id', matchIds);
-  check(pendingError, '承認待ちの片付け');
 }
 
 // ---------------------------------------------------------------------------
@@ -1245,7 +1248,8 @@ export async function stopRound(tournamentId, roundIndex, matchIds) {
 //
 // 選手は brackets に直接書けない（brackets_write は運営限定）。ここを緩めると
 // 対戦表を丸ごと書き換えられてしまうので、確定の処理はDB側の関数に閉じ込めてある。
-// 片方が報告し、相手が承認して初めて確定する。
+// 当事者のどちらが入力しても、その場で確定する（相手の承認は挟まない）。
+// 食い違いは対戦チャットの「運営に報告」から運営に伝えてもらい、運営が直す。
 // ---------------------------------------------------------------------------
 
 // score は "3-1" 形式で、左が player1Id 側（対戦表の上の行）。
@@ -1256,26 +1260,7 @@ export async function reportMatchResult(tournamentId, matchId, score, winnerEntr
     p_score: score,
     p_winner_entrant_id: winnerEntrantId,
   });
-  checkRpc(error, 'ゲームカウントの報告');
-}
-
-// 相手の報告を承認して確定させる。対戦表への反映と matches への記録もここで行われる。
-export async function approveMatchResult(tournamentId, matchId) {
-  const { error } = await supabase.rpc('approve_match_result', {
-    p_tournament_id: tournamentId,
-    p_match_id: matchId,
-  });
-  checkRpc(error, '結果の承認');
-}
-
-// 自分が出した報告の取り消し（運営は誰の分でも消せる）。RLSのポリシーが判定する。
-export async function withdrawMatchResult(tournamentId, matchId) {
-  const { error } = await supabase
-    .from('match_result_reports')
-    .delete()
-    .eq('tournament_id', tournamentId)
-    .eq('match_id', matchId);
-  check(error, '報告の取り消し');
+  checkRpc(error, 'ゲームカウントの入力');
 }
 
 // ---------------------------------------------------------------------------
@@ -1460,7 +1445,7 @@ const PART_BY_TABLE = {
   brackets: 'brackets',
   matches: 'matches',
   tournament_rounds: 'rounds',
-  match_result_reports: 'resultReports',
+  tournament_organizers: 'organizers',
   match_room_codes: 'roomCodes',
   published_rankings: 'ranking',
   announcements: 'announcements',

@@ -1747,7 +1747,7 @@ td code { font-size: 0.85em; }
 
 .guide-report-btn { margin-top: 0.7rem; }
 
-/* 報告→承認→確定 の流れ */
+/* 入力→確定 の流れ */
 .guide-flow {
   display: flex;
   align-items: center;
@@ -2688,6 +2688,89 @@ a.card:hover {
 .partner-picker .scroll-box { max-height: 200px; }
 .partner-picker .empty-hint { margin: 0.2rem 0; }
 
+/* ---- 「この大会の運営」を選ぶ欄（js/organizerPicker.js）----
+
+   相方選びと違って複数人を選ぶので、選んだ人を札で並べて外せるようにする。
+   検索結果は「押すと足す」ボタンの列。チェックボックスの一覧にしないのは、
+   選手が増えたときに全員ぶんの行を出さずに済ませるため。 */
+.organizer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.organizer-field .note { margin: 0; }
+
+.organizer-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.organizer-chosen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  min-height: 2rem;
+}
+
+.organizer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* 外せない札（自分）にだけ添える。ボタンが無いことの理由を1語で示す */
+.organizer-chip-note {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+.organizer-chip-remove {
+  min-height: 0;
+  padding: 0 0.2rem;
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.organizer-chip-remove:hover { color: var(--loss); }
+
+.organizer-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.organizer-results .empty-hint { margin: 0.2rem 0; }
+
+.organizer-result {
+  min-height: 0;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.organizer-result:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 /* エントリーはこのページの主目的。他のボタンより一回り大きくし、
    発光をひとまわり強くして視線が最初に止まるようにする。 */
 .btn-entry {
@@ -3215,16 +3298,6 @@ a.card:hover {
 /* 対戦表側は状態を伝えるだけ（入力はチャットの中） */
 .match-status.result-status { color: var(--text-dim); }
 
-/* 相手の承認待ち／自分が承認する番。放置されると進まないので目に付かせる */
-.match-status.result-status.awaiting {
-  color: var(--accent-bright);
-  font-weight: 700;
-}
-
-/* 運営が見たときの「選手からの報告」行（対戦表・対戦チャット両方） */
-.match-status.pending-note,
-.chat-result-note.pending-note { color: var(--info); }
-
 /* チャットの中の入力欄。このダイアログの主目的なので、枠線をアクセント色にして
    大きめに出す（以前はログの下に小さく置かれ、気づかれなかった）。 */
 .chat-result {
@@ -3271,7 +3344,7 @@ a.card:hover {
   font-weight: 600;
 }
 
-/* 押す場所なので指のサイズで出す（承認・報告は1回押すだけの操作）。 */
+/* 押す場所なので指のサイズで出す（確定は1回押すだけの操作）。 */
 .chat-result-form button,
 .chat-result .row-actions button {
   min-height: 2.5rem;
@@ -3516,12 +3589,6 @@ body:has(#view-bracket:not([hidden]) .own-match-bar) button.scroll-top-btn {
   color: var(--text-dim);
 }
 
-/* 自分が動く番のときだけ色を付ける（ただ待っている状態と見分けられるように） */
-.own-match-status.is-action {
-  font-weight: 700;
-  color: var(--accent-bright);
-}
-
 /* 押す場所は右端に固定。文字の長さで位置が動くと目で追いにくい */
 .own-match-open {
   margin-left: auto;
@@ -3587,7 +3654,7 @@ dialog.dialog-chat {
   box-shadow: inset 0 -10px 14px -14px var(--glow);
 }
 
-/* 承認待ちなど、開かないと気づけない用があるときの印 */
+/* ゲームカウント未入力など、開かないと気づけない用があるときの印 */
 .chat-tab-dot {
   flex: none;
   width: 0.5rem;
@@ -4078,10 +4145,11 @@ dialog.dialog-chat {
 .profile-account-actions .meta-line { margin: 0; }
 
 /* ---------------------------------------------------------------------------
-   ランキング
-   --------------------------------------------------------------------------- */
+   順位の見せ方
 
-.clickable-row { cursor: pointer; }
+   ランキングの表は無くなった（順位はお知らせで発表する）。ここに残るのは、
+   大会の最終順位の表と、順位発表の画面（css/reveal.css）で使う分だけ。
+   --------------------------------------------------------------------------- */
 
 .rank-cell {
   font-weight: 800;
@@ -4094,24 +4162,6 @@ dialog.dialog-chat {
 .rank-2 .rank-cell { font-size: 1.15rem; color: var(--silver); }
 .rank-3 .rank-cell { font-size: 1.1rem; color: var(--bronze); }
 
-/* 王座は静かに明滅させる。表彰台のライトのイメージ */
-.ranking-table tr.rank-1 .rank-cell {
-  text-shadow: 0 0 10px rgba(240, 192, 90, 0.5);
-  animation: crown-glow 4s ease-in-out infinite;
-}
-
-@keyframes crown-glow {
-  0%, 100% { text-shadow: 0 0 6px rgba(240, 192, 90, 0.3); }
-  50%      { text-shadow: 0 0 16px rgba(240, 192, 90, 0.75); }
-}
-
-/* 上位3名は行を左から差し込む光のグラデーションで浮かせる */
-.ranking-table tr.rank-1 td { background: linear-gradient(90deg, rgba(240, 192, 90, 0.14), rgba(240, 192, 90, 0.04) 55%, transparent); }
-.ranking-table tr.rank-2 td { background: linear-gradient(90deg, rgba(195, 203, 219, 0.11), rgba(195, 203, 219, 0.03) 55%, transparent); }
-.ranking-table tr.rank-3 td { background: linear-gradient(90deg, rgba(207, 139, 87, 0.11), rgba(207, 139, 87, 0.03) 55%, transparent); }
-
-.rank-change-cell { text-align: center; }
-
 .rank-change {
   font-size: 0.78rem;
   font-weight: 700;
@@ -4122,19 +4172,6 @@ dialog.dialog-chat {
 .rank-change.down { color: var(--loss); }
 .rank-change.same { color: var(--text-faint); font-weight: 400; }
 .rank-change.new  { color: var(--accent-bright); }
-
-/* 集計欄を開く入口。閉じている間は下の公開中のランキングと詰まらないよう余白を取る */
-#ranking-create-btn { margin-bottom: 1rem; }
-
-#ranking-editor {
-  padding: 1.1rem 1.25rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--r);
-  background: var(--surface-2);
-  margin-bottom: 1rem;
-}
-
-#ranking-published-status { margin-top: 0; }
 
 /* ---- 自分の行の強調 ----
    ランキングや選手一覧で、自分がどこにいるか一目で分かるようにする。
@@ -4636,12 +4673,6 @@ dialog.char-picker { max-width: 56rem; }
   mask-image: linear-gradient(to left, #000 30%, transparent);
   -webkit-mask-image: linear-gradient(to left, #000 30%, transparent);
 }
-
-/* 上位3行は金・銀・銅の帯が既に敷いてある。そこに絵を重ねると色が濁るので、
-   絵のほうを一段薄くして帯を主にする（順位の印のほうが情報として上）。 */
-.ranking-table tr.rank-1 .row-art,
-.ranking-table tr.rank-2 .row-art,
-.ranking-table tr.rank-3 .row-art { opacity: 0.2; }
 
 /* 自分の行は緑で強調されている。ここも絵を薄くして、強調を鈍らせない */
 .own-row .row-art { opacity: 0.2; }

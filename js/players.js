@@ -4,14 +4,14 @@ import { characterRowArtHtml } from './characters.js';
 import { makeIconButton } from './icons.js';
 import * as db from './db.js';
 
-// 表示名を更新する。名前を変えた場合、旧名は pastNames に自動で残す。
+// プレイヤー名を更新する。名前を変えた場合、旧名は pastNames に自動で残す。
 // 戦績は不変のid（uuid）に紐づくので、名前が変わっても分断されない。
 export function updatePlayer(id, { currentName }) {
   const player = state.players.find((p) => p.id === id);
   if (!player) return { ok: false, error: '選手が見つかりません。' };
 
   const newName = currentName.trim();
-  if (!newName) return { ok: false, error: '表示名を入力してください。' };
+  if (!newName) return { ok: false, error: 'プレイヤー名を入力してください。' };
 
   if (newName !== player.currentName) {
     if (!player.pastNames.includes(player.currentName)) {
@@ -43,13 +43,13 @@ export async function canRemovePlayer(id) {
 //
 // 一覧に出すのは名前とアイコンだけ。ゲームアカウントIDや過去名、アカウント種別は
 // 詳細（選手ページ）で見られれば十分で、一覧では並べない（見やすさを優先）。
-// 表示名の編集もこの表には置かない。自分の行は名前をクリックして選手ページ経由で、
+// プレイヤー名の編集もこの表には置かない。自分の行は名前をクリックして選手ページ経由で、
 // 他人の行は運営が選手ページから編集する。一覧は「見る」ことに専念させる。
 //
 // options:
 //   ownPlayerId      -> ログイン中の本人の選手ID。その行を目立たせる
 //   isAdmin          -> 削除・アカウント統合などの運営操作を出すか
-//   filterQuery      -> 表示名・過去名（直近2件）の部分一致で絞り込む（改名しても見つかるように過去名も対象）。
+//   filterQuery      -> プレイヤー名・過去名（直近2件）の部分一致で絞り込む（改名しても見つかるように過去名も対象）。
 //                        空のときは一覧を出さず、検索を促す案内だけ表示する
 //   onDelete(player) -> 削除するとき
 //   onMerge(source, target) -> 代理登録された行に本人のアカウントを統合するとき
@@ -64,11 +64,13 @@ export function renderPlayerTable(containerEl, options = {}) {
 
   containerEl.innerHTML = '';
 
-  // 検索していないときは何も出さない。この下にはランキングが続くので、
-  // 「入力すると検索できます」のような案内文があると、そのぶん本題が押し下げられる
-  // （何を入れる欄かは入力欄のプレースホルダで足りる）。
+  // 検索していないときは一覧を出さない。全員を並べても探している人は見つからず、
+  // 選手が増えるほど重くなるだけだから（名前で絞ってから見せる）。
   const query = filterQuery.trim().toLowerCase();
-  if (!query) return;
+  if (!query) {
+    containerEl.innerHTML = '<p class="empty-hint">上の欄に名前を入力すると、選手を検索できます。</p>';
+    return;
+  }
 
   if (state.players.length === 0) {
     containerEl.innerHTML = '<p class="empty-hint">まだ選手が登録されていません。</p>';

@@ -5,7 +5,7 @@
 import './intro.js';
 import {
   state, newId, getPlayerName, isTeamTournament, getEntrantName, getEntrantMemberIds,
-  openChatReports,
+  openChatReports, organizerIdsOf,
 } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
 import { escapeHtml, avatarHtml, safeUrl, cardThumb, setupImagePicker } from './util.js';
@@ -15,8 +15,7 @@ import {
 } from './bracket.js';
 import { renderBracket } from './bracketView.js';
 import { reportChipHtml, syncOpenChat } from './matchChat.js';
-import { computeRankings, computeRankingsForRange, withRankChange, rankChangeInfo } from './ranking.js';
-import { renderRankingTable } from './rankingView.js';
+import { computeRankings, rankChangeInfo } from './ranking.js';
 import { renderRevealPage, closeRevealStage } from './reveal.js';
 import { getPlayerStats, championLabel, placementLabelOf } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
@@ -24,12 +23,13 @@ import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './r
 import { renderProfileForm, profileMetaHtml, profileBioHtml, isProfileFormMounted } from './profile.js';
 import { characterImageUrl } from './characters.js';
 import { keepFormDraft, clearFormDraft } from './formDraft.js';
+import { mountOrganizerPicker } from './organizerPicker.js';
 import {
   renderRecruitPage, renderTournamentActions, STATUS_LABELS, entrantUnit,
 } from './entries.js';
 import {
-  auth, initAuth, isAdmin, isLoggedIn, needsOnboarding, accountLabel,
-  signInWithProvider, signOut, reloadOwnPlayer,
+  auth, initAuth, isAdmin, isOwner, canManageTournament, isLoggedIn, needsOnboarding,
+  accountLabel, signInWithProvider, signOut, reloadOwnPlayer,
 } from './auth.js';
 import { isConfigured } from './supabaseClient.js';
 import { initStage, renderFeatured, renderStats, prefersReducedMotion } from './stage.js';
@@ -41,6 +41,12 @@ let selectedParticipantIds = [];
 let participantSearchQuery = '';
 let playerSearchQuery = '';
 let currentBracketTournamentId = null;
+
+// 「この大会の運営」欄の操作卓（js/organizerPicker.js）。作成用と編集用で別に持つ。
+// 建て直すと選んだ顔ぶれが消えるので、画面を描き直すたびには作らない
+// （この画面は Realtime の更新でも描き直される）。
+let organizerPicker = null;
+let editOrganizerPicker = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -60,6 +66,7 @@ const tournamentNameInput = $('tournament-name-input');
 const tournamentDateInput = $('tournament-date-input');
 const tournamentCapacityInput = $('tournament-capacity-input');
 const tournamentRulesInput = $('tournament-rules-input');
+const tournamentOrganizersEl = $('tournament-organizers');
 const tournamentStreamInput = $('tournament-stream-input');
 const tournamentSubmitBtn = $('tournament-submit-btn');
 const tournamentMatchTypeInput = $('tournament-match-type-input');
@@ -110,6 +117,7 @@ const tournamentEditForm = $('tournament-edit-form');
 const tournamentEditNameInput = $('tournament-edit-name-input');
 const tournamentEditDateInput = $('tournament-edit-date-input');
 const tournamentEditRulesInput = $('tournament-edit-rules-input');
+const tournamentEditOrganizersEl = $('tournament-edit-organizers');
 const tournamentEditStreamInput = $('tournament-edit-stream-input');
 const tournamentEditCancelBtn = $('tournament-edit-cancel-btn');
 const tournamentEditMatchTypeInput = $('tournament-edit-match-type-input');
@@ -142,16 +150,7 @@ const profileDiscordBtn = $('profile-discord-btn');
 const profileAccountActions = $('profile-account-actions');
 const profileAccountEmail = $('profile-account-email');
 
-const rankingContainer = $('ranking-container');
-const rankingCreateBtn = $('ranking-create-btn');
 const rankingRevealBtn = $('ranking-reveal-btn');
-const rankingEditorEl = $('ranking-editor');
-const rankingStartInput = $('ranking-start-input');
-const rankingEndInput = $('ranking-end-input');
-const rankingPublishBtn = $('ranking-publish-btn');
-const rankingCancelBtn = $('ranking-cancel-btn');
-const rankingPublishedStatusEl = $('ranking-published-status');
-const rankingEditorNoteEl = $('ranking-editor-note');
 
 const appStatusEl = $('app-status');
 const syncBarEl = $('sync-bar');
@@ -220,19 +219,24 @@ async function persist(action, label) {
 // ログイン状態に応じて、運営専用・ログイン専用のUIをまとめて出し分ける。
 function applyAuthUI() {
   const admin = isAdmin();
+  const owner = isOwner();
   const loggedIn = isLoggedIn();
+  // 大会は誰でも開ける。必要なのは選手登録だけ（作った人がその大会の運営になる）。
+  const canCreateTournament = Boolean(auth.player);
+  // いま開いている大会を管理できるか。詳細ページを開いたままログイン状態が
+  // 変わることがあるので、ここでも見ておく（描き直しは routeFromHash 側）。
+  const canManageCurrent = canManageTournament(currentBracketTournamentId);
 
-  navTournamentLink.hidden = !admin;
+  navTournamentLink.hidden = !canCreateTournament;
   announcementNewBtn.hidden = !admin;
-  rankingCreateBtn.hidden = !admin;
-  rankingRevealBtn.hidden = !admin;
-  tournamentEditBtn.hidden = !admin;
-  tournamentDeleteBtn.hidden = !admin;
-  if (!admin) tournamentEditForm.hidden = true;
+  // ランキングの集計と順位発表は持ち主だけ。大会を開ける人が増えても、
+  // 全大会を横断して順位を決める操作は1人に閉じておく。
+  rankingRevealBtn.hidden = !owner;
+  tournamentEditBtn.hidden = !canManageCurrent;
+  tournamentDeleteBtn.hidden = !canManageCurrent;
+  if (!canManageCurrent) tournamentEditForm.hidden = true;
   // 運営でなくなったら投稿フォームも畳む
   if (!admin) closeAnnouncementForm();
-  // 同じく、開いていたランキングの編集欄も畳む
-  if (!admin) closeRankingEditor();
 
   loginBtn.hidden = loggedIn;
   accountAvatarEl.hidden = !loggedIn;
@@ -265,10 +269,10 @@ const VIEW_IDS = {
   tournament: 'view-tournament-detail',
   bracket: 'view-bracket',
   player: 'view-player-detail',
-  // 選手一覧はランキングと同じページに統合した。#players は以前のリンクや
+  // 選手を探すページ。#ranking は、ランキングの表を置いていた頃のリンクや
   // ブックマークから来る人のために、そのまま同じ画面へ通す。
-  players: 'view-ranking',
-  ranking: 'view-ranking',
+  players: 'view-players',
+  ranking: 'view-players',
   // 順位発表（運営専用）。ランキングの表とは見せ方も操作もまるで違うので、
   // 同じページのモードにせず別のページにしてある（js/reveal.js）。
   reveal: 'view-reveal',
@@ -280,8 +284,8 @@ const VIEW_IDS = {
 
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
 const NAV_PAGE_OF = {
-  tournament: 'tournaments', bracket: 'tournaments', player: 'ranking',
-  players: 'ranking', reveal: 'ranking', news: 'newslist',
+  tournament: 'tournaments', bracket: 'tournaments', player: 'players',
+  players: 'players', reveal: 'players', news: 'newslist',
 };
 
 function parseHash() {
@@ -376,8 +380,13 @@ function routeFromHash() {
   // #news はパラメータの有無で一覧と詳細に分かれる（#news=一覧、#news/{id}=詳細）
   if (page === 'news' && !param) target = 'newslist';
 
-  // 大会作成と順位発表は運営限定。マイページはログアウト中でも開ける（そこからログインする）
-  if ((target === 'create' || target === 'reveal') && !isAdmin()) {
+  // 大会作成は選手登録さえ済んでいれば誰でも。順位発表はサイトの持ち主だけ。
+  // マイページはログアウト中でも開ける（そこからログインする）。
+  if (target === 'create' && !auth.player) {
+    location.replace('#home');
+    target = 'home';
+  }
+  if (target === 'reveal' && !isOwner()) {
     location.replace('#home');
     target = 'home';
   }
@@ -401,8 +410,12 @@ function routeFromHash() {
     // .reveal-playing が残り、移った先でヘッダーもナビも消えたままになる。
     if (target !== 'reveal') closeRevealStage();
 
-    Object.entries(VIEW_IDS).forEach(([name, id]) => {
-      $(id).hidden = name !== target;
+    // 比べるのはページ名ではなく要素のID。1つの画面に2つのハッシュが向いている
+    // ことがあり（#players と #ranking は同じ画面）、名前で比べると、後から回って
+    // きた別名のほうが「対象ではない」と判断して、出したばかりの画面を隠してしまう。
+    const targetViewId = VIEW_IDS[target];
+    Object.values(VIEW_IDS).forEach((id) => {
+      $(id).hidden = id !== targetViewId;
     });
 
     // 中身を別ファイルに分けてある読み物ページ（はじめに・利用規約・プライバシーポリシー）。
@@ -426,15 +439,17 @@ function routeFromHash() {
     else if (target === 'newslist') draw(renderNewsListPage());
     else if (target === 'tournaments') renderTournamentsPage(param);
     else if (target === 'entries') draw(renderEntriesPage());
-    else if (target === 'create') { renderParticipantCheckboxes(); renderSelectedList(); }
+    else if (target === 'create') {
+      renderParticipantCheckboxes();
+      renderSelectedList();
+      ensureCreateOrganizerPicker();
+    }
     else if (target === 'tournament') draw(renderTournamentDetail(param));
     else if (target === 'bracket') draw(renderBracketPage(param));
     else if (target === 'player') draw(renderPlayerDetail(param));
-    // 選手検索とランキングは同じページ。どちらのハッシュで来ても両方を描く。
-    else if (target === 'players' || target === 'ranking') {
-      refreshPlayerUI();
-      renderRankingPage();
-    } else if (target === 'reveal') draw(renderRevealPage());
+    // 選手を探すページ。#ranking で来た人も同じ画面に着く。
+    else if (target === 'players' || target === 'ranking') refreshPlayerUI();
+    else if (target === 'reveal') draw(renderRevealPage());
     else if (target === 'profile') renderProfilePage();
 
     // 別の画面へ移ったときは先頭から見せる。ハッシュだけを書き換える作りなので、
@@ -641,6 +656,20 @@ function refreshPlayerUI() {
     },
   });
   renderParticipantCheckboxes();
+}
+
+// 大会作成の「この大会の運営」欄。
+//
+// 建てるのは1回だけ。この画面は Realtime の更新でも描き直されるので、
+// そのたびに建て直すと、指名しかけた顔ぶれが消えてしまう。
+// 作成が終わったあとだけ reset で建て直す（前の大会の顔ぶれを持ち越さないため）。
+function ensureCreateOrganizerPicker({ reset = false } = {}) {
+  if (!auth.player) return;
+  if (organizerPicker && !reset) return;
+  organizerPicker = mountOrganizerPicker(tournamentOrganizersEl, {
+    selectedIds: [auth.player.id],
+    lockedId: auth.player.id,
+  });
 }
 
 function renderParticipantCheckboxes() {
@@ -857,7 +886,7 @@ function renderProfilePage() {
   // 登録がまだの人には、いきなり入力欄を出す（見せるプロフィールがまだ無い）
   if (needsOnboarding()) {
     profileTitleEl.textContent = '選手登録';
-    profileNoteEl.textContent = '表示名など必要事項を記入すると登録が完了します。あとからいつでも変更できます。';
+    profileNoteEl.textContent = 'プレイヤー名など必要事項を記入すると登録が完了します。あとからいつでも変更できます。';
     if (keepExistingForm) return;
     renderProfileForm(profileFormContainer, null, {
       submitLabel: '登録する',
@@ -899,7 +928,7 @@ function renderProfilePage() {
         renderProfilePage();
       },
       onSubmit: async (profile) => {
-        // 表示名を変えたら旧名を過去名に残す（players.js の updatePlayer と同じ扱い）
+        // プレイヤー名を変えたら旧名を過去名に残す（players.js の updatePlayer と同じ扱い）
         const pastNames = [...auth.player.pastNames];
         if (profile.currentName !== auth.player.currentName
           && !pastNames.includes(auth.player.currentName)) {
@@ -947,7 +976,7 @@ function renderOwnProfileView() {
     foot: bio + '<div class="player-record"></div>',
   })
     + '<div class="player-history"></div>'
-    + (chips || (bio ? '' : '<p class="empty-hint">まだ表示名だけです。鉛筆アイコンからアイコン・使用キャラ・自己紹介などを追加できます。</p>'));
+    + (chips || (bio ? '' : '<p class="empty-hint">まだプレイヤー名だけです。鉛筆アイコンからアイコン・使用キャラ・自己紹介などを追加できます。</p>'));
 
   profileViewEl.querySelector('.profile-edit-btn').addEventListener('click', () => {
     setProfileEditing(true);
@@ -1255,7 +1284,12 @@ function renderTournamentInfo(tournament) {
 
   // 未対応の報告は大会情報のいちばん上に出す。運営が対戦表まで下りなくても
   // 「この大会で何か起きている」と気づけるようにするため。
-  const openReports = isAdmin() ? openChatReports(tournament.id) : [];
+  const openReports = canManageTournament(tournament.id) ? openChatReports(tournament.id) : [];
+
+  // この大会の運営。誰に連絡すればよいかが分からないと、もめたときに詰まる。
+  const organizerNames = organizerIdsOf(tournament.id)
+    .map((id) => getPlayerName(id))
+    .filter(Boolean);
 
   let html = `
     <h3>大会情報</h3>
@@ -1276,6 +1310,9 @@ function renderTournamentInfo(tournament) {
       <div><dt>三位決定戦</dt><dd>${tournament.thirdPlaceMatch ? '行う' : '行わない'}</dd></div>
       <div><dt>開催日</dt><dd>${escapeHtml(tournament.date || '日付未設定')}</dd></div>
       <div><dt>進行状況</dt><dd>${escapeHtml(tournamentStatusLabel(tournament))}</dd></div>
+      ${organizerNames.length > 0
+    ? `<div><dt>運営</dt><dd>${escapeHtml(organizerNames.join('、'))}</dd></div>`
+    : ''}
     </dl>
   `;
   // 配信元。試合を見に行く導線なので、ルールより先に、押せる形で出す。
@@ -1340,6 +1377,12 @@ function backToListLink(tournament) {
 async function renderTournamentDetail(tournamentId) {
   currentBracketTournamentId = tournamentId;
   tournamentEditForm.hidden = true;
+
+  // 編集・削除はこの大会の運営だけ。大会は誰でも開けるので、ここの出し分けは
+  // 「サイトの運営か」ではなく「この大会の運営か」で決まる。
+  const canManage = canManageTournament(tournamentId);
+  tournamentEditBtn.hidden = !canManage;
+  tournamentDeleteBtn.hidden = !canManage;
 
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
@@ -1409,7 +1452,7 @@ function canAdjustBracket(tournamentId) {
 function renderBracketAdminTools(tournamentId) {
   bracketAdminToolsEl.innerHTML = '';
 
-  if (!isAdmin() || !canAdjustBracket(tournamentId)) {
+  if (!canManageTournament(tournamentId) || !canAdjustBracket(tournamentId)) {
     bracketAdminToolsEl.hidden = true;
     if (bracketSwap?.tournamentId === tournamentId) bracketSwap = null;
     return;
@@ -1529,7 +1572,7 @@ async function renderBracketPage(tournamentId) {
   const isParticipant = Boolean(auth.player)
     && tournament.participantIds.includes(auth.player.id)
     && tournament.status !== 'finished';
-  bracketOwnHintEl.hidden = !isParticipant || isAdmin();
+  bracketOwnHintEl.hidden = !isParticipant || canManageTournament(tournamentId);
   if (!bracketOwnHintEl.hidden) {
     bracketOwnHintEl.textContent = '色の付いた行が自分の対戦です。画面下の「あなたの対戦」から、ルームコードの確認・対戦相手とのチャット・ゲームカウントの報告ができます。選手名を押すと、その選手のプロフィールが見られます。';
   }
@@ -1572,8 +1615,8 @@ async function renderBracketPage(tournamentId) {
       }
     }, '試合結果の保存');
   }, {
-    readOnly: !isAdmin(),
-    // 選手がゲームカウントを報告・承認したあと。DBの関数側で書き込みが済んでいるので、
+    readOnly: !canManageTournament(tournamentId),
+    // 選手がゲームカウントを入力したあと。DBの関数側で書き込みが済んでいるので、
     // ここは取り直して描き直すだけでよい（onChanged と違い、書き戻しはしない）。
     onRefresh: async () => { await refreshFromDb(); },
     // 組み合わせの調整中だけ、選手の行を「選ぶ」対象にする
@@ -1601,7 +1644,7 @@ function renderResultSection(tournament) {
   const confirmed = tournament.status === 'finished';
 
   if (!decided) {
-    if (isAdmin()) {
+    if (canManageTournament(tournament.id)) {
       const note = document.createElement('p');
       note.className = 'note';
       note.textContent = 'すべての対戦が終わると、ここで結果を確定できます。';
@@ -1615,12 +1658,12 @@ function renderResultSection(tournament) {
     box.className = 'result-pending';
 
     const note = document.createElement('p');
-    note.textContent = isAdmin()
+    note.textContent = canManageTournament(tournament.id)
       ? 'すべての対戦が終わりました。内容を確認して「結果を確定する」を押すと、優勝者と最終順位が公開されます。'
       : 'すべての対戦が終わりました。運営が結果を確定するまでお待ちください。';
     box.appendChild(note);
 
-    if (isAdmin()) {
+    if (canManageTournament(tournament.id)) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = '結果を確定する';
@@ -1711,7 +1754,7 @@ function renderResultSection(tournament) {
   `;
   resultSectionEl.appendChild(wrap);
 
-  if (isAdmin()) {
+  if (canManageTournament(tournament.id)) {
     const undo = document.createElement('button');
     undo.type = 'button';
     undo.className = 'btn-secondary';
@@ -1736,123 +1779,10 @@ function renderResultSection(tournament) {
   }
 }
 
-// ---- ランキング ----
-
 function formatDateTime(iso) {
   const d = new Date(iso);
   return `${d.toLocaleDateString('ja-JP')} ${d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
 }
-
-function formatJaDate(date) {
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-}
-
-// 'YYYY-MM-DD' をそのまま「〇年〇月〇日」にする。new Date(文字列) を経由すると
-// タイムゾーンの解釈次第で日付がずれかねないので、文字列を直接分解する。
-function formatJaDateStr(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return `${y}年${m}月${d}日`;
-}
-
-// カレンダーで選んだ開始日・終了日（'YYYY-MM-DD' または null）を
-// 「〇年〇月〇日〜〇年〇月〇日」の形にする。片方だけ省略した場合はその側を開けたまま表示し、
-// 両方省略なら「全期間」と表示する。
-function periodRangeLabel(start, end) {
-  if (!start && !end) return '全期間';
-  return `${start ? formatJaDateStr(start) : ''}〜${end ? formatJaDateStr(end) : ''}`;
-}
-
-// 移行前の「直近Nか月」形式で公開された古いデータだけに使う表示。
-// periodMonths か月分をさかのぼった開始日と、基準日（endDate）を範囲表示にする。
-function legacyMonthsRangeLabel(periodMonths, endDate) {
-  if (periodMonths == null) return '全期間';
-  const start = new Date(endDate);
-  start.setMonth(start.getMonth() - Number(periodMonths));
-  return `${formatJaDate(start)}〜${formatJaDate(endDate)}`;
-}
-
-function publishedStatusLine() {
-  const published = state.publishedRanking;
-  const periodLabel = published
-    ? (published.periodStart || published.periodEnd
-      ? periodRangeLabel(published.periodStart, published.periodEnd)
-      : legacyMonthsRangeLabel(published.periodMonths ?? null, new Date(published.publishedAt)))
-    : '';
-
-  if (isAdmin()) {
-    if (!published) return '未公開';
-    return `公開中: ${periodLabel}（${formatDateTime(published.publishedAt)} 公開）`;
-  }
-  return published ? `集計期間: ${periodLabel}` : '';
-}
-
-// 日付入力欄から、現在選ばれている範囲を取り出す（空欄は無制限を表す null）。
-function selectedRankingRange() {
-  return { start: rankingStartInput.value || null, end: rankingEndInput.value || null };
-}
-
-// ランキングの集計欄を開いているか。開いている間だけ、運営には公開中のものではなく
-// 集計中のプレビューを見せる。普段は運営も閲覧者と同じ「公開中のランキング」を見る。
-let rankingEditorOpen = false;
-
-// ランキングの集計には全期間の試合結果が要る。普段は持っていないので、
-// 運営がこの欄を開いたときに初めて全データを読み込む。
-async function openRankingEditor() {
-  rankingCreateBtn.disabled = true;
-  setStatus('集計データを読み込んでいます...', 'loading');
-  try {
-    await db.ensureFullData();
-  } catch (err) {
-    setStatus(err.message, 'error');
-    rankingCreateBtn.disabled = false;
-    return;
-  }
-  setStatus('');
-  rankingCreateBtn.disabled = false;
-
-  rankingEditorOpen = true;
-  rankingEditorEl.hidden = false;
-  rankingEditorNoteEl.hidden = false;
-  rankingCreateBtn.hidden = true;
-  renderRankingPage();
-}
-
-function closeRankingEditor() {
-  rankingEditorOpen = false;
-  rankingEditorEl.hidden = true;
-  rankingEditorNoteEl.hidden = true;
-  rankingCreateBtn.hidden = !isAdmin();
-  renderRankingPage();
-}
-
-// 集計欄を開いている運営には選択中の期間のライブプレビューを、
-// それ以外には公開済みスナップショットを見せる。
-function renderRankingPage() {
-  rankingPublishedStatusEl.textContent = publishedStatusLine();
-
-  if (isAdmin() && rankingEditorOpen) {
-    const { rankings: preview } = computeRankingsForRange(state, selectedRankingRange());
-    const previewWithChange = withRankChange(preview, state.publishedRanking?.rankings);
-    renderRankingTable(
-      rankingContainer,
-      previewWithChange,
-      'この期間にランキング反映対象の大会の試合がないため、ランキングを計算できません。',
-      auth.player?.id ?? null,
-    );
-  } else {
-    renderRankingTable(
-      rankingContainer,
-      state.publishedRanking?.rankings ?? [],
-      'まだランキングが公開されていません。',
-      auth.player?.id ?? null,
-    );
-  }
-}
-
-// ---- 選手個人ページ ----
-
-// 「直近の戦績」に札で出す件数。全件は下の「すべての戦歴」が受け持つ。
-const RECENT_RESULTS = 3;
 
 // ---------------------------------------------------------------------------
 // プロフィール（選手ページ・マイページ）
@@ -2046,7 +1976,7 @@ async function renderPlayerDetail(playerId) {
       ? `<a href="#profile" class="profile-edit-link" title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</a>`
       : '',
     extra: !isOwn && isAdmin()
-      ? '<p class="meta-line"><button type="button" class="btn-secondary admin-rename-btn">表示名を変更</button></p>'
+      ? '<p class="meta-line"><button type="button" class="btn-secondary admin-rename-btn">プレイヤー名を変更</button></p>'
       : '',
     // 自己紹介と直近の戦績はヒーローの下段に入れる（同じ島）。
     // 全件の表だけは外に出す ── 開くと何十行にもなるので、島の中で伸ばすと
@@ -2056,12 +1986,12 @@ async function renderPlayerDetail(playerId) {
     + historyTableHtml(stats)
     + profileFooterHtml(player);
 
-  // 表示名の変更。選手一覧の表からは外したので、運営はここから直す。
+  // プレイヤー名の変更。選手一覧の表からは外したので、運営はここから直す。
   // 代理登録された選手（本人のアカウントが無い人）を直せる唯一の経路でもある。
   const renameBtn = playerDetailEl.querySelector('.admin-rename-btn');
   if (renameBtn) {
     renameBtn.addEventListener('click', async () => {
-      const input = prompt(`「${player.currentName}」の新しい表示名を入力してください。`, player.currentName);
+      const input = prompt(`「${player.currentName}」の新しいプレイヤー名を入力してください。`, player.currentName);
       if (input === null) return;
 
       const result = updatePlayer(player.id, { currentName: input });
@@ -2070,7 +2000,7 @@ async function renderPlayerDetail(playerId) {
         return;
       }
       renameBtn.disabled = true;
-      const ok = await persist(() => db.savePlayer(result.player), '表示名の変更');
+      const ok = await persist(() => db.savePlayer(result.player), 'プレイヤー名の変更');
       if (ok) await refreshFromDb();
       else renameBtn.disabled = false;
     });
@@ -2207,51 +2137,7 @@ tournamentForm.addEventListener('change', (e) => {
   tournamentSubmitBtn.textContent = manual ? 'ブラケットを生成' : '大会を作成';
 });
 
-rankingCreateBtn.addEventListener('click', openRankingEditor);
-rankingCancelBtn.addEventListener('click', closeRankingEditor);
 rankingRevealBtn.addEventListener('click', () => { location.hash = '#reveal'; });
-
-rankingStartInput.addEventListener('change', () => {
-  if (isAdmin()) renderRankingPage();
-});
-rankingEndInput.addEventListener('change', () => {
-  if (isAdmin()) renderRankingPage();
-});
-
-rankingPublishBtn.addEventListener('click', async () => {
-  const range = selectedRankingRange();
-  if (range.start && range.end && range.start > range.end) {
-    alert('開始日が終了日より後になっています。');
-    return;
-  }
-  const { periodStart, periodEnd, rankings } = computeRankingsForRange(state, range);
-
-  if (rankings.length === 0) {
-    alert('この期間に確定した試合がまだないため、公開できません。');
-    return;
-  }
-  if (!confirm(`${periodRangeLabel(periodStart, periodEnd)}のランキングを公開します。閲覧者に反映されます。よろしいですか？`)) return;
-
-  // 前回公開時点の順位を各エントリに焼き込み、公開後もずっと「前回との差」が分かるようにする
-  const snapshot = {
-    publishedAt: new Date().toISOString(),
-    periodStart,
-    periodEnd,
-    rankings: withRankChange(rankings, state.publishedRanking?.rankings),
-  };
-
-  rankingPublishBtn.disabled = true;
-  const ok = await persist(() => db.publishRanking(snapshot), 'ランキングの公開');
-  rankingPublishBtn.disabled = false;
-  if (!ok) return;
-
-  state.publishedRanking = snapshot;
-
-  // 公開したら作業は終わりなので集計欄を畳む。閲覧者と同じ「公開中のランキング」
-  // （＝いま公開したスナップショット。正しい前回比バッジ入り）の表示に戻る。
-  // プレビューのまま残すと、前回比が自分自身との比較になって全て「変動なし」に潰れる。
-  closeRankingEditor();
-});
 
 // 「その他」を選んだときだけ説明欄を出す。他の選択肢では書いても表示に使われない。
 function bindMatchTypeNoteToggle(select, field) {
@@ -2358,6 +2244,11 @@ tournamentForm.addEventListener('submit', async (e) => {
     // 先に画像を上げてURLを確定させてから大会を作る
     tournament.imageUrl = await resolveImageUrl(tournamentImagePicker, 'tournaments');
     await db.createTournament(tournament);
+    // 作った本人はDB側のトリガで必ず運営に入る。ここで足すのは、その上で
+    // 指名した人だけ（自分を含めて渡しても on conflict で二重にはならない）。
+    if (organizerPicker) {
+      await db.setTournamentOrganizers(tournament.id, organizerPicker.selectedIds());
+    }
     if (!manual) return;
 
     // 参加者やブラケットの登録に失敗したら、作りかけの大会を残さない。
@@ -2389,6 +2280,7 @@ tournamentForm.addEventListener('submit', async (e) => {
   tournamentStreamInput.value = '';
   tournamentThirdPlaceInput.checked = false;
   tournamentImagePicker.setCurrent('');
+  ensureCreateOrganizerPicker({ reset: true });
   selectedParticipantIds = [];
   // 作れたので下書きは用済み（残すと次に大会を作るとき前回の内容が入ってくる）
   clearFormDraft(TOURNAMENT_DRAFT_KEY);
@@ -2410,6 +2302,16 @@ tournamentEditBtn.addEventListener('click', () => {
   tournamentEditRulesInput.value = tournament.rules || '';
   tournamentEditStreamInput.value = tournament.streamUrl || '';
   tournamentEditImagePicker.setCurrent(tournament.imageUrl || '');
+  // 運営の欄は開くたびに建て直す。いま入っている顔ぶれを見せる必要があり、
+  // 別の大会を開いたときに前の大会の顔ぶれが残っていては困るため。
+  //
+  // 外せないのは「自分がいま運営に入っているとき」だけ。サイト全体の運営が
+  // 他人の大会を直しているときは自分が名簿に居ないので、その場合は何も固定しない。
+  const currentOrganizers = organizerIdsOf(tournament.id);
+  editOrganizerPicker = mountOrganizerPicker(tournamentEditOrganizersEl, {
+    selectedIds: currentOrganizers,
+    lockedId: currentOrganizers.includes(auth.player?.id) ? auth.player.id : null,
+  });
   // 保存済みの内容を入れ終えてから下書きを重ねる（書きかけがあればそちらが勝つ）
   keepFormDraft(tournamentEditForm, `tournament-edit-${tournament.id}`);
   tournamentEditForm.hidden = !tournamentEditForm.hidden;
@@ -2452,6 +2354,9 @@ tournamentEditForm.addEventListener('submit', async (e) => {
   const ok = await persist(async () => {
     tournament.imageUrl = await resolveImageUrl(tournamentEditImagePicker, 'tournaments');
     await db.saveTournament(tournament);
+    if (editOrganizerPicker) {
+      await db.setTournamentOrganizers(tournament.id, editOrganizerPicker.selectedIds());
+    }
     // 差し替え・削除で使われなくなった画像は消しておく。失敗しても保存は済んでいる。
     if (previousImage && previousImage !== tournament.imageUrl) {
       await db.removeImageByUrl(previousImage).catch(() => {});
@@ -2460,6 +2365,9 @@ tournamentEditForm.addEventListener('submit', async (e) => {
   if (ok) {
     clearFormDraft(`tournament-edit-${currentBracketTournamentId}`);
     tournamentEditForm.hidden = true;
+    // 運営を入れ替えたことを、自分の画面にも反映させる（自分を外した場合は
+    // 編集ボタンごと消える）。
+    await refreshFromDb();
   }
   renderTournamentDetail(currentBracketTournamentId);
 });

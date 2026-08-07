@@ -41,8 +41,8 @@ export function rankChangeInfo(previousRank, rank) {
 }
 
 // カレンダーで選んだ開始日・終了日（'YYYY-MM-DD' 文字列。どちらも省略可）から
-// ランキングをまとめて計算する。renderRankingPage / 公開ボタン / 画像書き出しボタンの
-// 3箇所で同じ計算が必要なため共通化する。
+// ランキングをまとめて計算する。順位発表の画面（js/reveal.js）が、発表するランキングの
+// プレビューと「前回の順位」の保存の両方で同じ計算を要るため共通化してある。
 export function computeRankingsForRange(state, { start = null, end = null } = {}) {
   const filteredMatches = filterMatchesByRange(state, { start, end });
   return {
