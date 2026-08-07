@@ -106,7 +106,7 @@ if (pageRefs.length) console.log(`OK   読み物ページ${pageRefs.length}件�
 // fonts/ は _headers 側で immutable から外してある（理由はそのファイルに記載）ので、
 // ?v= が無くてよい ── ここでも見に行かない。
 
-const IMMUTABLE_DIRS = ['js', 'css', 'img', 'pages'];
+const IMMUTABLE_DIRS = ['js', 'css', 'img', 'pages', 'video'];
 
 // href="..." / src="..." / data-src="..." / CSSの url(...) から、
 // 上のディレクトリを指すローカルな参照を拾う。

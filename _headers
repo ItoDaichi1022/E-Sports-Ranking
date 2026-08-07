@@ -44,6 +44,13 @@
 /img/*
   Cache-Control: public, max-age=31536000, immutable
 
+# 順位発表の画面（#reveal）の背景動画だけを置く場所。img/ に混ぜていないのは、
+# あちらが「WebPの静止画だけ」を約束している場所だから（img/README.md と
+# scripts/check-cache-version.mjs のWebP検査）。1本15MBほどあるので、
+# 取り直しが起きないよう img/ と同じく1年 immutable にしておく。
+/video/*
+  Cache-Control: public, max-age=31536000, immutable
+
 /pages/*
   Cache-Control: public, max-age=31536000, immutable
 

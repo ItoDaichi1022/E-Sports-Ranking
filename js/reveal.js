@@ -53,6 +53,8 @@ const countEl = $('reveal-count');
 const startBtn = $('reveal-start-btn');
 const stageEl = $('reveal-stage');
 const canvasEl = $('reveal-canvas');
+const slotEl = $('reveal-slot');
+const bgEl = $('reveal-bg');
 
 // 準備画面で選ばれている選手のID。ランキングを引き直しても選択を保つために
 // 一覧の描き直しとは別に持っておく（期間を少し動かしただけで選び直しになると使えない）。
@@ -267,6 +269,12 @@ export async function renderRevealPage() {
   closeStage();
   setupEl.hidden = false;
 
+  // 背景動画をここで読み込み始める。index.html では data-src に伏せてあるので、
+  // この画面（運営専用）を開くまで15MBを取りに行かない。
+  // 発表を始めてから読むと最初の「第〇位」が背景なしで出てしまうので、
+  // 選手を選んでいるあいだに裏で読ませておく。
+  if (bgEl.dataset.src && !bgEl.src) bgEl.src = bgEl.dataset.src;
+
   setRevealStatus('集計データを読み込んでいます...', 'loading');
   startBtn.disabled = true;
   try {
@@ -477,12 +485,20 @@ function drawCurrent() {
   //          ここに、その選手の大会でのプレー動画を重ねる。編集で足すのではなく
   //          発表の側に間を用意しておくことで、プレー動画の尺に合わせて
   //          好きなだけ待ってからカードをめくれる。
-  if (playing.phase === 'blank' || playing.phase === 'gap') {
-    canvasEl.replaceChildren();
+  const showing = playing.phase === 'title' || playing.phase === 'card';
+
+  // 背景の動画は、画があるときだけ出す。何も出さない画で流したままにすると、
+  // プレー動画を重ねる場所が背景で塞がってしまう。
+  // 消すのは表示だけで、再生は止めない ── 止めて掛け直すと毎回頭から流れ直し、
+  // カードをめくるたびに背景が巻き戻って見える。
+  canvasEl.classList.toggle('has-bg', showing);
+
+  if (!showing) {
+    slotEl.replaceChildren();
     return;
   }
   const entry = playing.entries[playing.index];
-  canvasEl.replaceChildren(
+  slotEl.replaceChildren(
     playing.phase === 'title' ? titleElement(entry) : cardElement(entry),
   );
 }
@@ -493,7 +509,12 @@ function closeStage() {
   stageEl.hidden = true;
   stageEl.classList.remove('is-sample');
   setupEl.hidden = false;
-  canvasEl.replaceChildren();
+  slotEl.replaceChildren();
+  // 背景動画は消して止める。準備画面に戻ってからも裏で流れ続けると、
+  // 見えないところでフレームを描き続けることになる（読み込み済みのまま止めるので、
+  // 次に発表を始めるときの待ちは増えない）。
+  canvasEl.classList.remove('has-bg');
+  bgEl.pause();
   document.body.classList.remove('reveal-playing');
   document.removeEventListener('keydown', onStageKey);
   window.removeEventListener('resize', fitStage);
@@ -588,6 +609,10 @@ function startPresentation() {
   setupEl.hidden = true;
   stageEl.hidden = false;
   stageEl.classList.toggle('is-sample', sampleMode);
+  // 背景動画は最初から流しておく（見せるのは「第〇位」からだが、めくった瞬間に
+  // 頭から始まると継ぎ目が目立つ）。muted なので自動再生は止められないが、
+  // 拒否されても発表そのものは続けられるよう握りつぶす。
+  bgEl.play().catch(() => {});
   document.body.classList.add('reveal-playing');
   document.addEventListener('keydown', onStageKey);
   window.addEventListener('resize', fitStage);

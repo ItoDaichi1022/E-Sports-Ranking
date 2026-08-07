@@ -176,11 +176,40 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 
 /* 1920×1080 の画そのもの。--reveal-scale は js/reveal.js が画面の大きさから決める。 */
 #reveal-canvas {
+  position: relative;
   width: 1920px;
   height: 1080px;
   flex: none;
+  overflow: hidden;
   transform: scale(var(--reveal-scale, 1));
   transform-origin: center center;
+}
+
+/* 背景の動画。素材も1920×1080なので等倍で収まるが、差し替えたときに縦横比が
+   変わっても崩れないよう cover にしてある。
+   既定は非表示。「第〇位」と選手カードのときだけ js/reveal.js が .has-bg を付ける
+   ── 何も出さない画（開始前と、プレー動画を重ねる間）で背景が残っていると、
+   下の映像が塞がって透過合成の意味が無くなる。
+   visibility で消すのは、display:none にすると再生位置が巻き戻る実装があるため。 */
+#reveal-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#reveal-canvas.has-bg #reveal-bg { visibility: visible; }
+
+/* 1枚ぶんの画。背景動画より手前に置く */
+#reveal-slot {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
 }
 
 /* 【操作キーの案内をこの面に置かないこと】以前は右下に数秒で消える案内を出していたが、

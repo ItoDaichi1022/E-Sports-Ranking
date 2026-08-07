@@ -9,15 +9,15 @@
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。
      タブはWebP。iOSのホーム画面（apple-touch-icon）だけはWebPを読まないのでPNGを残す。 -->
-<link rel="icon" href="img/icon.webp?v=123" type="image/webp">
-<link rel="apple-touch-icon" href="img/icon.png?v=123">
+<link rel="icon" href="img/icon.webp?v=124" type="image/webp">
+<link rel="apple-touch-icon" href="img/icon.png?v=124">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=123">
+<link rel="stylesheet" href="css/style.css?v=124">
 <!-- 順位発表の画面（#reveal）だけで使う。style.css は既に長いので分けてある。 -->
-<link rel="stylesheet" href="css/reveal.css?v=123">
+<link rel="stylesheet" href="css/reveal.css?v=124">
 
 <!-- スクロールに合わせた登場アニメの「入れ物」を開ける印。
      登場アニメは「最初は透明 → 見えたら不透明」で作るが、その透明を素で
@@ -300,7 +300,7 @@
                画像を差し替えるときは、この2つの数字も実寸に合わせること
                （img/README.md 参照）。 -->
           <img class="hero-game-logo" id="hero-game-logo"
-               src="img/game-logo.webp?v=123" alt="" width="700" height="623">
+               src="img/game-logo.webp?v=124" alt="" width="700" height="623">
         </div>
 
         <p class="hero-eyebrow reveal">Tournament &amp; Ranking</p>
@@ -450,12 +450,12 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=123"></section>
+  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=124"></section>
 
   <!-- 本番までの環境づくり（回線・コントローラ）。中身は pages/setup.html。
        エントリー済みの大会詳細から誘導する（js/entries.js の setupPrompt）。
        楽天アフィリエイトのリンクを含むので、広告である旨の明示がページ冒頭にある。 -->
-  <section id="view-setup" class="view stage" hidden data-src="pages/setup.html?v=123"></section>
+  <section id="view-setup" class="view stage" hidden data-src="pages/setup.html?v=124"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -868,7 +868,20 @@
     <!-- 発表そのもの。中身は1人ぶんずつ js/reveal.js が組み立てて入れ替える
          （クラスの付け外しではなく要素ごと作り直すことで、演出を確実に頭から流す）。 -->
     <div id="reveal-stage" hidden>
-      <div id="reveal-canvas"></div>
+      <div id="reveal-canvas">
+        <!-- 背景の動画。「第〇位」と選手カードのときだけ出す（プレー動画を重ねる間は
+             透明のままにしないと、下の映像が隠れてしまう）。
+             src ではなく data-src なのは、15MBを他のページの利用者に取りに行かせないため。
+             js/reveal.js が、運営が発表の準備画面を開いた時点で初めて src に写す
+             （pages/*.html の遅延読み込みと同じ作法）。
+             muted は必須 ── 音声トラックを持っているので、外すと収録に音が乗るうえ、
+             ブラウザの自動再生も止められる。 -->
+        <video id="reveal-bg" data-src="video/0204.mp4?v=124"
+               muted loop playsinline preload="none" aria-hidden="true"></video>
+        <!-- 1枚ぶんの画が入れ替わる場所。背景動画を消さずに中身だけ差し替えるため、
+             canvas ではなくこの内側を replaceChildren する。 -->
+        <div id="reveal-slot"></div>
+      </div>
       <!-- サンプルデータのときだけ js/reveal.js が #reveal-stage に .is-sample を付け、
            これを表示する（css/reveal.css）。収録画面に架空の数字が紛れていても気付けるように。 -->
       <p class="reveal-sample-badge" aria-hidden="true">SAMPLE DATA ー 架空のデータです</p>
@@ -880,9 +893,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=123"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=124"></section>
 
-  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=123"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=124"></section>
 
 </main>
 
@@ -903,7 +916,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=123"></script>
+<script src="js/vendor/supabase.js?v=124"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -915,34 +928,34 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=123",
-    "./js/bracket.js":        "./js/bracket.js?v=123",
-    "./js/bracketView.js":    "./js/bracketView.js?v=123",
-    "./js/characterData.js":  "./js/characterData.js?v=123",
-    "./js/characterFocus.js": "./js/characterFocus.js?v=123",
-    "./js/characterPicker.js": "./js/characterPicker.js?v=123",
-    "./js/characters.js":     "./js/characters.js?v=123",
-    "./js/db.js":             "./js/db.js?v=123",
-    "./js/entries.js":        "./js/entries.js?v=123",
-    "./js/formDraft.js":      "./js/formDraft.js?v=123",
-    "./js/icons.js":          "./js/icons.js?v=123",
-    "./js/intro.js":          "./js/intro.js?v=123",
-    "./js/matchChat.js":      "./js/matchChat.js?v=123",
-    "./js/playerStats.js":    "./js/playerStats.js?v=123",
-    "./js/players.js":        "./js/players.js?v=123",
-    "./js/profile.js":        "./js/profile.js?v=123",
-    "./js/ranking.js":        "./js/ranking.js?v=123",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=123",
-    "./js/rankingView.js":    "./js/rankingView.js?v=123",
-    "./js/reveal.js":         "./js/reveal.js?v=123",
-    "./js/stage.js":          "./js/stage.js?v=123",
-    "./js/state.js":          "./js/state.js?v=123",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=123",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=123",
-    "./js/util.js":           "./js/util.js?v=123"
+    "./js/auth.js":           "./js/auth.js?v=124",
+    "./js/bracket.js":        "./js/bracket.js?v=124",
+    "./js/bracketView.js":    "./js/bracketView.js?v=124",
+    "./js/characterData.js":  "./js/characterData.js?v=124",
+    "./js/characterFocus.js": "./js/characterFocus.js?v=124",
+    "./js/characterPicker.js": "./js/characterPicker.js?v=124",
+    "./js/characters.js":     "./js/characters.js?v=124",
+    "./js/db.js":             "./js/db.js?v=124",
+    "./js/entries.js":        "./js/entries.js?v=124",
+    "./js/formDraft.js":      "./js/formDraft.js?v=124",
+    "./js/icons.js":          "./js/icons.js?v=124",
+    "./js/intro.js":          "./js/intro.js?v=124",
+    "./js/matchChat.js":      "./js/matchChat.js?v=124",
+    "./js/playerStats.js":    "./js/playerStats.js?v=124",
+    "./js/players.js":        "./js/players.js?v=124",
+    "./js/profile.js":        "./js/profile.js?v=124",
+    "./js/ranking.js":        "./js/ranking.js?v=124",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=124",
+    "./js/rankingView.js":    "./js/rankingView.js?v=124",
+    "./js/reveal.js":         "./js/reveal.js?v=124",
+    "./js/stage.js":          "./js/stage.js?v=124",
+    "./js/state.js":          "./js/state.js?v=124",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=124",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=124",
+    "./js/util.js":           "./js/util.js?v=124"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=123"></script>
+<script type="module" src="js/app.js?v=124"></script>
 </body>
 </html>
