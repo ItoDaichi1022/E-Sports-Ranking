@@ -15,7 +15,7 @@
 
 import {
   state, getEntrantName, getEntrantMemberIds, openChatReports,
-  findTournament, isRoundStarted, matchRoomCode,
+  findTournament, isRoundStarted, roundState, matchRoomCode,
 } from './state.js';
 import { auth, canManageTournament } from './auth.js';
 import { confirmMatch, editMatch } from './bracket.js';
@@ -32,6 +32,7 @@ const logEl = document.getElementById('match-chat-log');
 const formEl = document.getElementById('match-chat-form');
 const inputEl = document.getElementById('match-chat-input');
 const sendBtn = document.getElementById('match-chat-send-btn');
+const startEl = document.getElementById('match-chat-start');
 const closedNoteEl = document.getElementById('match-chat-closed-note');
 const errorEl = document.getElementById('match-chat-error');
 const closeBtn = document.getElementById('match-chat-close-btn');
@@ -113,36 +114,56 @@ function timeLabel(iso) {
   return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function messageHtml(tournament, mySide, m) {
+  const player = state.players.find((p) => p.id === m.playerId);
+  const name = player ? player.currentName : '退会した選手';
+  // 自分の側（チーム戦なら相方も含む）の発言を右に寄せる
+  const ownSide = mySide != null
+    && getEntrantMemberIds(tournament.id, mySide).includes(m.playerId);
+
+  return `
+    <div class="chat-message${ownSide ? ' own' : ''}" data-id="${escapeHtml(m.id)}">
+      <div class="chat-message-head">
+        <span class="chat-message-name">${escapeHtml(name)}</span>
+        <span class="chat-message-time">${escapeHtml(timeLabel(m.createdAt))}</span>
+        ${roomIsAdmin() ? '<button type="button" class="chat-delete-btn" title="この発言を削除">✕</button>' : ''}
+      </div>
+      <p class="chat-message-body">${escapeHtml(m.body)}</p>
+    </div>
+  `;
+}
+
 function renderLog(tournament, match) {
   // 描き直す前に、いちばん下まで見ていたかを覚えておく。読み返している最中に
   // 新着が来て勝手にスクロールが飛ぶのを防ぐ。
   const wasAtBottom = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
 
-  if (room.messages.length === 0) {
-    logEl.innerHTML = '<p class="empty-hint">まだ発言がありません。</p>';
-    return;
-  }
-
   const mySide = myEntrantIdIn(tournament, match);
 
-  logEl.innerHTML = room.messages.map((m) => {
-    const player = state.players.find((p) => p.id === m.playerId);
-    const name = player ? player.currentName : '退会した選手';
-    // 自分の側（チーム戦なら相方も含む）の発言を右に寄せる
-    const ownSide = mySide != null
-      && getEntrantMemberIds(tournament.id, mySide).includes(m.playerId);
+  // 開始の合図を、会話の流れの中にも1本の区切りとして入れる。上の帯は「いまどうか」を
+  // 伝えるが、あとから読み返したときに「どの発言が開始の前だったか」は分からない。
+  // 待ち合わせの相談と、始まってからのやり取りの境目をここで示す。
+  const startedAt = roundState(room.tournamentId, room.roundIndex).startedAt;
+  const startedTime = startedAt ? new Date(startedAt).getTime() : null;
+  const dividerHtml = startedAt
+    ? `<div class="chat-start-divider"><span>試合開始 ${escapeHtml(timeLabel(startedAt))}</span></div>`
+    : '';
 
-    return `
-      <div class="chat-message${ownSide ? ' own' : ''}" data-id="${escapeHtml(m.id)}">
-        <div class="chat-message-head">
-          <span class="chat-message-name">${escapeHtml(name)}</span>
-          <span class="chat-message-time">${escapeHtml(timeLabel(m.createdAt))}</span>
-          ${roomIsAdmin() ? '<button type="button" class="chat-delete-btn" title="この発言を削除">✕</button>' : ''}
-        </div>
-        <p class="chat-message-body">${escapeHtml(m.body)}</p>
-      </div>
-    `;
-  }).join('');
+  const items = [];
+  let dividerPlaced = !startedAt;
+  for (const m of room.messages) {
+    if (!dividerPlaced && new Date(m.createdAt).getTime() >= startedTime) {
+      items.push(dividerHtml);
+      dividerPlaced = true;
+    }
+    items.push(messageHtml(tournament, mySide, m));
+  }
+  // 開始後にまだ誰も発言していなければ、区切りは最後尾に来る
+  if (!dividerPlaced) items.push(dividerHtml);
+
+  if (room.messages.length === 0) items.push('<p class="empty-hint">まだ発言がありません。</p>');
+
+  logEl.innerHTML = items.join('');
 
   if (wasAtBottom) logEl.scrollTop = logEl.scrollHeight;
 }
@@ -206,6 +227,49 @@ function syncTabs() {
   tabsEl.hidden = !available; // タブが1枚しか無いなら見せない
   tabDotEl.hidden = !(available && resultTabNeedsAttention());
   if (!available && activeTab !== 'talk') setChatTab('talk');
+}
+
+// ---- 試合開始の合図 ----
+//
+// 選手がこの部屋でいちばん待っているのは「もう始めてよいのか」。運営が押す開始は
+// 対戦表のラウンド見出しにしか出ておらず、対戦の画面を開いたまま待っている人には
+// 何も変わったように見えなかった。タブより上に置いて、どちらのタブからも見えるようにする。
+//
+// 開いている最中に開始されたときだけ一度光らせる（Realtimeで届いた変化に気づかせる）。
+// 開いた時点で既に始まっていた場合は光らせない ── 毎回光ると印としての意味が薄れる。
+function renderStartBanner() {
+  const match = currentMatch();
+  const started = isRoundStarted(room.tournamentId, room.roundIndex);
+  const justStarted = started && !room.sawStarted;
+  room.sawStarted = started;
+
+  // 確定した対戦に合図の意味は無い（結果はゲームカウント欄に出ている）
+  if (!match || match.confirmed) {
+    startEl.hidden = true;
+    startEl.innerHTML = '';
+    return;
+  }
+
+  const startedAt = roundState(room.tournamentId, room.roundIndex).startedAt;
+  const timeHtml = startedAt
+    ? `<span class="chat-start-time">${escapeHtml(timeLabel(startedAt))} 開始</span>`
+    : '';
+
+  startEl.hidden = false;
+  startEl.className = 'chat-start'
+    + (started ? ' is-live' : ' is-waiting')
+    + (justStarted ? ' is-new' : '');
+
+  if (started) {
+    startEl.innerHTML = '<span class="chat-start-badge">試合開始</span>'
+      + '<span class="chat-start-text">対戦を始めてください。'
+      + '終わったら「ゲームカウント」タブに結果を入力します。</span>'
+      + timeHtml;
+  } else {
+    startEl.innerHTML = '<span class="chat-start-badge">開始待ち</span>'
+      + '<span class="chat-start-text">運営がこの回戦を開始すると、'
+      + 'ここが「試合開始」に変わります。待ち合わせの相談はチャットでできます。</span>';
+  }
 }
 
 // ---- ルームコード ----
@@ -378,6 +442,7 @@ function scoreInput(label) {
 async function afterResultChange(btn) {
   try {
     await room.onRefresh();
+    renderStartBanner();
     renderResultPanel();
     syncTabs();
     syncWriteState();
@@ -571,6 +636,7 @@ function editConfirmedRow() {
 
     // 対戦表の描き直しとDBへの書き戻しは呼び出し側（js/app.js）が持っている
     room.onChanged?.();
+    renderStartBanner();
     renderResultPanel();
     syncTabs();
     syncWriteState();
@@ -743,6 +809,7 @@ function stopPolling() {
 export function syncOpenChat() {
   if (!room) return;
   syncWriteState();
+  renderStartBanner();
   renderResultPanel();
   syncTabs();
   // 編集中に描き直すと入力欄ごと消えてしまうので、そのときだけ見送る
@@ -760,6 +827,8 @@ export function closeMatchChat() {
   resultEl.innerHTML = '';
   roomEl.hidden = true;
   roomEl.innerHTML = '';
+  startEl.hidden = true;
+  startEl.innerHTML = '';
   if (dialog.open) dialog.close();
 }
 
@@ -793,6 +862,9 @@ export async function openMatchChat(tournament, match, roundIndex, onRefresh, on
     roundIndex,
     messages: [],
     lastAt: null,
+    // 開いた時点で既に始まっていたかどうか。開いている最中に始まったときだけ
+    // 合図を光らせるための目印（renderStartBanner）。
+    sawStarted: isRoundStarted(tournament.id, roundIndex),
     onRefresh: onRefresh ?? (async () => {}),
     onChanged,
   };
@@ -800,6 +872,7 @@ export async function openMatchChat(tournament, match, roundIndex, onRefresh, on
   titleEl.textContent = `${name1} vs ${name2}`;
   metaEl.textContent = `${tournament.name} ・ ${match.round}`;
   syncWriteState();
+  renderStartBanner();
   renderResultPanel();
   renderRoomCode();
   // 開くのは必ず会話側。ゲームカウントを入れるのは試合が終わってからで、

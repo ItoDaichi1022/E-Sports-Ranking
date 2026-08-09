@@ -8,7 +8,7 @@ import {
   state, isTeamTournament, entrantIdOfPlayer, getEntrantMemberIds, getPlayerName,
 } from './state.js';
 import { escapeHtml, cardThumb } from './util.js';
-import { auth, isLoggedIn, canManageTournament } from './auth.js';
+import { auth, isLoggedIn, isAdmin } from './auth.js';
 import { computeRankings } from './ranking.js';
 import { createBracket } from './bracket.js';
 import { reportChipHtml } from './matchChat.js';
@@ -86,6 +86,9 @@ export async function closeRecruitmentAndStart(tournamentId) {
   state.brackets[tournamentId] = bracket;
   state.bracketIds.add(tournamentId);
   tournament.entrantIds = seeded;
+  // シード番号はいま saveSeeds / saveTeamSeeds が index+1 で書き込んだところ。
+  // 次の読み込みを待たずに画面へ出せるよう、同じ値をここでも入れておく。
+  tournament.entrantSeeds = seeded.map((_, i) => i + 1);
   tournament.participantIds = seeded.flatMap((id) => getEntrantMemberIds(tournamentId, id));
   tournament.entrantCount = tournament.entrantIds.length;
   tournament.participantCount = tournament.participantIds.length;
@@ -151,7 +154,7 @@ function soloEntryButton(tournament, onChanged) {
 // 覚えておかないと、チーム名を打っている最中に入力が消えてしまう。
 let openTeamForm = null; // { tournamentId, teamName, partnerId, partnerQuery } | null
 
-// 選手の表示名。同姓同名や表記ゆれで取り違えないよう、あればゲームIDも添える。
+// プレイヤー名。同姓同名や表記ゆれで取り違えないよう、あればゲームIDも添える。
 function playerLabel(player) {
   return player.gameAccountId
     ? `${player.currentName}（${player.gameAccountId}）`
@@ -564,7 +567,7 @@ export function renderTournamentActions(containerEl, tournament, onChanged) {
   if (tournament.status === 'recruiting') {
     row.appendChild(entryControls(tournament, onChanged));
   }
-  if (canManageTournament(tournament.id)) {
+  if (isAdmin()) {
     const admin = adminControls(tournament, onChanged);
     if (admin.children.length > 0) row.appendChild(admin);
   }
@@ -587,7 +590,7 @@ export function renderRecruitPage(containerEl) {
   containerEl.innerHTML = '';
 
   const visible = state.tournaments.filter((t) =>
-    t.status === 'recruiting' || (canManageTournament(t.id) && t.status === 'draft'));
+    t.status === 'recruiting' || (isAdmin() && t.status === 'draft'));
 
   if (visible.length === 0) {
     containerEl.innerHTML = '<p class="empty-hint">現在募集中の大会はありません。</p>';

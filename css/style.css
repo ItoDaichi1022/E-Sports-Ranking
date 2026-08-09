@@ -403,9 +403,13 @@ header h1 a::before {
   box-shadow: none;
 }
 
-.nav-toggle:hover {
+/* :not(:disabled) は詳細度のため（.nav-close:hover と同じ理由）。
+   共通の button:hover に文字色を持っていかれると、3本線／×が黒くなって消える。 */
+.nav-toggle:hover:not(:disabled) {
   background: var(--surface-2);
   border-color: var(--border-strong);
+  color: var(--text);
+  filter: none;
 }
 
 /* 3本線。開いているときは中央を消して上下を交差させ、閉じる印にする。 */
@@ -2810,24 +2814,23 @@ a.card:hover {
   to   { left: 125%; }
 }
 
-/* 参加者チップ（大会情報の「エントリー中の選手」で使用） */
-.entrant-list {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
+/* ---- 参加メンバー一覧（大会詳細）----
+
+   1枠ずつが対戦表の対戦カード（.match-box + .match-player）そのままなので、
+   ここで決めるのは並べ方だけ。
+
+   シード順は上から下に読む並びだが、32枠64枠を1列に積むと大会情報が長くなりすぎる。
+   幅が足りるときだけ列を増やし、読む順（左から右、上から下）はシード順のままにする。 */
+.entrant-roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.5rem;
   margin-top: 0.6rem;
 }
 
-.entrant-chip {
-  padding: 0.25rem 0.7rem;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-dim);
-  font-size: 0.82rem;
-  /* 名前が途中で折り返して1つの丸が2行にならないようにする */
-  white-space: nowrap;
-}
+/* 対戦カードは表の中で2行が縦に並ぶが、こちらは1行だけの札。
+   縦に潰れて見えないよう、行の高さだけ少し確保する。 */
+.entrant-card .match-player { min-height: 2.4rem; }
 
 /* 最終順位のチーム欄：チーム名の下にメンバー全員を並べる */
 .standings-team {
@@ -2842,25 +2845,6 @@ a.card:hover {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
-}
-
-/* チーム戦（2v2）はチーム名とメンバーの2段になるので、丸ではなく角丸の札にする */
-.entrant-chip-team {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: var(--r-sm);
-}
-
-.entrant-chip-name {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.entrant-chip-members {
-  font-size: 0.74rem;
-  color: var(--text-faint);
 }
 
 
@@ -2897,6 +2881,10 @@ a.card:hover {
 }
 
 .bracket-title-block h2 { margin-bottom: 0.25rem; }
+
+/* 大会詳細の「共有」ボタン。押すと「コピーしました」に変わるので、
+   その分の幅を最初から取っておく（変わるたびに隣のボタンが動くのを防ぐ）。 */
+.tournament-share-btn { min-width: 7.5rem; }
 
 .bracket {
   position: relative;
@@ -3295,8 +3283,15 @@ a.card:hover {
 
 /* ---- 選手が入れるゲームカウント ---- */
 
-/* 対戦表側は状態を伝えるだけ（入力はチャットの中） */
+/* 対戦表側は状態を伝えるだけ（入力はチャットの中）。
+   始まっている対戦だけアクセント色にして、開始待ちの列と見分けられるようにする。 */
 .match-status.result-status { color: var(--text-dim); }
+
+.match-status.result-status.is-live {
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  font-weight: 600;
+}
 
 /* チャットの中の入力欄。このダイアログの主目的なので、枠線をアクセント色にして
    大きめに出す（以前はログの下に小さく置かれ、気づかれなかった）。 */
@@ -3589,6 +3584,18 @@ body:has(#view-bracket:not([hidden]) .own-match-bar) button.scroll-top-btn {
   color: var(--text-dim);
 }
 
+/* 始まったら札にする。この帯はページのどこを見ていても出ているので、
+   対戦表を開いていない人にも合図がここで届く。 */
+.own-match-status.is-live {
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--r-pill);
+  background: var(--accent-grad);
+  color: var(--accent-fg);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
 /* 押す場所は右端に固定。文字の長さで位置が動くと目で追いにくい */
 .own-match-open {
   margin-left: auto;
@@ -3618,6 +3625,98 @@ dialog.dialog-chat {
   max-height: calc(100vh - 2rem);
   max-height: calc(100dvh - 2rem);
   overflow-y: auto;
+}
+
+/* ---- 試合開始の合図 ----
+
+   選手がこの画面で待っているのはこれ。タブより上に置いてあるので、
+   どちらのタブを開いていても目に入る。開始前は落ち着いた灰色で「待つ場所」だと
+   分かるだけにし、始まった瞬間にアクセント色の面へ変える ── 色そのものが変わる
+   ので、文字を読まなくても視界の端で気づける。 */
+.chat-start {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.7rem;
+  margin: 0 0 0.9rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.chat-start-badge {
+  flex: none;
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.chat-start-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.chat-start-time {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+.chat-start.is-live {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-ring) inset;
+}
+
+.chat-start.is-live .chat-start-badge {
+  background: var(--accent-grad);
+  color: var(--accent-fg);
+  font-size: 1.05rem;
+}
+
+.chat-start.is-live .chat-start-text { color: var(--text); }
+
+/* 開いたまま待っていた人には、変わったこと自体を見せる必要がある
+   （静かに書き換わると、下を向いている数秒のあいだに見逃す）。
+   3回で止める ── 光り続けるとチャットを読む邪魔になる。
+   prefers-reduced-motion では全体規則（ページ末尾）が止める。 */
+.chat-start.is-new { animation: chat-start-flash 0.9s ease-out 3; }
+
+@keyframes chat-start-flash {
+  0%, 100% { box-shadow: 0 0 0 1px var(--accent-ring) inset; }
+  50%      { box-shadow: 0 0 0 1px var(--accent-ring) inset, 0 0 18px 2px var(--glow); }
+}
+
+/* 会話の中に入れる区切り。あとから読み返したときに、どこまでが待ち合わせの相談で
+   どこからが試合中のやり取りかが分かる。 */
+.chat-start-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.2rem 0;
+  color: var(--accent-bright);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+}
+
+.chat-start-divider::before,
+.chat-start-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--accent-ring);
 }
 
 .chat-tabs {
@@ -5726,6 +5825,83 @@ dialog.char-picker { max-width: 56rem; }
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+
+/* メニューの見出し行。左に「メニュー」、右に閉じる×。
+   ヘッダーのボタンも開いているあいだは×に変わるが、目線が項目の側にあるときは
+   左上まで戻るのが遠い。同じ入口をメニューの中にも置いて、どちらでも閉じられるようにする。
+   項目と同じ 1080px の列に揃えるので、右端が一覧の右端と一直線に並ぶ。 */
+.nav-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto 1.1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* 背景の大きな MENU と字面がぶつからないよう、こちらは日本語で小さく置く */
+.nav-head-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+/* ×ボタン。線の太さ（2px）と枠はヘッダーのメニューボタンと揃えて、
+   同じ役割の部品だと見た目で分かるようにする。 */
+.nav-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text-dim);
+  box-shadow: none;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* :not(:disabled) を付けているのは、共通の button:hover（文字色を
+   --accent-fg＝ほぼ黒にする）より詳細度を上げるため。付けないと、
+   暗い面の上で×が黒くなって消えてしまう。 */
+.nav-close:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+  filter: none;
+}
+
+.nav-close-x {
+  position: relative;
+  display: block;
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.nav-close-x::before,
+.nav-close-x::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.nav-close-x::before { transform: rotate(45deg); }
+.nav-close-x::after  { transform: rotate(-45deg); }
 
 /* 項目は本文と同じ幅（1080px）に収める。画面が広くても字が散らばらない */
 #main-nav a {

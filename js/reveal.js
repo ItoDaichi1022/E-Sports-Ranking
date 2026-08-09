@@ -42,6 +42,11 @@ const STAGE_HEIGHT = 1080;
 // 1人あたりに並べる好成績の件数。
 const ACHIEVEMENT_COUNT = 3;
 
+// 「発表する選手」の一覧に出す上限。選手が増えるほど一覧は長くなるが、
+// 発表は1人ずつ順に見せるもので、100人ぶんを流す収録はまず無い。
+// 目で探せる長さに区切っておく（発表できるのもここに出ている人まで）。
+const PICKER_LIMIT = 100;
+
 const setupEl = $('reveal-setup');
 const statusEl = $('reveal-status');
 const sampleToggle = $('reveal-sample-toggle');
@@ -208,6 +213,13 @@ function currentRankings() {
   return withRankChange(rankings, state.publishedRanking?.rankings);
 }
 
+// 選べる（＝発表できる）選手。上位 PICKER_LIMIT 人まで。
+// 一覧・プリセット・発表の開始がすべてこれを見るので、画面に出ていない選手が
+// 発表に混ざることはない。
+function pickerRankings() {
+  return currentRankings().slice(0, PICKER_LIMIT);
+}
+
 // 順位変動を出せるか。古い形式で公開したスナップショットは previousRank を持っておらず、
 // そのまま渡すと全員が NEW になってしまう（rankingView.js の showChange と同じ判定）。
 function hasRankChange(rankings) {
@@ -221,7 +233,10 @@ function changeBadgeHtml(entry, showChange) {
 }
 
 function renderPlayerPicker() {
-  const rankings = currentRankings();
+  // 集計はここで一度だけ。切り詰めた件数を知るために全体の長さも要る
+  // （pickerRankings を呼ぶと同じ集計をもう一度回すことになる）。
+  const all = currentRankings();
+  const rankings = all.slice(0, PICKER_LIMIT);
   const showChange = hasRankChange(rankings);
 
   if (rankings.length === 0) {
@@ -233,10 +248,16 @@ function renderPlayerPicker() {
 
   // 一覧に無くなった選手（期間を変えて圏外になった等）の選択は落とす。
   // 残しておくと「3人選択中」と出ているのに2人しか出ない、という食い違いになる。
+  // 上限からあふれた選手もここで落ちる（画面に出ていない人は発表もしない）。
   const availableIds = new Set(rankings.map((r) => r.id));
   [...selectedIds].forEach((id) => { if (!availableIds.has(id)) selectedIds.delete(id); });
 
-  playerListEl.innerHTML = rankings.map((r) => `
+  const limitNote = all.length > PICKER_LIMIT
+    ? `<p class="reveal-player-note">上位${PICKER_LIMIT}人まで表示しています`
+      + `（該当${all.length}人）。発表できるのはこの中からです。</p>`
+    : '';
+
+  playerListEl.innerHTML = limitNote + rankings.map((r) => `
     <label class="reveal-player-row">
       <input type="checkbox" value="${escapeHtml(r.id)}"${selectedIds.has(r.id) ? ' checked' : ''}>
       <span class="reveal-player-rank">${r.rank}</span>
@@ -254,13 +275,11 @@ function updateStartButton() {
   startBtn.disabled = selectedIds.size === 0;
 }
 
-// 上位n人に絞る。'all' は全員、'none' は全解除。
+// 上位n人に絞る。'none' は全解除。
 function applyPreset(preset) {
-  const rankings = currentRankings();
   selectedIds.clear();
   if (preset !== 'none') {
-    const limit = preset === 'all' ? rankings.length : Number(preset);
-    rankings.slice(0, limit).forEach((r) => selectedIds.add(r.id));
+    pickerRankings().slice(0, Number(preset)).forEach((r) => selectedIds.add(r.id));
   }
   renderPlayerPicker();
 }
@@ -674,7 +693,7 @@ function startPresentation() {
   // サンプルデータは戦績も作り物を最初から持っているので、選び直さない
   // （寄与の計算は実在の試合を見に行くので、架空のIDでは何も引けない）。
   const order = radioValue('reveal-order');
-  let entries = currentRankings().filter((r) => selectedIds.has(r.id));
+  let entries = pickerRankings().filter((r) => selectedIds.has(r.id));
   if (!sampleMode) {
     // 寄与の計算は全選手ぶんが一度に返るので、選手ごとに呼び直さない
     // （中でランキングと同じ反復計算を回している）。

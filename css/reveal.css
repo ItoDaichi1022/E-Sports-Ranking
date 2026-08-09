@@ -127,6 +127,18 @@
   background: var(--surface);
 }
 
+/* 上限で切り詰めたときの断り書き。一覧と一緒に送られると見落とすので上に貼り付ける */
+.reveal-player-note {
+  position: sticky;
+  top: 0;
+  margin: 0;
+  padding: 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
 .reveal-player-row {
   display: grid;
   grid-template-columns: auto 2.5rem 1fr auto auto;

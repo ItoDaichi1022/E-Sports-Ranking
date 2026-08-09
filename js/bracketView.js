@@ -46,9 +46,11 @@ let swapCtx = { active: false, selected: null, onPick: null };
 // 選手名からその人のプロフィールへ。対戦相手がどんな選手なのかは、対戦表を見て
 // いちばん気になるところなので、名前をそのまま入口にする。
 // 誰が入るか決まっていない枠（TBD）は押せない文字のままにする。
-function playerNameLink(playerId, name) {
+// canLink は対戦表の中でだけ落ちる。対戦表の外（参加メンバー一覧）から呼ぶときは
+// 入れ替えモードとは無関係なので、呼び出し側が true を渡す。
+function playerNameLink(playerId, name, canLink = !swapCtx.active) {
   // 入れ替え中は名前を押しても選手ページへ飛ばさない（押す意味が「選ぶ」に変わるため）
-  if (!playerId || swapCtx.active) {
+  if (!playerId || !canLink) {
     const span = document.createElement('span');
     span.textContent = name;
     return span;
@@ -65,7 +67,13 @@ function playerNameLink(playerId, name) {
 // Challonge風の1行（シード番号・名前・スコア枠）を作る。
 // チーム戦では name にチーム名が入り、members にメンバー名が並ぶ。
 // memberIds は members と同じ並び（個人戦はその選手1人）。
-function buildPlayerRow({ seed, name, members = [], memberIds = [], isWinner }) {
+//
+// showScore=false / canLink=true は対戦表の外（大会詳細の参加メンバー一覧）から
+// 使うときの形。スコアを入れる場所が無く、入れ替えモードとも関係が無い。
+function buildPlayerRow({
+  seed, name, members = [], memberIds = [], isWinner,
+  showScore = true, canLink = !swapCtx.active,
+}) {
   const row = document.createElement('div');
   row.className = 'match-player' + (isWinner ? ' winner' : '');
 
@@ -87,18 +95,19 @@ function buildPlayerRow({ seed, name, members = [], memberIds = [], isWinner }) 
     memberLine.className = 'entrant-members';
     members.forEach((memberName, i) => {
       if (i > 0) memberLine.append(document.createTextNode(' / '));
-      memberLine.appendChild(playerNameLink(memberIds[i], memberName));
+      memberLine.appendChild(playerNameLink(memberIds[i], memberName, canLink));
     });
 
     nameEl.append(teamName, memberLine);
   } else {
-    nameEl.appendChild(playerNameLink(memberIds[0], name));
+    nameEl.appendChild(playerNameLink(memberIds[0], name, canLink));
   }
 
   const scoreSpan = document.createElement('span');
   scoreSpan.className = 'player-score';
 
-  row.append(seedBadge, nameEl, scoreSpan);
+  row.append(seedBadge, nameEl);
+  if (showScore) row.appendChild(scoreSpan);
 
   // 誰と当たるのかは名前だけでは掴みにくい。ランキングの行と同じように、その枠の
   // メインキャラクターを地模様として敷いておく（登録していない枠には何も出さない）。
@@ -111,6 +120,29 @@ function buildPlayerRow({ seed, name, members = [], memberIds = [], isWinner }) 
   }
 
   return { row, scoreSpan, nameEl };
+}
+
+// 参加メンバー一覧（大会詳細）の1枠。対戦カードと同じ行をそのまま使う。
+//
+// 同じ大会の「誰が出ているか」を2通りの見た目で見せると、対戦表で覚えた顔ぶれと
+// 一覧の顔ぶれが結び付かない。シード番号・名前・メンバー・キャラクターの地模様まで
+// 対戦表と揃えておけば、一覧で見た枠がそのまま表の中で見つかる。
+//
+// seed に null を渡すとバッジは空欄になる（シードが決まる前の募集中の大会）。
+export function buildEntrantRow(tournamentId, entrantId, seed = null) {
+  const { row } = buildPlayerRow({
+    seed,
+    name: getEntrantName(tournamentId, entrantId),
+    members: getEntrantMemberNames(tournamentId, entrantId),
+    memberIds: getEntrantMemberIds(tournamentId, entrantId),
+    showScore: false,
+    canLink: true,
+  });
+
+  const box = document.createElement('div');
+  box.className = 'match-box entrant-card';
+  box.appendChild(row);
+  return box;
 }
 
 function drawConnectorLines(bracket, wrapper, matchElements) {
@@ -185,14 +217,15 @@ function chatButton(label, onOpen) {
 // 当事者に出す1行。入力そのものはチャットの中で行うので、ここは今どうなっているかを
 // 伝えて、チャットへ送り出すだけにする（対戦表の枠は狭く、入力欄には向かない）。
 //
-// 開始前だけ一言添える。開始したあとは何も出さない ── ゲームカウントは入れた瞬間に
+// 状態は2つだけ ── 開始を待っているか、始まっているか。ゲームカウントは入れた瞬間に
 // 確定するので、「入力済み・相手待ち」のような途中の状態がそもそも無い。
+// 始まったことは対戦表の上でも分かるようにする（回戦の見出しまで目を上げなくてよい）。
 function resultStatusLine(tournamentId, roundIndex) {
-  if (isRoundStarted(tournamentId, roundIndex)) return null;
+  const started = isRoundStarted(tournamentId, roundIndex);
 
   const line = document.createElement('div');
-  line.className = 'match-status result-status';
-  line.textContent = '運営の開始待ち';
+  line.className = 'match-status result-status' + (started ? ' is-live' : '');
+  line.textContent = started ? '試合開始 — 開いて対戦' : '運営の開始待ち';
   return line;
 }
 
@@ -289,14 +322,13 @@ function ownMatchBar(tournament, tournamentId, bracket, onRefresh, onChanged) {
 
   panel.append(label, roundChip, vs);
 
-  // 開始を待っている間だけ一言添える。開始したあとは、ここから対戦を開いて
-  // ゲームカウントを入れるだけなので、途中の状態を伝えることが無い。
-  if (!isRoundStarted(tournamentId, roundIndex)) {
-    const status = document.createElement('span');
-    status.className = 'own-match-status';
-    status.textContent = '運営の開始待ち';
-    panel.appendChild(status);
-  }
+  // 開始したかどうかを添える。この帯はページのどこを見ていても出ているので、
+  // 対戦表を開いていない人にも合図がここで届く。
+  const started = isRoundStarted(tournamentId, roundIndex);
+  const status = document.createElement('span');
+  status.className = 'own-match-status' + (started ? ' is-live' : '');
+  status.textContent = started ? '試合開始' : '運営の開始待ち';
+  panel.appendChild(status);
 
   // 相手が決まるまではチャットの部屋も作れない（canUseMatchChat も同じ判定）
   if (canUseMatchChat(tournament, match)) {
@@ -471,6 +503,8 @@ function renderMatchBox(
 //
 // 運営には「配信台がいくつ選ばれているか」と開始／取り消しのボタン、
 // 選手と観戦者には開始したかどうかだけを出す。
+// 配信台は開始の条件ではない ── 配信を伴わない大会でも回戦は進むので、
+// 未選択のままでも開始できる。
 function roundControls(tournamentId, roundIndex, round, readOnly, onRefresh) {
   const wrap = document.createElement('div');
   wrap.className = 'round-controls';
@@ -496,21 +530,23 @@ function roundControls(tournamentId, roundIndex, round, readOnly, onRefresh) {
 
   const note = document.createElement('span');
   note.className = 'round-stream-note';
-  note.textContent = streamCount > 0 ? `配信台 ${streamCount}試合` : '配信台が未定';
+  note.textContent = streamCount > 0 ? `配信台 ${streamCount}試合` : '配信台なし';
   wrap.appendChild(note);
 
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = started ? 'btn-secondary' : '';
   btn.textContent = started ? '開始を取り消す' : `${round.name} を開始`;
-  // 配信台を決めるまで開始できない（DB側のCHECK制約でも同じ条件を持っている）
-  btn.disabled = !started && streamCount === 0;
-  if (btn.disabled) btn.title = '先に配信台にする試合を選んでください。';
 
   btn.addEventListener('click', async () => {
+    // 配信台は任意（配信しない大会・その回戦だけ配信しない大会もある）。
+    // ただ、決めるつもりで忘れたまま押した場合に気づけるよう、確認で一言添える。
+    const startMessage = streamCount > 0
+      ? `${round.name} を開始します。選手がゲームカウントを入力できるようになります。よろしいですか？`
+      : `${round.name} を配信台なしで開始します。選手がゲームカウントを入力できるようになります。よろしいですか？`;
     const message = started
       ? `${round.name} の開始を取り消します。まだ確定していない対戦の入力欄が閉じます。よろしいですか？`
-      : `${round.name} を開始します。選手がゲームカウントを入力できるようになります。よろしいですか？`;
+      : startMessage;
     if (!confirm(message)) return;
 
     btn.disabled = true;

@@ -238,6 +238,30 @@ function buildTile(ref, { title, note, selectedIndex }) {
   return btn;
 }
 
+// 選び直したときに、既にある絵の見た目だけを書き換える。
+//
+// 一覧ごと組み直すと、そのたびに中のスクロールが先頭へ戻る ── スキンを2つ選ぶだけで
+// 一覧の頭まで飛ばされ、押した場所が指の下から消える。変わるのは「何番目に
+// 選ばれているか」だけなので、そこだけ触って並びはそのままにしておく。
+function syncTile(btn, selectedIndex, disabled) {
+  btn.classList.toggle('is-selected', selectedIndex != null);
+  btn.setAttribute('aria-pressed', String(selectedIndex != null));
+  btn.disabled = disabled;
+
+  let badge = btn.querySelector('.char-tile-badge');
+  if (selectedIndex == null) {
+    badge?.remove();
+    return;
+  }
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'char-tile-badge';
+    // buildTile と同じ並び（絵のすぐ後ろ・名前より前）に入れる
+    btn.insertBefore(badge, btn.querySelector('.char-tile-label'));
+  }
+  badge.textContent = selectedIndex === 0 ? 'メイン' : String(selectedIndex + 1);
+}
+
 // 選ぶダイアログを開く。決定なら選んだ配列、キャンセルなら null を返す。
 export function openCharacterPicker(initial = []) {
   const el = ensureDialog();
@@ -251,6 +275,13 @@ export function openCharacterPicker(initial = []) {
   // よけて持っていて、閉じたあとに戻してくれる（createCharacterField）。
   const selected = initial.filter((ref) => parseCharacterRef(ref)?.known);
   let openCharacter = null;
+  // いま並んでいる絵。選び直しのたびに作り直さず、ここを見て印だけ付け替える。
+  //   { el, ref }        スキンのマス（押すと選ぶ／外す。上限に達すると押せなくなる）
+  //   { el, character }  キャラクター一覧のマス（押すとスキンを開くだけなので、
+  //                      上限に達しても押せる ── 選んだものを外しに入れる道が要る）
+  let tiles = [];
+  // キャラクターを開く前に、一覧のどこまで見ていたか。戻ったときにそこへ返す。
+  let listScrollTop = 0;
 
   return new Promise((resolve) => {
     const drawSelected = () => {
@@ -270,10 +301,26 @@ export function openCharacterPicker(initial = []) {
         item.addEventListener('click', () => {
           selected.splice(i, 1);
           drawSelected();
-          drawBody();
+          syncTiles();
         });
         selectedEl.appendChild(item);
       });
+    };
+
+    // 並んでいる絵の印を、いまの選択に合わせ直す。組み直さないので、
+    // どこまでスクロールしていたか・どのキャラクターを開いていたかは変わらない。
+    const syncTiles = () => {
+      const atMax = selected.length >= MAX;
+      for (const tile of tiles) {
+        if (tile.character) {
+          // そのキャラクターのスキンが1つでも選ばれていれば、開かなくても分かるように番号を出す
+          const at = selected.findIndex((ref) => ref.startsWith(`${tile.character.id}:`));
+          syncTile(tile.el, at >= 0 ? at : null, false);
+        } else {
+          const at = selected.indexOf(tile.ref);
+          syncTile(tile.el, at >= 0 ? at : null, at < 0 && atMax);
+        }
+      }
     };
 
     const toggle = (ref) => {
@@ -282,13 +329,14 @@ export function openCharacterPicker(initial = []) {
       else if (selected.length < MAX) selected.push(ref);
       else return; // 上限。黙って何もしない（押せない見た目にしてある）
       drawSelected();
-      drawBody();
+      syncTiles();
     };
 
     // 一覧はキャラクター → スキンの2段。226枚を最初から全部並べると、
     // 目当てのキャラクターにたどり着く前に力尽きる。
     const drawBody = () => {
       bodyEl.innerHTML = '';
+      tiles = [];
 
       if (openCharacter) {
         const back = document.createElement('button');
@@ -327,11 +375,15 @@ export function openCharacterPicker(initial = []) {
             });
             if (at < 0 && selected.length >= MAX) tile.disabled = true;
             tile.addEventListener('click', () => toggle(ref));
+            tiles.push({ el: tile, ref });
             grid.appendChild(tile);
           }
           group.appendChild(grid);
           bodyEl.appendChild(group);
         }
+        // スキンの一覧は開いたばかりなので先頭から見せる（一覧を下までたどって
+        // 開いたときに、その位置のまま中途半端なところが出るのを防ぐ）。
+        bodyEl.scrollTop = 0;
         return;
       }
 
@@ -353,10 +405,19 @@ export function openCharacterPicker(initial = []) {
           note: `${count}種`,
           selectedIndex: chosen >= 0 ? chosen : null,
         });
-        tile.addEventListener('click', () => { openCharacter = character; drawBody(); });
+        tile.addEventListener('click', () => {
+          // 戻ってきたときに同じ場所を見せるため、離れる直前の位置を控える
+          listScrollTop = bodyEl.scrollTop;
+          openCharacter = character;
+          drawBody();
+        });
+        tiles.push({ el: tile, character });
         grid.appendChild(tile);
       }
       bodyEl.appendChild(grid);
+      // 226人ぶんの一覧は長い。スキンを見て戻るたびに頭出しされると、
+      // 2人目を探すのに毎回同じところまでスクロールし直すことになる。
+      bodyEl.scrollTop = listScrollTop;
     };
 
     // 一度きりの後片付け。ダイアログは使い回すので、開くたびに付けた
@@ -369,7 +430,8 @@ export function openCharacterPicker(initial = []) {
       el.removeEventListener('cancel', onCancel);
       resolve(result);
     };
-    const onSearch = () => { openCharacter = null; drawBody(); };
+    // 絞り込むと並びそのものが変わるので、控えてある位置は意味を失う。先頭から見せる。
+    const onSearch = () => { openCharacter = null; listScrollTop = 0; drawBody(); };
     const onDone = () => finish(selected);
     const onCancel = (e) => { e.preventDefault?.(); finish(null); };
 
@@ -380,6 +442,8 @@ export function openCharacterPicker(initial = []) {
     el.addEventListener('cancel', onCancel);
 
     searchEl.value = '';
+    openCharacter = null;
+    listScrollTop = 0;
     drawSelected();
     drawBody();
     el.showModal();

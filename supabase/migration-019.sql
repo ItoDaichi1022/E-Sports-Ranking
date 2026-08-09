@@ -73,7 +73,7 @@ $$;
 -- 持ち主を決める。★ここを自分のメールアドレスに書き換えてから実行すること★
 do $$
 declare
-  owner_email constant text := 'higashi.of.east@gmail.com';
+  owner_email constant text := 'tomokkugyu@gmail.com';
 begin
   update players p
      set role = 'owner'

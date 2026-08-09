@@ -88,6 +88,10 @@ function buildEntrants(teamRows, entryRows) {
 
   return {
     entrantIds: ordered.map((x) => x.id),
+    // entrantIds と同じ並びのシード番号。まだ決まっていない枠（募集中）は null。
+    // 並び順だけでは「登録順に並んでいるだけ」と区別が付かないので、番号を出す側が
+    // 決定済みかどうかを見分けられるように、値そのものを持ち回る。
+    entrantSeeds: ordered.map((x) => x.seed ?? null),
     participantIds: ordered.flatMap((x) => x.memberIds),
     teams: ordered
       .filter((x) => x.team)
@@ -101,7 +105,7 @@ function buildEntrants(teamRows, entryRows) {
   };
 }
 
-function toTournament(row, { entrantIds, participantIds, teams }) {
+function toTournament(row, { entrantIds, entrantSeeds, participantIds, teams }) {
   return {
     id: row.id,
     name: row.name,
@@ -126,6 +130,7 @@ function toTournament(row, { entrantIds, participantIds, teams }) {
     createdBy: row.created_by,
     // 出場枠と出場した人。個人戦では同じ配列になる（js/state.js の説明を参照）
     entrantIds,
+    entrantSeeds,
     participantIds,
     teams,
     // 一覧カード用の人数。行を読み込んでいない大会では loadAll が
@@ -444,7 +449,7 @@ export async function loadAll(parts = null) {
       // 一覧カードに出す人数は埋め込みカウントから拾う（詳細を開くと実際の配列に置き換わる）。
       const assembled = detailLoaded(t.id)
         ? buildEntrants(teamsByTournament.get(t.id) ?? [], entriesByTournament.get(t.id) ?? [])
-        : { entrantIds: [], participantIds: [], teams: [] };
+        : { entrantIds: [], entrantSeeds: [], participantIds: [], teams: [] };
       const tournament = toTournament(t, assembled);
       if (detailLoaded(t.id)) {
         tournament.participantCount = assembled.participantIds.length;
@@ -520,6 +525,7 @@ export async function ensureTournamentDetail(tournamentId) {
 
   const assembled = buildEntrants(teams.data, entries.data);
   tournament.entrantIds = assembled.entrantIds;
+  tournament.entrantSeeds = assembled.entrantSeeds;
   tournament.participantIds = assembled.participantIds;
   tournament.teams = assembled.teams;
   tournament.entrantCount = assembled.entrantIds.length;
@@ -1169,8 +1175,8 @@ export async function clearEntryPlacements(tournamentId) {
 // 回戦の開始と配信台
 //
 // 選手がゲームカウントを入力できるのは、運営がその回戦を開始してから。
-// 開始の前に配信台を決めなければならないという条件は、テーブルのCHECK制約
-// （rounds_stream_before_start）が持っている。ここで作れるのは運営だけ（RLS）。
+// 配信台（配信に乗せる試合）は任意で、決めなくても開始できる。
+// ここで作れるのは運営だけ（RLS）。
 // ---------------------------------------------------------------------------
 
 // 配信台に乗せる試合を決める。基本は1つだが、全試合を配信する大会もあるので配列。
@@ -1211,26 +1217,25 @@ export async function clearMatchRoomCode(tournamentId, matchId) {
   check(error, 'ルームコードの削除');
 }
 
-// 回戦を開始する。配信台が未定のままだとCHECK制約に弾かれるので、
-// クライアント側の出し分けを抜けても開始できない。
+// 回戦を開始する。配信台は未定のままでもよい（配信しない大会もある）。
+//
+// UPDATEではなくUPSERT。配信台を一度も決めていない回戦にはまだ行が無く、
+// UPDATEだと0行で「成功」して、選手の画面が開かないまま運営だけが
+// 開始したつもりになる。streamed_match_ids は送らないので、既に決めてある
+// 配信台はそのまま残る。
 export async function startRound(tournamentId, roundIndex, adminPlayerId) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('tournament_rounds')
-    .update({ started_at: new Date().toISOString(), started_by: adminPlayerId })
-    .eq('tournament_id', tournamentId)
-    .eq('round_index', roundIndex)
-    .select('started_at');
-
-  if (error?.code === '23514') {
-    throw new Error('先に配信台（配信する試合）を決めてください。');
-  }
+    .upsert(
+      {
+        tournament_id: tournamentId,
+        round_index: roundIndex,
+        started_at: new Date().toISOString(),
+        started_by: adminPlayerId,
+      },
+      { onConflict: 'tournament_id,round_index' },
+    );
   check(error, '回戦の開始');
-
-  // 配信台を一度も決めていない回戦には行が無く、UPDATEは0行で「成功」する。
-  // そのまま開始した扱いにすると、選手の画面が開かないまま運営だけが開始したつもりになる。
-  if (!data || data.length === 0) {
-    throw new Error('先に配信台（配信する試合）を決めてください。');
-  }
 }
 
 // 開始を取り消す。押し間違い用。

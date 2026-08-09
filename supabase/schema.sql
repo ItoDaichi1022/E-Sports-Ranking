@@ -140,7 +140,8 @@ create table if not exists brackets (
 -- 回戦ごとの開始と配信台。
 --
 -- 選手がゲームカウントを入力できるのは、運営がその回戦を開始してから。
--- 開始の前に配信台（＝配信に乗せる試合）を決めなければならず、そこは制約で保証する。
+-- 配信台（＝配信に乗せる試合）は任意で、未定のままでも回戦は開始できる
+-- （配信を伴わない大会や、その回戦だけ配信しない大会があるため）。
 -- 基本は1回戦につき1試合だが、全試合を配信する大会もあるので複数選べる。
 create table if not exists tournament_rounds (
   tournament_id      uuid not null references tournaments(id) on delete cascade,
@@ -151,11 +152,7 @@ create table if not exists tournament_rounds (
   -- 開始通知を出した時刻。null なら未開始（選手は報告できない）
   started_at         timestamptz,
   started_by         uuid references players(id) on delete set null,
-  primary key (tournament_id, round_index),
-  -- 配信台を決めずに開始通知は出せない
-  constraint rounds_stream_before_start check (
-    started_at is null or coalesce(array_length(streamed_match_ids, 1), 0) >= 1
-  )
+  primary key (tournament_id, round_index)
 );
 
 -- 確定した試合。個人戦は winner_id / loser_id、チーム戦は winner_team_id /

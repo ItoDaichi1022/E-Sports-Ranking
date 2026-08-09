@@ -1,6 +1,9 @@
 .env
 node_modules/
 
+# wrangler（dev・deploy）が作る作業用の置き場。中身は毎回作り直される
+.wrangler/
+
 # キャラクターの配布素材（合計2.3GB、1枚で最大145MB）。
 # サイトが使うのは、ここから作った img/characters/ の軽い複製（10MB）だけ。
 # 元素材をGitに入れると、以後この履歴を clone するたびに2.3GBを引くことになる。

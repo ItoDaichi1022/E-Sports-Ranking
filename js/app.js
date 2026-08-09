@@ -13,7 +13,7 @@ import {
   createBracket, updateTournament, allMatchesDecided, finalStandings, finalPlacements,
   swapBracketEntrants,
 } from './bracket.js';
-import { renderBracket } from './bracketView.js';
+import { renderBracket, buildEntrantRow } from './bracketView.js';
 import { reportChipHtml, syncOpenChat } from './matchChat.js';
 import { computeRankings, rankChangeInfo } from './ranking.js';
 import { renderRevealPage, closeRevealStage } from './reveal.js';
@@ -113,6 +113,7 @@ const bracketAdminToolsEl = $('bracket-admin-tools');
 const bracketContainer = $('bracket-container');
 const tournamentEditBtn = $('tournament-edit-btn');
 const tournamentDeleteBtn = $('tournament-delete-btn');
+const tournamentShareBtn = $('tournament-share-btn');
 const tournamentEditForm = $('tournament-edit-form');
 const tournamentEditNameInput = $('tournament-edit-name-input');
 const tournamentEditDateInput = $('tournament-edit-date-input');
@@ -160,6 +161,7 @@ const logoutBtn = $('logout-btn');
 const navTournamentLink = $('nav-tournament-link');
 const mainNav = $('main-nav');
 const navToggle = $('nav-toggle');
+const navCloseBtn = $('nav-close');
 
 // ホームの「見せる面」のブロック（js/stage.js が中身を作る）
 const homeFeaturedEl = $('home-featured');
@@ -1335,30 +1337,47 @@ function renderTournamentInfo(tournament) {
     `;
   }
 
-  // ブラケットが出来る前は対戦表が無いので、代わりに顔ぶれを見せる。
-  // 募集中の大会の詳細を選手が確認できるようにするための表示。
-  if (!state.bracketIds.has(tournament.id) && tournament.entrantCount > 0) {
-    if (isTeamTournament(tournament)) {
-      // チーム戦はチーム名を主に、メンバーを添える。誰と誰が組んでいるかが
-      // 分からないと、これから申し込む人が相手を選べない。
-      const chips = tournament.teams.map((team) => {
-        const members = team.memberIds.map((id) => getPlayerName(id)).join(' / ');
-        return `<span class="entrant-chip entrant-chip-team">
-            <span class="entrant-chip-name">${escapeHtml(team.name)}</span>
-            <span class="entrant-chip-members">${escapeHtml(members)}</span>
-          </span>`;
-      }).join('');
-      html += `<h4>エントリー中のチーム</h4><div class="entrant-list">${chips}</div>`;
-    } else {
-      const names = tournament.entrantIds.map((id) => {
-        const player = state.players.find((p) => p.id === id);
-        return `<span class="entrant-chip">${escapeHtml(player ? player.currentName : id)}</span>`;
-      }).join('');
-      html += `<h4>エントリー中の選手</h4><div class="entrant-list">${names}</div>`;
-    }
-  }
-
   tournamentInfoEl.innerHTML = html;
+
+  // 顔ぶれは組み立てた要素で足す（名前が選手ページへの入口になるため、
+  // 文字列にせず js/bracketView.js が作る行をそのまま置く）。
+  appendEntrantRoster(tournament);
+}
+
+// 参加メンバーの一覧。シード順（まだ決まっていなければ登録順）に上から並べ、
+// 1枠ずつ対戦表の対戦カードと同じ見た目で出す。
+//
+// 対戦表が組まれたあとも出す。表は勝ち上がりを追うためのもので、横に長く、
+// 「誰が出ているのか」を一望するのには向かない。ここに全枠を上から並べておけば、
+// 表を開かなくても顔ぶれとシード順が分かる。
+//
+// 見た目を対戦カードと揃えているのは、一覧で見た枠を表の中で見つけられるようにするため
+// （シード番号・チーム名とメンバー・キャラクターの地模様まで同じ形になる）。
+function appendEntrantRoster(tournament) {
+  if (tournament.entrantIds.length === 0) return;
+
+  // シードは募集の締切時に決まる。それまでは番号が無く、並びも登録順のままなので、
+  // 「シード順」と名乗らない（番号のバッジも空欄になる）。
+  const seeds = tournament.entrantSeeds ?? [];
+  const seeded = seeds.some((s) => s != null);
+  const unit = isTeamTournament(tournament) ? 'チーム' : '選手';
+
+  const heading = document.createElement('h4');
+  heading.textContent = seeded ? `参加${unit}（シード順）` : `エントリー中の${unit}`;
+
+  const note = document.createElement('p');
+  note.className = 'note';
+  note.textContent = seeded
+    ? '上が第1シード。この並びで対戦表の組み合わせが決まっています。'
+    : 'シードはまだ決まっていません。エントリーした順に並んでいます。';
+
+  const list = document.createElement('div');
+  list.className = 'entrant-roster';
+  tournament.entrantIds.forEach((id, i) => {
+    list.appendChild(buildEntrantRow(tournament.id, id, seeds[i] ?? null));
+  });
+
+  tournamentInfoEl.append(heading, note, list);
 }
 
 // 大会一覧へ戻るときの行き先。この大会がいま並んでいるタブへ戻す。
@@ -1383,9 +1402,17 @@ async function renderTournamentDetail(tournamentId) {
   const canManage = canManageTournament(tournamentId);
   tournamentEditBtn.hidden = !canManage;
   tournamentDeleteBtn.hidden = !canManage;
+  // 共有は運営でなくても押せる。無い大会のときだけ、下で隠す。
+  tournamentShareBtn.hidden = false;
+
+  // 別の大会を開いたときに「コピーしました」が残らないよう、毎回戻す
+  clearTimeout(shareBtnResetTimer);
+  tournamentShareBtn.textContent = '共有';
 
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
+    // 無い大会のリンクを配っても仕方がないので、ここだけは隠す
+    tournamentShareBtn.hidden = true;
     renderHero(tournamentHeroEl, null);
     tournamentTitleEl.textContent = '大会が見つかりません';
     tournamentMetaEl.textContent = '';
@@ -2233,6 +2260,8 @@ tournamentForm.addEventListener('submit', async (e) => {
     createdBy: auth.player?.id ?? null,
     // この経路は個人戦専用（2v2は上で弾いている）なので、出場枠＝選手で同じ配列になる
     entrantIds: manual ? [...selectedParticipantIds] : [],
+    // 選んだ並びがそのままシード順（replaceEntries が index+1 で書き込む）
+    entrantSeeds: manual ? selectedParticipantIds.map((_, i) => i + 1) : [],
     participantIds: manual ? [...selectedParticipantIds] : [],
     teams: [],
     entrantCount: manual ? selectedParticipantIds.length : 0,
@@ -2287,6 +2316,57 @@ tournamentForm.addEventListener('submit', async (e) => {
 
   await refreshFromDb();
   location.hash = manual ? `#tournament/${encodeURIComponent(tournament.id)}` : '#tournaments/recruiting';
+});
+
+// 大会の共有リンク。いま開いているURL（#tournament/xxx）ではなく、専用の /t/{id} を配る。
+//
+// ハッシュはサーバーに送られないので、#付きのURLをXやDiscordに貼っても、向こうは
+// トップページしか読めず、どの大会かが分からない（プレビューが全部同じになる）。
+// /t/{id} は Worker が受けていて、大会名と大会画像を入れたHTMLを返す（worker/index.js）。
+// 人がそのURLを開いたときは、その場で #tournament/{id} へ送り返される。
+//
+// origin から組み立てるのは、配信先（独自ドメイン・*.workers.dev・wrangler dev）に
+// 依存しないため。Worker はルート直下に居るので、pathname は足さない。
+function tournamentShareUrl(tournamentId) {
+  return `${location.origin}/t/${encodeURIComponent(tournamentId)}`;
+}
+
+let shareBtnResetTimer = null;
+
+// 押した結果をボタンの文字で返す。共有シートが開く端末では何も言わなくても
+// 分かるが、コピーは黙って終わると「押せたのか」が分からない。
+function flashShareBtn(text) {
+  tournamentShareBtn.textContent = text;
+  clearTimeout(shareBtnResetTimer);
+  shareBtnResetTimer = setTimeout(() => { tournamentShareBtn.textContent = '共有'; }, 1800);
+}
+
+tournamentShareBtn.addEventListener('click', async () => {
+  const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
+  if (!tournament) return;
+  const url = tournamentShareUrl(tournament.id);
+
+  // スマートフォンでは端末の共有シートを出す（そこからXやDiscordへ直接送れる）。
+  // 途中でやめたときは AbortError で戻ってくるので、失敗として扱わない。
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: tournament.name, url });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      // 共有シートが使えなかっただけなので、下のコピーに落とす
+    }
+  }
+
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+    await navigator.clipboard.writeText(url);
+    flashShareBtn('コピーしました');
+  } catch {
+    // クリップボードは http 接続や許可の無い環境では使えない。
+    // その場合は選んでコピーできる形で見せるところまでやる。
+    window.prompt('このURLをコピーしてください', url);
+  }
 });
 
 tournamentEditBtn.addEventListener('click', () => {
@@ -2646,6 +2726,9 @@ function setNavOpen(open) {
 navToggle.addEventListener('click', () => {
   setNavOpen(!mainNav.classList.contains('open'));
 });
+
+// メニューの中の×。押した後のフォーカスは setNavOpen が開くボタンへ戻す
+navCloseBtn.addEventListener('click', () => setNavOpen(false));
 
 // 今いるページと同じリンクを押した場合は hashchange が起きないので、ここでも閉じる
 mainNav.addEventListener('click', (e) => {

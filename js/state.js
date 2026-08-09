@@ -5,12 +5,15 @@ export const state = {
   // { id, currentName, pastNames: [], gameAccountId, bio, mainCharacters: [],
   //   snsX, snsTwitch, snsYoutube, role, userId }
   players: [],
-  // { id, name, date, format, matchType, matchTypeNote, entrantIds: [], participantIds: [],
-  //   teams: [], entrantCount, participantCount, weight, rules, imageUrl, status, capacity }
+  // { id, name, date, format, matchType, matchTypeNote, entrantIds: [], entrantSeeds: [],
+  //   participantIds: [], teams: [], entrantCount, participantCount, weight, rules,
+  //   imageUrl, status, capacity }
   //
   // 出場の単位が2つあることに注意（2v2でこの2つがズレる）。
   //   entrantIds     ブラケットの枠に入る単位。個人戦は選手ID、チーム戦はチームID。
   //                  シード・枠数・定員・大会規模Tierはすべてこちらで数える
+  //   entrantSeeds   entrantIds と同じ並びのシード番号。募集中などシードが決まる前は
+  //                  null が並ぶ（並びは登録順）。番号を画面に出してよいかの判定に使う
   //   participantIds 出場した「人」。チーム戦ではメンバー全員が並ぶ。
   //                  選手ページ・選手削除の判定はこちら
   // 個人戦ではこの2つは同じ配列になるので、既存の挙動は変わらない。

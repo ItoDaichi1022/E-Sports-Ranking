@@ -10,6 +10,10 @@
 // ここ2行を自分のSupabaseプロジェクトの値に書き換える（supabase/SETUP.md 参照）。
 // anonキーは公開前提の値で、実際の防御はデータベース側のRLSが行う。
 // リポジトリにコミットして問題ない。
+//
+// 【wrangler.jsonc の vars も同時に直すこと】共有リンク（/t/{大会ID}）を返す
+// Worker はブラウザ用のこのモジュールを読めないので、同じ2つの値をあちらにも
+// 持たせてある。片方だけ直すと、プレビューだけが古いプロジェクトを見に行く。
 // ---------------------------------------------------------------------------
 export const SUPABASE_URL = 'https://zgqoeicdnneivzasneez.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_yTrfsOpDxshekZrQtZ8f9Q_m5TKjqfZ';

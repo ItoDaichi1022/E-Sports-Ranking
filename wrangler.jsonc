@@ -1,14 +1,29 @@
 {
   // Cloudflare へのデプロイ設定。
   //
-  // このリポジトリはビルド工程を持たない純粋な静的サイトなので、Worker のコード（main）は
-  // 持たず、静的アセットだけを配信する。これを置いておくことで、Cloudflare 側の
-  // 対話セットアップ（毎回 wrangler.jsonc を生成し直す流れ）に頼らず設定が固定される。
+  // 画面を作っているのは静的アセット（index.html・css/・js/）だけで、ビルド工程は
+  // 持たない。Worker（main）は1つだけ仕事を持っていて、大会の共有リンク
+  // /t/{大会ID} に og: タグ付きのHTMLを返す（worker/index.js の説明を参照）。
+  // それ以外のURLはこれまでどおり静的アセットがそのまま返る ── 既定では
+  // アセットのほうが先に照合され、当たらなかったURLだけが Worker に渡るため。
   //
   // どのファイルを上げないかは同じ階層の .assetsignore で指定している（node_modules 等）。
   "name": "esports-ranking",
   "compatibility_date": "2026-07-26",
+  "main": "worker/index.js",
   "assets": {
-    "directory": "."
+    "directory": ".",
+    // Worker から静的アセットを引くための口。/t/ 以外のURLをここへ丸投げして、
+    // Worker が居なかったときと同じ応答（404 など）を返すために使う。
+    "binding": "ASSETS"
+  },
+  // Worker から見える設定値。中身は js/supabaseClient.js と同じもので、
+  // anonキーは公開前提の値（実際の防御はDB側のRLS）。
+  // 【接続先を変えるときは js/supabaseClient.js と両方直すこと】
+  // ブラウザ側はモジュールを読み、Worker側はここを読むので、片方だけ直すと
+  // 共有リンクのプレビューだけが古いプロジェクトを見に行く。
+  "vars": {
+    "SUPABASE_URL": "https://zgqoeicdnneivzasneez.supabase.co",
+    "SUPABASE_ANON_KEY": "sb_publishable_yTrfsOpDxshekZrQtZ8f9Q_m5TKjqfZ"
   }
 }

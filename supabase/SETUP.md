@@ -182,7 +182,7 @@ URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デ�
 | [`migration-008.sql`](migration-008.sql) | 対戦カードごとのチャット（`match_chat_messages` テーブル） |
 | [`migration-009.sql`](migration-009.sql) | チャットからの運営への報告（`match_chat_reports` テーブル） |
 | [`migration-010.sql`](migration-010.sql) | 選手によるゲームカウントの入力（`match_result_reports` テーブル。018 で撤廃） |
-| [`migration-011.sql`](migration-011.sql) | 回戦ごとの開始と配信台（`tournament_rounds` テーブル） |
+| [`migration-011.sql`](migration-011.sql) | 回戦ごとの開始と配信台（`tournament_rounds` テーブル。020 で配信台の必須を撤廃） |
 | [`migration-012.sql`](migration-012.sql) | 対戦カードごとのルームコード（`match_room_codes` テーブル） |
 | [`migration-013.sql`](migration-013.sql) | ゲスト閲覧が42501で失敗する不具合の修正（`is_match_participant` の実行権限） |
 | [`migration-014.sql`](migration-014.sql) | ランキング公開の集計期間をカレンダーの開始日・終了日で選べるようにする（`published_rankings.period_start` / `period_end`） |
@@ -191,6 +191,7 @@ URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デ�
 | [`migration-017.sql`](migration-017.sql) | ランキングに反映させるかを運営が選べるようにする（`tournaments.ranking_opt_in`） |
 | [`migration-018.sql`](migration-018.sql) | ゲームカウントの「相手の承認」を撤廃（`match_result_reports` テーブルの削除） |
 | [`migration-019.sql`](migration-019.sql) | 大会を誰でも作れるようにし、権限を大会ごとに持たせる（`tournament_organizers` テーブル＋`owner` ロール） |
+| [`migration-020.sql`](migration-020.sql) | 配信台が未定でも回戦を開始できるようにする（`rounds_stream_before_start` 制約の削除） |
 
 補足:
 
@@ -229,10 +230,11 @@ URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デ�
   以外のことはできません。008 の `bracket_match` を使うので、**008 のあとに実行**してください。
   （010 の時点では「片方が報告 → 相手が承認」で確定する形でしたが、018 で承認を
   撤廃しました。下の 018 を参照。）
-- **011 の回戦の開始** — 運営が配信台（配信に乗せる試合）を決めて回戦を開始するまで、
-  選手はゲームカウントを入力できなくなります。「配信台を決めずに開始できない」は
-  テーブルのCHECK制約が保証します。010 の関数を条件付きで置き換えるので、
+- **011 の回戦の開始** — 運営が回戦を開始するまで、選手はゲームカウントを
+  入力できなくなります。010 の関数を条件付きで置き換えるので、
   **必ず 010 のあとに実行**してください。
+  （011 の時点では配信台を決めないと開始できませんでしたが、020 で任意にしました。
+  下の 020 を参照。）
 - **018 の承認の撤廃** — ゲームカウントは、当事者のどちらが入力しても**その場で確定**
   するようになります。承認の関数（`approve_match_result`）と承認待ちのテーブル
   （`match_result_reports`）は削除されます。**適用した時点で承認待ちだった報告は
@@ -253,6 +255,11 @@ URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デ�
 
   既存の大会の運営には `owner` だけを入れます。これまで `admin` だった人は
   ロールのまま全大会を触れるので、この時点で誰かが操作できなくなることはありません。
+- **020 の配信台** — 配信台（配信に乗せる試合）が未定でも回戦を開始できるようになります。
+  配信を伴わない大会では決める配信台がそもそも無く、011 の制約のせいで回戦を
+  開始できない＝選手がゲームカウントを入力できない状態になっていました。
+  開始できるのが運営だけである点も、開始するまで選手が入力できない点も変わりません。
+  既に決めてある配信台はそのまま残ります。
 
 ## 8. 後始末
 
