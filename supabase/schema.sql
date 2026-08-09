@@ -51,14 +51,17 @@ create table if not exists tournaments (
   match_type      text,
   -- match_type = 'other' のときだけ意味を持つ、運営が書いた対戦方法の説明
   match_type_note text,
-  -- ランキングに反映させるかどうかの、運営の意思。偽なら条件（人数・対戦方法）を
+  -- ランキングに反映させるかどうかの、運営の意思。偽なら条件（人数・対戦方法・配信元）を
   -- 満たしていてもスコアに入れない ── エキシビションや練習会のための逃げ道。
   -- 既定は真なので、この列より前に作られた大会はこれまでどおり条件だけで決まる。
   ranking_opt_in  boolean not null default true,
   rules      text,
   -- 大会のバナー画像。Storageの images バケットに置いた公開URL
   image_url  text,
-  -- 配信元。この大会の配信を見に行くURL（TwitchやYouTubeのチャンネル等）
+  -- 配信元。この大会の配信を見に行くURL。
+  -- ランキング反映の条件でもあり、ホストがYouTube（youtube.com / youtu.be）の大会だけが
+  -- スコア計算の対象になる（判定は js/rankingEligibility.js）。空欄・他サイトのURLでも
+  -- 大会は開ける（その場合は対象外）。
   stream_url text,
   -- 三位決定戦を行うか。真ならブラケット生成時に準決勝の敗者どうしの試合を足す
   -- （js/bracket.js）。行わない大会では準決勝で負けた2人は同率のベスト4になる。

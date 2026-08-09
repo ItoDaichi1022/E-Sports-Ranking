@@ -22,20 +22,20 @@
 <meta property="og:locale" content="ja_JP">
 <meta property="og:title" content="IgniteArena — どこでも熱く、遊べ。">
 <meta property="og:description" content="コミュニティの大会運営と個人ランキングをまとめて扱う場所。大会を開く・エントリーする・対戦表を追う。">
-<meta property="og:image" content="img/icon.png?v=128">
+<meta property="og:image" content="img/icon.png?v=129">
 <meta name="twitter:card" content="summary">
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。
      タブはWebP。iOSのホーム画面（apple-touch-icon）だけはWebPを読まないのでPNGを残す。 -->
-<link rel="icon" href="img/icon.webp?v=128" type="image/webp">
-<link rel="apple-touch-icon" href="img/icon.png?v=128">
+<link rel="icon" href="img/icon.webp?v=129" type="image/webp">
+<link rel="apple-touch-icon" href="img/icon.png?v=129">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=128">
+<link rel="stylesheet" href="css/style.css?v=129">
 <!-- 順位発表の画面（#reveal）だけで使う。style.css は既に長いので分けてある。 -->
-<link rel="stylesheet" href="css/reveal.css?v=128">
+<link rel="stylesheet" href="css/reveal.css?v=129">
 
 <!-- スクロールに合わせた登場アニメの「入れ物」を開ける印。
      登場アニメは「最初は透明 → 見えたら不透明」で作るが、その透明を素で
@@ -332,7 +332,7 @@
                画像を差し替えるときは、この2つの数字も実寸に合わせること
                （img/README.md 参照）。 -->
           <img class="hero-game-logo" id="hero-game-logo"
-               src="img/game-logo.webp?v=128" alt="" width="700" height="623">
+               src="img/game-logo.webp?v=129" alt="" width="700" height="623">
         </div>
 
         <p class="hero-eyebrow reveal">Tournament &amp; Ranking</p>
@@ -482,12 +482,12 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=128"></section>
+  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=129"></section>
 
   <!-- 本番までの環境づくり（回線・コントローラ）。中身は pages/setup.html。
        エントリー済みの大会詳細から誘導する（js/entries.js の setupPrompt）。
        楽天アフィリエイトのリンクを含むので、広告である旨の明示がページ冒頭にある。 -->
-  <section id="view-setup" class="view stage" hidden data-src="pages/setup.html?v=128"></section>
+  <section id="view-setup" class="view stage" hidden data-src="pages/setup.html?v=129"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -562,8 +562,8 @@
         開催日
         <input type="date" id="tournament-date-input">
       </label>
-      <!-- 対戦方法はランキング反映の条件になる（16人以上 かつ 1v1／リレー。
-           加えて下の「ランキングへの反映」を外していないこと）。
+      <!-- 対戦方法はランキング反映の条件になる（16人以上 かつ 1v1／リレー かつ
+           配信元がYouTube。加えて下の「ランキングへの反映」を外していないこと）。
            あとから変えられるが、既定を空にして運営に必ず選ばせる。 -->
       <label>
         対戦方法
@@ -579,7 +579,7 @@
         対戦方法の説明
         <input type="text" id="tournament-match-type-note-input" placeholder="例: 3人チーム戦">
       </label>
-      <!-- ランキングへの反映。条件（16人以上・1v1／リレー）を満たしていても、
+      <!-- ランキングへの反映。条件（16人以上・1v1／リレー・YouTube配信）を満たしていても、
            運営が外せる逃げ道。エキシビションや練習会のための欄なので、既定は入り。
            あとから大会情報の編集でも変えられる。 -->
       <fieldset class="ranking-opt-field">
@@ -589,7 +589,8 @@
           条件を満たしたらランキングに反映する
         </label>
         <p class="note">
-          条件は「参加16人以上」かつ「対戦方法が1v1またはリレー」です。
+          条件は「参加16人以上」かつ「対戦方法が1v1またはリレー」かつ
+          「配信元がYouTubeのURL」です。
           外すと、条件を満たしていてもこの大会の試合はスコアに影響しません（戦歴には残ります）。
           エキシビションや練習会などに使えます。
         </p>
@@ -598,9 +599,15 @@
         定員（任意・空欄なら無制限）
         <input type="number" id="tournament-capacity-input" min="2" placeholder="例: 32">
       </label>
+      <!-- 配信元はランキング反映の条件（③）でもある。任意の欄のままにしてあるのは、
+           ランキングに乗せない大会 ── 練習会や身内の大会 ── を開けなくしないため。 -->
       <label class="stream-field">
         配信元（任意・URL）
-        <input type="url" id="tournament-stream-input" placeholder="例: https://www.twitch.tv/yourchannel">
+        <input type="url" id="tournament-stream-input" placeholder="例: https://www.youtube.com/@yourchannel/live">
+        <span class="field-note">
+          ランキングに反映するにはYouTubeのURL（youtube.com / youtu.be）が必要です。
+          他のサイトのURLや未入力でも大会は開けますが、スコアには反映されません。
+        </span>
       </label>
       <label class="rules-field">
         ルール（任意）
@@ -729,8 +736,8 @@
           条件を満たしたらランキングに反映する
         </label>
         <p class="note">
-          外すと、条件（参加16人以上・1v1／リレー）を満たしていてもスコアに影響しません。
-          変更は次にランキングを作成したときから反映されます。
+          外すと、条件（参加16人以上・1v1／リレー・配信元がYouTube）を満たしていても
+          スコアに影響しません。変更は次にランキングを作成したときから反映されます。
         </p>
       </fieldset>
       <label>
@@ -739,7 +746,11 @@
       </label>
       <label class="stream-field">
         配信元（任意・URL）
-        <input type="url" id="tournament-edit-stream-input" placeholder="例: https://www.twitch.tv/yourchannel">
+        <input type="url" id="tournament-edit-stream-input" placeholder="例: https://www.youtube.com/@yourchannel/live">
+        <span class="field-note">
+          ランキングに反映するにはYouTubeのURL（youtube.com / youtu.be）が必要です。
+          変更は次にランキングを作成したときから反映されます。
+        </span>
       </label>
       <label class="rules-field">
         ルール（任意）
@@ -926,7 +937,7 @@
              （pages/*.html の遅延読み込みと同じ作法）。
              muted は必須 ── 音声トラックを持っているので、外すと収録に音が乗るうえ、
              ブラウザの自動再生も止められる。 -->
-        <video id="reveal-bg" data-src="video/0204.mp4?v=128"
+        <video id="reveal-bg" data-src="video/0204.mp4?v=129"
                muted loop playsinline preload="none" aria-hidden="true"></video>
         <!-- 1枚ぶんの画が入れ替わる場所。背景動画を消さずに中身だけ差し替えるため、
              canvas ではなくこの内側を replaceChildren する。 -->
@@ -943,9 +954,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=128"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=129"></section>
 
-  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=128"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=129"></section>
 
 </main>
 
@@ -966,7 +977,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=128"></script>
+<script src="js/vendor/supabase.js?v=129"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -978,34 +989,34 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=128",
-    "./js/bracket.js":        "./js/bracket.js?v=128",
-    "./js/bracketView.js":    "./js/bracketView.js?v=128",
-    "./js/characterData.js":  "./js/characterData.js?v=128",
-    "./js/characterFocus.js": "./js/characterFocus.js?v=128",
-    "./js/characterPicker.js": "./js/characterPicker.js?v=128",
-    "./js/characters.js":     "./js/characters.js?v=128",
-    "./js/db.js":             "./js/db.js?v=128",
-    "./js/entries.js":        "./js/entries.js?v=128",
-    "./js/formDraft.js":      "./js/formDraft.js?v=128",
-    "./js/icons.js":          "./js/icons.js?v=128",
-    "./js/intro.js":          "./js/intro.js?v=128",
-    "./js/matchChat.js":      "./js/matchChat.js?v=128",
-    "./js/organizerPicker.js": "./js/organizerPicker.js?v=128",
-    "./js/playerStats.js":    "./js/playerStats.js?v=128",
-    "./js/players.js":        "./js/players.js?v=128",
-    "./js/profile.js":        "./js/profile.js?v=128",
-    "./js/ranking.js":        "./js/ranking.js?v=128",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=128",
-    "./js/reveal.js":         "./js/reveal.js?v=128",
-    "./js/stage.js":          "./js/stage.js?v=128",
-    "./js/state.js":          "./js/state.js?v=128",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=128",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=128",
-    "./js/util.js":           "./js/util.js?v=128"
+    "./js/auth.js":           "./js/auth.js?v=129",
+    "./js/bracket.js":        "./js/bracket.js?v=129",
+    "./js/bracketView.js":    "./js/bracketView.js?v=129",
+    "./js/characterData.js":  "./js/characterData.js?v=129",
+    "./js/characterFocus.js": "./js/characterFocus.js?v=129",
+    "./js/characterPicker.js": "./js/characterPicker.js?v=129",
+    "./js/characters.js":     "./js/characters.js?v=129",
+    "./js/db.js":             "./js/db.js?v=129",
+    "./js/entries.js":        "./js/entries.js?v=129",
+    "./js/formDraft.js":      "./js/formDraft.js?v=129",
+    "./js/icons.js":          "./js/icons.js?v=129",
+    "./js/intro.js":          "./js/intro.js?v=129",
+    "./js/matchChat.js":      "./js/matchChat.js?v=129",
+    "./js/organizerPicker.js": "./js/organizerPicker.js?v=129",
+    "./js/playerStats.js":    "./js/playerStats.js?v=129",
+    "./js/players.js":        "./js/players.js?v=129",
+    "./js/profile.js":        "./js/profile.js?v=129",
+    "./js/ranking.js":        "./js/ranking.js?v=129",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=129",
+    "./js/reveal.js":         "./js/reveal.js?v=129",
+    "./js/stage.js":          "./js/stage.js?v=129",
+    "./js/state.js":          "./js/state.js?v=129",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=129",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=129",
+    "./js/util.js":           "./js/util.js?v=129"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=128"></script>
+<script type="module" src="js/app.js?v=129"></script>
 </body>
 </html>

@@ -1238,7 +1238,8 @@ function renderHero(el, imageUrl) {
   }
 }
 
-// ランキングに反映される大会かどうかの印。条件（16人以上・1v1／リレー・運営の設定）は
+// ランキングに反映される大会かどうかの印。条件（16人以上・1v1／リレー・YouTube配信・
+// 運営の設定）は
 // 大会の内容で決まるので、満たしていない場合は何が足りないかもそのまま出す。
 // 募集中の大会では人数が増えて条件を満たすことがあるため、見出しの文言を変える。
 //
@@ -1262,8 +1263,8 @@ function rankingEligibilityHtml(tournament) {
   const title = settled ? 'ランキング反映なし' : 'ランキング反映対象外';
   const note = optedOut
     ? 'この大会はランキングに反映しない設定です。試合の結果はスコアに影響しません（戦歴には残ります）。'
-    : `条件（参加${RANKED_MIN_PARTICIPANTS}人以上・対戦方法が1v1かリレー）を満たしていません：
-       ${escapeHtml(reasons.join(' / '))}`;
+    : `条件（参加${RANKED_MIN_PARTICIPANTS}人以上・対戦方法が1v1かリレー・配信元がYouTube）を
+       満たしていません：${escapeHtml(reasons.join(' / '))}`;
 
   return `
     <div class="ranking-mark ranking-mark-off">
