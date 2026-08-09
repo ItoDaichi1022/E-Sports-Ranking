@@ -186,8 +186,9 @@ function ensureDialog() {
     </div>
     <div class="char-picker-body" id="char-picker-body"></div>
     <div class="dialog-actions">
+      <button type="button" class="btn-secondary char-picker-back-btn" id="char-picker-back" hidden>← すべてのキャラクター</button>
       <button type="button" class="btn-secondary" id="char-picker-cancel">キャンセル</button>
-      <button type="button" id="char-picker-done">決定</button>
+      <button type="button" id="char-picker-done">閉じる</button>
     </div>
   `;
   document.body.appendChild(dialog);
@@ -262,7 +263,7 @@ function syncTile(btn, selectedIndex, disabled) {
   badge.textContent = selectedIndex === 0 ? 'メイン' : String(selectedIndex + 1);
 }
 
-// 選ぶダイアログを開く。決定なら選んだ配列、キャンセルなら null を返す。
+// 選ぶダイアログを開く。閉じるなら選んだ配列、キャンセルなら null を返す。
 export function openCharacterPicker(initial = []) {
   const el = ensureDialog();
   const selectedEl = el.querySelector('#char-picker-selected');
@@ -270,6 +271,10 @@ export function openCharacterPicker(initial = []) {
   const bodyEl = el.querySelector('#char-picker-body');
   const doneBtn = el.querySelector('#char-picker-done');
   const cancelBtn = el.querySelector('#char-picker-cancel');
+  // 下の操作列にも置く「戻る」。一覧の中にも同じものがあるが、そちらは
+  // スキンを見ている間に画面の外へ流れていく ── 2人目を選ぶたびに一番上まで
+  // スクロールし直すことになるので、いつも見えている位置にも出しておく。
+  const backBtn = el.querySelector('#char-picker-back');
 
   // ここで扱えるのは絵のあるものだけ。読めなかった文字列は呼び出し側が
   // よけて持っていて、閉じたあとに戻してくれる（createCharacterField）。
@@ -337,13 +342,15 @@ export function openCharacterPicker(initial = []) {
     const drawBody = () => {
       bodyEl.innerHTML = '';
       tiles = [];
+      // 下の「戻る」は、キャラクターを開いている間だけ出す
+      backBtn.hidden = !openCharacter;
 
       if (openCharacter) {
         const back = document.createElement('button');
         back.type = 'button';
         back.className = 'back-link as-button char-picker-back';
         back.textContent = '← すべてのキャラクター';
-        back.addEventListener('click', () => { openCharacter = null; drawBody(); });
+        back.addEventListener('click', goBack);
         bodyEl.appendChild(back);
 
         const head = document.createElement('p');
@@ -427,9 +434,13 @@ export function openCharacterPicker(initial = []) {
       searchEl.removeEventListener('input', onSearch);
       doneBtn.removeEventListener('click', onDone);
       cancelBtn.removeEventListener('click', onCancel);
+      backBtn.removeEventListener('click', goBack);
       el.removeEventListener('cancel', onCancel);
       resolve(result);
     };
+    // スキン選びからキャラクター一覧へ。控えてある位置（listScrollTop）に
+    // 返るので、続けて次のキャラクターをすぐ選べる。
+    const goBack = () => { openCharacter = null; drawBody(); };
     // 絞り込むと並びそのものが変わるので、控えてある位置は意味を失う。先頭から見せる。
     const onSearch = () => { openCharacter = null; listScrollTop = 0; drawBody(); };
     const onDone = () => finish(selected);
@@ -438,6 +449,7 @@ export function openCharacterPicker(initial = []) {
     searchEl.addEventListener('input', onSearch);
     doneBtn.addEventListener('click', onDone);
     cancelBtn.addEventListener('click', onCancel);
+    backBtn.addEventListener('click', goBack);
     // Escキーで閉じたときも「キャンセル」として扱う
     el.addEventListener('cancel', onCancel);
 

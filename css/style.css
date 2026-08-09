@@ -4640,7 +4640,7 @@ dialog.char-picker { max-width: 56rem; }
 .char-picker-search input { width: 100%; }
 
 /* 一覧は高さを決めて中だけスクロールさせる。ダイアログごと伸ばすと、
-   決定ボタンが画面の下に消えて押せなくなる。 */
+   下の操作列（戻る・閉じる）が画面の下に消えて押せなくなる。 */
 .char-picker-body {
   max-height: 52vh;
   overflow-y: auto;
@@ -4651,6 +4651,12 @@ dialog.char-picker { max-width: 56rem; }
   display: inline-block;
   margin-bottom: 0.5rem;
 }
+
+/* 下の操作列に置く「戻る」。一覧の中の戻る（.char-picker-back）はスキンを
+   見ているうちに上へ流れてしまうので、こちらは常に見える位置に残す。
+   閉じる・キャンセルとは役割が違うので、左端に離して置く。 */
+.char-picker-back-btn { margin-right: auto; }
+.char-picker-back-btn[hidden] { display: none; }
 
 .char-picker-head {
   margin: 0 0 0.75rem;
