@@ -133,6 +133,14 @@ const tournamentMetaEl = $('tournament-meta');
 const tournamentBackLink = $('tournament-back-link');
 const bracketLinkEl = $('bracket-link');
 const bracketLinkNoteEl = $('bracket-link-note');
+const entrantsLinkEl = $('entrants-link');
+const entrantsLinkTitleEl = $('entrants-link-title');
+const entrantsLinkNoteEl = $('entrants-link-note');
+const entrantsTitleEl = $('entrants-title');
+const entrantsMetaEl = $('entrants-meta');
+const entrantsNoteEl = $('entrants-note');
+const entrantsContainerEl = $('entrants-container');
+const entrantsBackLink = $('entrants-back-link');
 const resultSectionEl = $('result-section');
 const bracketBackLink = $('bracket-back-link');
 const tournamentEditCapacityInput = $('tournament-edit-capacity-input');
@@ -270,6 +278,8 @@ const VIEW_IDS = {
   create: 'view-tournament',
   tournament: 'view-tournament-detail',
   bracket: 'view-bracket',
+  // 出場選手一覧。詳細・対戦表と同じく大会ごとのページ（#entrants/{大会ID}）
+  entrants: 'view-entrants',
   player: 'view-player-detail',
   // 選手を探すページ。#ranking は、ランキングの表を置いていた頃のリンクや
   // ブックマークから来る人のために、そのまま同じ画面へ通す。
@@ -286,8 +296,8 @@ const VIEW_IDS = {
 
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
 const NAV_PAGE_OF = {
-  tournament: 'tournaments', bracket: 'tournaments', player: 'players',
-  players: 'players', reveal: 'players', news: 'newslist',
+  tournament: 'tournaments', bracket: 'tournaments', entrants: 'tournaments',
+  player: 'players', players: 'players', reveal: 'players', news: 'newslist',
 };
 
 function parseHash() {
@@ -448,6 +458,7 @@ function routeFromHash() {
     }
     else if (target === 'tournament') draw(renderTournamentDetail(param));
     else if (target === 'bracket') draw(renderBracketPage(param));
+    else if (target === 'entrants') draw(renderEntrantsPage(param));
     else if (target === 'player') draw(renderPlayerDetail(param));
     // 選手を探すページ。#ranking で来た人も同じ画面に着く。
     else if (target === 'players' || target === 'ranking') refreshPlayerUI();
@@ -1339,46 +1350,96 @@ function renderTournamentInfo(tournament) {
   }
 
   tournamentInfoEl.innerHTML = html;
-
-  // 顔ぶれは組み立てた要素で足す（名前が選手ページへの入口になるため、
-  // 文字列にせず js/bracketView.js が作る行をそのまま置く）。
-  appendEntrantRoster(tournament);
 }
 
-// 参加メンバーの一覧。シード順（まだ決まっていなければ登録順）に上から並べ、
+// 出場選手一覧のページ（#entrants/{大会ID}）。名前の五十音順に上から並べ、
 // 1枠ずつ対戦表の対戦カードと同じ見た目で出す。
 //
-// 対戦表が組まれたあとも出す。表は勝ち上がりを追うためのもので、横に長く、
-// 「誰が出ているのか」を一望するのには向かない。ここに全枠を上から並べておけば、
-// 表を開かなくても顔ぶれとシード順が分かる。
+// 大会詳細に直に並べず1ページ取っているのは、顔ぶれが数十枠になるため。
+// 詳細の中に置くと、その下の大会情報とエントリーの操作が画面から押し出される。
 //
-// 見た目を対戦カードと揃えているのは、一覧で見た枠を表の中で見つけられるようにするため
-// （シード番号・チーム名とメンバー・キャラクターの地模様まで同じ形になる）。
-function appendEntrantRoster(tournament) {
-  if (tournament.entrantIds.length === 0) return;
+// 並びが名前順なのは、このページの用途が「あの人は出ているか」を探すことだから。
+// シード順に並べると、探す人は先頭から順に目で追うしかない。シード番号は行の
+// バッジに残してあるので、順位付けの情報が消えるわけではない。
+//
+// 見た目を対戦カードと揃えているのは、ここで見た枠を対戦表の中で見つけられるように
+// するため（シード番号・チーム名とメンバー・キャラクターの地模様まで同じ形になる）。
+async function renderEntrantsPage(tournamentId) {
+  entrantsBackLink.href = `#tournament/${encodeURIComponent(tournamentId)}`;
 
-  // シードは募集の締切時に決まる。それまでは番号が無く、並びも登録順のままなので、
-  // 「シード順」と名乗らない（番号のバッジも空欄になる）。
+  const tournament = state.tournaments.find((t) => t.id === tournamentId);
+  if (!tournament) {
+    entrantsBackLink.href = '#tournaments';
+    entrantsBackLink.textContent = '← 大会一覧へ';
+    entrantsTitleEl.textContent = '大会が見つかりません';
+    entrantsMetaEl.textContent = '';
+    entrantsNoteEl.textContent = '';
+    entrantsContainerEl.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
+    return;
+  }
+
+  entrantsBackLink.textContent = '← 大会の詳細へ';
+  entrantsTitleEl.textContent = `${tournament.name} の出場${isTeamTournament(tournament) ? 'チーム' : '選手'}`;
+  entrantsMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
+
+  // 「誰が出ているか」はこのページで初めて必要になるので、ここで取りに行く
+  // （大会一覧では人数しか持っていない。js/state.js の説明を参照）。
+  try {
+    await db.ensureTournamentDetail(tournamentId);
+  } catch (err) {
+    entrantsNoteEl.textContent = '';
+    entrantsContainerEl.innerHTML = `<p class="empty-hint">${escapeHtml(err.message)}</p>`;
+    return;
+  }
+  // 読み込んでいる間に別の画面へ移っていたら、そこへ古い内容を描かない
+  if (!isCurrentRoute('entrants', tournamentId)) return;
+
+  entrantsContainerEl.innerHTML = '';
+
+  if (tournament.entrantIds.length === 0) {
+    entrantsNoteEl.textContent = '';
+    entrantsContainerEl.innerHTML = '<p class="empty-hint">まだ誰もエントリーしていません。</p>';
+    return;
+  }
+
+  // シードは募集の締切時に決まる。それまでは番号が無いので、バッジは空欄になり、
+  // 説明でも触れない（無い番号の話をしても読む人の役に立たない）。
   const seeds = tournament.entrantSeeds ?? [];
   const seeded = seeds.some((s) => s != null);
-  const unit = isTeamTournament(tournament) ? 'チーム' : '選手';
-
-  const heading = document.createElement('h4');
-  heading.textContent = seeded ? `参加${unit}（シード順）` : `エントリー中の${unit}`;
-
-  const note = document.createElement('p');
-  note.className = 'note';
-  note.textContent = seeded
-    ? '上が第1シード。この並びで対戦表の組み合わせが決まっています。'
-    : 'シードはまだ決まっていません。エントリーした順に並んでいます。';
+  const unit = isTeamTournament(tournament) ? 'チーム名' : '選手名';
+  entrantsNoteEl.textContent = seeded
+    ? `${unit}の五十音順に並んでいます。左の番号はシード順です。名前を押すと、その選手のプロフィールが見られます。`
+    : `${unit}の五十音順に並んでいます。シードは募集を締め切った時点で決まります。名前を押すと、その選手のプロフィールが見られます。`;
 
   const list = document.createElement('div');
   list.className = 'entrant-roster';
-  tournament.entrantIds.forEach((id, i) => {
-    list.appendChild(buildEntrantRow(tournament.id, id, seeds[i] ?? null));
-  });
+  sortEntrantsByName(tournamentId, tournament.entrantIds, seeds)
+    .forEach(({ id, seed }) => list.appendChild(buildEntrantRow(tournamentId, id, seed)));
+  entrantsContainerEl.appendChild(list);
+}
 
-  tournamentInfoEl.append(heading, note, list);
+// 名前を並べ替えるときの比較。日本語の辞書順（かなの五十音順）で見る。
+//
+// 名前の読みは持っていないので、漢字の名前は読みではなく文字そのものの順に並ぶ
+// （「一ノ瀬」を「いちのせ」として、かなの中に混ぜることはできない）。同じ理由で
+// 英字の名前も別のかたまりになる。それでも登録順よりは目当ての名前に辿り着ける。
+const nameCollator = new Intl.Collator('ja', { numeric: true, sensitivity: 'base' });
+
+// 出場枠を名前の五十音順に並べる。戻り値の seed は元のシード番号（未確定なら null）で、
+// 並びが変わってもバッジの数字は動かない。
+function sortEntrantsByName(tournamentId, entrantIds, seeds = []) {
+  return entrantIds
+    .map((id, i) => ({
+      id,
+      seed: seeds[i] ?? null,
+      name: getEntrantName(tournamentId, id) ?? '',
+    }))
+    .sort((a, b) => {
+      const byName = nameCollator.compare(a.name, b.name);
+      if (byName !== 0) return byName;
+      // 同名（別人でも起こりうる）はシード順に。番号が無い枠は後ろへ。
+      return (a.seed ?? Infinity) - (b.seed ?? Infinity);
+    });
 }
 
 // 大会一覧へ戻るときの行き先。この大会がいま並んでいるタブへ戻す。
@@ -1389,8 +1450,8 @@ function backToListLink(tournament) {
   return { href: `#tournaments/${tab}`, text: '← 大会一覧へ' };
 }
 
-// 大会詳細。対戦表そのものは別ページ（#bracket/{id}）に分けてあり、
-// ここには「ブラケットを見る」という入口だけを置く。
+// 大会詳細。対戦表（#bracket/{id}）と出場選手一覧（#entrants/{id}）は別ページに
+// 分けてあり、ここにはそこへの入口だけを置く。
 //
 // 「誰が出ているか」はこのページで初めて必要になるので、ここで取りに行く
 // （一覧では人数しか持っていない。js/state.js の説明を参照）。
@@ -1420,6 +1481,7 @@ async function renderTournamentDetail(tournamentId) {
     tournamentInfoEl.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
     tournamentActionsEl.innerHTML = '';
     bracketLinkEl.hidden = true;
+    entrantsLinkEl.hidden = true;
     return;
   }
 
@@ -1449,6 +1511,18 @@ async function renderTournamentDetail(tournamentId) {
     bracketLinkNoteEl.textContent = tournament.status === 'finished'
       ? '対戦表と最終結果'
       : '対戦表と進行状況';
+  }
+
+  // 出場選手一覧への入口。エントリーが1つも無いうちは、開いても空のページなので隠す。
+  // シードが決まる前でも出す ── これから申し込む人が顔ぶれを見る場所でもあるため。
+  const unit = isTeamTournament(tournament) ? 'チーム' : '選手';
+  entrantsLinkEl.hidden = tournament.entrantIds.length === 0;
+  if (!entrantsLinkEl.hidden) {
+    entrantsLinkEl.href = `#entrants/${encodeURIComponent(tournamentId)}`;
+    entrantsLinkTitleEl.textContent = `出場${unit}一覧を見る`;
+    entrantsLinkNoteEl.textContent = tournament.status === 'recruiting' || tournament.status === 'draft'
+      ? `エントリー中の${unit}を五十音順で（${entrantCountLabel(tournament)}）`
+      : `出場${unit}を五十音順で（${entrantCountLabel(tournament)}）`;
   }
 
   // エントリーと運営の募集操作。募集一覧のカードは入口だけにしたので、ここが操作の場所。
