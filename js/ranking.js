@@ -3,15 +3,29 @@ import { isRankedTournament } from './rankingEligibility.js';
 import { getEntrantMemberIds } from './state.js';
 
 // LumiRank軽量版：相手の強さで重み付けした反復スコアリングのみを残した最小実装。
-// doc/design.md の「7. ランキング方式」に準拠する。
+// doc/design.md の「8. ランキング方式」に準拠する。
 export const RANKING_CONFIG = {
   initialScore: 1000,   // 全選手の初期スコア（相対値のみ意味を持つ）
-  kFactor: 32,          // 1試合あたりの基本ポイント振れ幅
-  maxIterations: 200,   // 収束しない場合の安全上限
+  scoreSpread: 400,     // このスコア差で期待勝率が約91%（10:1）になる物差し
+  priorMatches: 2,      // 全員に足す「初期値の仮想相手との引き分け」の回数
+  maxIterations: 200,   // 収束しない場合の安全上限（実データでは十数回で収束する）
   convergenceEpsilon: 0.01,
+  maxStepPerIteration: 400, // 1回の更新で動かせる上限（発散止め）
   scaleTarget: 100,     // #1のスコアをこの値にスケーリングする
   minTournaments: 1,    // 足切り大会数（design.md 10章で確定）
 };
+
+// スコア差から期待勝率を出す。Eloと同じロジスティック曲線で、
+// scoreSpread（400）点の差がついていると強い側の期待勝率が約91%になる。
+//
+// 【この関数がランキングの中心にある理由】
+// 勝敗を「期待勝率とのズレ」で測るため。格上に勝てば大きく上がり、格下に勝っても
+// ほとんど上がらない ── その差を作るのがこの曲線で、勝ち星をただ数える方式や、
+// 1試合ごとの観測値を平均する方式では作れない（doc/design.md 8章の「averaging方式で
+// 起きた不都合」）。
+export function winProbability(scoreA, scoreB) {
+  return 1 / (1 + 10 ** ((scoreB - scoreA) / RANKING_CONFIG.scoreSpread));
+}
 
 // 大会規模による重み。tournament.weight が未設定(null)の場合は出場枠の数から暫定算出する。
 // （ここに来るのは1v1・リレーの大会だけなので、出場枠＝参加人数）
@@ -99,6 +113,26 @@ function countTournamentsByPlayer(matches) {
 // 順位を出す computeRankings と、大会ごとの寄与を出す scoreContributionsByPlayer が
 // まったく同じ計算を二度書かないために切り出してある。片方だけ式をいじると
 // 「発表画面に出る根拠」と「実際の順位」が食い違うので、必ずここを直すこと。
+//
+// 【何を解いているか】
+// 各選手にスコアを1つ与え、「そのスコア差から出る期待勝率で、実際の勝敗がいちばん
+// 起こりやすくなる」組み合わせを探す（Elo／Bradley-Terryの最尤推定）。1試合ごとに
+//
+//   勝ち星の余剰 = 実際の結果(勝ち1 / 負け0) − 期待勝率
+//
+// を集め、これが釣り合う位置までスコアを動かす。格上に勝てば余剰が大きく、格下に
+// 勝ってもほぼ0 ── だから「勝ち上がった選手が、初戦で負けた選手と並ぶ」ことは起きない。
+//
+// 【試合数の少ない選手の扱い（priorMatches）】
+// 全員に「初期値と同じ強さの仮想相手と priorMatches 回引き分けた」ぶんを足してある。
+// これが無いと、1試合しかしていない無敗の選手が無限に上がってしまう（優勝者も同じ）。
+// 引き戻す力があるので、試合数が少ない選手のスコアは初期値の近くに留まり、
+// 試合を重ねた選手ほど自分の成績どおりの位置まで動ける。
+//
+// 【解き方】
+// 選手ごとに1階微分（勝ち星の余剰）と2階微分（そのスコア帯で1点動かしたときの効き）を
+// 出し、その比だけ動かす（対角ニュートン法）。全選手を同時に更新し、動きが
+// convergenceEpsilon 未満になったら収束とみなす。実データでは十数回で収まる。
 function runScoring(state) {
   const { matches, tournaments } = state;
 
@@ -114,7 +148,7 @@ function runScoring(state) {
   });
   if (participantIds.size === 0) {
     return {
-      scores: new Map(), scale: 1, participantIds, rankedMatches, bonusOf: () => 0,
+      scores: new Map(), scale: 1, participantIds, rankedMatches, weightOf: () => 1,
     };
   }
 
@@ -129,107 +163,121 @@ function runScoring(state) {
     ? weightValues.reduce((a, b) => a + b, 0) / weightValues.length
     : 1;
 
-  const bonusOf = (tournamentId) => {
+  // 各試合の重み。平均を1にした相対値で、大きい大会の1勝ほど大きくスコアを動かす。
+  const weightOf = (tournamentId) => {
     const rawWeight = weightByTournament.get(tournamentId) ?? avgWeight;
-    const relativeWeight = avgWeight > 0 ? rawWeight / avgWeight : 1;
-    return RANKING_CONFIG.kFactor * relativeWeight;
+    return avgWeight > 0 ? rawWeight / avgWeight : 1;
   };
 
-  let scores = new Map();
-  participantIds.forEach((id) => scores.set(id, RANKING_CONFIG.initialScore));
+  const {
+    initialScore, scoreSpread, priorMatches,
+    maxIterations, convergenceEpsilon, maxStepPerIteration,
+  } = RANKING_CONFIG;
 
-  for (let iter = 0; iter < RANKING_CONFIG.maxIterations; iter += 1) {
-    const sums = new Map();
-    participantIds.forEach((id) => sums.set(id, { total: 0, count: 0 }));
+  const scores = new Map();
+  participantIds.forEach((id) => scores.set(id, initialScore));
+
+  for (let iter = 0; iter < maxIterations; iter += 1) {
+    // surplus: 勝ち星の余剰（実際の結果 − 期待勝率）の合計。プラスなら上げる方向。
+    // information: そのスコア帯で1点動かしたときの効きの大きさ。勝率が五分に近い試合ほど
+    // 大きく、力量差がはっきりしている試合ほど小さい（＝動かしても情報が増えない）。
+    const surplus = new Map();
+    const information = new Map();
+    participantIds.forEach((id) => {
+      surplus.set(id, 0);
+      information.set(id, 0);
+    });
 
     rankedMatches.forEach((m) => {
-      const bonus = bonusOf(m.tournamentId);
-      const winnerScore = scores.get(m.winnerId);
-      const loserScore = scores.get(m.loserId);
+      const weight = weightOf(m.tournamentId);
+      const winnerProb = winProbability(scores.get(m.winnerId), scores.get(m.loserId));
+      // 勝者から見た余剰。敗者にはそのまま符号を反転して入る（合計は必ず釣り合う）。
+      const gain = weight * (1 - winnerProb);
+      const info = weight * winnerProb * (1 - winnerProb);
 
-      // 勝者は「敗者の強さ + ボーナス」を観測値として得る（強い相手ほど得点が高い）。
-      const winnerSum = sums.get(m.winnerId);
-      winnerSum.total += loserScore + bonus;
-      winnerSum.count += 1;
-
-      // 敗者は「勝者の強さ - ボーナス」を観測値として得る（弱い相手に負けるほど失点が大きい）。
-      const loserSum = sums.get(m.loserId);
-      loserSum.total += winnerScore - bonus;
-      loserSum.count += 1;
+      surplus.set(m.winnerId, surplus.get(m.winnerId) + gain);
+      surplus.set(m.loserId, surplus.get(m.loserId) - gain);
+      information.set(m.winnerId, information.get(m.winnerId) + info);
+      information.set(m.loserId, information.get(m.loserId) + info);
     });
 
     let maxDelta = 0;
     const nextScores = new Map();
     participantIds.forEach((id) => {
-      const { total, count } = sums.get(id);
-      const newScore = count > 0 ? total / count : scores.get(id);
-      maxDelta = Math.max(maxDelta, Math.abs(newScore - scores.get(id)));
-      nextScores.set(id, newScore);
-    });
-    scores = nextScores;
+      // 仮想相手（初期値）との引き分けを priorMatches 回ぶん足す。実際の試合とまったく
+      // 同じ形で足すので、試合数が増えれば自然に効きが薄れていく。
+      const priorProb = winProbability(scores.get(id), initialScore);
+      const totalSurplus = surplus.get(id) + priorMatches * (0.5 - priorProb);
+      const totalInfo = information.get(id) + priorMatches * priorProb * (1 - priorProb);
 
-    if (maxDelta < RANKING_CONFIG.convergenceEpsilon) break;
+      // 余剰（勝ち星の単位）を、効きの大きさでスコアの単位（点）に直す。
+      // Math.LN10 は、期待勝率が10のべき乗で書かれていることから出てくる係数。
+      const rawStep = (scoreSpread * totalSurplus) / (Math.LN10 * Math.max(totalInfo, 1e-9));
+      const step = Math.max(-maxStepPerIteration, Math.min(maxStepPerIteration, rawStep));
+
+      maxDelta = Math.max(maxDelta, Math.abs(step));
+      nextScores.set(id, scores.get(id) + step);
+    });
+    nextScores.forEach((value, id) => scores.set(id, value));
+
+    if (maxDelta < convergenceEpsilon) break;
   }
 
   const maxScore = Math.max(...scores.values());
   const scale = maxScore > 0 ? RANKING_CONFIG.scaleTarget / maxScore : 1;
 
-  return { scores, scale, participantIds, rankedMatches, bonusOf };
+  return { scores, scale, participantIds, rankedMatches, weightOf };
 }
 
 // 選手ごとに「どの大会がスコアを押し上げたか」を、効いた順に並べて返す。
-// 戻り値: Map<選手ID, [{ tournamentId, score, matchCount, wins, losses }]>（score降順）
+// 戻り値: Map<選手ID, [{ tournamentId, impact, matchCount, wins, losses }]>（impact降順）
+//
+// 【impact とは】
+// その大会で挙げた「勝ち星の余剰」の合計 ── 実際の勝ち数から、スコアどおりなら
+// そうなったはずの期待勝ち数を引いた値（大会規模の重み付き）。スコアはこの余剰が
+// 釣り合う位置で決まるので（runScoring）、余剰がプラスの大会はスコアを押し上げ、
+// マイナスの大会は押し下げている。単位は点ではなく勝ち星で、大会どうしを比べるための
+// 物差しとしてだけ使う。
 //
 // 【なぜ順位ではなくこれで選ぶのか】
-// スコアは1試合ごとの観測値（勝てば「相手の強さ+ボーナス」、負ければ
-// 「相手の強さ-ボーナス」）の平均に収束する。つまり平均より高い観測値を出した大会が
-// スコアを押し上げ、低い大会が押し下げている。大会ごとに観測値の平均を出して
-// 高い順に並べれば、それがそのまま「スコアに良い影響を与えた大会」の順になる。
+// 少人数の大会で優勝するより、強豪ぞろいの大会で上位に食い込むほうがスコアには効く
+// ── その差がこの方式の要点で、発表画面はこちらの順で3件を選ぶ。負けた試合でも、
+// 期待勝率より上の内容（＝格上との対戦）なら余剰はマイナスに振れにくい。
 //
-// これは順位（優勝・ベスト4）とは一致しないことがある。少人数の大会で優勝するより、
-// 強豪ぞろいの大会で上位に食い込むほうがスコアには効く ── その差がこの方式の要点で、
-// 発表画面はこちらの順で3件を選ぶ。
-//
-// 観測値は収束後のスコアでもう一度取り直す。反復の途中の値には、まだ動いている
-// スコアが混ざっていて、大会どうしを比べる物差しにならないため。
+// 期待勝率は収束後のスコアで取り直す。反復の途中の値には、まだ動いているスコアが
+// 混ざっていて、大会どうしを比べる物差しにならないため。
 export function scoreContributionsByPlayer(state) {
-  const { scores, scale, rankedMatches, bonusOf } = runScoring(state);
+  const { scores, rankedMatches, weightOf } = runScoring(state);
 
   const byPlayer = new Map();
-  const observe = (playerId, tournamentId, observed, won) => {
+  const observe = (playerId, tournamentId, gained, won) => {
     if (!playerId) return;
     if (!byPlayer.has(playerId)) byPlayer.set(playerId, new Map());
     const byTournament = byPlayer.get(playerId);
     if (!byTournament.has(tournamentId)) {
       byTournament.set(tournamentId, {
-        tournamentId, total: 0, matchCount: 0, wins: 0, losses: 0,
+        tournamentId, impact: 0, matchCount: 0, wins: 0, losses: 0,
       });
     }
     const row = byTournament.get(tournamentId);
-    row.total += observed;
+    row.impact += gained;
     row.matchCount += 1;
     if (won) row.wins += 1;
     else row.losses += 1;
   };
 
   rankedMatches.forEach((m) => {
-    const bonus = bonusOf(m.tournamentId);
-    observe(m.winnerId, m.tournamentId, scores.get(m.loserId) + bonus, true);
-    observe(m.loserId, m.tournamentId, scores.get(m.winnerId) - bonus, false);
+    const weight = weightOf(m.tournamentId);
+    const winnerProb = winProbability(scores.get(m.winnerId), scores.get(m.loserId));
+    const gain = weight * (1 - winnerProb);
+    observe(m.winnerId, m.tournamentId, gain, true);
+    observe(m.loserId, m.tournamentId, -gain, false);
   });
 
   const result = new Map();
   byPlayer.forEach((byTournament, playerId) => {
     result.set(playerId, [...byTournament.values()]
-      .map((row) => ({
-        tournamentId: row.tournamentId,
-        matchCount: row.matchCount,
-        wins: row.wins,
-        losses: row.losses,
-        // 画面に出ているスコアと同じ物差しにそろえる（順位表と桁が違うと比べられない）
-        score: (row.total / row.matchCount) * scale,
-      }))
-      .sort((a, b) => b.score - a.score));
+      .sort((a, b) => b.impact - a.impact));
   });
   return result;
 }
@@ -252,6 +300,16 @@ export function computeRankings(state) {
   // 好成績はスコアと違い、対象外の大会も含めて集計期間内の全出場大会から選ぶ。
   const allTournamentsByPlayer = countTournamentsByPlayer(matches);
 
+  // 同点のときの並び順を決めるための勝ち数（表示には出さない）。
+  // 力量が本当に同じ形の成績（対称なブラケットの別ブロックなど）では小数点まで同じ
+  // スコアになりうる。そのままだと並びが試合データの読み込み順で変わってしまうので、
+  // 勝ち数 → 名前 で必ず同じ順になるようにする。
+  const winsByPlayer = new Map();
+  rankedMatches.forEach((m) => {
+    if (!m.winnerId) return;
+    winsByPlayer.set(m.winnerId, (winsByPlayer.get(m.winnerId) ?? 0) + 1);
+  });
+
   return [...participantIds]
     .map((id) => {
       const player = players.find((p) => p.id === id);
@@ -265,6 +323,10 @@ export function computeRankings(state) {
       };
     })
     .filter((r) => r.tournamentsPlayed >= RANKING_CONFIG.minTournaments)
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => (
+      b.score - a.score
+      || (winsByPlayer.get(b.id) ?? 0) - (winsByPlayer.get(a.id) ?? 0)
+      || a.name.localeCompare(b.name, 'ja')
+    ))
     .map((r, idx) => ({ ...r, rank: idx + 1 }));
 }
