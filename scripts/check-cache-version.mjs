@@ -57,6 +57,17 @@ for (const [key, value] of Object.entries(imports)) {
 const pageRefs = [...html.matchAll(/data-src="(pages\/[\w.-]+\.html)(\?v=(\d+))?"/g)];
 for (const [, file, , v] of pageRefs) collect(v, file);
 
+// CSSの中から img/ を指す url() も同じ版数にそろえる。ここだけ index.html の外に
+// 版数があるので、まとめて上げるときに取り残されやすい ── 取り残すと、画像は
+// 1年 immutable なので差し替えても古いまま配られ続ける。
+const cssNames = readdirSync(path.join(ROOT, 'css')).filter((n) => n.endsWith('.css'));
+for (const name of cssNames) {
+  const source = readFileSync(path.join(ROOT, 'css', name), 'utf8');
+  for (const [, ref] of source.matchAll(/url\(\s*['"]?((?:\.\.\/)?img\/[^'")]+)['"]?\s*\)/g)) {
+    collect(ref.match(/\?v=(\d+)$/)?.[1], `css/${name} の "${ref}"`);
+  }
+}
+
 if (versions.size > 1) {
   fail(`版数がそろっていません: ${[...versions].sort().join(', ')}`);
 } else if (versions.size === 1) {
@@ -122,9 +133,14 @@ function localRefs(source) {
   return found;
 }
 
+// CSSは css/ の中身をすべて見る。style.css だけを名指ししていたころに
+// reveal.css の url() が検査から漏れていた ── 分割したファイルを足すたびに
+// ここへ書き足すのを忘れるので、名指しをやめて拾い集める形にした。
 const scanned = [
   ['index.html', html],
-  ['css/style.css', readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8')],
+  ...readdirSync(path.join(ROOT, 'css')).filter((n) => n.endsWith('.css')).map(
+    (n) => [`css/${n}`, readFileSync(path.join(ROOT, 'css', n), 'utf8')],
+  ),
   ...readdirSync(path.join(ROOT, 'pages')).map(
     (n) => [`pages/${n}`, readFileSync(path.join(ROOT, 'pages', n), 'utf8')],
   ),

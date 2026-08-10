@@ -351,8 +351,10 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 
    このカードはOBSの「ブラウザ」ソース（1920×1080ぴったり）で読み込み、
    録画済みのプレー動画レイヤーの上に透過で重ねて使う。だから、この画面自身は
-   一切背景を持たない（.reveal-card にも #reveal-stage にも背景色を置かない。
+   原則として背景を持たない（.reveal-card にも #reveal-stage にも背景色を置かない。
    body.reveal-playing で style.css の地模様も打ち消す）。
+   例外は使用キャラクターの列（.reveal-chara）だけで、あそこは切り抜きの絵を
+   立たせるために専用の地を敷いている ── 理由はその規則のところに書いてある。
 
    横に3列。左から 選手アイコン / 使用キャラクター / 文字。
    画面の端から端まで、上下も余白なしで使い切る（padding を持たない）。
@@ -511,12 +513,26 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
    縦に積んで、メインが上から2/3、サブがのこり1/3を分け合う
    （サブ1体なら1/3をひとりで、2体なら1/6ずつ）。枠どうしの切れ目も線で、
    角丸や影は付けない ── 島にすると、下の映像から浮いた板に見えてしまう。 */
+/* この列だけは下の映像を透かさず、専用の地を敷く（img/character_back.webp）。
+   カード全体は透過が原則だが（この節の冒頭を参照）、キャラクターの絵は背景を
+   抜いた切り抜きなので、動くプレー動画の上に直接置くと輪郭が映像に溶ける。
+   ここだけ地を持たせて、絵が必ず同じ面の上に立つようにする。
+
+   絵は 1672×941 の横長で、この列は 461×1080 の縦長。cover で満たすと横幅の
+   24%ぶん、ちょうど真ん中だけが映る ── 素材は中央を静かな暗緑にして左右の端に
+   三角形を寄せた作りなので、切り出されるのは意図された「物を置く場所」のほう。
+   端の三角形をもっと見せたいときは background-position を左右へ振る。
+
+   この画像を読みに行くのは、発表カードが実際に組まれたときだけ。CSSは全ページで
+   読まれるが、背景画像は要素が描かれるまで取りに行かれず、.reveal-chara は
+   js/reveal.js が発表のときに初めて作るため（背景動画の data-src と同じ考え方）。 */
 .reveal-chara {
   flex: 0 0 24%;
   min-width: 0;
   display: flex;
   flex-direction: column;
   border-right: 3px solid var(--reveal-accent, var(--accent));
+  background: #10241a url('../img/character_back.webp?v=133') center / cover no-repeat;
 }
 
 .reveal-chara-main {
