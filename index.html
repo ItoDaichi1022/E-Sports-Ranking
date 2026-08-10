@@ -22,20 +22,20 @@
 <meta property="og:locale" content="ja_JP">
 <meta property="og:title" content="IgniteArena — どこでも熱く、遊べ。">
 <meta property="og:description" content="コミュニティの大会運営と個人ランキングをまとめて扱う場所。大会を開く・エントリーする・対戦表を追う。">
-<meta property="og:image" content="img/icon.png?v=131">
+<meta property="og:image" content="img/icon.png?v=132">
 <meta name="twitter:card" content="summary">
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。
      タブはWebP。iOSのホーム画面（apple-touch-icon）だけはWebPを読まないのでPNGを残す。 -->
-<link rel="icon" href="img/icon.webp?v=131" type="image/webp">
-<link rel="apple-touch-icon" href="img/icon.png?v=131">
+<link rel="icon" href="img/icon.webp?v=132" type="image/webp">
+<link rel="apple-touch-icon" href="img/icon.png?v=132">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=131">
+<link rel="stylesheet" href="css/style.css?v=132">
 <!-- 順位発表の画面（#reveal）だけで使う。style.css は既に長いので分けてある。 -->
-<link rel="stylesheet" href="css/reveal.css?v=131">
+<link rel="stylesheet" href="css/reveal.css?v=132">
 
 <!-- スクロールに合わせた登場アニメの「入れ物」を開ける印。
      登場アニメは「最初は透明 → 見えたら不透明」で作るが、その透明を素で
@@ -332,7 +332,7 @@
                画像を差し替えるときは、この2つの数字も実寸に合わせること
                （img/README.md 参照）。 -->
           <img class="hero-game-logo" id="hero-game-logo"
-               src="img/game-logo.webp?v=131" alt="" width="700" height="623">
+               src="img/game-logo.webp?v=132" alt="" width="700" height="623">
         </div>
 
         <p class="hero-eyebrow reveal">Tournament &amp; Ranking</p>
@@ -482,12 +482,12 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=131"></section>
+  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=132"></section>
 
   <!-- 本番までの環境づくり（回線・コントローラ）。中身は pages/setup.html。
        エントリー済みの大会詳細から誘導する（js/entries.js の setupPrompt）。
        楽天アフィリエイトのリンクを含むので、広告である旨の明示がページ冒頭にある。 -->
-  <section id="view-setup" class="view stage" hidden data-src="pages/setup.html?v=131"></section>
+  <section id="view-setup" class="view stage" hidden data-src="pages/setup.html?v=132"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -961,7 +961,7 @@
              （pages/*.html の遅延読み込みと同じ作法）。
              muted は必須 ── 音声トラックを持っているので、外すと収録に音が乗るうえ、
              ブラウザの自動再生も止められる。 -->
-        <video id="reveal-bg" data-src="video/0204.mp4?v=131"
+        <video id="reveal-bg" data-src="video/0204.mov?v=132"
                muted loop playsinline preload="none" aria-hidden="true"></video>
         <!-- 1枚ぶんの画が入れ替わる場所。背景動画を消さずに中身だけ差し替えるため、
              canvas ではなくこの内側を replaceChildren する。 -->
@@ -978,9 +978,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=131"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=132"></section>
 
-  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=131"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=132"></section>
 
 </main>
 
@@ -1001,7 +1001,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=131"></script>
+<script src="js/vendor/supabase.js?v=132"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -1013,34 +1013,34 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=131",
-    "./js/bracket.js":        "./js/bracket.js?v=131",
-    "./js/bracketView.js":    "./js/bracketView.js?v=131",
-    "./js/characterData.js":  "./js/characterData.js?v=131",
-    "./js/characterFocus.js": "./js/characterFocus.js?v=131",
-    "./js/characterPicker.js": "./js/characterPicker.js?v=131",
-    "./js/characters.js":     "./js/characters.js?v=131",
-    "./js/db.js":             "./js/db.js?v=131",
-    "./js/entries.js":        "./js/entries.js?v=131",
-    "./js/formDraft.js":      "./js/formDraft.js?v=131",
-    "./js/icons.js":          "./js/icons.js?v=131",
-    "./js/intro.js":          "./js/intro.js?v=131",
-    "./js/matchChat.js":      "./js/matchChat.js?v=131",
-    "./js/organizerPicker.js": "./js/organizerPicker.js?v=131",
-    "./js/playerStats.js":    "./js/playerStats.js?v=131",
-    "./js/players.js":        "./js/players.js?v=131",
-    "./js/profile.js":        "./js/profile.js?v=131",
-    "./js/ranking.js":        "./js/ranking.js?v=131",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=131",
-    "./js/reveal.js":         "./js/reveal.js?v=131",
-    "./js/stage.js":          "./js/stage.js?v=131",
-    "./js/state.js":          "./js/state.js?v=131",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=131",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=131",
-    "./js/util.js":           "./js/util.js?v=131"
+    "./js/auth.js":           "./js/auth.js?v=132",
+    "./js/bracket.js":        "./js/bracket.js?v=132",
+    "./js/bracketView.js":    "./js/bracketView.js?v=132",
+    "./js/characterData.js":  "./js/characterData.js?v=132",
+    "./js/characterFocus.js": "./js/characterFocus.js?v=132",
+    "./js/characterPicker.js": "./js/characterPicker.js?v=132",
+    "./js/characters.js":     "./js/characters.js?v=132",
+    "./js/db.js":             "./js/db.js?v=132",
+    "./js/entries.js":        "./js/entries.js?v=132",
+    "./js/formDraft.js":      "./js/formDraft.js?v=132",
+    "./js/icons.js":          "./js/icons.js?v=132",
+    "./js/intro.js":          "./js/intro.js?v=132",
+    "./js/matchChat.js":      "./js/matchChat.js?v=132",
+    "./js/organizerPicker.js": "./js/organizerPicker.js?v=132",
+    "./js/playerStats.js":    "./js/playerStats.js?v=132",
+    "./js/players.js":        "./js/players.js?v=132",
+    "./js/profile.js":        "./js/profile.js?v=132",
+    "./js/ranking.js":        "./js/ranking.js?v=132",
+    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=132",
+    "./js/reveal.js":         "./js/reveal.js?v=132",
+    "./js/stage.js":          "./js/stage.js?v=132",
+    "./js/state.js":          "./js/state.js?v=132",
+    "./js/supabaseClient.js": "./js/supabaseClient.js?v=132",
+    "./js/tournamentTier.js": "./js/tournamentTier.js?v=132",
+    "./js/util.js":           "./js/util.js?v=132"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=131"></script>
+<script type="module" src="js/app.js?v=132"></script>
 </body>
 </html>

@@ -132,10 +132,12 @@ const scanned = [
 
 let refCount = 0;
 let refProblems = 0;
+let missingRefs = 0;
 for (const [where, source] of scanned) {
   for (const ref of localRefs(source)) {
     // 先頭の ./ ../ / を落として、どのディレクトリ配下かだけを見る
-    const dir = ref.replace(/^(\.\.?\/)+/, '').replace(/^\//, '').split('/')[0];
+    const relative = ref.replace(/^(\.\.?\/)+/, '').replace(/^\//, '');
+    const dir = relative.split('/')[0];
     if (!IMMUTABLE_DIRS.includes(dir)) continue;
     refCount += 1;
     if (!/\?v=\d+/.test(ref)) {
@@ -143,10 +145,21 @@ for (const [where, source] of scanned) {
       fail(`${where} の "${ref}" に ?v= がありません`
         + '（_headers で1年キャッシュされる場所なので、更新できなくなります）');
     }
+    // 指し先が実在するかも見る。素材を差し替えて拡張子が変わったとき
+    // （video/0204.mp4 → .mov）、参照だけが古いまま残ると本番で404になる。
+    // ブラウザの<video>は読めなくても黙って止まるだけなので、ここで弾かないと
+    // 収録の当日まで気づけない。
+    if (!existsSync(path.join(ROOT, relative.replace(/\?.*$/, '')))) {
+      missingRefs += 1;
+      fail(`${where} の "${ref}" は存在しないファイルを指しています`);
+    }
   }
 }
 if (refCount && refProblems === 0) {
   console.log(`OK   1年キャッシュされる${refCount}件の参照すべてに ?v= がある`);
+}
+if (refCount && missingRefs === 0) {
+  console.log(`OK   同${refCount}件の指し先がすべて実在する`);
 }
 
 // ---- キャラクターの画像 ----
