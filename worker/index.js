@@ -81,7 +81,11 @@ function safeDecode(s) {
 }
 
 // 大会を1件だけ引く。anonキーで読める（supabase/schema.sql の tournaments_select は
-// anon に対して using (true)）。参加数は js/db.js の一覧と同じ埋め込みカウントで取る。
+// anon にも開いている）。参加数は js/db.js の一覧と同じ埋め込みカウントで取る。
+//
+// 【準備中の大会は引けない】公開前（status = 'draft'）の行はRLSが anon に返さない
+// ので、0件＝「見つかりません」になる。共有URLを先に配られても、公開するまでは
+// 大会名も画像も出ない ── 意図した動きで、直す対象ではない。
 async function fetchTournament(env, id) {
   const query = new URLSearchParams({
     id: `eq.${id}`,

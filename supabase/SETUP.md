@@ -192,6 +192,8 @@ URLは `https://好きな名前.pages.dev/` になり、`git push` で自動デ�
 | [`migration-018.sql`](migration-018.sql) | ゲームカウントの「相手の承認」を撤廃（`match_result_reports` テーブルの削除） |
 | [`migration-019.sql`](migration-019.sql) | 大会を誰でも作れるようにし、権限を大会ごとに持たせる（`tournament_organizers` テーブル＋`owner` ロール） |
 | [`migration-020.sql`](migration-020.sql) | 配信台が未定でも回戦を開始できるようにする（`rounds_stream_before_start` 制約の削除） |
+| [`migration-021.sql`](migration-021.sql) | エントリーの締切時刻（`tournaments.entry_deadline`。表示だけで、自動では締め切らない） |
+| [`migration-022.sql`](migration-022.sql) | 準備中（`draft`）の大会を運営以外には返さないようにする（`is_tournament_visible` と閲覧ポリシー） |
 
 補足:
 

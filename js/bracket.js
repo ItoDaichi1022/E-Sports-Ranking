@@ -343,11 +343,14 @@ export function editMatch(tournamentId, matchId) {
   return { ok: true };
 }
 
-// 大会の基本情報（名前・日付・対戦方法・ランキング反映・定員・ルール）を修正する。
+// 大会の基本情報（名前・日付・対戦方法・ランキング反映・定員・締切・ルール）を修正する。
 // 募集中でも変更できる。
 export function updateTournament(
   tournamentId,
-  { name, date, matchType, matchTypeNote, rankingOptIn, rules, streamUrl, capacity },
+  {
+    name, date, matchType, matchTypeNote, rankingOptIn, rules, streamUrl, capacity,
+    entryDeadline,
+  },
 ) {
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) return { ok: false, error: '対象の大会が見つかりません。' };
@@ -398,6 +401,12 @@ export function updateTournament(
     }
     tournament.capacity = capacity;
   }
+
+  // エントリー締切。呼び出し側で日時として検証済みのISO文字列（未設定は null）。
+  // 過ぎた時刻も受け付ける ── 締め切るのは運営の操作で、締切はあくまで掲示なので、
+  // 「もう過ぎている時刻を入れ直す」ことに意味がある場面（延ばしそこねた告知を
+  // 実態に合わせる、など）を塞ぐ理由が無い。
+  if (entryDeadline !== undefined) tournament.entryDeadline = entryDeadline || null;
 
   tournament.name = newName;
   tournament.date = date || null;

@@ -25,7 +25,7 @@ import { characterImageUrl } from './characters.js';
 import { keepFormDraft, clearFormDraft } from './formDraft.js';
 import { mountOrganizerPicker } from './organizerPicker.js';
 import {
-  renderRecruitPage, renderTournamentActions, STATUS_LABELS, entrantUnit,
+  renderRecruitPage, renderTournamentActions, STATUS_LABELS, entrantUnit, entryDeadlineText,
 } from './entries.js';
 import {
   auth, initAuth, isAdmin, isOwner, canManageTournament, isLoggedIn, needsOnboarding,
@@ -65,6 +65,7 @@ const tournamentForm = $('tournament-form');
 const tournamentNameInput = $('tournament-name-input');
 const tournamentDateInput = $('tournament-date-input');
 const tournamentCapacityInput = $('tournament-capacity-input');
+const tournamentDeadlineInput = $('tournament-deadline-input');
 const tournamentRulesInput = $('tournament-rules-input');
 const tournamentOrganizersEl = $('tournament-organizers');
 const tournamentStreamInput = $('tournament-stream-input');
@@ -144,6 +145,7 @@ const entrantsBackLink = $('entrants-back-link');
 const resultSectionEl = $('result-section');
 const bracketBackLink = $('bracket-back-link');
 const tournamentEditCapacityInput = $('tournament-edit-capacity-input');
+const tournamentEditDeadlineInput = $('tournament-edit-deadline-input');
 
 const playerDetailEl = $('player-detail');
 const playerBackBtn = $('player-back-btn');
@@ -1236,6 +1238,36 @@ function readStreamUrl(input) {
   return url;
 }
 
+// エントリー締切の入力欄（input[type=datetime-local]）とDBの値の橋渡し。
+//
+// 入力欄が返すのは「2026-08-15T21:00」という、地域の情報を持たない壁時計の文字列。
+// 打った人の時計での時刻なので、そのまま Date に渡すとローカル時刻として読まれ、
+// 保存はISO（UTC）になる。逆に戻すときは同じ経路を通す必要があり、
+// toISOString() をそのまま入れると9時間ずれた時刻が欄に出る。
+const INVALID_DEADLINE = Symbol('invalid-deadline');
+
+function readDeadline(input) {
+  const raw = input.value.trim();
+  if (!raw) return null;
+  const at = new Date(raw);
+  if (Number.isNaN(at.getTime())) {
+    alert('エントリー締切の日時が正しくありません。');
+    input.focus();
+    return INVALID_DEADLINE;
+  }
+  return at.toISOString();
+}
+
+// ISO → 入力欄の値。分までしか扱わないので秒以下は落とす。
+function deadlineInputValue(iso) {
+  if (!iso) return '';
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`
+    + `T${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
+
 // 詳細ページ（大会・お知らせ）の画像ヘッダー。
 // 画像が無いときは枠ごと隠し、余白だけが残らないようにする。
 function renderHero(el, imageUrl) {
@@ -1305,6 +1337,12 @@ function renderTournamentInfo(tournament) {
     .map((id) => getPlayerName(id))
     .filter(Boolean);
 
+  // エントリー締切。募集を終えれば役目の済む値なので、進行中・終了した大会では出さない
+  // （残り時間つきの掲示は、エントリーボタンの隣にある。js/entries.js）。
+  const deadlineText = tournament.status === 'draft' || tournament.status === 'recruiting'
+    ? entryDeadlineText(tournament)
+    : '';
+
   let html = `
     <h3>大会情報</h3>
     ${openReports.length > 0 ? `
@@ -1323,6 +1361,7 @@ function renderTournamentInfo(tournament) {
       <div><dt>形式</dt><dd>${escapeHtml(formatLabel)}</dd></div>
       <div><dt>三位決定戦</dt><dd>${tournament.thirdPlaceMatch ? '行う' : '行わない'}</dd></div>
       <div><dt>開催日</dt><dd>${escapeHtml(tournament.date || '日付未設定')}</dd></div>
+      ${deadlineText ? `<div><dt>エントリー締切</dt><dd>${escapeHtml(deadlineText)}</dd></div>` : ''}
       <div><dt>進行状況</dt><dd>${escapeHtml(tournamentStatusLabel(tournament))}</dd></div>
       ${organizerNames.length > 0
     ? `<div><dt>運営</dt><dd>${escapeHtml(organizerNames.join('、'))}</dd></div>`
@@ -2314,6 +2353,9 @@ tournamentForm.addEventListener('submit', async (e) => {
   const streamUrl = readStreamUrl(tournamentStreamInput);
   if (streamUrl === INVALID_URL) return;
 
+  const entryDeadline = readDeadline(tournamentDeadlineInput);
+  if (entryDeadline === INVALID_DEADLINE) return;
+
   const tournament = {
     id: newId(),
     name,
@@ -2334,7 +2376,14 @@ tournamentForm.addEventListener('submit', async (e) => {
     // 定員はエントリー募集を制御するためのもの。運営が参加者を直接選ぶ場合は
     // 意味を持たないうえ、選んだ人数が定員を超えると自分で自分を弾いてしまう。
     capacity: manual ? null : capacity,
-    status: manual ? 'running' : 'recruiting',
+    // 締切も募集のための値。運営が参加者を直接選ぶ大会には募集そのものが無い
+    entryDeadline: manual ? null : entryDeadline,
+    // 作った大会は必ず準備中（＝非公開）から始まる。募集の開始も、参加者を直に
+    // 選んだ大会の開始も、運営が大会ページで「公開」を押したときに起きる
+    // （js/entries.js の adminControls）。作った瞬間に世に出ると、打ち間違いも
+    // 決めかねている日付もそのまま広まってしまい、取り消しがきかない。
+    // DB側も draft の行を運営以外に返さない（supabase/migration-022.sql）。
+    status: 'draft',
     createdBy: auth.player?.id ?? null,
     // この経路は個人戦専用（2v2は上で弾いている）なので、出場枠＝選手で同じ配列になる
     entrantIds: manual ? [...selectedParticipantIds] : [],
@@ -2383,6 +2432,7 @@ tournamentForm.addEventListener('submit', async (e) => {
   syncMatchTypeNote();
   syncEntryModeForMatchType();
   tournamentCapacityInput.value = '';
+  tournamentDeadlineInput.value = '';
   tournamentRulesInput.value = '';
   tournamentStreamInput.value = '';
   tournamentThirdPlaceInput.checked = false;
@@ -2393,7 +2443,9 @@ tournamentForm.addEventListener('submit', async (e) => {
   clearFormDraft(TOURNAMENT_DRAFT_KEY);
 
   await refreshFromDb();
-  location.hash = manual ? `#tournament/${encodeURIComponent(tournament.id)}` : '#tournaments/recruiting';
+  // 作り終えたら、作り方に関わらずその大会のページへ。公開の操作はそこにあり、
+  // 一覧へ戻しても（まだ非公開なので）運営以外には何も無いページに見える。
+  location.hash = `#tournament/${encodeURIComponent(tournament.id)}`;
 });
 
 // 大会の共有リンク。いま開いているURL（#tournament/xxx）ではなく、専用の /t/{id} を配る。
@@ -2457,6 +2509,7 @@ tournamentEditBtn.addEventListener('click', () => {
   tournamentEditRankingOptInInput.checked = tournament.rankingOptIn !== false;
   syncEditMatchTypeNote();
   tournamentEditCapacityInput.value = tournament.capacity ?? '';
+  tournamentEditDeadlineInput.value = deadlineInputValue(tournament.entryDeadline);
   tournamentEditRulesInput.value = tournament.rules || '';
   tournamentEditStreamInput.value = tournament.streamUrl || '';
   tournamentEditImagePicker.setCurrent(tournament.imageUrl || '');
@@ -2492,6 +2545,9 @@ tournamentEditForm.addEventListener('submit', async (e) => {
   const streamUrl = readStreamUrl(tournamentEditStreamInput);
   if (streamUrl === INVALID_URL) return;
 
+  const entryDeadline = readDeadline(tournamentEditDeadlineInput);
+  if (entryDeadline === INVALID_DEADLINE) return;
+
   const capacityRaw = tournamentEditCapacityInput.value.trim();
   const result = updateTournament(currentBracketTournamentId, {
     name: tournamentEditNameInput.value,
@@ -2502,6 +2558,7 @@ tournamentEditForm.addEventListener('submit', async (e) => {
     rules: tournamentEditRulesInput.value,
     streamUrl,
     capacity: capacityRaw === '' ? null : Number(capacityRaw),
+    entryDeadline,
   });
   if (!result.ok) {
     alert(result.error);

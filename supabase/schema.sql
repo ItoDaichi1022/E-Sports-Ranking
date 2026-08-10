@@ -69,6 +69,12 @@ create table if not exists tournaments (
   -- draft(準備中) → recruiting(募集中) → running(進行中) → finished(終了)
   status     text not null default 'draft',
   capacity   int,
+  -- 運営が掲げるエントリーの締切時刻（任意）。「いつまでに入ればよいか」を選手に
+  -- 見せるためだけの列で、この時刻を過ぎても何も自動では起きない ── 締め切って
+  -- ブラケットを作るのは今までどおり運営の操作（js/entries.js の
+  -- closeRecruitmentAndStart）で、時刻はその判断材料として出す。
+  -- date 列と違って時刻に意味があるので timestamptz で持つ。
+  entry_deadline timestamptz,
   -- 大会規模の重み。null なら参加人数から自動算出（js/ranking.js）
   weight     numeric,
   created_by uuid references players(id) on delete set null,
@@ -360,6 +366,38 @@ as $$
     where o.tournament_id = p_tournament_id
       and o.player_id = current_player_id()
   );
+$$;
+
+-- その大会を世間に出してよいか。準備中（draft）の大会は運営にしか見えない。
+--
+-- 大会は作った瞬間から draft で、公開するのは運営が押したとき（js/entries.js の
+-- adminControls）。それまでは名前も日付もルールも、選手にもゲストにも返さない ──
+-- 画面から隠すだけでは、URLを直に叩けば読めてしまう。
+--
+-- 大会にぶら下がるもの（エントリー・チーム・運営・対戦表）の閲覧ポリシーも
+-- これを通す。大会本体だけ隠しても、チーム名や出場者がそのまま読めるなら
+-- 隠したことにならない。
+-- security definer なのは、中で見る tournaments 自身の閲覧ポリシーに
+-- 引っかからないようにするため（掛かると draft が見えず、常に真になってしまう）。
+create or replace function is_tournament_visible(p_tournament_id uuid)
+  returns boolean
+  language sql
+  security definer
+  stable
+  set search_path = public
+as $$
+  -- case にしているのは、評価の順を確実にするため。or で並べると、どちらを先に
+  -- 見るかは実行計画しだいで、行ごとに is_tournament_admin（さらにその中で
+  -- players の参照）が走ることになりかねない。公開済みの大会が大多数なので、
+  -- 主キー1回の確認で済ませられる側を必ず先に見る。
+  select case
+    when exists (
+      select 1 from tournaments t
+      where t.id = p_tournament_id
+        and (t.status <> 'draft' or t.created_by = current_player_id())
+    ) then true
+    else is_tournament_admin(p_tournament_id)
+  end;
 $$;
 
 -- 大会を作った人を必ずその大会の運営にする。
@@ -691,10 +729,23 @@ create policy players_delete on players
 
 -- ---- tournaments ----
 
+-- 準備中（draft）の大会は運営にしか返さない。運営が公開するまで、選手にも
+-- ゲストにも「その大会がある」ことすら知られない（is_tournament_visible の説明を参照）。
+--
+-- 【created_by を見ている理由】大会の作成は insert ... returning で行う
+-- （js/db.js の createTournament）。returning で返る行にもこのポリシーが掛かるが、
+-- 作った人を運営に入れるのは after insert のトリガなので、その時点ではまだ
+-- tournament_organizers に行が無い ── is_tournament_admin だけで判定すると、
+-- サイト全体の運営でない人は自分が作った大会を受け取れずに失敗する。
+-- 作った本人にはいつでも見えるべきものでもあるので、ここで直接見る。
 drop policy if exists tournaments_select on tournaments;
 create policy tournaments_select on tournaments
   for select to anon, authenticated
-  using (true);
+  using (
+    status <> 'draft'
+    or created_by = current_player_id()
+    or is_tournament_admin(id)
+  );
 
 -- 選手登録さえ済んでいれば誰でも大会を作れる。作った人はトリガで
 -- その大会の運営に入るので、作った直後から編集・削除できる。
@@ -719,7 +770,7 @@ create policy tournaments_delete on tournaments
 drop policy if exists organizers_select on tournament_organizers;
 create policy organizers_select on tournament_organizers
   for select to anon, authenticated
-  using (true);
+  using (is_tournament_visible(tournament_id));
 
 -- 運営の付け外しができるのは、その大会の運営自身とサイト全体の運営。
 drop policy if exists organizers_write on tournament_organizers;
@@ -733,7 +784,7 @@ create policy organizers_write on tournament_organizers
 drop policy if exists teams_select on tournament_teams;
 create policy teams_select on tournament_teams
   for select to anon, authenticated
-  using (true);
+  using (is_tournament_visible(tournament_id));
 
 -- 一般ユーザーの経路は下のRPC（enter_tournament_as_team / cancel_team_entry）に
 -- 限定する。RPCは security definer なのでRLSを通らない。直接の書き込みは運営だけ。
@@ -748,7 +799,7 @@ create policy teams_write on tournament_teams
 drop policy if exists entries_select on tournament_entries;
 create policy entries_select on tournament_entries
   for select to anon, authenticated
-  using (true);
+  using (is_tournament_visible(tournament_id));
 
 -- 自分の選手行で、募集中の大会にだけエントリーできる。
 -- チーム戦は申し込んだ人が相方の行も入れる必要があるので、このポリシーでは通らない。
@@ -791,9 +842,11 @@ create policy entries_update on tournament_entries
 
 -- ---- brackets / matches / published_rankings ----
 
+-- 運営が参加者を直接選ぶ大会では、作成した時点でブラケットまで出来ている。
+-- 公開前に組み合わせを見られてしまわないよう、ここも大会と同じ見え方にそろえる。
 drop policy if exists brackets_select on brackets;
 create policy brackets_select on brackets
-  for select to anon, authenticated using (true);
+  for select to anon, authenticated using (is_tournament_visible(tournament_id));
 
 drop policy if exists brackets_write on brackets;
 create policy brackets_write on brackets
@@ -801,9 +854,12 @@ create policy brackets_write on brackets
   using (is_tournament_admin(tournament_id))
   with check (is_tournament_admin(tournament_id));
 
+-- 試合結果も大会と同じ見え方にそろえる。運営が参加者を直接選んだ大会は公開前から
+-- 対戦表を持てるので、公開せずに回戦を始めることもできてしまう。そこで漏れないよう、
+-- ぶら下がるものは例外なく is_tournament_visible を通す。
 drop policy if exists matches_select on matches;
 create policy matches_select on matches
-  for select to anon, authenticated using (true);
+  for select to anon, authenticated using (is_tournament_visible(tournament_id));
 
 drop policy if exists matches_write on matches;
 create policy matches_write on matches
@@ -865,7 +921,7 @@ create policy chat_delete on match_chat_messages
 drop policy if exists rounds_select on tournament_rounds;
 create policy rounds_select on tournament_rounds
   for select to anon, authenticated
-  using (true);
+  using (is_tournament_visible(tournament_id));
 
 drop policy if exists rounds_write on tournament_rounds;
 create policy rounds_write on tournament_rounds
@@ -1357,15 +1413,18 @@ revoke all on function round_is_started(uuid, uuid)    from anon, public;
 revoke all on function report_match_result(uuid, uuid, text, uuid) from anon, public;
 revoke all on function is_owner()                      from anon, public;
 revoke all on function is_tournament_admin(uuid)       from anon, public;
+revoke all on function is_tournament_visible(uuid)     from anon, public;
 grant execute on function bracket_match(uuid, uuid)       to authenticated;
 grant execute on function is_owner()                      to authenticated;
--- is_match_participant と is_tournament_admin だけは anon にも許可する。
--- match_room_codes と match_chat_reports の select ポリシーは anon にも適用され、
--- その中でこれらの関数を呼ぶため、実行権限が無いとゲストの読み込み自体が
--- 42501で失敗する（行が0件になるのではなく、エラーになる）。ログインして
--- いなければ常に偽を返すだけなので、ゲストに見えるデータは増えない。
+-- is_match_participant / is_tournament_admin / is_tournament_visible だけは
+-- anon にも許可する。match_room_codes・match_chat_reports・大会まわりの select
+-- ポリシーは anon にも適用され、その中でこれらの関数を呼ぶため、実行権限が
+-- 無いとゲストの読み込み自体が42501で失敗する（行が0件になるのではなく、
+-- エラーになる）。ログインしていなければ「公開済みの大会か」を答えるだけ、
+-- あるいは常に偽を返すだけなので、ゲストに見えるデータは増えない。
 grant execute on function is_match_participant(uuid, uuid) to anon, authenticated;
 grant execute on function is_tournament_admin(uuid)        to anon, authenticated;
+grant execute on function is_tournament_visible(uuid)      to anon, authenticated;
 grant execute on function can_use_match_chat(uuid, uuid)  to authenticated;
 grant execute on function match_chat_is_open(uuid, uuid)  to authenticated;
 grant execute on function my_entrant_id(uuid)             to authenticated;

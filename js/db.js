@@ -127,6 +127,9 @@ function toTournament(row, { entrantIds, entrantSeeds, participantIds, teams }) 
     weight: row.weight,
     status: row.status,
     capacity: row.capacity,
+    // 運営が掲げるエントリーの締切時刻（ISO文字列）。未設定は null。
+    // これを過ぎても自動では何も起きない（画面に出すだけ。js/entries.js を参照）
+    entryDeadline: row.entry_deadline ?? null,
     createdBy: row.created_by,
     // 出場枠と出場した人。個人戦では同じ配列になる（js/state.js の説明を参照）
     entrantIds,
@@ -838,6 +841,7 @@ export async function createTournament(tournament) {
       third_place_match: Boolean(tournament.thirdPlaceMatch),
       status: tournament.status ?? 'draft',
       capacity: tournament.capacity ?? null,
+      entry_deadline: tournament.entryDeadline || null,
       weight: tournament.weight ?? null,
       created_by: tournament.createdBy ?? null,
     })
@@ -862,6 +866,7 @@ export async function saveTournament(tournament) {
       third_place_match: Boolean(tournament.thirdPlaceMatch),
       status: tournament.status,
       capacity: tournament.capacity ?? null,
+      entry_deadline: tournament.entryDeadline || null,
     })
     .eq('id', tournament.id);
   check(error, '大会の保存');

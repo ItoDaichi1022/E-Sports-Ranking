@@ -11,18 +11,61 @@ import * as db from './db.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
 // 実際のトーナメント表のように中央揃えで配置される。
+//
+// 狭い画面では詰める。32枠の表は 32×100px＝3200px あり、指で何度も送らないと
+// 端まで行き着かない。対戦カードそのものは70pxほどなので、葉を60pxまで詰めても
+// カードは重ならない（1回戦の枠は葉2つ分＝120pxある）。
 const LEAF_ROW_HEIGHT_PX = 100;
+const LEAF_ROW_HEIGHT_NARROW_PX = 60;
+
+// 「狭い画面」の境目。css/style.css の対戦表まわりのメディアクエリと同じ値にすること
+// （片方だけ動かすと、列の幅と枠の高さが食い違う）。
+const NARROW_QUERY = '(max-width: 640px)';
+
+function isNarrowScreen() {
+  return window.matchMedia(NARROW_QUERY).matches;
+}
+
+function leafRowHeight() {
+  return isNarrowScreen() ? LEAF_ROW_HEIGHT_NARROW_PX : LEAF_ROW_HEIGHT_PX;
+}
+
+// 対戦表の見せ方。
+//
+//   tree    横に伸びる本来の対戦表。勝ち上がりの枝がそのまま見える
+//   rounds  回戦ごとに1列で積む一覧。横スクロールが要らず、空白も生まれない
+//
+// 20枠の表は tree だと 1700×3200px ほどになり、スマートフォンでは縦にも横にも
+// 送り続けないと全貌が掴めない。そこで狭い画面では rounds を既定にする。
+// 対戦カードそのもの（名前・シード・ゲームカウント・地模様）は tree と同じものを
+// そのまま並べるので、見た目の作りは変わらない ── 並べ方だけを変えている。
+//
+// 人が選んだらその選択を優先する（null のあいだだけ画面幅に任せる）。
+// 選択はページを開いているあいだ覚えておく。回戦が進むたびに描き直されるので、
+// そのつど既定へ戻ると、選んだ形が勝手に元へ戻ってしまう。
+let viewModeChoice = null;
+
+function effectiveViewMode() {
+  return viewModeChoice ?? (isNarrowScreen() ? 'rounds' : 'tree');
+}
+
+// 回戦ごと表示で開いている回戦。大会が変わったら選び直す。
+let openRound = { tournamentId: null, index: 0 };
 
 let lastRenderArgs = null;
 let resizeRedrawTimer = null;
 
+function redraw() {
+  if (!lastRenderArgs) return;
+  renderBracket(
+    lastRenderArgs.tournamentId, lastRenderArgs.containerEl,
+    lastRenderArgs.onChanged, lastRenderArgs.options,
+  );
+}
+
 window.addEventListener('resize', () => {
   clearTimeout(resizeRedrawTimer);
-  resizeRedrawTimer = setTimeout(() => {
-    if (lastRenderArgs) {
-      renderBracket(lastRenderArgs.tournamentId, lastRenderArgs.containerEl, lastRenderArgs.onChanged, lastRenderArgs.options);
-    }
-  }, 150);
+  resizeRedrawTimer = setTimeout(redraw, 150);
 });
 
 function slotPlacement(roundIndex, matchIndex) {
@@ -564,6 +607,210 @@ function roundControls(tournamentId, roundIndex, round, readOnly, onRefresh) {
   return wrap;
 }
 
+// ---- 回戦ごとの一覧（狭い画面の既定） ----
+//
+// 対戦表を1回戦ずつに切り分けて、縦に積むだけの形。横スクロールが要らず、
+// 枝を描くための空白も生まれないので、20枠の大会でも指1本で端まで読める。
+//
+// 勝ち上がりの枝は見えなくなるが、その代わりに回戦の札（タブ）で行き来できる。
+// 「いま自分はどこにいるか」は画面下端の「あなたの対戦」が受け持っているので、
+// この一覧が担うのは「この回戦で誰と誰が当たっているか」だけでよい。
+
+// 回戦の呼び名。表の中の見出し（.round-header）は R1 / SF / F と短くしてあるが、
+// こちらは選ぶための札なので、そのまま日本語で言う。
+function roundLabel(bracket, roundIndex) {
+  const fromEnd = bracket.totalRounds - roundIndex;
+  if (fromEnd === 1) return '決勝';
+  if (fromEnd === 2) return '準決勝';
+  if (fromEnd === 3) return '準々決勝';
+  return `${roundIndex + 1}回戦`;
+}
+
+// その回戦の進み具合。数えるのは実際に行われる対戦だけで、不戦勝は別に添える
+// （BYEは生成時点で確定済みなので、混ぜると「16試合中12試合が確定」のような、
+// 何も起きていないのに終わりかけに見える数字になる）。
+function roundProgress(round) {
+  const byes = round.matches.filter((m) => m.isBye).length;
+  const played = round.matches.filter((m) => !m.isBye);
+  const done = played.filter((m) => m.confirmed).length;
+  return { byes, total: played.length, done, finished: done === played.length };
+}
+
+// 最初に開く回戦。まだ終わっていない回戦のうち、いちばん早いもの＝いま動いている回戦。
+// 全部終わっていれば決勝（最後の回戦）を出す。
+function currentRoundIndex(bracket) {
+  const i = bracket.rounds.findIndex((round) => !roundProgress(round).finished);
+  return i === -1 ? bracket.rounds.length - 1 : i;
+}
+
+// いま開いている回戦。大会が変わったとき（と、まだ何も選んでいないとき）は
+// 進行中の回戦から始める。人が札を押して選んだ回戦は、描き直しをまたいで残す。
+function openRoundIndex(tournamentId, bracket) {
+  if (openRound.tournamentId !== tournamentId) {
+    openRound = { tournamentId, index: currentRoundIndex(bracket) };
+  }
+  return Math.min(openRound.index, bracket.rounds.length - 1);
+}
+
+// 回戦を選ぶ札。どの回戦がどこまで進んだかが、開かなくても分かるようにする。
+function roundTabs(tournamentId, bracket, activeIndex) {
+  const tabs = document.createElement('div');
+  tabs.className = 'bracket-round-tabs';
+
+  bracket.rounds.forEach((round, i) => {
+    const { done, total, finished } = roundProgress(round);
+
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'bracket-round-tab';
+    if (i === activeIndex) tab.classList.add('is-active');
+    if (finished) tab.classList.add('is-done');
+    tab.setAttribute('aria-pressed', String(i === activeIndex));
+
+    const name = document.createElement('span');
+    name.className = 'bracket-round-tab-name';
+    name.textContent = round.name;
+
+    const count = document.createElement('span');
+    count.className = 'bracket-round-tab-count';
+    count.textContent = total === 0 ? '—' : `${done}/${total}`;
+
+    tab.append(name, count);
+    tab.addEventListener('click', () => {
+      openRound = { tournamentId, index: i };
+      redraw();
+    });
+    tabs.appendChild(tab);
+  });
+
+  return tabs;
+}
+
+// 前後の回戦への送り。札は上にあるので、読み終えた下からも戻れるようにする。
+function roundStepper(tournamentId, bracket, activeIndex) {
+  const nav = document.createElement('div');
+  nav.className = 'bracket-round-nav';
+
+  const step = (delta, text) => {
+    const i = activeIndex + delta;
+    if (i < 0 || i >= bracket.rounds.length) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-secondary';
+    btn.textContent = text.replace('%s', roundLabel(bracket, i));
+    btn.addEventListener('click', () => {
+      openRound = { tournamentId, index: i };
+      redraw();
+      // 送った先の先頭から読ませる。押した場所（一覧の下）のままだと、
+      // 切り替わったことに気づかないまま途中の対戦を見ることになる。
+      lastRenderArgs?.containerEl.querySelector('.bracket-rounds')
+        ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+    nav.appendChild(btn);
+  };
+
+  step(-1, '← %s');
+  step(1, '%s →');
+  return nav;
+}
+
+function renderRoundList(ctx, containerEl) {
+  const {
+    tournament, tournamentId, bracket, onChanged, readOnly, seedOf, onRefresh,
+  } = ctx;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'bracket-rounds';
+
+  const activeIndex = openRoundIndex(tournamentId, bracket);
+  const round = bracket.rounds[activeIndex];
+  const { byes, total, done } = roundProgress(round);
+
+  wrap.appendChild(roundTabs(tournamentId, bracket, activeIndex));
+
+  const head = document.createElement('div');
+  head.className = 'bracket-round-head';
+
+  const title = document.createElement('h3');
+  title.className = 'bracket-round-name';
+  title.textContent = roundLabel(bracket, activeIndex);
+
+  const note = document.createElement('p');
+  note.className = 'bracket-round-note';
+  note.textContent = total === 0
+    ? `不戦勝 ${byes}枠`
+    : `${total}試合中 ${done}試合が確定${byes > 0 ? `・不戦勝 ${byes}枠` : ''}`;
+
+  head.append(title, note);
+  wrap.appendChild(head);
+
+  // 回戦の開始・配信台は表と同じもの。列の高さをそろえる必要が無いので、
+  // ここでは横に並べる（.bracket-rounds の中だけ形が変わる。css/style.css）。
+  if (!swapCtx.active) {
+    wrap.appendChild(roundControls(tournamentId, activeIndex, round, readOnly, onRefresh));
+  }
+
+  const roundInProgress = isRoundInProgress(tournamentId, activeIndex, round);
+
+  const list = document.createElement('div');
+  list.className = 'bracket-round-list';
+
+  round.matches.forEach((match) => {
+    const item = document.createElement('div');
+    item.className = 'bracket-round-item';
+
+    // 三位決定戦は決勝と同じ回戦に混ざっている。表では独立した列に出して
+    // 見分けているので、こちらでは名前を添えて同じことをする。
+    if (match.isThirdPlace) {
+      const label = document.createElement('span');
+      label.className = 'bracket-round-item-label';
+      label.textContent = '3位決定戦';
+      item.appendChild(label);
+    }
+
+    item.appendChild(renderMatchBox(
+      tournament, tournamentId, activeIndex, match, onChanged, readOnly, seedOf, onRefresh,
+      roundInProgress,
+    ));
+    list.appendChild(item);
+  });
+
+  wrap.appendChild(list);
+  wrap.appendChild(roundStepper(tournamentId, bracket, activeIndex));
+  containerEl.appendChild(wrap);
+}
+
+// ---- 見せ方の切り替え ----
+//
+// 既定は画面幅に任せる（狭ければ回戦ごと）が、選べるようにしておく。
+// スマートフォンでも枝の形を見たいことはあるし、机の上の画面でも
+// 「いまの回戦だけ見たい」ことはある。
+function viewModeToggle(mode) {
+  const wrap = document.createElement('div');
+  wrap.className = 'bracket-view-toggle';
+  wrap.setAttribute('role', 'group');
+  wrap.setAttribute('aria-label', '対戦表の見せ方');
+
+  const add = (value, text, title) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'bracket-view-btn' + (mode === value ? ' is-active' : '');
+    btn.textContent = text;
+    btn.title = title;
+    btn.setAttribute('aria-pressed', String(mode === value));
+    btn.addEventListener('click', () => {
+      if (viewModeChoice === value) return;
+      viewModeChoice = value;
+      redraw();
+    });
+    wrap.appendChild(btn);
+  };
+
+  add('rounds', '回戦ごと', '選んだ回戦の対戦カードだけを縦に並べます');
+  add('tree', '全体', '勝ち上がりの枝ごと、対戦表を横に広げて見ます');
+  return wrap;
+}
+
 // options.onRefresh: 選手の操作（ゲームカウントの入力）のあとに呼ぶ再読み込み。
 // onChanged（運営の勝敗入力）とは別にしてある。onChanged は対戦表そのものをDBへ
 // 書き戻すので、選手が呼ぶとRLSで弾かれる。
@@ -610,11 +857,28 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
     if (bar) containerEl.appendChild(bar);
   }
 
+  const ctx = {
+    tournament, tournamentId, bracket, onChanged, readOnly, seedOf, onRefresh,
+  };
+
+  const mode = effectiveViewMode();
+  containerEl.appendChild(viewModeToggle(mode));
+
+  if (mode === 'rounds') renderRoundList(ctx, containerEl);
+  else renderTree(ctx, containerEl, prevScrollLeft);
+}
+
+// 本来の対戦表。左から右へ、勝ち上がりの枝ごと1枚に描く。
+function renderTree(ctx, containerEl, prevScrollLeft) {
+  const {
+    tournament, tournamentId, bracket, onChanged, readOnly, seedOf, onRefresh,
+  } = ctx;
+
   const wrapper = document.createElement('div');
   wrapper.className = 'bracket';
 
   const matchElements = new Map();
-  const bodyHeight = bracket.bracketSize * LEAF_ROW_HEIGHT_PX;
+  const bodyHeight = bracket.bracketSize * leafRowHeight();
 
   bracket.rounds.forEach((round, roundIndex) => {
     const col = document.createElement('div');

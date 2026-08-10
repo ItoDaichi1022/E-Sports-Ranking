@@ -2441,8 +2441,93 @@ a.card:hover {
   border-top: 1px solid var(--border-soft);
 }
 
-/* 運営の操作は主導線（エントリー）から離し、右端に寄せる */
+/* 運営の操作は主導線（エントリー）から離し、右端に寄せる。
+   ただし操作がそれしか無いとき（＝準備中の大会の「公開」）は寄せない ──
+   離す相手がいないのに右端へ飛ぶと、上の帯と縦の線が合わなくなる。 */
 .tournament-actions-row .row-actions { margin-left: auto; }
+.tournament-actions-row .row-actions:only-child { margin-left: 0; }
+
+/* エントリー締切の掲示。募集一覧のカードと、大会詳細のエントリーボタンの隣で使う。
+   見た目を進行状況の印（.status-chip）に合わせているのは、どちらも「この大会が
+   いまどういう状態か」を一言で示すもので、同じ場所に並ぶこともあるため。
+   折り返しを許すのは、細い画面では日時と残り時間で1行に収まらないから。 */
+.entry-deadline {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.entry-deadline-chip {
+  padding: 0.2rem 0.65rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 残り3時間を切ったら警告色。ここから先は「今日中に決める」ではなく
+   「いま決める」時間帯なので、他の印より強く出てよい。 */
+.entry-deadline-chip.is-soon {
+  color: var(--warn);
+  border-color: rgba(245, 181, 68, 0.4);
+  background: rgba(245, 181, 68, 0.12);
+}
+
+/* 過ぎたものは引く。消してしまわないのは、締切を掲げていた事実まで消えると
+   「まだ間に合うのか」がかえって分からなくなるため。 */
+.entry-deadline-chip.is-passed {
+  color: var(--text-faint);
+  border-style: dashed;
+  background: none;
+}
+
+.entry-deadline-note {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+/* まだ公開していない大会の帯（運営だけが見る。js/entries.js の draftNotice）。
+   破線の枠にしているのは、準備中の印（.status-chip.status-draft）と同じ言い方で
+   「まだ形になっていない」を示すため。公開のボタンはこのすぐ下に並ぶので、
+   色で急かさず、状態を伝えることだけに徹する。 */
+.draft-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 2rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.draft-notice-title {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.draft-notice-text {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+/* 帯の直後に操作が続くときは、そのあいだの区切り線を消す（同じ話の続きなので） */
+.draft-notice + .tournament-actions-row {
+  margin-top: 0.9rem;
+  padding-top: 0;
+  border-top: none;
+}
 
 /* エントリー済みの人にだけ出る、対戦環境（#setup）への案内。
    主導線はあくまでエントリーなので、面も枠も持たせず本文の続きとして置く。
@@ -3006,6 +3091,187 @@ a.card:hover {
 }
 
 .match-slot { min-width: 0; }
+
+/* ---- 対戦表の見せ方の切り替え（js/bracketView.js の viewModeToggle）----
+
+   「全体」＝ここまでの対戦表（.bracket）、「回戦ごと」＝下の .bracket-rounds。
+   狭い画面では回戦ごとが既定になる。押す機会は多くないので、2つ並べた小さな
+   切り替えを表の右上に置くだけにして、表そのものから場所を取らない。 */
+.bracket-view-toggle {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin-left: auto;
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+}
+
+.bracket-view-btn {
+  min-height: 0;
+  padding: 0.3rem 0.85rem;
+  border: none;
+  border-radius: var(--r-pill);
+  background: none;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.bracket-view-btn:hover:not(:disabled) {
+  filter: none;
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.bracket-view-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+
+/* ---- 回戦ごとの一覧 ----
+
+   狭い画面の既定。対戦カードそのもの（.match-box）は全体表示とまったく同じものを
+   並べていて、変えているのは並べ方だけ ── 横スクロールをやめ、枝を描くための
+   空白を捨てる。20枠の大会でも、指1本で端まで読める高さに収まる。 */
+.bracket-rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.75rem 0 0;
+}
+
+/* 回戦の札。数が多い大会では横に溢れるので、ここだけ横に流す
+   （表全体を流すのとは違い、送るのは札の帯だけで済む）。 */
+.bracket-round-tabs {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scrollbar-width: thin;
+}
+
+.bracket-round-tab {
+  flex: none;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-height: 0;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  box-shadow: none;
+  color: var(--text-dim);
+}
+
+.bracket-round-tab:hover:not(:disabled) {
+  filter: none;
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.bracket-round-tab-name {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.bracket-round-tab-count {
+  font-size: 0.66rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+
+/* 終わった回戦は引く。まだ動いている回戦を探すとき、目が滑る先を減らす。 */
+.bracket-round-tab.is-done { color: var(--text-faint); }
+
+.bracket-round-tab.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+
+.bracket-round-tab.is-active .bracket-round-tab-count { color: var(--accent-bright); }
+
+.bracket-round-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.bracket-round-name {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.bracket-round-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 回戦の開始と配信台。表の中では列の高さをそろえるために縦積み・高さ固定に
+   してあるが、ここには揃える隣の列が無いので、横に並べて場所を詰める。 */
+.bracket-rounds .round-controls {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-height: 0;
+  margin-bottom: 0;
+  font-size: 0.76rem;
+}
+
+/* 広い画面で「回戦ごと」を選んだときは、余った幅に対戦カードを並べる。
+   狭い画面（カード1枚ぶんの幅しかない）では自然に1列になる。 */
+.bracket-round-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+.bracket-round-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+/* 3位決定戦の見出し。表では独立した列に置いて見分けているので、
+   一覧では名前を添えて同じことをする。 */
+.bracket-round-item-label {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+/* 前後の回戦への送り。一覧を読み終えた場所からそのまま次へ行けるように、
+   札（上）と同じ操作を下にも置く。 */
+.bracket-round-nav {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* 幅を等分するのは、最初と最後の回戦では片方しか出ないため。位置で覚えると
+   ボタンが1つになった瞬間に押し間違えるので、どちらも同じ大きさに広げて
+   文字を読ませる（指で押す画面なので、大きいほうが当てやすくもある）。 */
+.bracket-round-nav button {
+  flex: 1;
+  min-height: 0;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+}
 
 .bracket-lines {
   position: absolute;
@@ -3613,6 +3879,24 @@ body:has(#view-bracket:not([hidden]) .own-match-bar) button.scroll-top-btn {
     margin-left: 0;
     margin-top: 0.15rem;
     padding: 0.5rem 1.1rem;
+  }
+
+  /* ---- 狭い画面の「全体」表示 ----
+
+     既定は回戦ごとの一覧だが、枝の形を見たくて全体に切り替えることはある。
+     そのときのために、列の幅と回戦の見出しを詰めて、一度に目に入る範囲を広げる
+     （枠の高さは js/bracketView.js の LEAF_ROW_HEIGHT_NARROW_PX。この境目の値を
+     動かすなら、あちらの NARROW_QUERY も一緒に動かすこと）。
+
+     対戦カードそのもの（文字の大きさ・ゲームカウント・地模様）には触らない。
+     読むためのものが小さくなっては、詰めた意味が無い。 */
+  .bracket { gap: 1.5rem; }
+
+  .round-column { width: 244px; }
+
+  .round-controls {
+    min-height: 3.6rem;
+    margin-bottom: 0.4rem;
   }
 }
 
