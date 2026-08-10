@@ -513,10 +513,31 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
    縦に積んで、メインが上から2/3、サブがのこり1/3を分け合う
    （サブ1体なら1/3をひとりで、2体なら1/6ずつ）。枠どうしの切れ目も線で、
    角丸や影は付けない ── 島にすると、下の映像から浮いた板に見えてしまう。 */
-/* この列だけは下の映像を透かさず、専用の地を敷く（img/character_back.webp）。
-   カード全体は透過が原則だが（この節の冒頭を参照）、キャラクターの絵は背景を
-   抜いた切り抜きなので、動くプレー動画の上に直接置くと輪郭が映像に溶ける。
-   ここだけ地を持たせて、絵が必ず同じ面の上に立つようにする。
+/* 地（img/character_back.webp）は擬似要素に持たせる。列そのものの background に
+   すると、カードが出た瞬間から敷かれてしまう ── ここは「最初はプレー動画が
+   透けていて、メインの絵と一緒に地が入ってくる」ようにしたいので、地にも
+   動きを持たせる必要があり、そのためには絵と別の面が要る。
+   z-index: -1 で中身の後ろへ回すが、列自身に position と z-index を持たせて
+   積み重ねの文脈を閉じてあるので、カードの他の段（順位の閃光など）とは干渉しない。 */
+.reveal-chara {
+  position: relative;
+  z-index: 0;
+  flex: 0 0 24%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 3px solid var(--reveal-accent, var(--accent));
+}
+
+/* この列だけは下の映像を透かさず、専用の地を敷く。カード全体は透過が原則だが
+   （この節の冒頭を参照）、キャラクターの絵は背景を抜いた切り抜きなので、動く
+   プレー動画の上に直接置くと輪郭が映像に溶ける。ここだけ地を持たせて、絵が
+   必ず同じ面の上に立つようにする。
+
+   出る時機と尺はメイン（.reveal-chara-main）とぴったり同じにしてある。地だけ
+   先に出ると「板が現れてから絵が乗る」2手の動きになり、1つのものが入ってくる
+   ように見えない。動きは透過だけにする ── 絵と同じように動かすと、動かない
+   区切り線の内側で面がずれ、板が浮いて見える。
 
    絵は 1672×941 の横長で、この列は 461×1080 の縦長。cover で満たすと横幅の
    24%ぶん、ちょうど真ん中だけが映る ── 素材は中央を静かな暗緑にして左右の端に
@@ -526,13 +547,21 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
    この画像を読みに行くのは、発表カードが実際に組まれたときだけ。CSSは全ページで
    読まれるが、背景画像は要素が描かれるまで取りに行かれず、.reveal-chara は
    js/reveal.js が発表のときに初めて作るため（背景動画の data-src と同じ考え方）。 */
-.reveal-chara {
-  flex: 0 0 24%;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  border-right: 3px solid var(--reveal-accent, var(--accent));
-  background: #10241a url('../img/character_back.webp?v=134') center / cover no-repeat;
+.reveal-chara::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #10241a url('../img/character_back.webp?v=135') center / cover no-repeat;
+  /* メインの絵（.reveal-chara-main）と同じ値にすること。片方だけ動かすと揃わない */
+  --rv-dur: 0.6s;
+  --rv-delay: 1.1s;
+  animation: reveal-chara-plate-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+@keyframes reveal-chara-plate-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .reveal-chara-main {
@@ -693,8 +722,10 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 /* 1件ぶんの細長い島。並びは 大会画像 → 大会名 → 順位 → Tier。
    左端をそろえたいので画像の幅は固定で、伸び縮みするのは大会名だけ
    （長い大会名は3点リーダで切る）。
-   角を高さの半分まで丸めて横長の錠剤の形にすると、板ではなく「札が置いてある」
-   見え方になり、下の映像との境目も柔らかくなる。 */
+   角は丸めない。以前は高さの半分まで丸めた錠剤の形だったが、この画の他の枠
+   （選手アイコン・キャラクターの列）はどれも直線で切ってあるので、ここだけ
+   丸いと3件が別の様式の部品に見えた。左右の余白も同じにして、四角い枠の中に
+   四角い画像が収まる形にそろえる。 */
 .reveal-achievement {
   display: grid;
   grid-template-columns: 124px minmax(0, 1fr) auto auto;
@@ -702,10 +733,12 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   /* 列の間隔は詰めぎみにする。ここを広げるほど大会名に残る幅が減り、
      字を大きくした意味が無くなる（先に3点リーダで切れてしまう）。 */
   gap: 16px;
-  padding: 24px 26px 24px 10px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.74), rgba(0, 0, 0, 0.52));
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+  padding: 24px 26px;
+  /* 地は濃いめに。下のプレー動画は明るい場面も暗い場面もあるので、薄いと
+     明るい場面で文字が沈む。3件が「置いてある札」だと分かる程度には
+     映像を透かしたままにしてある（完全な不透明にはしない）。 */
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.74));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
   --rv-dur: 0.5s;
   animation: reveal-step-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
@@ -717,12 +750,11 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 
 /* 画像が未登録の大会でも枠だけは残す（js/reveal.js が中身の無い span を出す）。
    詰めてしまうと行ごとに大会名の頭がずれて、3件が並びに見えなくなる。
-   島が錠剤の形なので、こちらも丸にして角が浮かないようにする。 */
+   島が四角いので、こちらも四角のままにして角の形をそろえる。 */
 .reveal-achievement-art {
   width: 124px;
   height: 124px;
   overflow: hidden;
-  border-radius: 50%;
   background: rgba(255, 255, 255, 0.12);
 }
 
@@ -792,11 +824,16 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
    必ず --rv-dur / --rv-delay に書くこと。
    --------------------------------------------------------------------------- */
 
+/* 擬似要素は `*` では拾えないので明示する。カード直下の ::before / ::after だけを
+   名指ししていたころ、中の段に足した .reveal-chara::before が漏れた ── 段を足す
+   たびに書き足すのを忘れるので、`* ::before` の形で子孫のぶんもまとめて拾う。 */
 @media (prefers-reduced-motion: reduce) {
   #reveal-canvas .reveal-card,
   #reveal-canvas .reveal-card *,
   #reveal-canvas .reveal-card::before,
   #reveal-canvas .reveal-card::after,
+  #reveal-canvas .reveal-card *::before,
+  #reveal-canvas .reveal-card *::after,
   #reveal-canvas .reveal-title,
   #reveal-canvas .reveal-title *,
   #reveal-canvas .reveal-title::after {
