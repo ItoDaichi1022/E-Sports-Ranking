@@ -533,6 +533,40 @@ function titleElement(entry) {
   return title;
 }
 
+// 名前に使う文字の大きさ（px）を、その名前ごとに決める。
+//
+// 名前はこの画の主役なので、できるだけ大きく出したい。ただし一律に大きくすると、
+// 長い名前が3点リーダで切れて誰なのか読めなくなる ── 目立たせるつもりが逆效果になる。
+// 折り返して2行にする道は取れない（2行になると下のスコア以下が押し出されて、
+// カードごとに位置が変わり、めくるたびに画面が跳ねる。css/reveal.css に既述）。
+// そこで「その名前が1行で収まる大きさのうち、いちばん大きいもの」を選ぶ。
+//
+// 幅は字の種類で見積もりを変える。全角（日本語）は1文字が字の大きさとほぼ同じ幅を
+// 取るのに対し、半角の英数字はその6割ほどしかない。同じ5文字でも "ゴウシオン" と
+// "Gwynn" では要る幅が倍近く違うので、文字数ではなくこの重みの合計で測る。
+const NAME_MAX_SIZE = 108;
+const NAME_MIN_SIZE = 56;
+// 半角1文字を全角の何文字ぶんとして数えるか。太字（800）なので気持ち広めに見る。
+const HALF_WIDTH_UNIT = 0.6;
+
+// 3列目（.reveal-body）の内寸。カード幅から他の列と余白を引いた値で、
+// 割り振りは css/reveal.css の flex と padding に合わせてある。
+// キャラクターを登録していない選手はあの列ごと出ないので、そのぶん名前を大きくできる。
+const BODY_PADDING_X = 56 * 2;
+const PHOTO_COLUMN = STAGE_WIDTH * 0.30 + 3; // 3px は列の区切り線
+const CHARA_COLUMN = STAGE_WIDTH * 0.24 + 3;
+
+function nameFontSize(name, hasCharaColumn) {
+  let units = 0;
+  for (const ch of name) units += ch.charCodeAt(0) < 0x0100 ? HALF_WIDTH_UNIT : 1;
+  if (units <= 0) return NAME_MAX_SIZE;
+
+  const room = STAGE_WIDTH - PHOTO_COLUMN - (hasCharaColumn ? CHARA_COLUMN : 0) - BODY_PADDING_X;
+  // 見積もりなので、収まりきらなかったときの保険は CSS の text-overflow に残してある。
+  // 下限を切ってまで小さくしないのは、読めない大きさで全部入れても意味がないため。
+  return Math.round(Math.min(NAME_MAX_SIZE, Math.max(NAME_MIN_SIZE, room / units)));
+}
+
 function cardElement(entry) {
   // サンプルデータ（架空の選手）は実在の選手を探しに行かず、架空の中身をそのまま使う。
   const player = entry.samplePlayer ?? state.players.find((p) => p.id === entry.id);
@@ -540,6 +574,9 @@ function cardElement(entry) {
   // いまの選手の情報から引き、名前はランキングに記録された値を使う
   // （rankingView.js の rankingAvatar と同じ考え方）。
   const photoUrl = safeUrl(player?.avatarUrl);
+
+  const charaHtml = characterColumnHtml(player?.mainCharacters);
+  const nameSize = nameFontSize(entry.name, charaHtml !== '');
 
   const card = document.createElement('div');
   card.className = `reveal-card${entry.rank <= 3 ? ` rank-${entry.rank}` : ''}`;
@@ -550,9 +587,9 @@ function cardElement(entry) {
     : `<span class="reveal-photo-fallback">${escapeHtml(initialOf(entry.name))}</span>`}
       <p class="reveal-rank"><span class="reveal-rank-num">${entry.rank}</span><span class="reveal-rank-unit">位</span></p>
     </div>
-    ${characterColumnHtml(player?.mainCharacters)}
+    ${charaHtml}
     <div class="reveal-body">
-      <p class="reveal-name"><span>${escapeHtml(entry.name)}</span></p>
+      <p class="reveal-name" style="--name-size:${nameSize}px"><span>${escapeHtml(entry.name)}</span></p>
       <p class="reveal-score">
         <span class="reveal-score-label">SCORE</span>
         <span class="reveal-score-value">${entry.score.toFixed(1)}</span>
