@@ -54,6 +54,7 @@ js/
   state.js             アプリ全体で共有する in-memory データ。出場枠（選手／チーム）の解決もここ
   bracket.js           ブラケットの生成と勝敗の確定
   bracketView.js       ブラケットの描画（2v2ではチーム名＋メンバーを出す）
+  bracketZoom.js       対戦表の拡大縮小（地図のように、つまんで寄る・引く）
   matchChat.js         対戦カードごとのチャットと運営への報告（当事者と運営だけ）
   ranking.js           ランキング計算（LumiRank軽量版）
   rankingEligibility.js 大会をランキングに反映するかの条件（16人以上・1v1／リレー・YouTube配信・運営の設定）

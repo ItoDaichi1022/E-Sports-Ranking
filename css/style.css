@@ -3050,12 +3050,60 @@ a.card:hover {
   height: 1.15rem;
 }
 
-.bracket {
+/* ---- トーナメント表の枠組み（js/bracketView.js の renderTree）----
+
+   .bracket-frame  表と拡大縮小ボタンを重ねるための入れ物
+   .bracket-stage  実際にスクロールする箱。指1本の送りはブラウザ本来のスクロール
+   .bracket-sizer  倍率をかけた大きさを持つだけの箱。transform はレイアウト上の
+                   大きさを変えないので、スクロールできる範囲はこれで作る
+   .bracket        対戦表そのもの。transform: scale で縮む1枚の板
+
+   仕組みの説明は js/bracketZoom.js に書いてある。 */
+.bracket-frame {
   position: relative;
+  margin-bottom: 0.4rem;
+}
+
+.bracket-stage {
+  position: relative;
+  width: 100%;
+  /* 画面いっぱいには広げない。上下にページを残しておくと、表の中に指が捕まった
+     ときでもページを動かせるし、戻る導線も画面から消えない。 */
+  max-height: 72vh;
+  max-height: 72dvh;
+  overflow: auto;
+  /* 指1本の送りはブラウザに任せる（端まで来ればページのスクロールへ続く）。
+     2本指のつまみだけを js が受け取る ── pinch-zoom を許していないので、
+     ページごと拡大されることはない。 */
+  touch-action: pan-x pan-y;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  /* 対戦カード（--surface-2）より一段暗い面。表がどこまでかが分かる */
+  background: var(--surface);
+  cursor: grab;
+  /* 横に振り切っても、ブラウザの「戻る」が働かないようにする */
+  overscroll-behavior-x: contain;
+}
+
+.bracket-stage.is-panning {
+  cursor: grabbing;
+  /* 掴んで動かしている間に文字が選択されると、表ではなく文章を引きずることになる */
+  user-select: none;
+}
+
+.bracket-sizer {
+  position: relative;
+}
+
+.bracket {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
   display: flex;
   gap: 3rem;
-  overflow-x: auto;
-  padding: 1rem 0;
+  width: max-content;
+  padding: 1rem;
 }
 
 /* 列（＝対戦カード）の幅。
@@ -3170,6 +3218,58 @@ a.card:hover {
 }
 
 .match-slot { min-width: 0; }
+
+/* ---- 拡大縮小の操作（js/bracketView.js の zoomControls）----
+
+   表の右下に重ねる。表そのものからは場所を取らず、どこまで送っても同じところに
+   出ている（stage の外＝frame の上に置いてあるので、一緒にスクロールしない）。 */
+.bracket-zoom {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  box-shadow: 0 2px 10px -4px rgba(0, 0, 0, 0.5);
+}
+
+.bracket-zoom-btn {
+  min-width: 2.2rem;
+  min-height: 2.2rem;
+  padding: 0 0.55rem;
+  border: none;
+  border-radius: var(--r-pill);
+  background: none;
+  box-shadow: none;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.bracket-zoom-btn:hover:not(:disabled) {
+  filter: none;
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+/* 操作の説明。指の画面とマウスの画面で言うことが違うので、両方書いて出し分ける */
+.bracket-zoom-hint {
+  margin: 0 0 1rem;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+.bracket-zoom-hint .for-touch { display: none; }
+
+@media (pointer: coarse) {
+  .bracket-zoom-hint .for-touch { display: inline; }
+  .bracket-zoom-hint .for-mouse { display: none; }
+}
 
 /* ---- 対戦表の見せ方の切り替え（js/bracketView.js の viewModeToggle）----
 
@@ -3364,6 +3464,9 @@ a.card:hover {
   fill: none;
   stroke: var(--border);
   stroke-width: 2;
+  /* 表を縮めても線の太さは保つ。枝は表の骨格なので、引いたときに消えては困る
+     （縮めた分だけ細くなると、全体を眺める倍率でいちばん見えなくなる） */
+  vector-effect: non-scaling-stroke;
 }
 
 /* Challonge風のマッチボックス：カードに選手行を積み、行間に区切り線を引く */
@@ -3960,23 +4063,31 @@ body:has(#view-bracket:not([hidden]) .own-match-bar) button.scroll-top-btn {
     padding: 0.5rem 1.1rem;
   }
 
-  /* ---- 狭い画面の「全体」表示 ----
+  /* 対戦表そのものは狭い画面でも詰めない（列の幅も枠の高さもそのまま）。
+     形を画面ごとに変えると、スマートフォンで覚えた表と大きな画面の表が
+     食い違ってしまう。狭さには倍率で応じる（js/bracketZoom.js）。 */
 
-     既定は回戦ごとの一覧だが、枝の形を見たくて全体に切り替えることはある。
-     そのときのために、列の幅と回戦の見出しを詰めて、一度に目に入る範囲を広げる
-     （枠の高さは js/bracketView.js の LEAF_ROW_HEIGHT_NARROW_PX。この境目の値を
-     動かすなら、あちらの NARROW_QUERY も一緒に動かすこと）。
-
-     対戦カードそのもの（文字の大きさ・ゲームカウント・地模様）には触らない。
-     読むためのものが小さくなっては、詰めた意味が無い。 */
-  .bracket { gap: 1.5rem; }
-
-  .round-column { width: 244px; }
-
-  .round-controls {
-    min-height: 3.6rem;
-    margin-bottom: 0.4rem;
+  /* 表の箱は少し低くする。表の中で指を動かしている間はページが動かないので、
+     箱の外（上下）に、ページを送るために触れる場所を残しておく。 */
+  .bracket-stage {
+    max-height: 66vh;
+    max-height: 66dvh;
   }
+
+  /* 拡大縮小のボタンは指で押す大きさに。表の右下は対戦カードと重なる場所なので、
+     押し間違えないだけの間合いも取る。 */
+  .bracket-zoom {
+    right: 0.5rem;
+    bottom: 0.5rem;
+    gap: 0.3rem;
+  }
+
+  .bracket-zoom-btn {
+    min-width: 2.6rem;
+    min-height: 2.6rem;
+  }
+
+  .bracket-zoom-hint { text-align: left; }
 }
 
 /* 対戦チャットのダイアログはタブ2枚（話す／結果を入れる）。

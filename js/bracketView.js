@@ -7,53 +7,48 @@ import { characterRowArtElement } from './characters.js';
 import { auth, canManageTournament } from './auth.js';
 import { canUseMatchChat, openMatchChat } from './matchChat.js';
 import { makeIconButton } from './icons.js';
+import { attachBracketZoom } from './bracketZoom.js';
 import * as db from './db.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
 // 実際のトーナメント表のように中央揃えで配置される。
 //
-// 狭い画面では詰める。32枠の表は 32×100px＝3200px あり、指で何度も送らないと
-// 端まで行き着かない。対戦カードそのものは70pxほどなので、葉を60pxまで詰めても
-// カードは重ならない（1回戦の枠は葉2つ分＝120pxある）。
+// 画面の広さで変えることはしない。狭い画面には拡大縮小（js/bracketZoom.js）で
+// 応じるので、表の形はどの画面でも同じ ── スマートフォンで見た形と、大きな画面で
+// 見た形が食い違わない。
 const LEAF_ROW_HEIGHT_PX = 100;
-const LEAF_ROW_HEIGHT_NARROW_PX = 60;
-
-// 「狭い画面」の境目。css/style.css の対戦表まわりのメディアクエリと同じ値にすること
-// （片方だけ動かすと、列の幅と枠の高さが食い違う）。
-const NARROW_QUERY = '(max-width: 640px)';
-
-function isNarrowScreen() {
-  return window.matchMedia(NARROW_QUERY).matches;
-}
-
-function leafRowHeight() {
-  return isNarrowScreen() ? LEAF_ROW_HEIGHT_NARROW_PX : LEAF_ROW_HEIGHT_PX;
-}
 
 // 対戦表の見せ方。
 //
 //   tree    横に伸びる本来の対戦表。勝ち上がりの枝がそのまま見える
-//   rounds  回戦ごとに1列で積む一覧。横スクロールが要らず、空白も生まれない
+//   rounds  回戦ごとに1列で積む一覧。1試合ずつ大きく読める
 //
-// 20枠の表は tree だと 1700×3200px ほどになり、スマートフォンでは縦にも横にも
-// 送り続けないと全貌が掴めない。そこで狭い画面では rounds を既定にする。
+// 既定はどの画面でも tree。表を見に来た人がいちばん見たいのは勝ち上がりの枝なので、
+// 画面が狭いというだけで形を組み替えない。狭さには倍率で応じる（地図と同じで、
+// 全体を眺めてから寄る。js/bracketZoom.js）。
+//
+// rounds は「いまの回戦の対戦カードだけを大きく読みたい」ときのための形として残す。
 // 対戦カードそのもの（名前・シード・ゲームカウント・地模様）は tree と同じものを
-// そのまま並べるので、見た目の作りは変わらない ── 並べ方だけを変えている。
+// 並べるので、見た目の作りは変わらない ── 並べ方だけを変えている。
 //
-// 人が選んだらその選択を優先する（null のあいだだけ画面幅に任せる）。
 // 選択はページを開いているあいだ覚えておく。回戦が進むたびに描き直されるので、
 // そのつど既定へ戻ると、選んだ形が勝手に元へ戻ってしまう。
 let viewModeChoice = null;
 
 function effectiveViewMode() {
-  return viewModeChoice ?? (isNarrowScreen() ? 'rounds' : 'tree');
+  return viewModeChoice ?? 'tree';
 }
 
 // 回戦ごと表示で開いている回戦。大会が変わったら選び直す。
 let openRound = { tournamentId: null, index: 0 };
 
 let lastRenderArgs = null;
-let resizeRedrawTimer = null;
+
+// いま画面に出ている対戦表の拡大縮小（js/bracketZoom.js）と、その倍率・位置。
+// 表は更新のたびに丸ごと作り直されるので、作り直す直前にここへ控えて、描いたあとに
+// 戻す ── そうしないと、見ていたところが更新のたびに左上へ飛んでしまう。
+let activeZoom = null;
+let savedTreeView = { tournamentId: null, scale: 1, left: 0, top: 0 };
 
 function redraw() {
   if (!lastRenderArgs) return;
@@ -62,11 +57,6 @@ function redraw() {
     lastRenderArgs.onChanged, lastRenderArgs.options,
   );
 }
-
-window.addEventListener('resize', () => {
-  clearTimeout(resizeRedrawTimer);
-  resizeRedrawTimer = setTimeout(redraw, 150);
-});
 
 function slotPlacement(roundIndex, matchIndex) {
   const rowSpan = 2 ** (roundIndex + 1);
@@ -782,9 +772,8 @@ function renderRoundList(ctx, containerEl) {
 
 // ---- 見せ方の切り替え ----
 //
-// 既定は画面幅に任せる（狭ければ回戦ごと）が、選べるようにしておく。
-// スマートフォンでも枝の形を見たいことはあるし、机の上の画面でも
-// 「いまの回戦だけ見たい」ことはある。
+// 既定はトーナメント表（枝ごと）。ただし「いまの回戦で誰と誰が当たっているか」だけを
+// 大きく読みたいことはあるので、回戦ごとの一覧にも切り替えられるようにしておく。
 function viewModeToggle(mode) {
   const wrap = document.createElement('div');
   wrap.className = 'bracket-view-toggle';
@@ -807,8 +796,54 @@ function viewModeToggle(mode) {
   };
 
   add('rounds', '回戦ごと', '選んだ回戦の対戦カードだけを縦に並べます');
-  add('tree', '全体', '勝ち上がりの枝ごと、対戦表を横に広げて見ます');
+  add('tree', 'トーナメント表', '勝ち上がりの枝ごと見ます。つまむと拡大・縮小できます');
   return wrap;
+}
+
+// ---- 拡大縮小の操作 ----
+//
+// つまむ・Ctrl＋ホイールを知らなくても倍率を変えられるように、表の右下に置く。
+// 出すのは3つだけ ── 引く・寄る・全体。地図と同じ並びなので、押す前に分かる。
+function zoomControls(zoom) {
+  const wrap = document.createElement('div');
+  wrap.className = 'bracket-zoom';
+  wrap.setAttribute('role', 'group');
+  wrap.setAttribute('aria-label', '対戦表の拡大・縮小');
+
+  const add = (text, label, onClick) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'bracket-zoom-btn';
+    btn.textContent = text;
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.addEventListener('click', onClick);
+    wrap.appendChild(btn);
+  };
+
+  add('−', '縮小', () => zoom.zoomBy(1 / 1.4));
+  add('＋', '拡大', () => zoom.zoomBy(1.4));
+  add('全体', '表全体が入る大きさにする', () => zoom.fit());
+  return wrap;
+}
+
+// 操作の説明を1行だけ添える。つまめること自体に気づかないと、大きな表は
+// 「端まで送れない読みにくい表」のままになる。
+// 指の画面とマウスの画面で言うことが違うので、両方を書いて css で出し分ける。
+function zoomHint() {
+  const hint = document.createElement('p');
+  hint.className = 'bracket-zoom-hint';
+
+  const touch = document.createElement('span');
+  touch.className = 'for-touch';
+  touch.textContent = '2本指でつまむと拡大・縮小、1本指でなぞると表を動かせます。';
+
+  const mouse = document.createElement('span');
+  mouse.className = 'for-mouse';
+  mouse.textContent = 'Ctrl（⌘）＋ホイールで拡大・縮小、掴んで動かせます。';
+
+  hint.append(touch, mouse);
+  return hint;
 }
 
 // options.onRefresh: 選手の操作（ゲームカウントの入力）のあとに呼ぶ再読み込み。
@@ -826,13 +861,15 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
     onPick: options.swap?.onPick ?? (() => {}),
   };
 
-  // 同じ大会の描き直しでは、横スクロール位置を引き継ぐ。
+  // 同じ大会の描き直しでは、いま見ている倍率と位置を引き継ぐ。
   // 対戦表は Realtime の更新（他の画面の変更でも飛んでくる）のたびに丸ごと
   // 作り直されるので、これが無いと見ている最中に先頭へ戻ってしまう。
   // 別の大会を初めて描くときは引き継がない（前の大会の位置は無関係）。
-  const prevWrapper = containerEl.querySelector('.bracket');
-  const keepScroll = prevWrapper && lastRenderArgs?.tournamentId === tournamentId;
-  const prevScrollLeft = keepScroll ? prevWrapper.scrollLeft : 0;
+  if (activeZoom && lastRenderArgs?.tournamentId === tournamentId) {
+    savedTreeView = { tournamentId, ...activeZoom.view() };
+  }
+  activeZoom = null;
+  const savedView = savedTreeView.tournamentId === tournamentId ? savedTreeView : null;
 
   lastRenderArgs = { tournamentId, containerEl, onChanged, options };
 
@@ -865,20 +902,36 @@ export function renderBracket(tournamentId, containerEl, onChanged, options = {}
   containerEl.appendChild(viewModeToggle(mode));
 
   if (mode === 'rounds') renderRoundList(ctx, containerEl);
-  else renderTree(ctx, containerEl, prevScrollLeft);
+  else renderTree(ctx, containerEl, savedView);
 }
 
 // 本来の対戦表。左から右へ、勝ち上がりの枝ごと1枚に描く。
-function renderTree(ctx, containerEl, prevScrollLeft) {
+//
+// 表そのもの（.bracket）は倍率をかけられる1枚の板として作り、スクロールと
+// 拡大縮小は外側の箱が受け持つ（js/bracketZoom.js）。板の中の作りは倍率と無関係
+// なので、列の幅も枠の高さもどの画面でも同じ値でよい。
+function renderTree(ctx, containerEl, savedView) {
   const {
     tournament, tournamentId, bracket, onChanged, readOnly, seedOf, onRefresh,
   } = ctx;
+
+  const frame = document.createElement('div');
+  frame.className = 'bracket-frame';
+
+  const stage = document.createElement('div');
+  stage.className = 'bracket-stage';
+  stage.tabIndex = 0;
+  stage.setAttribute('role', 'region');
+  stage.setAttribute('aria-label', 'トーナメント表');
+
+  const sizer = document.createElement('div');
+  sizer.className = 'bracket-sizer';
 
   const wrapper = document.createElement('div');
   wrapper.className = 'bracket';
 
   const matchElements = new Map();
-  const bodyHeight = bracket.bracketSize * leafRowHeight();
+  const bodyHeight = bracket.bracketSize * LEAF_ROW_HEIGHT_PX;
 
   bracket.rounds.forEach((round, roundIndex) => {
     const col = document.createElement('div');
@@ -961,10 +1014,25 @@ function renderTree(ctx, containerEl, prevScrollLeft) {
     wrapper.appendChild(col);
   }
 
-  containerEl.appendChild(wrapper);
+  sizer.appendChild(wrapper);
+  stage.appendChild(sizer);
+  frame.appendChild(stage);
+  containerEl.appendChild(frame);
+
+  // 接続線は倍率をかける前（等倍）に描く。線の座標は getBoundingClientRect で
+  // 測っていて、先に縮めると測り取る位置がその分ずれてしまう。
+  // 描いた線は表の一部なので、あとは表ごと同じ倍率で縮む。
   drawConnectorLines(bracket, wrapper, matchElements);
 
-  // スクロールの復元は接続線を描いた後に行う。線の座標は getBoundingClientRect で
-  // 測っていて、先にスクロールさせると測り取る位置がその分ずれてしまう。
-  if (prevScrollLeft > 0) wrapper.scrollLeft = prevScrollLeft;
+  activeZoom = attachBracketZoom({
+    stage,
+    sizer,
+    canvas: wrapper,
+    contentW: Math.max(wrapper.scrollWidth, wrapper.offsetWidth),
+    contentH: Math.max(wrapper.scrollHeight, wrapper.offsetHeight),
+    savedView,
+  });
+
+  frame.appendChild(zoomControls(activeZoom));
+  containerEl.appendChild(zoomHint());
 }
