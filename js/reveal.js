@@ -62,6 +62,7 @@ const stageEl = $('reveal-stage');
 const canvasEl = $('reveal-canvas');
 const slotEl = $('reveal-slot');
 const bgEl = $('reveal-bg');
+const bgBackEl = $('reveal-bg-b');
 
 // 準備画面で選ばれている選手のID。ランキングを引き直しても選択を保つために
 // 一覧の描き直しとは別に持っておく（期間を少し動かしただけで選び直しになると使えない）。
@@ -294,7 +295,17 @@ export async function renderRevealPage() {
   // この画面（運営専用）を開くまで15MBを取りに行かない。
   // 発表を始めてから読むと最初の「第〇位」が背景なしで出てしまうので、
   // 選手を選んでいるあいだに裏で読ませておく。
-  if (bgEl.dataset.src && !bgEl.src) bgEl.src = bgEl.dataset.src;
+  //
+  // 2本目は1本目に続けて読ませる。同時に始めると同じ15MBを2回取りに行きかねないが、
+  // 1本目が流せる状態になってからなら実体はブラウザのキャッシュにある
+  // （/video/* は _headers で1年 immutable）。継ぎ目で初めて読み始めるのでは
+  // 間に合わないので、ここで先に用意しておく。
+  if (bgEl.dataset.src && !bgEl.src) {
+    bgEl.src = bgEl.dataset.src;
+    bgEl.addEventListener('canplay', () => {
+      if (!bgBackEl.src) bgBackEl.src = bgEl.dataset.src;
+    }, { once: true });
+  }
 
   setRevealStatus('集計データを読み込んでいます...', 'loading');
   startBtn.disabled = true;
@@ -603,6 +614,83 @@ function cardElement(entry) {
   return card;
 }
 
+// ---------------------------------------------------------------------------
+// 背景動画のつなぎ目を消す
+//
+// loop 属性は、終わりのフレームから頭のフレームへ一瞬で飛ぶ。素材の頭と終わりの
+// 絵が違うので、一周ごとに画が切り替わったように見えてしまう。
+//
+// そこで同じ動画を2本（bgEl / bgBackEl）重ね、一方が終わりに近づいたら
+// もう一方を頭から流し始めて、重なっている BG_FADE 秒のあいだに入れ替える。
+// 見ている側には、終わりの絵から頭の絵へ溶けていくようにしか見えない。
+//
+// 透過を動かすのは上に重なる bgBackEl だけ（理由は css/reveal.css の #reveal-bg-b。
+// 2本を薄くし合うと、重なりの中ほどで下地が透けて暗い谷ができる）。
+// ここは「どちらの絵を見せているか（front）」と「いつ入れ替えるか」だけを持つ。
+// ---------------------------------------------------------------------------
+
+// 重ねる秒数。css/reveal.css の #reveal-bg-b の transition と必ずそろえること。
+const BG_FADE = 1.2;
+
+// いま絵が見えているほう。もう一方は、出番が来るまで止めてある。
+let bgFront = bgEl;
+let bgTimer = null;
+
+// 次の一周を始める。front は最後の BG_FADE 秒を流しきってから自然に終わる
+// （loop 属性を外してあるので、終端で止まったままになる）。
+function swapBgLayer() {
+  const next = bgFront === bgEl ? bgBackEl : bgEl;
+  next.currentTime = 0;
+  next.play().catch(() => {});
+  // 上の1本の出入りだけで入れ替える。次が上の1本なら現す、下の1本なら隠す
+  // （隠せば、その下でずっと待っている bgEl の絵が出てくる）。
+  bgBackEl.classList.toggle('is-front', next === bgBackEl);
+  bgFront = next;
+}
+
+function watchBgLoop() {
+  bgTimer = requestAnimationFrame(watchBgLoop);
+
+  const { duration, currentTime } = bgFront;
+  // メタデータが届くまで duration は NaN。届いていない＝まだ流れていないので何もしない。
+  // 素材が BG_FADE より短いことは想定しないが、そのときは重ねずに切り替える。
+  if (!Number.isFinite(duration) || duration <= 0) return;
+  if (currentTime < Math.max(0, duration - BG_FADE)) return;
+
+  swapBgLayer();
+}
+
+function startBgLoop() {
+  stopBgLoop();
+  bgFront = bgEl;
+  // 上の1本を、透過の動きを挟まずに引っ込める。撮り直しのとき、前回が
+  // 「上の1本が見えている」ところで終わっていると、ただ class を外すだけでは
+  // 止まったままの最後のフレームが1.2秒かけて消えていく ── 頭出しのはずが
+  // 前回の残りが重なって出てしまう。transition をいったん切って値を確定させ、
+  // それから戻すことで、その1.2秒を飛ばす（間の reflow は値を確定させるため。
+  // 同じフレームのうちに戻すと、変化が無かったことにされて効かない）。
+  bgBackEl.style.transition = 'none';
+  bgBackEl.classList.remove('is-front');
+  void bgBackEl.offsetWidth;
+  bgBackEl.style.transition = '';
+  bgBackEl.pause();
+  bgBackEl.currentTime = 0;
+  // currentTime を戻すのは、撮り直したときに前回の続きから流れないようにするため
+  // （何度撮っても同じ画から始まる）。
+  // muted なので自動再生は止められないが、拒否されても発表そのものは続けられるよう
+  // 握りつぶす。
+  bgEl.currentTime = 0;
+  bgEl.play().catch(() => {});
+  bgTimer = requestAnimationFrame(watchBgLoop);
+}
+
+function stopBgLoop() {
+  if (bgTimer !== null) cancelAnimationFrame(bgTimer);
+  bgTimer = null;
+  bgEl.pause();
+  bgBackEl.pause();
+}
+
 // 画面の大きさに合わせて、1920×1080の画をまるごと縮める。
 function fitStage() {
   const scale = Math.min(window.innerWidth / STAGE_WIDTH, window.innerHeight / STAGE_HEIGHT);
@@ -649,10 +737,10 @@ function closeStage() {
   stageEl.classList.remove('is-sample');
   setupEl.hidden = false;
   slotEl.replaceChildren();
-  // 背景動画は止める。準備画面に戻ってからも裏で流れ続けると、見えないところで
+  // 背景動画は2本とも止める。準備画面に戻ってからも裏で流れ続けると、見えないところで
   // フレームを描き続けることになる（読み込み済みのまま止めるので、次に発表を
-  // 始めるときの待ちは増えない）。
-  bgEl.pause();
+  // 始めるときの待ちは増えない）。継ぎ目を見張る rAF もここで降ろす。
+  stopBgLoop();
   document.body.classList.remove('reveal-playing');
   document.removeEventListener('keydown', onStageKey);
   window.removeEventListener('resize', fitStage);
@@ -752,8 +840,7 @@ function startPresentation() {
   // （何度撮っても同じ画から始まる）。
   // muted なので自動再生は止められないが、拒否されても発表そのものは続けられるよう
   // 握りつぶす。
-  bgEl.currentTime = 0;
-  bgEl.play().catch(() => {});
+  startBgLoop();
   document.body.classList.add('reveal-playing');
   document.addEventListener('keydown', onStageKey);
   window.addEventListener('resize', fitStage);

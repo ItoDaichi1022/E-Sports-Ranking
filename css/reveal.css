@@ -215,10 +215,14 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 /* 背景の動画。素材も1920×1080なので等倍で収まるが、差し替えたときに縦横比が
    変わっても崩れないよう cover にしてある。
    発表のあいだは出しっぱなしにする ── 開始前の何も無い画から最後までずっと流し、
-   出したり消したりしない（フェードも掛けない）。画のたびに現れる背景は、
+   カードをめくるたびに出したり消したりはしない。画のたびに現れる背景は、
    めくるたびに「別の映像に切り替わった」ように見えてしまう。
-   そのぶんこれは canvas の最背面に置き、プレー動画はOBS側でこの面より前に重ねる。 */
-#reveal-bg {
+   そのぶんこれは canvas の最背面に置き、プレー動画はOBS側でこの面より前に重ねる。
+
+   同じ規則を2本に当てる（index.html にある理由のとおり、継ぎ目を溶かすために
+   同じ動画を2本重ねて一周ぶんずらして流す）。2本とも同じ位置・同じ大きさで
+   ぴったり重なる。 */
+.reveal-bg {
   position: absolute;
   inset: 0;
   /* canvas の中で一番後ろ。#reveal-slot（z-index:1）より必ず後ろに来る */
@@ -228,6 +232,27 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   object-fit: cover;
   pointer-events: none;
 }
+
+/* 【動かすのは上の1本だけ】2本を同時に薄くし合う作り方はしない。
+   透過は足し算ではなく重ね合わせなので、両方を0.5にすると
+   0.5 + 0.5×0.5 = 0.75 にしかならず、入れ替わりの中ほどで4分の1だけ
+   下地（＝何も無い＝OBSでは素通し）が透ける。継ぎ目に暗い谷ができる、
+   よくある失敗で、まさに今回消したかったものが別の形で戻ってくる。
+
+   下の1本（#reveal-bg）は不透明のまま置き、上に重なる #reveal-bg-b だけを
+   0↔1 で出入りさせる。こうすると見えている絵は必ず
+   「上 × α ＋ 下 ×（1−α）」になり、合計はどの瞬間も1 ── 下地は一度も透けない。
+   出ていくほうは、上に完全に覆われてから止める。
+
+   linear なのも同じ理由で、緩急を付けると交差の対称性が崩れる。
+   尺は js/reveal.js の BG_FADE と必ず同じにすること（あちらは「終わりの何秒前に
+   次を始めるか」にこの秒数を使う。片方だけ変えると重なりがずれる）。 */
+#reveal-bg-b {
+  opacity: 0;
+  transition: opacity 1.2s linear;
+}
+
+#reveal-bg-b.is-front { opacity: 1; }
 
 /* 1枚ぶんの画。背景動画より手前に置く */
 #reveal-slot {
@@ -552,7 +577,7 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: #10241a url('../img/character_back.webp?v=137') center / cover no-repeat;
+  background: #10241a url('../img/character_back.webp?v=138') center / cover no-repeat;
   /* メインの絵（.reveal-chara-main）と同じ値にすること。片方だけ動かすと揃わない */
   --rv-dur: 0.6s;
   --rv-delay: 1.1s;
