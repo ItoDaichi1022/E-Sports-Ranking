@@ -560,7 +560,9 @@ function titleElement(entry) {
 const NAME_MAX_SIZE = 108;
 const NAME_MIN_SIZE = 56;
 // 半角1文字を全角の何文字ぶんとして数えるか。太字（800）なので気持ち広めに見る。
-const HALF_WIDTH_UNIT = 0.6;
+// 0.6 だったのは本文の字（system-ui）で出していたころの値。いまは名前も Oxanium で
+// 出す（css/reveal.css の .reveal-name）ぶん、同じ大きさでも横に広い。
+const HALF_WIDTH_UNIT = 0.66;
 
 // 3列目（.reveal-body）の内寸。カード幅から他の列と余白を引いた値で、
 // 割り振りは css/reveal.css の flex と padding に合わせてある。
@@ -577,6 +579,9 @@ const CHARA_COLUMN = STAGE_WIDTH * 0.24 + 3;
 const HEX_SIDE_UNITS = (0.42 + 0.14) * 2;
 // 縁（--hex-rim）の左右ぶん。こちらは字の大きさに連れないので実寸で引く。
 const HEX_RIM_X = 8 * 0.55 * 2;
+// 名前は斜体で出すので、最後の字の上が右へ倒れて、その手前の字より少しはみ出す
+// （逆に先頭の字は下が左へ出る）。傾きは字の大きさに連れるため、文字数と同じ単位で持つ。
+const ITALIC_LEAN_UNITS = 0.14;
 
 function nameFontSize(name, hasCharaColumn) {
   let units = 0;
@@ -588,7 +593,7 @@ function nameFontSize(name, hasCharaColumn) {
   // これが列の内寸に収まる最大の size を解いた形が下の式。
   // 見積もりなので、収まりきらなかったときの保険は CSS の text-overflow に残してある。
   // 下限を切ってまで小さくしないのは、読めない大きさで全部入れても意味がないため。
-  const fit = (room - HEX_RIM_X) / (units + HEX_SIDE_UNITS);
+  const fit = (room - HEX_RIM_X) / (units + HEX_SIDE_UNITS + ITALIC_LEAN_UNITS);
   return Math.round(Math.min(NAME_MAX_SIZE, Math.max(NAME_MIN_SIZE, fit)));
 }
 
