@@ -27,7 +27,7 @@ export function placementLabelOf(tournamentId, depth) {
   return depth == null ? '進行中' : depthLabel(depth);
 }
 
-// 大会の優勝者の表示名。結果が確定していなければ null。
+// 大会の優勝者のプレイヤー名。結果が確定していなければ null。
 //
 // チーム戦ではチーム名を返す。メンバー全員のエントリー行に優勝の記録が入っているので、
 // 選手名で返すと片方だけが優勝者として出てしまう。
