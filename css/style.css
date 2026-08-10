@@ -1003,6 +1003,81 @@ a.btn-secondary:hover {
   font-size: 0.82rem;
 }
 
+/* ---- 歯車から開く操作の一覧（js/app.js の setActionMenuOpen が開け閉めする）----
+   めったに押さない・押し間違えると痛い操作（編集・削除）を一段隠す入れ物。
+   閉じている状態を既定にして、画面の上のほうを操作で埋めないようにする。 */
+.action-menu { position: relative; }
+
+/* 歯車は文字を持たないので、幅は絵のぶんだけでよい。
+   .row-actions button の padding より後に書いて、そちらを上書きする。 */
+.action-menu-btn { padding: 0.35rem 0.55rem; }
+
+.action-menu-btn svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+}
+
+/* 開いているあいだは押しっぱなしに見せる。どのボタンから出ている一覧なのかが、
+   離れた場所を見ていても分かる。 */
+.action-menu-btn[aria-expanded="true"] {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+/* 右端に揃えるのは、この歯車がページの右肩に居るため。左に揃えると
+   狭い画面で一覧が画面の外へはみ出す。 */
+.action-menu-list {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 11rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 中の項目はボタンではなくメニューの行として見せる。面も枠も持たせず、
+   触れたところだけが明るくなる形にすると、上から順に読める。 */
+.action-menu-list button {
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 2.4rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: var(--r-sm);
+  background: none;
+  box-shadow: none;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.action-menu-list button:hover:not(:disabled),
+.action-menu-list button:focus-visible {
+  background: var(--surface-3);
+  color: var(--text);
+  filter: none;
+}
+
+/* 取り消せない操作は赤で置く。並びの最後に来るので、指が滑って
+   隣を押す事故は起きにくい。 */
+.action-menu-list .action-menu-danger { color: var(--loss); }
+
+.action-menu-list .action-menu-danger:hover:not(:disabled),
+.action-menu-list .action-menu-danger:focus-visible {
+  background: rgba(226, 68, 92, 0.14);
+  color: var(--loss);
+}
+
 /* ---------------------------------------------------------------------------
    フォーム
    --------------------------------------------------------------------------- */
@@ -2967,9 +3042,13 @@ a.card:hover {
 
 .bracket-title-block h2 { margin-bottom: 0.25rem; }
 
-/* 大会詳細の「共有」ボタン。押すと「コピーしました」に変わるので、
-   その分の幅を最初から取っておく（変わるたびに隣のボタンが動くのを防ぐ）。 */
-.tournament-share-btn { min-width: 7.5rem; }
+/* 大会詳細の共有ボタン。中身は矢印のアイコンだけで、押した直後はチェックに
+   変わる（js/app.js の flashShareBtn）。どちらも同じ大きさの絵なので、
+   隣の「大会情報を編集」がその都度動くことはない。 */
+.tournament-share-btn svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
 
 .bracket {
   position: relative;

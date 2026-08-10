@@ -536,9 +536,11 @@ function characterColumnHtml(mainCharacters) {
 function titleElement(entry) {
   const title = document.createElement('div');
   title.className = `reveal-title${entry.rank <= 3 ? ` rank-${entry.rank}` : ''}`;
+  // 六角形の板の入れ子（外＝縁、内＝色の面）。組み方の理由は css/reveal.css の
+  // 「六角形の板」を参照。中身の幅で板が伸びるので、桁数が変わっても枠が付いてくる。
   title.innerHTML = `
     <p class="reveal-title-rank">
-      <span class="reveal-title-prefix">第</span><span class="reveal-title-num">${entry.rank}</span><span class="reveal-title-unit">位</span>
+      <span class="reveal-hex"><span class="reveal-hex-in"><span class="reveal-title-prefix">第</span><span class="reveal-title-num">${entry.rank}</span><span class="reveal-title-unit">位</span></span></span>
     </p>
   `;
   return title;
@@ -567,15 +569,27 @@ const BODY_PADDING_X = 56 * 2;
 const PHOTO_COLUMN = STAGE_WIDTH * 0.30 + 3; // 3px は列の区切り線
 const CHARA_COLUMN = STAGE_WIDTH * 0.24 + 3;
 
+// 名前を乗せる六角形の板が、文字の左右に食う量。css/reveal.css の
+// .reveal-name .reveal-hex（斜辺 --hex-cut）と .reveal-hex-in（左右の余白）の
+// 値と必ずそろえること ── 板の余白は名前の大きさに比例して決めてあるので、
+// ここも「名前1文字ぶんの何倍か」で持つ。片方だけ変えると、名前が枠に入るか
+// どうかの見積もりがずれる。
+const HEX_SIDE_UNITS = (0.42 + 0.14) * 2;
+// 縁（--hex-rim）の左右ぶん。こちらは字の大きさに連れないので実寸で引く。
+const HEX_RIM_X = 8 * 0.55 * 2;
+
 function nameFontSize(name, hasCharaColumn) {
   let units = 0;
   for (const ch of name) units += ch.charCodeAt(0) < 0x0100 ? HALF_WIDTH_UNIT : 1;
   if (units <= 0) return NAME_MAX_SIZE;
 
   const room = STAGE_WIDTH - PHOTO_COLUMN - (hasCharaColumn ? CHARA_COLUMN : 0) - BODY_PADDING_X;
+  // 板の左右も名前の大きさで伸びるので、要る幅は size×(文字ぶん + 板ぶん) になる。
+  // これが列の内寸に収まる最大の size を解いた形が下の式。
   // 見積もりなので、収まりきらなかったときの保険は CSS の text-overflow に残してある。
   // 下限を切ってまで小さくしないのは、読めない大きさで全部入れても意味がないため。
-  return Math.round(Math.min(NAME_MAX_SIZE, Math.max(NAME_MIN_SIZE, room / units)));
+  const fit = (room - HEX_RIM_X) / (units + HEX_SIDE_UNITS);
+  return Math.round(Math.min(NAME_MAX_SIZE, Math.max(NAME_MIN_SIZE, fit)));
 }
 
 function cardElement(entry) {
@@ -596,11 +610,11 @@ function cardElement(entry) {
       ${photoUrl
     ? `<img src="${escapeHtml(photoUrl)}" alt="">`
     : `<span class="reveal-photo-fallback">${escapeHtml(initialOf(entry.name))}</span>`}
-      <p class="reveal-rank"><span class="reveal-rank-num">${entry.rank}</span><span class="reveal-rank-unit">位</span></p>
+      <p class="reveal-rank"><span class="reveal-hex"><span class="reveal-hex-in"><span class="reveal-rank-num">${entry.rank}</span><span class="reveal-rank-unit">位</span></span></span></p>
     </div>
     ${charaHtml}
     <div class="reveal-body">
-      <p class="reveal-name" style="--name-size:${nameSize}px"><span>${escapeHtml(entry.name)}</span></p>
+      <p class="reveal-name" style="--name-size:${nameSize}px"><span class="reveal-hex"><span class="reveal-hex-in">${escapeHtml(entry.name)}</span></span></p>
       <p class="reveal-score">
         <span class="reveal-score-label">SCORE</span>
         <span class="reveal-score-value">${entry.score.toFixed(1)}</span>

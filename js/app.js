@@ -114,6 +114,10 @@ const bracketAdminToolsEl = $('bracket-admin-tools');
 const bracketContainer = $('bracket-container');
 const tournamentEditBtn = $('tournament-edit-btn');
 const tournamentDeleteBtn = $('tournament-delete-btn');
+// 編集・削除をしまってある歯車。3つで1組（外枠・押す場所・中身）
+const tournamentManageEl = $('tournament-manage');
+const tournamentManageBtn = $('tournament-manage-btn');
+const tournamentManageList = $('tournament-manage-list');
 const tournamentShareBtn = $('tournament-share-btn');
 const tournamentEditForm = $('tournament-edit-form');
 const tournamentEditNameInput = $('tournament-edit-name-input');
@@ -244,9 +248,11 @@ function applyAuthUI() {
   // ランキングの集計と順位発表は持ち主だけ。大会を開ける人が増えても、
   // 全大会を横断して順位を決める操作は1人に閉じておく。
   rankingRevealBtn.hidden = !owner;
-  tournamentEditBtn.hidden = !canManageCurrent;
-  tournamentDeleteBtn.hidden = !canManageCurrent;
-  if (!canManageCurrent) tournamentEditForm.hidden = true;
+  tournamentManageEl.hidden = !canManageCurrent;
+  if (!canManageCurrent) {
+    setManageMenuOpen(false);
+    tournamentEditForm.hidden = true;
+  }
   // 運営でなくなったら投稿フォームも畳む
   if (!admin) closeAnnouncementForm();
 
@@ -1498,17 +1504,18 @@ async function renderTournamentDetail(tournamentId) {
   currentBracketTournamentId = tournamentId;
   tournamentEditForm.hidden = true;
 
-  // 編集・削除はこの大会の運営だけ。大会は誰でも開けるので、ここの出し分けは
+  // 編集・削除（歯車）はこの大会の運営だけ。大会は誰でも開けるので、ここの出し分けは
   // 「サイトの運営か」ではなく「この大会の運営か」で決まる。
   const canManage = canManageTournament(tournamentId);
-  tournamentEditBtn.hidden = !canManage;
-  tournamentDeleteBtn.hidden = !canManage;
+  tournamentManageEl.hidden = !canManage;
+  // 別の大会を開いたときに開きっぱなしにしない
+  setManageMenuOpen(false);
   // 共有は運営でなくても押せる。無い大会のときだけ、下で隠す。
   tournamentShareBtn.hidden = false;
 
-  // 別の大会を開いたときに「コピーしました」が残らないよう、毎回戻す
+  // 別の大会を開いたときに「コピーしました」の印が残らないよう、毎回戻す
   clearTimeout(shareBtnResetTimer);
-  tournamentShareBtn.textContent = '共有';
+  resetShareBtn();
 
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
@@ -2463,12 +2470,19 @@ function tournamentShareUrl(tournamentId) {
 
 let shareBtnResetTimer = null;
 
-// 押した結果をボタンの文字で返す。共有シートが開く端末では何も言わなくても
+// 共有ボタンは矢印のアイコンだけで出す。編集・削除と違って押しても何も壊れず、
+// 箱から出ていく矢印は共有シートと同じ絵なので、文字が無くても伝わる。
+function resetShareBtn() {
+  setButtonIcon(tournamentShareBtn, 'share', '共有');
+}
+
+// 押した結果をアイコンの差し替えで返す。共有シートが開く端末では何も言わなくても
 // 分かるが、コピーは黙って終わると「押せたのか」が分からない。
-function flashShareBtn(text) {
-  tournamentShareBtn.textContent = text;
+// 読み上げ用のラベルも一緒に変えて、絵の変化を見られない人にも同じことを伝える。
+function flashShareBtn(name, label) {
+  setButtonIcon(tournamentShareBtn, name, label);
   clearTimeout(shareBtnResetTimer);
-  shareBtnResetTimer = setTimeout(() => { tournamentShareBtn.textContent = '共有'; }, 1800);
+  shareBtnResetTimer = setTimeout(resetShareBtn, 1800);
 }
 
 tournamentShareBtn.addEventListener('click', async () => {
@@ -2491,7 +2505,7 @@ tournamentShareBtn.addEventListener('click', async () => {
   try {
     if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
     await navigator.clipboard.writeText(url);
-    flashShareBtn('コピーしました');
+    flashShareBtn('check', 'リンクをコピーしました');
   } catch {
     // クリップボードは http 接続や許可の無い環境では使えない。
     // その場合は選んでコピーできる形で見せるところまでやる。
@@ -2499,9 +2513,48 @@ tournamentShareBtn.addEventListener('click', async () => {
   }
 });
 
+// ---- 大会の管理（歯車） ----
+//
+// 編集と削除は、大会に一度あるかどうかの操作で、しかも削除は取り返しがつかない。
+// 出しっぱなしにすると「共有」や「エントリー」と同じ大きさで常に並ぶことになるので、
+// 歯車の中にしまい、開けた人にだけ見せる。
+//
+// ダイアログ（<dialog>）にしないのは、押す場所のすぐ下に出したいため。画面の中央に
+// 出てくると、どのボタンから開いたものかが一度視線を切らないと分からない。
+
+setButtonIcon(tournamentManageBtn, 'gear', '大会の管理');
+
+function setManageMenuOpen(open) {
+  tournamentManageList.hidden = !open;
+  tournamentManageBtn.setAttribute('aria-expanded', String(open));
+  // 閉じるときに中にフォーカスが残っていると、キーボードだけの人が
+  // 見えないボタンの上に取り残される。開くのに使った歯車へ戻す。
+  if (!open && tournamentManageList.contains(document.activeElement)) tournamentManageBtn.focus();
+}
+
+tournamentManageBtn.addEventListener('click', () => {
+  setManageMenuOpen(tournamentManageList.hidden);
+});
+
+// 外を触ったら閉じる。中の項目を押したときは、それぞれの処理のあとで閉じる
+// （ここで先に閉じると、確認ダイアログが出る前に一覧が消えて落ち着かない）。
+document.addEventListener('click', (e) => {
+  if (tournamentManageList.hidden) return;
+  if (e.target.closest('#tournament-manage')) return;
+  setManageMenuOpen(false);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') setManageMenuOpen(false);
+});
+
+// 大会を離れたら閉じておく（削除したときは行き先が大会一覧になる）
+window.addEventListener('hashchange', () => setManageMenuOpen(false));
+
 tournamentEditBtn.addEventListener('click', () => {
   const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
   if (!tournament) return;
+  setManageMenuOpen(false);
   tournamentEditNameInput.value = tournament.name;
   tournamentEditDateInput.value = tournament.date || '';
   tournamentEditMatchTypeInput.value = tournament.matchType || '';
@@ -2590,7 +2643,10 @@ tournamentEditForm.addEventListener('submit', async (e) => {
 tournamentDeleteBtn.addEventListener('click', async () => {
   const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
   if (!tournament) return;
-  if (!confirm(`大会「${tournament.name}」と、その試合結果をすべて削除します。よろしいですか？`)) return;
+  const ready = confirm(`大会「${tournament.name}」と、その試合結果をすべて削除します。よろしいですか？`);
+  // やめたときも閉じる。開いたままでは、いま何を押したのかが残って見える
+  setManageMenuOpen(false);
+  if (!ready) return;
 
   // ブラケット・試合・エントリーは外部キーのカスケードで一緒に消える
   const imageUrl = tournament.imageUrl || '';

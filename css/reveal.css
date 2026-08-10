@@ -292,6 +292,95 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 #reveal-stage.is-sample .reveal-sample-badge { display: block; }
 
 /* ---------------------------------------------------------------------------
+   六角形の板（順位・名前を乗せる枠）
+
+   この画は下にプレー動画が透ける。順位も名前も、影だけを頼りに文字を直接そこへ
+   置いていたが、それだと「映像に文字を打ち込んだ」ようにしか見えず、映像の明暗で
+   読みやすさも変わる。文字を板に乗せて、板ごと画の部品にする。
+
+   【なぜ六角形か】この画の枠はどれも直線で切ってある（列の区切り線、戦績の島）。
+   角丸を持ち込むと様式が2つになるので、直線のまま「文字の器」だと分かる形にする。
+
+   【横に伸びるのは水平の辺だけ】斜辺が横に食う量（--hex-cut）をpxで固定してあるので、
+   中身が長くなったぶんは上下の水平な辺だけが伸びる。名前が長い選手でも、
+   六角形が間延びした平行四辺形に化けたりせず、同じ角度の斜辺を保ったまま枠が広がる。
+   （百分率で切ると、幅が変わるたびに斜辺の角度まで変わってしまう。）
+
+   【二重の板】外側（.reveal-hex）は暗い縁、内側（.reveal-hex-in）が色の面。
+   縁が要るのは、明るい場面の映像の上で鮮やかな面がそのまま溶けないようにするため。
+   同じ多角形を、少しだけ小さい箱にもう一度当てて作る。
+   縁の横幅を縦幅の 0.55 倍にしてあるのは、斜辺に対しては横のずれが実寸より
+   大きく効くため ── 同じ値にすると斜めのところだけ縁が太く見える。
+
+   【色は1か所で決まる】面は --reveal-plate、文字は --reveal-ink。順位色（金銀銅）と
+   そろえてあり、4位以下はサイトの緑。暗い板に白文字へ替えたくなったら、
+   この2つの値だけを差し替えればよい（形と余白の規則は触らずに済む）。
+   --------------------------------------------------------------------------- */
+
+.reveal-card,
+.reveal-title {
+  --reveal-plate: linear-gradient(105deg, #c8f84a 0%, #93d500 46%, #5d8c00 100%);
+  --reveal-plate-edge: rgba(5, 11, 2, 0.92);
+  --reveal-ink: #0c1600;
+}
+
+.reveal-card.rank-1,
+.reveal-title.rank-1 {
+  --reveal-plate: linear-gradient(105deg, #ffeeb4 0%, #f0c05a 46%, #bd7f13 100%);
+  --reveal-ink: #2b1c00;
+}
+
+.reveal-card.rank-2,
+.reveal-title.rank-2 {
+  --reveal-plate: linear-gradient(105deg, #ffffff 0%, #c3cbdb 46%, #8390a8 100%);
+  --reveal-ink: #131722;
+}
+
+.reveal-card.rank-3,
+.reveal-title.rank-3 {
+  --reveal-plate: linear-gradient(105deg, #ffd7b3 0%, #cf8b57 46%, #925127 100%);
+  --reveal-ink: #2a1305;
+}
+
+/* 外と内で同じ多角形を使う。--hex-cut は内側にも継承されるので、
+   内側の箱が縁のぶんだけ小さくても斜辺はほぼ平行に走る。 */
+.reveal-hex,
+.reveal-hex-in {
+  clip-path: polygon(
+    0 50%,
+    var(--hex-cut) 0,
+    calc(100% - var(--hex-cut)) 0,
+    100% 50%,
+    calc(100% - var(--hex-cut)) 100%,
+    var(--hex-cut) 100%
+  );
+}
+
+.reveal-hex {
+  /* 使う場所ごとに上書きする（文字の大きさで釣り合う角度が変わるため）。
+     ここの値は、万一渡らなかったときでも形が崩れない程度のもの。 */
+  --hex-cut: 40px;
+  --hex-rim: 8px;
+  display: block;
+  max-width: 100%;
+  /* flex の子として置くので、切り詰め（3点リーダ）を効かせるために要る */
+  min-width: 0;
+  padding: var(--hex-rim) calc(var(--hex-rim) * 0.55);
+  background: var(--reveal-plate-edge);
+}
+
+.reveal-hex-in {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  background: var(--reveal-plate);
+  color: var(--reveal-ink);
+  /* 濃い文字を明るい面に置くので、影ではなく上向きのわずかな光で字を起こす。
+     暗い影を足すと、面の色ごと濁って鮮やかさが死ぬ。 */
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+/* ---------------------------------------------------------------------------
    中扉（「第〇位」）
 
    選手のカードを出す前に1枚はさむ画。数字だけを画面の真ん中に置き、それ以外は
@@ -335,16 +424,28 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 
 .reveal-title-rank {
   margin: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 18px;
-  line-height: 0.9;
-  /* 4位以下は白。カードの順位と同じ理由（緑のままだと下の映像に埋もれやすい） */
-  color: var(--reveal-accent, #fff);
-  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.95), 0 0 110px rgba(0, 0, 0, 0.9);
   --rv-dur: 0.9s;
   --rv-delay: 0s;
   animation: reveal-title-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+/* 数字は板に乗る（このファイルの「六角形の板」を参照）。板の幅は中身で決まるので、
+   1桁でも3桁でも枠が数字にぴったり付いてくる。
+   斜辺は板の高さのおよそ 0.58 倍。名前の板・カードの順位の板も同じ比で、
+   3か所の六角形が同じ角度に見えるようにそろえてある。 */
+.reveal-title-rank .reveal-hex {
+  --hex-cut: 155px;
+  --hex-rim: 10px;
+}
+
+.reveal-title-rank .reveal-hex-in {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 18px;
+  line-height: 0.9;
+  white-space: nowrap;
+  padding: 58px calc(var(--hex-cut) + 60px);
 }
 
 /* 大きくぼやけた状態から締まって出る。カードの順位（reveal-rank-in）と同じ動きを
@@ -354,9 +455,12 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   to   { opacity: 1; transform: scale(1); filter: blur(0); }
 }
 
+/* 「第」と「位」は数字の添え物。同じ濃さで置くと数字と競うので、少し薄くして
+   読む順を数字→単位に決める（板の色が透けるぶん、面ともなじむ）。 */
 .reveal-title-prefix {
   font-size: 130px;
   font-weight: 700;
+  opacity: 0.72;
 }
 
 .reveal-title-num {
@@ -369,6 +473,7 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
 .reveal-title-unit {
   font-size: 150px;
   font-weight: 700;
+  opacity: 0.72;
 }
 
 /* ---------------------------------------------------------------------------
@@ -391,9 +496,12 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
    絵はその枠を端まで満たす。線はその選手の順位色（金銀銅）なので、
    構造の区切りと順位の合図を1本で兼ねる。
 
-   【文字だけは島に乗せる】絵は線で囲われた枠を持つが、文字は下の映像に直接乗る。
-   名前とスコアは影だけで読ませ、戦績は1件ずつ独立した細長い島に乗せる ──
-   右半分をまるごと暗い板で覆うと、下の映像がそこだけ死ぬため。
+   【文字は板に乗せる、ただし1つずつ】絵は線で囲われた枠を持つ。文字のほうは、
+   順位と名前を六角形の板に（このファイルの「六角形の板」）、戦績を1件ずつ独立した
+   細長い島に乗せる。板は文字の幅にだけ付き、右半分をまるごと覆う形にはしない ──
+   一枚の暗い板で覆うと、下の映像がそこだけ死ぬため。
+   スコアだけは板を持たず影で読ませる。名前のすぐ下にもう1枚板が続くと、
+   名前が「その中の1行」に見えて主役でなくなる。
    --------------------------------------------------------------------------- */
 
 .reveal-card {
@@ -493,23 +601,20 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   to   { opacity: 1; transform: scale(1); }
 }
 
-/* 順位。アイコンの上に重ねるので、下が明るい写真でも読めるよう影を厚く敷く。
-   置き場所は左下 ── 立ち姿の顔は上のほうにあることが多く、下辺なら顔に
-   かぶらない。 */
+/* 順位。アイコンの上に重ねる。板に乗せてあるので、下が明るい写真でも
+   数字が沈まない（板については「六角形の板」の節を参照）。
+   置き場所は下辺 ── 立ち姿の顔は上のほうにあることが多く、下なら顔にかぶらない。
+   左端に寄せず、列の中で中央にそろえる。板は中身の幅で伸び縮みするので、
+   左に固定すると桁数で右端の位置が変わり、カードをめくるたびに枠が揺れて見える。 */
 .reveal-rank {
   position: absolute;
-  left: 40px;
-  bottom: 24px;
+  left: 18px;
+  right: 18px;
+  bottom: 32px;
   z-index: 2;
   margin: 0;
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  line-height: 0.9;
-  /* 4位以下は白。既定色（緑）のままだと、写真未設定の選手に出る緑の札の上で
-     緑の数字になって読めなくなる。1〜3位は金銀銅なので緑の上でも判別できる。 */
-  color: var(--reveal-accent, #fff);
-  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.95), 0 0 70px rgba(0, 0, 0, 0.9);
+  justify-content: center;
   /* 順位だけは他と違う出方をさせる。大きく現れて定位置に収まる動きが
      「めくった」という合図になる */
   --rv-dur: 0.7s;
@@ -517,21 +622,44 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   animation: reveal-rank-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
 }
 
+.reveal-rank .reveal-hex {
+  --hex-cut: 60px;
+  --hex-rim: 7px;
+}
+
+.reveal-rank .reveal-hex-in {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  line-height: 0.9;
+  white-space: nowrap;
+  padding: 20px calc(var(--hex-cut) + 20px);
+}
+
+/* 出るときの倍率は 1.2 まで。以前（文字だけのころ）は 1.45 だったが、板になると
+   その大きさではアイコンの列（576px）からはみ出し、overflow: hidden に左右の角を
+   削られる ── 文字なら端がにじんで消えるだけで済んだところが、面だと縦にすっぱり
+   切れて目に付く。1.2 なら2桁（99位まで）は膨らみきっても列に収まる。 */
 @keyframes reveal-rank-in {
-  from { opacity: 0; transform: scale(1.45); filter: blur(6px); }
+  from { opacity: 0; transform: scale(1.2); filter: blur(6px); }
   to   { opacity: 1; transform: scale(1); filter: blur(0); }
 }
 
+/* 板に入れたぶん、字は以前より小さい（240px→175px）。アイコンの列は 576px しかなく、
+   3桁（100位）でも枠ごと収まる大きさがここまでだった。数字だけを大きくしても
+   枠から溢れれば切れて読めないし、色の面に乗ったことで以前より強く出る。 */
 .reveal-rank-num {
   font-family: var(--font-display);
-  font-size: 240px;
+  font-size: 175px;
   font-weight: 800;
   letter-spacing: -0.04em;
 }
 
 .reveal-rank-unit {
-  font-size: 72px;
+  font-size: 52px;
   font-weight: 700;
+  opacity: 0.72;
 }
 
 /* ---- 2列目: 使用キャラクター ----
@@ -577,7 +705,7 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: #10241a url('../img/character_back.webp?v=140') center / cover no-repeat;
+  background: #10241a url('../img/character_back.webp?v=141') center / cover no-repeat;
   /* メインの絵（.reveal-chara-main）と同じ値にすること。片方だけ動かすと揃わない */
   --rv-dur: 0.6s;
   --rv-delay: 1.1s;
@@ -681,16 +809,15 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   animation: reveal-step-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
 }
 
-/* 名前は島に乗せず、影だけで読ませる。この画で一番大きい文字なので、
-   板を敷くと板のほうが目に入ってしまう。
+/* 名前も順位と同じ六角形の板に乗せる（「六角形の板」の節を参照）。板は中身の幅で
+   決まるので、名前が長い選手ほど上下の水平な辺が伸びて枠が横に広がる。
    この列の中では中央そろえにする ── 誰のカードかを示す見出しなので、下に続く
    スコアや戦績（左そろえで読ませる情報）とは別の扱いにして、格の違いを
-   位置でも出す。切り詰め（3点リーダ）は中央そろえのままでも効く。 */
+   位置でも出す。 */
 .reveal-name {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
   /* 大きさは名前ごとに変わる。短い名前ほど大きく出したいが、一律に大きくすると
      長い名前が3点リーダで切れて誰なのか読めなくなるので、「入る大きさのうち
      いちばん大きいもの」を js/reveal.js の nameFontSize が選んで渡す。
@@ -701,20 +828,6 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
      ひと塊の名前として読める（見出し用の常套手段） */
   letter-spacing: -0.015em;
   line-height: 1.15;
-  /* 地の文（--text）はわずかに緑がかった白。名前だけは純白にして、
-     同じ列のスコアや戦績より一段明るく置く */
-  color: #fff;
-  /* 影は3枚重ね。役目が違う。
-     1枚目 … 真下の濃い影。明るい場面でも字の形が抜ける
-     2枚目 … 全方位の暗いにじみ。字の周りだけ映像を沈めて読ませる
-     3枚目 … 順位色の光。1〜3位なら金銀銅、4位以下はサイトの緑になり、
-              区切り線や順位の数字と同じ色が名前にも回る。これが「目立たせる」
-              役で、上の2枚が「読ませる」役 ── 光だけ足すと明るい場面で
-              かえって読みにくくなるので、必ず暗い2枚と重ねて使うこと。 */
-  text-shadow:
-    0 4px 10px rgba(0, 0, 0, 0.95),
-    0 0 26px rgba(0, 0, 0, 0.9),
-    0 0 70px var(--reveal-accent, var(--accent-bright));
   /* 長い名前でも2行にしない。2行になると下のスコア以下が押し出されて
      カードごとに位置が変わり、めくったときに画面が跳ねて見える */
   --rv-dur: 0.6s;
@@ -723,6 +836,23 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
      大きく・ぼけた状態から定位置に締まる動きは順位の数字と同じ作りで、
      「ここが主役」という合図をそろえている。 */
   animation: reveal-name-in var(--rv-dur) cubic-bezier(0.16, 1, 0.3, 1) var(--rv-delay) backwards;
+}
+
+/* 板の寸法は名前の大きさに連れる。文字が小さいのに斜辺だけ大きいと、六角形が
+   のっぺりした帯に見えてしまうので、斜辺も余白も --name-size の比で決める
+   （この比は js/reveal.js の nameFontSize が横幅を見積もるときにも使う。
+   片方だけ変えると、名前が枠に入る大きさの見積もりがずれる）。 */
+.reveal-name .reveal-hex {
+  --hex-cut: calc(var(--name-size, 92px) * 0.42);
+  --hex-rim: 8px;
+}
+
+.reveal-name .reveal-hex-in {
+  /* 見積もりで収まりきらなかったときの保険。板の内側で3点リーダに切り替わる */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: calc(var(--name-size, 92px) * 0.16) calc(var(--hex-cut) + var(--name-size, 92px) * 0.14);
 }
 
 @keyframes reveal-name-in {
