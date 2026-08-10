@@ -407,10 +407,10 @@ async function publishCurrentRanking() {
 
 // キャラクター立ち絵の「顔（目のあたり）」の位置を、CSSに渡せる形で返す。
 //
-// サブキャラクターの札は顔だけを大きく切り出すので、どこを窓の中心に置くかで
-// 出来がまるで変わる（素材のポーズはバラバラで、顔が真ん中にある保証がない）。
-// 組み方は style.css の .row-art img と同じ ── 絵を窓より大きく引き伸ばし、
-// この (--fx, --fy) の点が窓の中心に来るように置く。
+// キャラクターの枠は、メインもサブも絵を枠より大きく引き伸ばして満たす（cover）。
+// はみ出す分をどこで切るかで出来がまるで変わるので（素材のポーズはバラバラで、
+// 顔が真ん中にある保証がない）、この (--fx, --fy) の点が枠の同じ位置に来るように
+// 置いて、顔を必ず枠の中に残す。組み方は style.css の .row-art img と同じ。
 //
 // js/characters.js の focusStyle と同じ表を引くが、あちらの上下左右のクランプは
 // 掛けない。あれは「行の高さしか無い細長い窓」のためのもので、こちらの窓は
@@ -479,14 +479,9 @@ function achievementsOf(playerId, contributions) {
 // 分け合う（サブ1体なら1/3をひとりで、2体なら1/6ずつ。割り振りはCSSの flex）。
 // 3人目以降まで並べると1枚が薄い帯になってしまうので、サブは最大2人ぶんまで。
 //
-// 【メインとサブで絵の見せ方が違う理由】
-// メインは切り取らず全身を枠に収める（CSSの object-fit: contain）。素材のポーズは
-// 1枚ずつ違い、武器を振りかぶっていたり寝そべっていたりするので、「顔がここにある
-// はず」と決めて切ると必ずどれかが崩れる。切らなければ、どんなポーズでも顔と上半身は
-// 必ず映る ── ポーズの違いへの一番確実な対応が「切らないこと」になる。
-// サブの枠は横長で低く、全身を収めると顔が豆粒になる。こちらは顔の位置の表
-// （js/characterFocus.js）を object-position に入れて顔を枠に寄せる。
-// どちらの道でも「顔は必ず出る」ことは保証される。
+// メインもサブも、絵は枠を端まで満たす（CSSの object-fit: cover）。はみ出した分は
+// 切るが、切る位置は顔の位置の表（js/characterFocus.js）を object-position に
+// 入れて決めるので、武器を振りかぶった絵でも寝そべった絵でも顔が枠の外へは出ない。
 function characterColumnHtml(mainCharacters) {
   const refs = (mainCharacters ?? []).filter(Boolean);
   if (refs.length === 0) return '';
@@ -495,13 +490,16 @@ function characterColumnHtml(mainCharacters) {
   const mainUrl = characterImageUrl(mainRef, 'large');
   if (!mainUrl) return '';
 
-  // 【サブだけ thumb を使う理由】顔の位置の表（js/characterFocus.js）は
-  // 240px角のサムネイルを方眼に載せて読み取った百分率で、そのサムネイルは
-  // 正方形に「収めた」もの＝左右に透明の余白が入っている
-  // （scripts/build-characters.mjs の fit: 'contain'）。
-  // 一方 @lg は余白なしで縦横比をそのまま残すので、同じ百分率が別の場所を指す。
-  // @lg に当てると顔が中心から横にずれる。表と組み合わせるときは必ず thumb のこと。
-  // 顔を切り出さないメイン（contain で全身）は、この制約と無関係なので @lg でよい。
+  // 【サブだけ thumb を使う理由】サブの枠は 227×359 と小さいので、@lg（長辺480px）を
+  // 持ってきても解像度は使い切れず、重さだけが増える。メインの枠は 458×718 あるので
+  // そちらは @lg を使う。
+  //
+  // なお顔の位置の表（js/characterFocus.js）は、240px角のサムネイルを方眼に載せて
+  // 読み取った百分率で、そのサムネイルは正方形に「収めた」もの＝縦長の絵なら左右に、
+  // 横長の絵なら上下に透明の余白が入っている（scripts/build-characters.mjs の
+  // fit: 'contain'）。余白の入った側の百分率は、余白の無い @lg では別の場所を指す。
+  // それでもメインに当てて構わない理由は css/reveal.css の .reveal-chara-main img
+  // にある ── cover が切る向きと、余白でずれる向きが必ず逆になるため。
   const subsHtml = subRefs.slice(0, 2).map((ref) => {
     const url = characterImageUrl(ref, 'thumb');
     if (!url) return '';
@@ -511,7 +509,7 @@ function characterColumnHtml(mainCharacters) {
   return `
     <div class="reveal-chara">
       <div class="reveal-chara-main">
-        <img src="${escapeHtml(mainUrl)}" alt="">
+        <img src="${escapeHtml(mainUrl)}" alt="" style="${focusVars(mainRef)}">
       </div>
       ${subsHtml ? `<div class="reveal-chara-subs">${subsHtml}</div>` : ''}
     </div>
