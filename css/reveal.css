@@ -532,7 +532,7 @@ body.reveal-playing { overflow: hidden; background: transparent; background-imag
   display: flex;
   flex-direction: column;
   border-right: 3px solid var(--reveal-accent, var(--accent));
-  background: #10241a url('../img/character_back.webp?v=133') center / cover no-repeat;
+  background: #10241a url('../img/character_back.webp?v=134') center / cover no-repeat;
 }
 
 .reveal-chara-main {
