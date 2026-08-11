@@ -1650,13 +1650,26 @@ function renderTournamentDetailLoading() {
   }
   tournamentStatusChipEl.hidden = true;
   tournamentMetaEl.innerHTML = '<span class="skeleton-line skeleton-text is-short"></span>';
-  tournamentInfoEl.innerHTML = '<div class="skeleton-line skeleton-panel"></div>';
   tournamentActionsEl.innerHTML = '';
-  renderEntryCta(tournamentEntryCtaEl, null);
   // 行き先が決まっていないリンクは出さない（押せてしまう空のリンクを作らない）
   bracketLinkEl.hidden = true;
   entrantsLinkEl.hidden = true;
   tournamentShareBtn.hidden = true;
+
+  // 【仮置きは一番上の枠に、1つだけ】
+  // 待っているあいだの仮置きは、JSが後から埋める枠のうち「一番上のもの」に置く。
+  // ここを間違えると、待たせた時間ぶんそのまま画面が飛ぶ ── 以前は大会情報
+  // （#tournament-info・ページの下のほう）に置いていたので、中身が届いた瞬間に
+  // エントリーの導線と対戦表・出場選手への入口がその上に割り込み、仮置きが
+  // 300px ほど下へ突き落とされていた（Lighthouse の CLS 0.19 はほぼこれ）。
+  //
+  // 一番上に置けば、届いた中身はその場で入れ替わり、続きは「まだ何も無い」
+  // 下の空きに足されるだけになる。動くものが無いので、ずれようがない。
+  // 逆に、下の枠は読み込み中は空のままにしておくこと。
+  renderEntryCta(tournamentEntryCtaEl, null);
+  tournamentEntryCtaEl.innerHTML = '<div class="skeleton-line skeleton-panel skeleton-panel-cta"></div>';
+  tournamentEntryCtaEl.hidden = false;
+  tournamentInfoEl.innerHTML = '';
 }
 
 // 大会詳細。対戦表（/tournaments/{id}/bracket/）と出場選手一覧（同 entrants/）は別ページに
@@ -1707,6 +1720,9 @@ async function renderTournamentDetail(tournamentId) {
   try {
     await db.ensureTournamentDetail(tournamentId);
   } catch (err) {
+    // 待たせるのをやめるので、仮置きも一緒に片付ける。残すと、灰色の帯が
+    // 流れ続けたまま下に失敗の知らせが出て、まだ読み込み中に見える。
+    renderEntryCta(tournamentEntryCtaEl, null);
     tournamentInfoEl.innerHTML = `<p class="empty-hint">${escapeHtml(err.message)}</p>`;
     return;
   }

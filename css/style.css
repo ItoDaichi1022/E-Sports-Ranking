@@ -1461,6 +1461,14 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   border-radius: var(--r);
 }
 
+/* 大会詳細の仮置き。エントリーの導線（.entry-cta）の場所に立つので、前後の空きも
+   そちらに揃える ── 上の余白が食い違うと、中身が入った瞬間に上端の位置がずれ、
+   場所を空けておいた意味がなくなる。高さは .entry-cta のおおよその高さ。 */
+.skeleton-panel-cta {
+  height: 9rem;
+  margin: 0 0 1.5rem;
+}
+
 /* 動きを止めている人には流さない。待っていることは形だけで伝わる。 */
 @media (prefers-reduced-motion: reduce) {
   .skeleton-block::after,
