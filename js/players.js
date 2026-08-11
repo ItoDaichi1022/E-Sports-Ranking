@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { avatarHtml } from './util.js';
 import { characterRowArtHtml } from './characters.js';
 import { makeIconButton } from './icons.js';
+import { pathFor } from './router.js';
 import * as db from './db.js';
 
 // プレイヤー名を更新する。名前を変えた場合、旧名は pastNames に自動で残す。
@@ -73,6 +74,12 @@ export function renderPlayerTable(containerEl, options = {}) {
   }
 
   if (state.players.length === 0) {
+    // まだ届いていないだけかもしれない。読み込み中に「登録されていません」と
+    // 出すと、初めて来た人には誰も居ないサイトに見える。
+    if (!db.hasLoadedOnce()) {
+      containerEl.innerHTML = '<p class="status-line loading">選手を読み込んでいます...</p>';
+      return;
+    }
     containerEl.innerHTML = '<p class="empty-hint">まだ選手が登録されていません。</p>';
     return;
   }
@@ -114,7 +121,7 @@ export function renderPlayerTable(containerEl, options = {}) {
     nameCell.className = 'player-identity';
     nameCell.innerHTML = avatarHtml(p, 'sm');
     const link = document.createElement('a');
-    link.href = `#player/${encodeURIComponent(p.id)}`;
+    link.href = pathFor('player', p.id);
     link.textContent = p.currentName;
     nameCell.appendChild(link);
     nameTd.appendChild(nameCell);

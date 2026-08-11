@@ -11,9 +11,10 @@
 // anonキーは公開前提の値で、実際の防御はデータベース側のRLSが行う。
 // リポジトリにコミットして問題ない。
 //
-// 【wrangler.jsonc の vars も同時に直すこと】共有リンク（/t/{大会ID}）を返す
-// Worker はブラウザ用のこのモジュールを読めないので、同じ2つの値をあちらにも
-// 持たせてある。片方だけ直すと、プレビューだけが古いプロジェクトを見に行く。
+// 【wrangler.jsonc の vars も同時に直すこと】ページの title や og: をサーバー側で
+// 埋める Worker はブラウザ用のこのモジュールを読めないので、同じ2つの値を
+// あちらにも持たせてある。片方だけ直すと、検索結果とSNSのプレビューだけが
+// 古いプロジェクトを見に行く。
 // ---------------------------------------------------------------------------
 export const SUPABASE_URL = 'https://zgqoeicdnneivzasneez.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_yTrfsOpDxshekZrQtZ8f9Q_m5TKjqfZ';
@@ -37,15 +38,25 @@ export const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON
     // OAuthから戻ってきたURLを自動で処理してセッションを確立する
     detectSessionInUrl: true,
     // PKCEを使う。既定のimplicitフローはアクセストークンをURLのハッシュ（#access_token=...）で
-    // 返すため、このアプリのハッシュベースのルーティング（#home, #bracket/xxx）と衝突する。
+    // 返すため、旧URL（#tournament/xxx）で着地した人を新しいパスへ書き換える処理
+    // （js/router.js の migrateLegacyUrl）とぶつかる。
     // PKCEはクエリ文字列（?code=...）で返るので干渉しない。安全性の面でも推奨される。
     flowType: 'pkce',
   },
 });
 
-// OAuthのリダイレクト先。配信先（Cloudflare Pages・独自ドメイン・ローカル等）に
-// 依存せず正しく戻れるよう、今アクセスしているURLから組み立てる（ハッシュは落とす）。
-// サブディレクトリ配信でもそのパスを保つ。
+// OAuthのリダイレクト先。配信先（*.workers.dev・独自ドメイン・ローカル等）に
+// 依存せず正しく戻れるよう、今アクセスしているURLの origin から組み立てる。
+//
+// 【いま開いているページには戻さない】ページのURLがパスになったので、
+// location.pathname を足せば「ログインした場所」へ帰せる ── が、Supabase は
+// 戻り先を Redirect URLs の許可リストと突き合わせるので、/tournaments/** まで
+// 登録しておかないと、深いページから押した人だけがログインできなくなる。
+// リポジトリの外（Supabaseの管理画面）の設定に挙動が依存するのは避けたいので、
+// 常にトップへ戻す ── ハッシュだった頃と同じ着地点でもある。
+//
+// 戻る場所を「押したページ」にしたくなったら、先に Supabase の
+// Redirect URLs へ `{配信先}/**` を足すこと。
 export function redirectUrl() {
-  return `${location.origin}${location.pathname}`;
+  return `${location.origin}/`;
 }

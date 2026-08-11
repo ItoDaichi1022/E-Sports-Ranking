@@ -69,11 +69,14 @@ export function representativeRef(character) {
 //
 // ?v= を必ず付ける。img/ は _headers で1年キャッシュされる場所なので、
 // 付けずに配ると素材を作り直しても新しい絵が届かなくなる。
+//
+// 先頭の / も必ず付ける。相対パスにすると、/tournaments/{id}/ のような深いURLから
+// 開いたときに /tournaments/{id}/img/... を取りに行き、絵が全部消える。
 export function characterImageUrl(ref, size = 'thumb') {
   const parsed = typeof ref === 'string' ? parseCharacterRef(ref) : ref;
   if (!parsed?.known) return null;
   const suffix = size === 'large' ? '@lg' : '';
-  return `img/characters/${parsed.characterId}/${parsed.variantId}${suffix}.webp?v=${ASSET_VERSION}`;
+  return `/img/characters/${parsed.characterId}/${parsed.variantId}${suffix}.webp?v=${ASSET_VERSION}`;
 }
 
 // 名前で絞り込む。日本語名・英語名・スキン名のどれに当たっても拾う

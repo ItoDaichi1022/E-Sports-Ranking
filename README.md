@@ -24,7 +24,7 @@
 
 | 役割 | 使うもの |
 |---|---|
-| ホスティング | Cloudflare（静的アセット。共有リンク `/t/{大会ID}` だけWorkerが返す） |
+| ホスティング | Cloudflare（静的アセット＋Worker。ページのURLと共有リンクをWorkerが受ける） |
 | データベース・認証 | Supabase (PostgreSQL + Auth + RLS) |
 | 自動更新 | Supabase Realtime |
 | フロントエンド | 素のJavaScript（ESモジュール、**ビルド工程なし**） |
@@ -47,7 +47,11 @@ pages/                  中身が長い読み物ページ。index.html の空の
 css/style.css
 fonts/                 見出し・数字用フォント Oxanium（OFLライセンス、woff2を同梱）
 js/
-  app.js               画面のルーティングとイベント配線
+  app.js               画面の描画とイベント配線
+  router.js            URLとページの対応表。リンクの横取り・戻る進む・旧URLの読み替え
+                       （worker/index.js もこの表を読む。増やすときはここだけ直す）
+  seo.js               ページごとの title・説明文・canonical・構造化データの文言
+                       （worker/index.js もこれを読んで、返すHTMLに埋め込む）
   supabaseClient.js    接続先の設定（ここを書き換える）
   auth.js              ログイン状態と自分の選手行
   db.js                DBとの読み書き。snake_case ⇄ camelCase の唯一の境界
@@ -67,9 +71,13 @@ js/
   util.js              エスケープ・URL検証・アイコン描画の共通処理
   tournamentTier.js    参加人数から大会規模Tierを判定
   vendor/supabase.js   supabase-js（同梱。CDNに依存しないため）
-worker/index.js        大会の共有リンク /t/{大会ID} を返す小さなWorker。
-                       XやDiscordに貼ったときのプレビュー（大会画像・大会名）を
-                       作るためだけに居る。他のURLは静的アセットがそのまま返る
+worker/index.js        URLをサーバー側で受ける小さなWorker。仕事は3つ。
+                       (1) /tournaments/{ID}/ のようなページのURLに index.html を返す
+                           （直リンクとリロードを404にしないため）
+                       (2) その <head> に、そのページの title・og:・canonical・
+                           構造化データを埋めて返す（HTMLRewriter）。文言を作るのは
+                           ブラウザ側と同じ js/seo.js。UAでの出し分けはしない
+                       (3) 古い共有リンク /t/{大会ID} を新URLへ301
 supabase/
   schema.sql           テーブル・RLS・トリガー・RPC
   migration-002.sql    構築済みプロジェクトへの差分適用（〜022まで番号順に当てる）
@@ -83,19 +91,43 @@ _headers               Cloudflareが返すキャッシュ指定。?v= の付く�
 
 ## ローカルで動かす
 
-静的ファイルを配るだけなので、どんな静的サーバーでも動きます。
+Cloudflare の開発サーバーを使います。先に [supabase/SETUP.md](supabase/SETUP.md) の
+手順3まで済ませてください。
 
 ```bash
-npx --yes serve .        # Node があるとき
-python -m http.server 8000   # Python があるとき
+npx --yes wrangler dev   # http://localhost:8787/
 ```
 
-`http://localhost:8000/`（`serve` は表示されたポート）を開きます。
-先に [supabase/SETUP.md](supabase/SETUP.md) の手順3まで済ませてください。
+**素の静的サーバー（`serve` や `python -m http.server`）では、トップページ以外が
+すべて404になります。** ページのURLは `/tournaments/{大会ID}/` のようなパスですが、
+そんなファイルは実在せず、どのURLでも index.html を返すという判断を
+[worker/index.js](worker/index.js) が受け持っているためです。検索結果とSNSに出る
+title・og: も同じところで埋めているので、そこを確かめるにもWorkerが要ります。
 
-大会の共有リンク（`/t/{大会ID}`）だけはWorkerが返しているので、素の静的サーバーでは
-404になります。そこも含めて確かめるときは Cloudflare の開発サーバーを使ってください。
+トップページだけを見て済む作業（ホームの見た目やCSSの調整）であれば、
+静的サーバーでも足ります。
+
+### `wrangler dev` が「Reloading local server...」を繰り返して応答しないとき
+
+`assets.directory` がリポジトリ直下（`.`）なので、wrangler 自身が作業用に書き込む
+`.wrangler/` が監視対象の中に入ってしまい、書き込み → 再読み込み → 書き込み …
+と回り続けることがある（`.assetsignore` はアップロード対象を絞るだけで、
+監視までは止めない）。回り出したら `.wrangler/` を消してから起動し直す。
 
 ```bash
-npx --yes wrangler dev   # http://localhost:8787/t/{大会ID}
+rm -rf .wrangler && npx --yes wrangler dev
 ```
+
+### 検索結果とSNSのプレビューを確かめる
+
+UAでの出し分けはしていないので、クローラーと同じものが `curl` でそのまま見える。
+**この2つの出力は完全に一致していなければならない**（食い違ったらそれは不具合）。
+
+```bash
+curl -s "http://localhost:8787/tournaments/{大会ID}/"                      | grep -E 'og:|<title>'
+curl -s -A "Twitterbot/1.0" "http://localhost:8787/tournaments/{大会ID}/"  | grep -E 'og:|<title>'
+```
+
+構造化データ（JSON-LD）は、出力の `application/ld+json` の中身を
+[リッチリザルトテスト](https://search.google.com/test/rich-results)（コードを直接貼る方）と
+[validator.schema.org](https://validator.schema.org/) に貼って確かめる。

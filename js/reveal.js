@@ -100,8 +100,8 @@ function setRevealStatus(text, type) {
 // （.reveal-achievements-empty の1行）は実データ側にだけ残る道で、ここでは作らない。
 //
 // 大会画像は実在の大会を持てないので、サイトに同梱した画像を借りて充てている。
-const SAMPLE_ART_A = 'img/game-logo.webp';
-const SAMPLE_ART_B = 'img/icon.webp';
+const SAMPLE_ART_A = '/img/game-logo.webp';
+const SAMPLE_ART_B = '/img/icon.webp';
 
 const SAMPLE_PLAYERS = [
   { name: 'サンプル選手A', score: 100.0, previousRank: 2, achievements: [
@@ -432,11 +432,11 @@ function focusVars(ref) {
 }
 
 // 大会の画像。運営が登録した画像は Supabase の絶対URLなので safeUrl がそのまま通す。
-// サンプルデータだけは、実在の大会を持てないのでサイトに同梱した画像を相対パスで指す
+// サンプルデータだけは、実在の大会を持てないのでサイトに同梱した画像を指す
 // （safeUrl は絶対URLしか通さないため、こちらだけ別に許す）。
 function achievementImageUrl(value) {
   if (!value) return null;
-  if (value.startsWith('img/')) return value;
+  if (value.startsWith('/img/')) return value;
   return safeUrl(value);
 }
 

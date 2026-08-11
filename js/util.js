@@ -35,6 +35,54 @@ export function avatarHtml(player, size = 'md') {
   return `<span class="avatar avatar-${size}">${escapeHtml(initialOf(player?.currentName))}</span>`;
 }
 
+// 読み込み中の仮置き（スケルトン）。
+//
+// 【なぜ「ありません」と出し分けるか】データが届く前の一覧は空っぽなので、
+// そのままだと「まだ大会はありません」と書いてしまう。初めて来た人には
+// それが事実に見え、0.5秒後に大会が現れても、最初の一言のほうが残る。
+// 中身の形（カードが何枚か）を先に出しておけば、届いた瞬間に入れ替わるだけで
+// 画面が跳ねない ── 高さも先に取るので、下にあるものが押し下げられない。
+//
+// 読み上げには載せない（aria-hidden）。中身の無い箱を読み上げても意味がなく、
+// 器そのものに aria-busy を付けて「読み込み中」だけを伝える。
+export function skeletonCards(count = 3, { tall = false } = {}) {
+  const list = document.createElement('div');
+  list.className = 'card-grid';
+  list.setAttribute('aria-busy', 'true');
+  list.setAttribute('aria-label', '読み込んでいます');
+
+  for (let i = 0; i < count; i += 1) {
+    const card = document.createElement('div');
+    card.className = 'card is-skeleton';
+    card.setAttribute('aria-hidden', 'true');
+    card.innerHTML = `
+      <div class="card-thumb${tall ? ' is-tall' : ''} skeleton-block"></div>
+      <div class="card-body">
+        <p class="skeleton-line skeleton-line-title"></p>
+        <p class="skeleton-line skeleton-line-meta"></p>
+      </div>`;
+    list.appendChild(card);
+  }
+  return list;
+}
+
+// 表の行の仮置き（選手一覧など）。列数はページごとに違うので受け取る。
+export function skeletonRows(count = 6, columns = 3) {
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < count; i += 1) {
+    const tr = document.createElement('tr');
+    tr.className = 'is-skeleton';
+    tr.setAttribute('aria-hidden', 'true');
+    for (let c = 0; c < columns; c += 1) {
+      const td = document.createElement('td');
+      td.innerHTML = '<span class="skeleton-line"></span>';
+      tr.appendChild(td);
+    }
+    frag.appendChild(tr);
+  }
+  return frag;
+}
+
 // 一覧に並ぶカード（募集・大会履歴・お知らせ）の画像枠。
 //
 // 枠の高さは固定し、中の画像は切り抜かずに全体を収める。画像が無いときは

@@ -8,7 +8,9 @@ import {
   openChatReports, organizerIdsOf,
 } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
-import { escapeHtml, avatarHtml, safeUrl, cardThumb, setupImagePicker } from './util.js';
+import {
+  escapeHtml, avatarHtml, safeUrl, cardThumb, setupImagePicker, skeletonCards,
+} from './util.js';
 import {
   createBracket, updateTournament, allMatchesDecided, finalStandings, finalPlacements,
   swapBracketEntrants,
@@ -25,8 +27,9 @@ import { characterImageUrl } from './characters.js';
 import { keepFormDraft, clearFormDraft } from './formDraft.js';
 import { mountOrganizerPicker } from './organizerPicker.js';
 import {
-  renderRecruitPage, renderTournamentActions, STATUS_LABELS, entrantUnit, entryDeadlineText,
+  renderRecruitPage, renderTournamentActions, renderEntryCta, entryDeadlineText,
 } from './entries.js';
+import { STATUS_LABELS, entrantUnit, entryState } from './tournamentState.js';
 import {
   auth, initAuth, isAdmin, isOwner, canManageTournament, isLoggedIn, needsOnboarding,
   accountLabel, signInWithProvider, signOut, reloadOwnPlayer,
@@ -34,6 +37,11 @@ import {
 import { isConfigured } from './supabaseClient.js';
 import { initStage, renderFeatured, renderStats, prefersReducedMotion } from './stage.js';
 import { iconSvg, makeIconButton, setButtonIcon } from './icons.js';
+import {
+  TOURNAMENT_TABS, ROUTE_CHANGE_EVENT, matchPath, pathFor, navigate, startRouter,
+  migrateLegacyUrl,
+} from './router.js';
+import { applyPageMeta } from './seo.js';
 import * as db from './db.js';
 
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
@@ -132,8 +140,10 @@ const tournamentEditMatchTypeNoteInput = $('tournament-edit-match-type-note-inpu
 const tournamentEditRankingOptInInput = $('tournament-edit-ranking-opt-in-input');
 const tournamentInfoEl = $('tournament-info');
 const tournamentActionsEl = $('tournament-actions');
+const tournamentEntryCtaEl = $('tournament-entry-cta');
 const tournamentHeroEl = $('tournament-hero');
 const tournamentTitleEl = $('tournament-title');
+const tournamentStatusChipEl = $('tournament-status-chip');
 const tournamentMetaEl = $('tournament-meta');
 const tournamentBackLink = $('tournament-back-link');
 const bracketLinkEl = $('bracket-link');
@@ -240,7 +250,7 @@ function applyAuthUI() {
   // 大会は誰でも開ける。必要なのは選手登録だけ（作った人がその大会の運営になる）。
   const canCreateTournament = Boolean(auth.player);
   // いま開いている大会を管理できるか。詳細ページを開いたままログイン状態が
-  // 変わることがあるので、ここでも見ておく（描き直しは routeFromHash 側）。
+  // 変わることがあるので、ここでも見ておく（描き直しは routeFromLocation 側）。
   const canManageCurrent = canManageTournament(currentBracketTournamentId);
 
   navTournamentLink.hidden = !canCreateTournament;
@@ -270,14 +280,17 @@ function applyAuthUI() {
 
 // ---- ルーティング ----
 
+// ページ名 → その画面を入れてある <section> のID。
+// ページ名とURLの対応は js/router.js の ROUTES にある（両方に同じ名前が並ぶので、
+// ページを増やすときは2か所そろえること）。
 const VIEW_IDS = {
   home: 'view-home',
   guide: 'view-guide', // はじめに（静的ページ。描画関数は持たない）
   setup: 'view-setup', // 対戦環境を整える（静的ページ。描画関数は持たない）
-  // #news はお知らせ一覧、#news/{id} は詳細。routeFromHash がパラメータの有無で分ける
+  // /news/ がお知らせ一覧、/news/{id}/ が詳細。URLの形が違うのでページ名も分けてある
   news: 'view-news',
   newslist: 'view-news-list',
-  // 大会一覧。募集中・進行中・終了はページ内タブ（#tournaments/{タブ名}）
+  // 大会一覧。募集中・進行中・終了はページ内タブ（/tournaments/?tab={タブ名}）
   tournaments: 'view-tournaments',
   // 自分がエントリー・出場した大会のまとめ
   entries: 'view-entries',
@@ -286,13 +299,12 @@ const VIEW_IDS = {
   create: 'view-tournament',
   tournament: 'view-tournament-detail',
   bracket: 'view-bracket',
-  // 出場選手一覧。詳細・対戦表と同じく大会ごとのページ（#entrants/{大会ID}）
+  // 出場選手一覧。詳細・対戦表と同じく大会ごとのページ（/tournaments/{大会ID}/entrants/）
   entrants: 'view-entrants',
   player: 'view-player-detail',
-  // 選手を探すページ。#ranking は、ランキングの表を置いていた頃のリンクや
-  // ブックマークから来る人のために、そのまま同じ画面へ通す。
+  // 選手を探すページ。ランキングの表を置いていた頃の #ranking から来た人も、
+  // router.js が読み替えてここへ着く。
   players: 'view-players',
-  ranking: 'view-players',
   // 順位発表（運営専用）。ランキングの表とは見せ方も操作もまるで違うので、
   // 同じページのモードにせず別のページにしてある（js/reveal.js）。
   reveal: 'view-reveal',
@@ -308,23 +320,77 @@ const NAV_PAGE_OF = {
   player: 'players', players: 'players', reveal: 'players', news: 'newslist',
 };
 
-function parseHash() {
-  const h = location.hash.replace(/^#/, '');
-  const [page, param] = h.split('/');
-  return { page: page || 'home', param: param ? decodeURIComponent(param) : null };
+// いま開いているURLが指すページ。
+//
+// 知らないURLはホームに倒す。ここへ来るのは、サーバー側で受け付けている形
+// （worker/index.js が index.html を返す形）だけなので、実際に起きるのは
+// 手でURLをいじった場合くらいになる。
+function currentRoute() {
+  const matched = matchPath(location.pathname);
+  return {
+    page: matched?.page ?? 'home',
+    param: matched?.param ?? null,
+    query: new URLSearchParams(location.search),
+  };
+}
+
+// そのページの title・説明文・canonical・構造化データを出し直す（js/seo.js）。
+//
+// 文言の組み立ては seo.js が持っているので、ここでやるのは「どのデータを見せるか」
+// を選ぶことだけ。描画と同じ経路で呼ぶため、背景の更新で大会名が変われば
+// 検索結果に出る題も一緒に追いつく。
+function applyRouteMeta(page, param) {
+  // 一覧がまだ1件も届いていないあいだは「見つからない」と決めない。
+  // 決めてしまうと、読み込み中のページに noindex が付いた瞬間ができる。
+  const loaded = lastLoadedAt > 0;
+
+  if (page === 'tournament' || page === 'bracket' || page === 'entrants') {
+    const t = state.tournaments.find((x) => x.id === param) ?? null;
+    applyPageMeta(page, {
+      param,
+      tournament: t,
+      // 参加規模の数え方は対戦方法で変わる（2v2はチーム数）ので、
+      // 数え方を知っているこちらで文字にしてから渡す。
+      entrantsText: t ? entrantCountLabel(t) : '',
+      notFound: loaded && !t,
+    });
+    return;
+  }
+
+  if (page === 'player') {
+    const p = state.players.find((x) => x.id === param) ?? null;
+    const entry = p ? state.publishedRanking?.rankings.find((r) => r.id === p.id) : null;
+    applyPageMeta(page, {
+      param,
+      player: p,
+      rankText: entry ? `公開ランキング${entry.rank}位` : '',
+      notFound: loaded && !p,
+    });
+    return;
+  }
+
+  if (page === 'news') {
+    // お知らせは最新数件しか手元に無いことがある。全件を取りに行くのは
+    // renderNewsPage の仕事で、取り終えたらあちらがここを呼び直す。
+    const a = state.announcements.find((x) => x.id === param) ?? null;
+    applyPageMeta(page, { param, announcement: a, notFound: loaded && !a && db.hasAllAnnouncements() });
+    return;
+  }
+
+  applyPageMeta(page, { param });
 }
 
 // いま表示しているのがこのページか。データを取りに行っている間に別の画面へ
 // 移ることがあるので、非同期の描画は結果を書き込む前にこれで確かめる
 // （確かめないと、移った先の画面に前のページの内容が出てしまう）。
 function isCurrentRoute(page, param = null) {
-  const now = parseHash();
+  const now = currentRoute();
   if (now.page !== page) return false;
   return param == null || now.param === param;
 }
 
 // 直前に表示していた画面。ページが変わったときだけスクロールを先頭へ戻すために覚えておく
-// （Realtimeの更新でも routeFromHash は呼ばれるので、毎回戻すと読んでいる途中で飛んでしまう）。
+// （Realtimeの更新でも routeFromLocation は呼ばれるので、毎回戻すと読んでいる途中で飛んでしまう）。
 let lastRouteKey = null;
 
 // ---- 読み物ページの読み込み ----
@@ -334,9 +400,33 @@ let lastRouteKey = null;
 // 本文は pages/*.html に分けてある（index.html を読める長さに保つため）。
 // 読み込むのは、そのページが最初に開かれたときの1回だけ。
 //
-// 読み込み先のURLは <section data-src="pages/guide.html?v=69"> に書いてある。
+// 読み込み先のURLは <section data-src="/pages/guide.html?v=69"> に書いてある。
+// 先頭の / は落とさないこと。相対パスのままだと、/tournaments/{id}/ のような
+// 深いURLから開いたときに /tournaments/{id}/pages/guide.html を取りに行って404になる。
 // ?v= を index.html の他の版数と同じ場所に置くことで、デプロイ時の一括置換と
 // scripts/check-cache-version.mjs の確認から漏れないようにしている。
+
+// その画面でしか使わないCSSを、初めて開いたときに1回だけ読む。
+//
+// 順位発表（/reveal/）の45KBがこれにあたる。持ち主しか開かない画面のCSSを
+// <head> に置くと、ブラウザはそれを読み終えるまで最初の描画を始めないため、
+// 一度も開かない人まで待たされる。読み込み先は <section data-css="..."> にある。
+//
+// 【一瞬だけ素の見た目が出る】CSSが届く前に画面を描くので、ごく短いあいだ
+// 装飾の無い状態が見える。開くのは操作のあと（持ち主がボタンを押す）で、
+// その先の全画面演出まではさらに一手あるので、ここでは待たせないほうを採る。
+const viewCssLoaded = new Set();
+
+function loadViewCss(viewId) {
+  const href = $(viewId)?.dataset.css;
+  if (!href || viewCssLoaded.has(href)) return;
+  viewCssLoaded.add(href);
+
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.appendChild(link);
+}
 
 const pageLoads = new Map(); // viewId -> Promise（二重取得を防ぐ）
 
@@ -360,7 +450,7 @@ function loadStaticPage(viewId) {
       el.innerHTML = html;
       // 二度と取りに行かない印。属性が残っていると、再訪のたびに読み直してしまう。
       delete el.dataset.src;
-      // 中身が入ったいま初めて演出を仕掛けられる（routeFromHash が呼んだ時点では
+      // 中身が入ったいま初めて演出を仕掛けられる（routeFromLocation が呼んだ時点では
       // この器はまだ空で、仕掛ける相手がいなかった）。
       initStage(el);
     })
@@ -375,39 +465,40 @@ function loadStaticPage(viewId) {
   pageLoads.set(viewId, task);
 }
 
-function routeFromHash() {
-  const { page, param } = parseHash();
+// いまのURLに合わせて画面を描く。
+//
+// 呼ばれる経路は3つある。どれも同じここへ集まるので、描く処理は1か所で済む。
+//   * リンクを押した／navigate() した  … router.js の go() から
+//   * 戻る・進む                       … router.js の popstate から
+//   * 背景の更新（Realtime・再取得）    … refreshFromDb などから直接
+// pushState は popstate を起こさないので、この「移動」と「描画」を分けておかないと
+// 自分で移動したときだけ画面が変わらない、という壊れ方をする。
+function routeFromLocation() {
+  const { page, param, query } = currentRoute();
 
-  // #login はページではなくログインダイアログを開くための入口
-  if (page === 'login') {
-    location.replace('#home');
+  // ?login=1 はページではなくログインダイアログを開くための入口
+  // （旧 #login から読み替えられて来る。router.js の pathFromLegacyHash）。
+  // クエリはすぐ消す ── 残すと、戻ってきたときや共有されたときに再び開いてしまう。
+  if (query.has('login')) {
+    query.delete('login');
+    const search = String(query);
+    history.replaceState(null, '', location.pathname + (search ? `?${search}` : ''));
     if (!isLoggedIn()) openLoginDialog();
-    return;
-  }
-
-  // ページ統合前の旧URL。古いリンク・ブックマークから来た人を対応するタブへ通す。
-  if (page === 'recruit') {
-    location.replace('#tournaments/recruiting');
-    return;
-  }
-  if (page === 'history') {
-    location.replace('#tournaments/finished');
-    return;
   }
 
   let target = VIEW_IDS[page] ? page : 'home';
 
-  // #news はパラメータの有無で一覧と詳細に分かれる（#news=一覧、#news/{id}=詳細）
-  if (page === 'news' && !param) target = 'newslist';
-
   // 大会作成は選手登録さえ済んでいれば誰でも。順位発表はサイトの持ち主だけ。
   // マイページはログアウト中でも開ける（そこからログインする）。
+  //
+  // 追い返すのは replaceState で。push すると、戻るボタンで入れないページへ
+  // 帰されて、また追い返されて、と往復から抜けられなくなる。
   if (target === 'create' && !auth.player) {
-    location.replace('#home');
+    history.replaceState(null, '', pathFor('home'));
     target = 'home';
   }
   if (target === 'reveal' && !isOwner()) {
-    location.replace('#home');
+    history.replaceState(null, '', pathFor('home'));
     target = 'home';
   }
 
@@ -417,7 +508,11 @@ function routeFromHash() {
   //   * 画面の切り替えに一枚かぶせるのも、移ったときだけ
   // ここを見ずに演出を走らせると、チャットや対戦表が更新されるたびに
   // 画面全体がひらめいて、見ている人には不具合に見える。
-  const routeKey = `${target}/${param ?? ''}`;
+  // 大会一覧のタブはクエリ（?tab=）に入っていて param には出てこない。ここに混ぜないと
+  // タブを切り替えても「同じ画面のまま」と判断され、先頭へのスクロールが起きない。
+  // location.search をそのまま使わないのは、画面の中身に関わらないクエリ
+  // （ログインから戻った直後の ?code= など）で「移った」と数えないため。
+  const routeKey = `${target}/${param ?? ''}/${query.get('tab') ?? ''}`;
   // 最初の1回は「移った」とは数えない。まだ何も描かれていない画面から
   // かぶせても、白い面が一度ひらめくだけで意味がないため。
   const isFirstRoute = lastRouteKey === null;
@@ -430,9 +525,9 @@ function routeFromHash() {
     // .reveal-playing が残り、移った先でヘッダーもナビも消えたままになる。
     if (target !== 'reveal') closeRevealStage();
 
-    // 比べるのはページ名ではなく要素のID。1つの画面に2つのハッシュが向いている
-    // ことがあり（#players と #ranking は同じ画面）、名前で比べると、後から回って
-    // きた別名のほうが「対象ではない」と判断して、出したばかりの画面を隠してしまう。
+    // 比べるのはページ名ではなく要素のID。2つのページ名が同じ画面を指すことがあり
+    // （かつて #players と #ranking がそうだった）、名前で比べると、後から回ってきた
+    // 別名のほうが「対象ではない」と判断して、出したばかりの画面を隠してしまう。
     const targetViewId = VIEW_IDS[target];
     Object.values(VIEW_IDS).forEach((id) => {
       $(id).hidden = id !== targetViewId;
@@ -441,6 +536,12 @@ function routeFromHash() {
     // 中身を別ファイルに分けてある読み物ページ（はじめに・利用規約・プライバシーポリシー）。
     // data-src が付いていないページでは何もしない。
     loadStaticPage(VIEW_IDS[target]);
+    // その画面だけで使うCSS（順位発表）。data-css が付いていないページでは何もしない。
+    loadViewCss(VIEW_IDS[target]);
+
+    // 検索結果とSNSに出る情報（title・説明文・canonical・構造化データ）。
+    // 画面と同じ材料から作るので、ここで一緒に出し直す。
+    applyRouteMeta(target, param);
 
     const navPage = NAV_PAGE_OF[target] || target;
     mainNav.querySelectorAll('a').forEach((a) => {
@@ -457,7 +558,7 @@ function routeFromHash() {
     if (target === 'home') renderHome();
     else if (target === 'news') draw(renderNewsPage(param));
     else if (target === 'newslist') draw(renderNewsListPage());
-    else if (target === 'tournaments') renderTournamentsPage(param);
+    else if (target === 'tournaments') renderTournamentsPage(query.get('tab'));
     else if (target === 'entries') draw(renderEntriesPage());
     else if (target === 'create') {
       renderParticipantCheckboxes();
@@ -468,13 +569,12 @@ function routeFromHash() {
     else if (target === 'bracket') draw(renderBracketPage(param));
     else if (target === 'entrants') draw(renderEntrantsPage(param));
     else if (target === 'player') draw(renderPlayerDetail(param));
-    // 選手を探すページ。#ranking で来た人も同じ画面に着く。
-    else if (target === 'players' || target === 'ranking') refreshPlayerUI();
+    else if (target === 'players') refreshPlayerUI();
     else if (target === 'reveal') draw(renderRevealPage());
     else if (target === 'profile') renderProfilePage();
 
-    // 別の画面へ移ったときは先頭から見せる。ハッシュだけを書き換える作りなので、
-    // 何もしないとブラウザは前の画面のスクロール位置をそのまま引き継いでしまい、
+    // 別の画面へ移ったときは先頭から見せる。ページを読み直さずURLだけを書き換える
+    // 作りなので、何もしないとブラウザは前の画面のスクロール位置をそのまま引き継ぎ、
     // 長いページから移ると途中や一番下から始まったように見える。
     // 中身を入れ替えたあとに戻す。先に戻しても、描画で高さが変わると位置がずれる。
     if (routeChanged) window.scrollTo(0, 0);
@@ -553,27 +653,38 @@ function renderHome() {
 // お知らせ一覧ページ。全件を新しい順（固定を先頭）に並べる。
 // 普段は最新の数件しか読んでいないので、ここで全件を取りに行く。
 async function renderNewsListPage() {
-  renderAnnouncementCards(newsListEl, state.announcements);
+  renderAnnouncementCards(newsListEl, state.announcements, { titleTag: 'h2' });
   try {
     await db.ensureAllAnnouncements();
   } catch (err) {
     setStatus(err.message, 'error');
     return;
   }
-  if (!isCurrentRoute('news')) return;
-  renderAnnouncementCards(newsListEl, state.announcements);
+  if (!isCurrentRoute('newslist')) return;
+  renderAnnouncementCards(newsListEl, state.announcements, { titleTag: 'h2' });
 }
 
 // お知らせのカード一覧。ホームとお知らせ一覧ページの両方から使う。
-function renderAnnouncementCards(containerEl, announcements) {
+//
+// titleTag は、その一覧が置かれる場所によって変わる。お知らせ一覧ページでは
+// ページの題（h1「お知らせ」）のすぐ下なので h2、ホームでは「お知らせ」という
+// ブロックの題（h2）の下なので h3 になる。同じ部品でも、見出しの深さは
+// 置かれた場所で決まる ── 決め打ちにすると、どちらかで段が飛ぶ。
+function renderAnnouncementCards(containerEl, announcements, { titleTag = 'h3' } = {}) {
   containerEl.innerHTML = '';
 
   if (announcements.length === 0) {
+    // まだDBから何も届いていないだけかもしれない。そこで「ありません」と
+    // 言い切ると、初めて来た人には空のサイトに見える。
+    if (!db.hasLoadedOnce()) {
+      containerEl.appendChild(skeletonCards(2));
+      return;
+    }
     containerEl.innerHTML = '<p class="empty-hint">まだお知らせはありません。</p>';
     return;
   }
 
-  // 一覧は画像・題名・日付だけの入口。本文は詳細ページ（#news/{id}）で読ませる。
+  // 一覧は画像・題名・日付だけの入口。本文は詳細ページ（/news/{id}/）で読ませる。
   // カードの形と並べ方は大会一覧と共通（css の .card 系）。
   const list = document.createElement('div');
   list.className = 'card-grid';
@@ -581,12 +692,12 @@ function renderAnnouncementCards(containerEl, announcements) {
   announcements.forEach((a) => {
     const card = document.createElement('a');
     card.className = `card${a.pinned ? ' pinned' : ''}`;
-    card.href = `#news/${encodeURIComponent(a.id)}`;
+    card.href = pathFor('news', a.id);
 
     const body = document.createElement('div');
     body.className = 'card-body';
 
-    const title = document.createElement('h3');
+    const title = document.createElement(titleTag);
     title.className = 'card-title';
     if (a.pinned) {
       const pin = document.createElement('span');
@@ -622,6 +733,9 @@ async function renderNewsPage(id) {
       setStatus(err.message, 'error');
     }
     if (!isCurrentRoute('news', id)) return;
+    // 全件が揃ったので、題と説明文を確かめ直す。routeFromLocation が呼んだ時点では
+    // まだ手元に無く、「お知らせ」という入れ物の名前しか出せていない。
+    applyRouteMeta('news', id);
   }
 
   const a = state.announcements.find((x) => x.id === id);
@@ -652,7 +766,7 @@ async function renderNewsPage(id) {
     if (a.imageUrl) await db.removeImageByUrl(a.imageUrl).catch(() => {});
     await refreshFromDb();
     // 消したお知らせのページに留まらないよう一覧へ戻す
-    location.hash = '#news';
+    navigate('newslist');
   });
 
   newsActionsEl.append(editBtn, delBtn);
@@ -918,7 +1032,7 @@ function renderProfilePage() {
         await reloadOwnPlayer();
         await refreshFromDb();
         setStatus('選手登録が完了しました。', 'success');
-        location.hash = `#player/${encodeURIComponent(auth.player.id)}`;
+        navigate('player', auth.player.id);
       },
     });
     return;
@@ -991,7 +1105,8 @@ function renderOwnProfileView() {
   // 先に枠を出しておいて後から差し込む（下の fillOwnRecord）。
   // 直近の戦績は島の中（.player-record）、全件の表は島の外（.player-history）。
   profileViewEl.innerHTML = playerHeroHtml(player, {
-    nameTag: 'h3',
+    // ページの題は「マイページ」（h1）なので、自分の名前はその下の段
+    nameTag: 'h2',
     action: `<button type="button" class="profile-edit-link profile-edit-btn"
               title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</button>`,
     foot: bio + '<div class="player-record"></div>',
@@ -1027,7 +1142,8 @@ async function fillOwnRecord(playerId) {
   if (!box || auth.player?.id !== playerId) return;
 
   const stats = getPlayerStats(playerId, record);
-  box.innerHTML = recentResultsHtml(stats);
+  // マイページは「マイページ(h1) → 自分の名前(h2)」の下なので1段深い
+  box.innerHTML = recentResultsHtml(stats, { titleTag: 'h3' });
 
   // 全件の表は島の外。枠が無いのは描き直された後なので、その時は何もしない。
   const history = profileViewEl.querySelector('.player-history');
@@ -1062,7 +1178,7 @@ async function renderEntriesPage() {
   if (!auth.player) {
     entriesNoteEl.textContent = '';
     entriesContentEl.innerHTML = '<p class="empty-hint">選手登録がまだです。'
-      + '<a href="#profile">マイページ</a>で登録すると、大会にエントリーできます。</p>';
+      + `<a href="${pathFor('profile')}">マイページ</a>で登録すると、大会にエントリーできます。</p>`;
     return;
   }
 
@@ -1086,7 +1202,7 @@ async function renderEntriesPage() {
 
   if (mine.length === 0) {
     entriesContentEl.innerHTML = '<p class="empty-hint">まだエントリーした大会がありません。'
-      + '<a href="#tournaments">募集中の大会</a>からエントリーできます。</p>';
+      + `<a href="${pathFor('tournaments')}">募集中の大会</a>からエントリーできます。</p>`;
     return;
   }
 
@@ -1094,7 +1210,7 @@ async function renderEntriesPage() {
     const items = mine.filter((t) => statuses.includes(t.status));
     if (items.length === 0) return; // 空のグループは見出しごと出さない
 
-    const heading = document.createElement('h3');
+    const heading = document.createElement('h2');
     heading.className = 'entries-group-title';
     heading.textContent = title;
     entriesContentEl.appendChild(heading);
@@ -1145,7 +1261,25 @@ function tournamentStatusLabel(t) {
   return champion ? `優勝: ${champion}` : label;
 }
 
-const TOURNAMENT_TABS = ['recruiting', 'running', 'finished'];
+// 大会名の隣に出すバッジ。「この大会はいま何を受け付けているか」を一言で示す。
+//
+// 募集中のあいだは、受付の状況（募集中・定員に達しました・締切時刻を過ぎています）が
+// そのまま大会の状態になるので js/tournamentState.js の判定を使う。エントリー
+// ボタンの出方も検索結果の eventStatus も同じ関数から出るので、three者がずれない。
+//
+// 始まったあとは、対戦表まで見ないと分からない「結果待ち」があるので
+// tournamentStatusInfo のほうが詳しい。どちらも見ているのは同じ t.status で、
+// 深さが違うだけ。
+function tournamentBadge(t) {
+  if (t.status === 'recruiting') {
+    const st = entryState(t);
+    return { label: st.label, tone: st.tone };
+  }
+  const info = tournamentStatusInfo(t);
+  return { label: info.label, tone: info.tone };
+}
+
+// タブの一覧は js/router.js が持っている（URLの ?tab= を読み替えるのに要るため）。
 
 // タブごとの説明。そのタブで何ができるかを1行で示す。
 const TOURNAMENT_TAB_NOTES = {
@@ -1171,17 +1305,22 @@ function renderTournamentsPage(param) {
   }
 
   const visible = state.tournaments.filter((t) => t.status === tab);
+  // ページの題（h1「大会」）のすぐ下に並ぶ一覧なので、カードの題は h2。
   renderTournamentCards(tournamentsListEl, [...visible].reverse(), tab === 'running'
     ? '進行中の大会はありません。'
-    : 'まだ終了した大会がありません。');
+    : 'まだ終了した大会がありません。', { titleTag: 'h2' });
 }
 
 // 始まった大会（進行中・終了）のカード一覧。大会一覧とエントリー状況で使う。
 // myPlacements（大会ID → 勝ち上がりの深さ）を渡すと、その成績をカードに添える。
-function renderTournamentCards(containerEl, tournaments, emptyText, { myPlacements = null } = {}) {
+function renderTournamentCards(containerEl, tournaments, emptyText, { myPlacements = null, titleTag = 'h3' } = {}) {
   containerEl.innerHTML = '';
 
   if (tournaments.length === 0) {
+    if (!db.hasLoadedOnce()) {
+      containerEl.appendChild(skeletonCards(3));
+      return;
+    }
     containerEl.innerHTML = `<p class="empty-hint">${escapeHtml(emptyText)}</p>`;
     return;
   }
@@ -1193,7 +1332,7 @@ function renderTournamentCards(containerEl, tournaments, emptyText, { myPlacemen
   tournaments.forEach((t) => {
     const card = document.createElement('a');
     card.className = 'card';
-    card.href = `#tournament/${encodeURIComponent(t.id)}`;
+    card.href = pathFor('tournament', t.id);
 
     const { label, tone, champion } = tournamentStatusInfo(t);
     const placement = myPlacements
@@ -1203,7 +1342,7 @@ function renderTournamentCards(containerEl, tournaments, emptyText, { myPlacemen
     const body = document.createElement('div');
     body.className = 'card-body';
     body.innerHTML = `
-      <h3 class="card-title">${escapeHtml(t.name)}</h3>
+      <${titleTag} class="card-title">${escapeHtml(t.name)}</${titleTag}>
       <p class="card-date">${escapeHtml(t.date || '日付未設定')} ・ ${escapeHtml(entrantCountLabel(t))}参加</p>
       <span class="status-chip status-${tone}">${escapeHtml(label)}</span>
       ${reportChipHtml(t.id)}
@@ -1276,10 +1415,16 @@ function deadlineInputValue(iso) {
 
 // 詳細ページ（大会・お知らせ）の画像ヘッダー。
 // 画像が無いときは枠ごと隠し、余白だけが残らないようにする。
+//
+// 【loading="lazy" を付けないこと】この絵はページの一番上にあり、多くの場合
+// そのページで一番大きい要素になる ── つまり「表示できた」と測られる当の相手
+// （LCP）。lazy を付けると、ブラウザはレイアウトが決まるまで取りに行かないので、
+// 一番見せたい絵が一番遅く出ることになる。fetchpriority で先に取らせる。
+// 逆に一覧のカードや対戦表の中の絵は lazy のままでよい（画面の外にあるため）。
 function renderHero(el, imageUrl) {
   const url = safeUrl(imageUrl);
   if (url) {
-    el.innerHTML = `<img src="${escapeHtml(url)}" alt="" loading="lazy">`;
+    el.innerHTML = `<img src="${escapeHtml(url)}" alt="" fetchpriority="high" decoding="async">`;
     el.hidden = false;
   } else {
     el.innerHTML = '';
@@ -1350,7 +1495,7 @@ function renderTournamentInfo(tournament) {
     : '';
 
   let html = `
-    <h3>大会情報</h3>
+    <h2>大会情報</h2>
     ${openReports.length > 0 ? `
       <div class="report-notice">
         <span class="report-notice-title">⚠ 未対応の報告が${openReports.length}件あります</span>
@@ -1379,7 +1524,7 @@ function renderTournamentInfo(tournament) {
   const streamUrl = safeUrl(tournament.streamUrl);
   if (streamUrl) {
     html += `
-      <h4>配信元</h4>
+      <h3>配信元</h3>
       <a class="stream-link" href="${escapeHtml(streamUrl)}" target="_blank" rel="noopener noreferrer">
         <span class="stream-link-label">配信を見る</span>
         <span class="stream-link-host">${escapeHtml(new URL(streamUrl).hostname)}</span>
@@ -1389,7 +1534,7 @@ function renderTournamentInfo(tournament) {
 
   if (tournament.rules) {
     html += `
-      <h4>ルール</h4>
+      <h3>ルール</h3>
       <p class="tournament-rules">${escapeHtml(tournament.rules)}</p>
     `;
   }
@@ -1397,7 +1542,7 @@ function renderTournamentInfo(tournament) {
   tournamentInfoEl.innerHTML = html;
 }
 
-// 出場選手一覧のページ（#entrants/{大会ID}）。名前の五十音順に上から並べ、
+// 出場選手一覧のページ（/tournaments/{大会ID}/entrants/）。名前の五十音順に上から並べ、
 // 1枠ずつ対戦表の対戦カードと同じ見た目で出す。
 //
 // 大会詳細に直に並べず1ページ取っているのは、顔ぶれが数十枠になるため。
@@ -1410,11 +1555,11 @@ function renderTournamentInfo(tournament) {
 // 見た目を対戦カードと揃えているのは、ここで見た枠を対戦表の中で見つけられるように
 // するため（シード番号・チーム名とメンバー・キャラクターの地模様まで同じ形になる）。
 async function renderEntrantsPage(tournamentId) {
-  entrantsBackLink.href = `#tournament/${encodeURIComponent(tournamentId)}`;
+  entrantsBackLink.href = pathFor('tournament', tournamentId);
 
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
-    entrantsBackLink.href = '#tournaments';
+    entrantsBackLink.href = pathFor('tournaments');
     entrantsBackLink.textContent = '← 大会一覧へ';
     entrantsTitleEl.textContent = '大会が見つかりません';
     entrantsMetaEl.textContent = '';
@@ -1492,10 +1637,10 @@ function sortEntrantsByName(tournamentId, entrantIds, seeds = []) {
 function backToListLink(tournament) {
   const tab = tournament.status === 'draft' ? 'recruiting'
     : TOURNAMENT_TABS.includes(tournament.status) ? tournament.status : 'finished';
-  return { href: `#tournaments/${tab}`, text: '← 大会一覧へ' };
+  return { href: pathFor('tournaments', null, { tab }), text: '← 大会一覧へ' };
 }
 
-// 大会詳細。対戦表（#bracket/{id}）と出場選手一覧（#entrants/{id}）は別ページに
+// 大会詳細。対戦表（/tournaments/{id}/bracket/）と出場選手一覧（同 entrants/）は別ページに
 // 分けてあり、ここにはそこへの入口だけを置く。
 //
 // 「誰が出ているか」はこのページで初めて必要になるので、ここで取りに行く
@@ -1524,8 +1669,10 @@ async function renderTournamentDetail(tournamentId) {
     renderHero(tournamentHeroEl, null);
     tournamentTitleEl.textContent = '大会が見つかりません';
     tournamentMetaEl.textContent = '';
+    tournamentStatusChipEl.hidden = true;
     tournamentInfoEl.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
     tournamentActionsEl.innerHTML = '';
+    renderEntryCta(tournamentEntryCtaEl, null);
     bracketLinkEl.hidden = true;
     entrantsLinkEl.hidden = true;
     return;
@@ -1542,7 +1689,20 @@ async function renderTournamentDetail(tournamentId) {
 
   renderHero(tournamentHeroEl, tournament.imageUrl);
   tournamentTitleEl.textContent = tournament.name;
-  tournamentMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
+
+  // 状態はバッジが受け持つので、この行からは外す（同じことを2回言わない）。
+  // 優勝者だけは状態ではなく結果なので、ここに残す。
+  const { champion } = tournamentStatusInfo(tournament);
+  tournamentMetaEl.textContent = [
+    tournament.date || '日付未設定',
+    `${entrantCountLabel(tournament)}参加`,
+    champion ? `優勝: ${champion}` : '',
+  ].filter(Boolean).join(' ・ ');
+
+  const badge = tournamentBadge(tournament);
+  tournamentStatusChipEl.hidden = false;
+  tournamentStatusChipEl.className = `status-chip status-${badge.tone}`;
+  tournamentStatusChipEl.textContent = badge.label;
 
   const back = backToListLink(tournament);
   tournamentBackLink.href = back.href;
@@ -1553,7 +1713,7 @@ async function renderTournamentDetail(tournamentId) {
   const hasBracket = state.bracketIds.has(tournamentId);
   bracketLinkEl.hidden = !hasBracket;
   if (hasBracket) {
-    bracketLinkEl.href = `#bracket/${encodeURIComponent(tournamentId)}`;
+    bracketLinkEl.href = pathFor('bracket', tournamentId);
     bracketLinkNoteEl.textContent = tournament.status === 'finished'
       ? '対戦表と最終結果'
       : '対戦表と進行状況';
@@ -1564,17 +1724,18 @@ async function renderTournamentDetail(tournamentId) {
   const unit = isTeamTournament(tournament) ? 'チーム' : '選手';
   entrantsLinkEl.hidden = tournament.entrantIds.length === 0;
   if (!entrantsLinkEl.hidden) {
-    entrantsLinkEl.href = `#entrants/${encodeURIComponent(tournamentId)}`;
+    entrantsLinkEl.href = pathFor('entrants', tournamentId);
     entrantsLinkTitleEl.textContent = `出場${unit}一覧を見る`;
     entrantsLinkNoteEl.textContent = tournament.status === 'recruiting' || tournament.status === 'draft'
       ? `エントリー中の${unit}を五十音順で（${entrantCountLabel(tournament)}）`
       : `出場${unit}を五十音順で（${entrantCountLabel(tournament)}）`;
   }
 
-  // エントリーと運営の募集操作。募集一覧のカードは入口だけにしたので、ここが操作の場所。
-  renderTournamentActions(tournamentActionsEl, tournament, async () => {
-    await refreshFromDb();
-  });
+  const onChanged = async () => { await refreshFromDb(); };
+
+  // エントリーの導線はページの上（見出しのすぐ下）。運営の募集操作は下のまま。
+  renderEntryCta(tournamentEntryCtaEl, tournament, onChanged);
+  renderTournamentActions(tournamentActionsEl, tournament, onChanged);
 
   renderTournamentInfo(tournament);
 }
@@ -1693,7 +1854,7 @@ async function renderBracketPage(tournamentId) {
     bracketAdminToolsEl.hidden = true;
     bracketContainer.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
     resultSectionEl.innerHTML = '';
-    bracketBackLink.href = '#tournaments';
+    bracketBackLink.href = pathFor('tournaments');
     bracketBackLink.textContent = '← 大会一覧へ';
     return;
   }
@@ -1726,7 +1887,7 @@ async function renderBracketPage(tournamentId) {
   }
 
   // 戻り先は大会詳細。ここへは詳細から来るため。
-  bracketBackLink.href = `#tournament/${encodeURIComponent(tournamentId)}`;
+  bracketBackLink.href = pathFor('tournament', tournamentId);
   bracketBackLink.textContent = '← 大会の詳細へ';
 
   if (!state.brackets[tournamentId] && state.bracketIds.has(tournamentId)) {
@@ -1853,7 +2014,7 @@ function renderResultSection(tournament) {
   const standings = finalStandings(bracket, 16);
   if (standings.length === 0) return;
 
-  const heading = document.createElement('h3');
+  const heading = document.createElement('h2');
   heading.textContent = '最終順位';
   resultSectionEl.appendChild(heading);
 
@@ -1872,7 +2033,7 @@ function renderResultSection(tournament) {
       return `
         <div class="player-identity">
           ${avatarHtml(player ?? { currentName: name }, 'sm')}
-          <a href="#player/${encodeURIComponent(id)}">${escapeHtml(name)}</a>
+          <a href="${pathFor('player', id)}">${escapeHtml(name)}</a>
         </div>
       `;
     }).join('');
@@ -1968,7 +2129,9 @@ const RECENT_RESULTS = 3;
 // 先頭が本人の名乗りだからで、複数枚を並べると誰の場所か分からなくなる。
 // 登録していない人には何も出さない ── 代わりの絵を置くと、選んでいない人まで
 // 選んだように見えてしまう。絵は装飾なので読み上げから外す。
-function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '', foot = '' } = {}) {
+// nameTag は置かれる場所で変わる。選手ページでは選手名がそのページの題なので h1、
+// マイページでは題が「マイページ」なので h2 になる。
+function playerHeroHtml(player, { nameTag = 'h1', action = '', extra = '', foot = '' } = {}) {
   const artUrl = characterImageUrl(player.mainCharacters?.[0], 'large');
   const rankEntry = state.publishedRanking?.rankings.find((r) => r.id === player.id);
 
@@ -2038,7 +2201,9 @@ function playerHeroHtml(player, { nameTag = 'h2', action = '', extra = '', foot 
 // 表より先にこれを置くのは、プロフィールを開いた人がまず知りたいのが
 // 「いま何位か」の次に「最近どこまで勝ったか」だから。表は全件を等しく並べるので、
 // 一番新しい1件を探すのに目が要る。
-function recentResultsHtml(stats) {
+// titleTag は置かれる場所で変わる。選手ページでは選手名（h1）のすぐ下なので h2、
+// マイページではページの題（h1「マイページ」）→ 自分の名前（h2）の下なので h3。
+function recentResultsHtml(stats, { titleTag = 'h2' } = {}) {
   if (!stats || stats.tournaments.length === 0) return '';
 
   const recent = [...stats.tournaments].reverse().slice(0, RECENT_RESULTS);
@@ -2046,7 +2211,7 @@ function recentResultsHtml(stats) {
     // 優勝・準優勝・3位は金銀銅にする（ランキング表と同じ配色の考え方）。
     const rankClass = { 優勝: ' is-1st', 準優勝: ' is-2nd', '3位': ' is-3rd' }[entry.placement] ?? '';
     return `
-      <a class="result-card${rankClass}" href="#tournament/${encodeURIComponent(entry.tournament.id)}">
+      <a class="result-card${rankClass}" href="${pathFor('tournament', entry.tournament.id)}">
         <span class="result-place">${escapeHtml(entry.placement || '—')}</span>
         <span class="result-body">
           <span class="result-name">${escapeHtml(entry.tournament.name)}</span>
@@ -2058,7 +2223,7 @@ function recentResultsHtml(stats) {
 
   return `
     <section class="profile-block">
-      <h3 class="profile-block-title">直近の戦績</h3>
+      <${titleTag} class="profile-block-title">直近の戦績</${titleTag}>
       <div class="result-cards">${cards}</div>
     </section>`;
 }
@@ -2081,7 +2246,7 @@ function historyTableHtml(stats) {
             ${entries.map((entry) => `
               <tr>
                 <td>
-                  <a href="#tournament/${encodeURIComponent(entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a>
+                  <a href="${pathFor('tournament', entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a>
                   ${entry.teamName ? `<div class="meta-line">${escapeHtml(entry.teamName)}</div>` : ''}
                 </td>
                 <td>${escapeHtml(entry.tournament.date || '—')}</td>
@@ -2124,7 +2289,7 @@ async function renderPlayerDetail(playerId) {
 
   playerDetailEl.innerHTML = playerHeroHtml(player, {
     action: isOwn
-      ? `<a href="#profile" class="profile-edit-link" title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</a>`
+      ? `<a href="${pathFor('profile')}" class="profile-edit-link" title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</a>`
       : '',
     extra: !isOwn && isAdmin()
       ? '<p class="meta-line"><button type="button" class="btn-secondary admin-rename-btn">プレイヤー名を変更</button></p>'
@@ -2204,8 +2369,8 @@ async function refreshFromDb({ silent = false, parts = null } = {}) {
     // 15分ぶん古いまま据え置かれてしまう。
     // 持ち越しが積み重なって結果的に全部位になった場合も、全件取得と同じに数える。
     if (!parts || db.ALL_PARTS.every((p) => parts.includes(p))) lastLoadedAt = Date.now();
-    routeFromHash();
-    // 開きっぱなしのチャットは画面の外にあるので、routeFromHash では更新されない。
+    routeFromLocation();
+    // 開きっぱなしのチャットは画面の外にあるので、routeFromLocation では更新されない。
     // 相手の報告や回戦の開始に追従させる。
     syncOpenChat();
     if (!silent) setStatus('');
@@ -2226,7 +2391,7 @@ function isUserTyping() {
   const el = document.activeElement;
   if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
     // 対戦チャットのメッセージ入力・報告文・ルームコードは例外。ダイアログは
-    // routeFromHash の再描画対象外で、syncOpenChat もこれらには触らない
+    // routeFromLocation の再描画対象外で、syncOpenChat もこれらには触らない
     // （ルームコードは書きかけの間だけ描き直しを見送る）ので、入力が消えることはない。
     // ここで真を返すと、チャットで会話している間じゅう更新が届かなくなってしまう
     // （送信のたびにフォーカスが入力欄へ戻るため、開いている間はほぼ常に入力中になる）。
@@ -2288,7 +2453,7 @@ tournamentForm.addEventListener('change', (e) => {
   tournamentSubmitBtn.textContent = manual ? 'ブラケットを生成' : '大会を作成';
 });
 
-rankingRevealBtn.addEventListener('click', () => { location.hash = '#reveal'; });
+rankingRevealBtn.addEventListener('click', () => { navigate('reveal'); });
 
 // 「その他」を選んだときだけ説明欄を出す。他の選択肢では書いても表示に使われない。
 function bindMatchTypeNoteToggle(select, field) {
@@ -2452,20 +2617,20 @@ tournamentForm.addEventListener('submit', async (e) => {
   await refreshFromDb();
   // 作り終えたら、作り方に関わらずその大会のページへ。公開の操作はそこにあり、
   // 一覧へ戻しても（まだ非公開なので）運営以外には何も無いページに見える。
-  location.hash = `#tournament/${encodeURIComponent(tournament.id)}`;
+  navigate('tournament', tournament.id);
 });
 
-// 大会の共有リンク。いま開いているURL（#tournament/xxx）ではなく、専用の /t/{id} を配る。
+// 大会の共有リンク。大会ページのURLそのものを配る。
 //
-// ハッシュはサーバーに送られないので、#付きのURLをXやDiscordに貼っても、向こうは
-// トップページしか読めず、どの大会かが分からない（プレビューが全部同じになる）。
-// /t/{id} は Worker が受けていて、大会名と大会画像を入れたHTMLを返す（worker/index.js）。
-// 人がそのURLを開いたときは、その場で #tournament/{id} へ送り返される。
+// 以前は専用の /t/{id} を配っていた。ハッシュ（#tournament/xxx）ではサーバーに
+// どの大会かが届かず、og: を返す口を別に用意するしかなかったため。いまは
+// /tournaments/{id}/ に Worker が直接 og: を埋めて返すので、その必要がない
+// （worker/index.js）。古い /t/{id} は301でここへ送られる。
 //
 // origin から組み立てるのは、配信先（独自ドメイン・*.workers.dev・wrangler dev）に
-// 依存しないため。Worker はルート直下に居るので、pathname は足さない。
+// 依存しないため。
 function tournamentShareUrl(tournamentId) {
-  return `${location.origin}/t/${encodeURIComponent(tournamentId)}`;
+  return `${location.origin}${pathFor('tournament', tournamentId)}`;
 }
 
 let shareBtnResetTimer = null;
@@ -2549,7 +2714,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // 大会を離れたら閉じておく（削除したときは行き先が大会一覧になる）
-window.addEventListener('hashchange', () => setManageMenuOpen(false));
+window.addEventListener(ROUTE_CHANGE_EVENT, () => setManageMenuOpen(false));
 
 tournamentEditBtn.addEventListener('click', () => {
   const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
@@ -2654,12 +2819,10 @@ tournamentDeleteBtn.addEventListener('click', async () => {
   if (!ok) return;
   if (imageUrl) await db.removeImageByUrl(imageUrl).catch(() => {});
   await refreshFromDb();
-  location.hash = '#tournaments';
+  navigate('tournaments');
 });
 
-// 「はじめに」の目次。ページ内の移動なので、ハッシュは変えずにスクロールで運ぶ。
-// （ハッシュはページの切り替えに使っているため、#見出しID を入れると
-//   routeFromHash が知らないページとして扱い、ホームへ戻してしまう）
+// 「はじめに」の目次。ページ内の移動なので、URLは変えずにスクロールで運ぶ。
 //
 // 目次そのものは pages/guide.html の中にあり、この時点ではまだ存在しない。
 // そこで、常にある入れ物（view-guide）で受けて、中の目次リンクを拾う。
@@ -2789,7 +2952,7 @@ logoutBtn.addEventListener('click', async () => {
   logoutBtn.disabled = true;
   try {
     await signOut();
-    location.hash = '#home';
+    navigate('home');
   } catch (err) {
     setStatus(err.message, 'error');
   } finally {
@@ -2889,9 +3052,9 @@ if (heroGameEl && heroGameLogoEl) {
 
 // ---- 狭い画面のメニュー ----
 //
-// 開閉状態は routeFromHash では触らない。背景の自動更新でも routeFromHash は
+// 開閉状態は routeFromLocation では触らない。背景の自動更新でも routeFromLocation は
 // 走るため、そこで閉じると開いた直後に勝手に畳まれてしまう。
-// 実際に画面が変わるとき（hashchange）と、リンクを押したときだけ閉じる。
+// 実際にURLが変わったとき（route-change）と、リンクを押したときだけ閉じる。
 
 // メニューは画面全体をふさぐ。開いているあいだは、その後ろにあるものを
 // 「無いもの」として扱う必要がある。
@@ -2921,7 +3084,7 @@ navToggle.addEventListener('click', () => {
 // メニューの中の×。押した後のフォーカスは setNavOpen が開くボタンへ戻す
 navCloseBtn.addEventListener('click', () => setNavOpen(false));
 
-// 今いるページと同じリンクを押した場合は hashchange が起きないので、ここでも閉じる
+// 今いるページと同じリンクを押した場合は route-change が起きないので、ここでも閉じる
 mainNav.addEventListener('click', (e) => {
   if (e.target.closest('a')) setNavOpen(false);
 });
@@ -2937,10 +3100,9 @@ document.addEventListener('click', (e) => {
   setNavOpen(false);
 });
 
-window.addEventListener('hashchange', () => {
-  setNavOpen(false);
-  routeFromHash();
-});
+// 画面が変わったらメニューは畳む。描き直しそのものは router.js が
+// routeFromLocation を呼んで行うので、ここでは呼ばない。
+window.addEventListener(ROUTE_CHANGE_EVENT, () => setNavOpen(false));
 
 // タブを開き直したときは最新を取り込む（Realtimeが届かない間に進んでいることがある）
 document.addEventListener('visibilitychange', () => {
@@ -2953,11 +3115,22 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // チャットから報告が出された／対応済みになった。大会カードと対戦表の印を出し直す。
-document.addEventListener('chat-reports-changed', () => routeFromHash());
+document.addEventListener('chat-reports-changed', () => routeFromLocation());
 
 // ---- 起動 ----
 
 async function start() {
+  // SNSやDMに残っている旧形式のURL（#tournament/xxx）で着地した人を、先に
+  // 新しいパスへ書き換える。ハッシュはサーバーに送られないので、この読み替えは
+  // ブラウザの中でしかできない ── サーバー側の301では拾えない。
+  //
+  // ルーティングを動かすより前に済ませること。後にすると、ハッシュ付きのURLは
+  // パスとしては「/」なので、一瞬ホームが描かれてから目的のページへ飛ぶ。
+  migrateLegacyUrl();
+
+  // リンクの横取りと、戻る・進むの受け取りを始める。描くのは routeFromLocation。
+  startRouter(routeFromLocation);
+
   // 接続先が未設定のまま動かすと、原因の分かりにくいネットワークエラーが出続けるので
   // 先に止めて、何をすればよいかを画面に出す（supabase/SETUP.md の手順3）。
   if (!isConfigured()) {
@@ -2976,18 +3149,18 @@ async function start() {
   try {
     await initAuth(() => {
       applyAuthUI();
-      routeFromHash();
+      routeFromLocation();
 
       // ログインしたのに選手行が無い＝新規登録がまだ。そのまま登録フォームへ案内する。
-      if (needsOnboarding() && parseHash().page !== 'profile') {
-        location.hash = '#profile';
+      if (needsOnboarding() && currentRoute().page !== 'profile') {
+        navigate('profile');
       }
     });
   } catch (err) {
     console.error('[start] 認証の初期化に失敗', err);
     setStatus(`ログイン状態を確認できませんでした（${err.message}）。未ログインとして表示します。`, 'error');
     applyAuthUI();
-    routeFromHash();
+    routeFromLocation();
   }
 
   await refreshFromDb();
@@ -3037,10 +3210,10 @@ async function start() {
       console.error('[app] 報告の取得に失敗', err);
     }
 
-    // 入力中は描き直しを持ち越す。routeFromHash は編集中のフォームを閉じてしまうため。
+    // 入力中は描き直しを持ち越す。routeFromLocation は編集中のフォームを閉じてしまうため。
     if (reportsRenderPending && !isUserTyping()) {
       reportsRenderPending = false;
-      routeFromHash();
+      routeFromLocation();
     }
   }, REPORT_POLL_MS);
 }

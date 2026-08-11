@@ -46,16 +46,26 @@ const collect = (v, what) => {
   else versions.add(v);
 };
 
-collect(html.match(/href="css\/style\.css\?v=(\d+)"/)?.[1], 'css/style.css');
-collect(html.match(/<script type="module" src="js\/app\.js\?v=(\d+)"/)?.[1], 'js/app.js');
-collect(html.match(/<script src="js\/vendor\/supabase\.js\?v=(\d+)"/)?.[1], 'js/vendor/supabase.js');
+// index.html の中のURLはすべて「/」始まり。ページを /tournaments/{id}/ のような
+// 深いURLでも同じHTMLで返すようになったため、相対パスだとその階層から解決されて
+// 全部404になる（index.html の先頭に同じ注意書きがある）。
+// ここの正規表現も「/」始まりだけを見る ── 相対パスに戻してしまったら、
+// 版数が見つからず「?v= が付いていません」で止まる。
+collect(html.match(/href="\/css\/style\.css\?v=(\d+)"/)?.[1], '/css/style.css');
+collect(html.match(/<script type="module" src="\/js\/app\.js\?v=(\d+)"/)?.[1], '/js/app.js');
+collect(html.match(/<script src="\/js\/vendor\/supabase\.js\?v=(\d+)"/)?.[1], '/js/vendor/supabase.js');
 for (const [key, value] of Object.entries(imports)) {
   collect(value.match(/\?v=(\d+)$/)?.[1], `インポートマップの "${key}"`);
 }
 
 // 読み物ページ（pages/*.html）は data-src で読み込む。ここも同じ版数にそろえる。
-const pageRefs = [...html.matchAll(/data-src="(pages\/[\w.-]+\.html)(\?v=(\d+))?"/g)];
+const pageRefs = [...html.matchAll(/data-src="\/(pages\/[\w.-]+\.html)(\?v=(\d+))?"/g)];
 for (const [, file, , v] of pageRefs) collect(v, file);
+
+// その画面を開いたときだけ読むCSS（data-css。js/app.js の loadViewCss）。
+// <link> と違って <head> に無いので、版数の確認から抜け落ちやすい。
+const viewCssRefs = [...html.matchAll(/data-css="\/(css\/[\w.-]+\.css)(\?v=(\d+))?"/g)];
+for (const [, file, , v] of viewCssRefs) collect(v, file);
 
 // CSSの中から img/ を指す url() も同じ版数にそろえる。ここだけ index.html の外に
 // 版数があるので、まとめて上げるときに取り残されやすい ── 取り残すと、画像は
@@ -85,14 +95,18 @@ for (const f of jsFiles) {
   for (const m of src.matchAll(/from\s+'\.\/([^']+)'/g)) used.add(m[1]);
 }
 
-const missing = [...used].filter((t) => !(`./js/${t}` in imports));
+// インポートマップの見出しは "/js/xxx.js"。モジュールの中の import './state.js' は
+// 「そのモジュールから見た相対」なので /js/state.js に解決され、この見出しと一致する。
+// 見出しのほうを "./js/state.js" と書くと、解決の基準がHTMLのURLになるため、
+// /tournaments/{id}/ で開いたときだけ一致しなくなる（=版数が効かない）。
+const missing = [...used].filter((t) => !(`/js/${t}` in imports));
 if (missing.length) {
-  missing.forEach((t) => fail(`"./js/${t}" がインポートマップに無い（古いキャッシュが読まれます）`));
+  missing.forEach((t) => fail(`"/js/${t}" がインポートマップに無い（古いキャッシュが読まれます）`));
 } else {
   console.log(`OK   importされている${used.size}モジュールすべてが登録済み`);
 }
 
-const known = new Set(jsFiles.map((n) => `./js/${n}`));
+const known = new Set(jsFiles.map((n) => `/js/${n}`));
 for (const key of Object.keys(imports)) {
   if (!known.has(key)) fail(`"${key}" は存在しないファイルを指しています`);
 }
@@ -124,7 +138,9 @@ const IMMUTABLE_DIRS = ['js', 'css', 'img', 'pages', 'video'];
 function localRefs(source) {
   const found = [];
   const patterns = [
-    /(?:href|src|data-src)="(?!https?:|\/\/|data:|#)([^"]+)"/g,
+    // data-css は「その画面を開いたときに読むCSS」（js/app.js の loadViewCss）。
+    // <link> と同じく1年キャッシュされる場所を指すので、ここも同じ検査に載せる。
+    /(?:href|src|data-src|data-css)="(?!https?:|\/\/|data:|#)([^"]+)"/g,
     /url\(\s*['"]?(?!https?:|\/\/|data:)([^'")]+)['"]?\s*\)/g,
   ];
   for (const re of patterns) {

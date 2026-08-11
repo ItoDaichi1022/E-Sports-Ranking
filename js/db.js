@@ -254,6 +254,14 @@ function checkRpc(error, what) {
 const loadedDetailIds = new Set(); // エントリー・チームを読み込んだ大会
 const loadedMatchIds = new Set(); // 試合結果を読み込んだ大会（対戦表を開いた大会）
 let fullDataLoaded = false; // 運営の集計操作（ensureFullData）で全件を読み込んだか
+
+// 一度でもDBから読めたか。0件なのか、まだ届いていないのかを画面が見分けるために使う。
+// 「まだ大会はありません」と「読み込んでいます」は、出す相手にとってまるで違う。
+let everLoaded = false;
+
+export function hasLoadedOnce() {
+  return everLoaded;
+}
 let allAnnouncementsLoaded = false; // お知らせを全件読み込んだか（一覧ページを開いたか）
 
 // 先に読むお知らせの件数。ホーム（最新3件）に足りればよく、全件は一覧ページで読む。
@@ -409,6 +417,11 @@ export async function loadAll(parts = null) {
     check(settled[i].error, QUERY_LABELS[name]);
     r[name] = settled[i];
   });
+
+  // ここまで来たら、少なくとも一度はDBの中身を見たことになる。
+  // 画面はこれを見て「まだ読んでいない」と「読んだ結果0件」を区別する
+  // （区別しないと、読み込み中の一瞬だけ「まだ大会はありません」と嘘を出す）。
+  everLoaded = true;
 
   if (want.has('tournaments')) {
     // 大会ごとにエントリーとチームをまとめ、出場枠の並び（シード順、未確定なら登録順）を作る。
@@ -590,6 +603,13 @@ export async function ensureAllAnnouncements() {
 
   allAnnouncementsLoaded = true;
   state.announcements = data.map(toAnnouncement);
+}
+
+// 全件が手元にあるか。「そのお知らせは無い」と言い切ってよいかの判断に使う
+// （最新数件しか読んでいない状態で言い切ると、古いお知らせのURLを開いた人に
+//   一瞬「見つかりません」を見せることになる。js/app.js の applyRouteMeta）。
+export function hasAllAnnouncements() {
+  return allAnnouncementsLoaded;
 }
 
 // 選手ページ用。その選手の出場記録（大会・順位・チーム名）だけを取る。

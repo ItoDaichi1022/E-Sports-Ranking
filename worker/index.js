@@ -1,104 +1,205 @@
-// 大会の共有リンク（/t/{大会ID}）を返す Worker。
+// このサイトのURLをサーバー側で受け持つ Worker。仕事は3つある。
 //
-// 【なぜ要るか】
-//   このサイトは #tournament/{id} というハッシュでページを切り替えている。
-//   ハッシュはブラウザの中だけのもので、サーバーには送られない。XやDiscordが
-//   貼られたリンクの中身を見に来るとき（プレビューを作るとき）に届くのは「/」だけで、
-//   しかも向こうはJSを動かさないので、どの大会のリンクを貼っても同じ index.html の
-//   ―― 中身が空の ―― 骨組みしか読めない。大会名も画像も取りようがない。
+// 【1. アプリのページを配る（SPAフォールバック）】
+//   画面はハッシュ（#tournament/xxx）ではなくパス（/tournaments/xxx/）で切り替える。
+//   パスはサーバーに届くので、そのURLに対して何かを返さなければならない ── ところが
+//   このサイトに実在するHTMLは index.html 1本きりで、/tournaments/xxx/ という
+//   ファイルはどこにも無い。何もしなければ、直リンクもリロードも全部404になる。
 //
-//   そこで、ハッシュを使わないURL /t/{id} を1本だけ用意する。ここではサーバー側
-//   （このWorker）が大会をDBから引き、og: タグを埋め込んだHTMLを返す。
-//   プレビューを作る側はそのタグだけを読んで帰る。人が同じURLを開いたときは、
-//   その場で /#tournament/{id} へ送り返すので、見えるのはいつものアプリの画面になる。
+//   そこで、js/router.js が知っているURLの形に当たったら index.html を返す。
+//   あとはブラウザの中で js/app.js がそのURLを読んで、該当のページを描く。
+//   知らない形のURLは、これまでどおり404のまま（存在しないページを200で返すと、
+//   検索エンジンに「中身のあるページ」として拾われてしまう）。
+//
+// 【2. そのページの title と og: を埋め込んで返す】
+//   XやDiscordがリンクの中身を見に来るとき、向こうはJSを動かさない。素の index.html を
+//   そのまま返すと、どの大会のURLを貼っても同じ ── サイト共通の ── プレビューになる。
+//   検索エンジンも、JSを動かす前のHTMLを最初に読む。
+//
+//   そこで、返す直前に HTMLRewriter で <head> の meta だけを差し替える。文言を作るのは
+//   ブラウザ側と同じ js/seo.js で、ここは「どのデータを渡すか」しか持たない。
+//   HTMLの本体（SPA）には一切手を入れない。
+//
+//   【UA（User-Agent）は見ない】クローラーにだけ違うHTMLを返す作りにはしていない。
+//   誰が来ても同じものを返す ── 出し分けはクローキングと判定される危険があるうえ、
+//   判定を外した相手（新しいSNS、検索エンジンの別のクローラー）に何も届かなくなる。
+//   確認するときは `curl -A "Twitterbot/1.0" <URL>` と UA 無しの結果を見比べること。
+//   食い違っていたら、それはこのファイルの不具合。
+//
+// 【3. 古い共有リンク（/t/{大会ID}）を新しいURLへ送る】
+//   og: を大会ごとに返す口が /t/{id} しか無かった頃の名残。いまは本来のURL
+//   （/tournaments/{id}/）が同じものを返せるので、301で送るだけの受け皿にしてある。
+//   SNSやDMに残っている古いリンクは、301を辿った先で正しいプレビューになる。
 //
 // 【ここに来るリクエスト】
-//   静的アセット（index.html・css/・js/ …）は Cloudflare がこのWorkerより先に返す。
-//   つまりここへ来るのは「どのファイルにも当たらなかったURL」だけ。/t/ 以外は
-//   env.ASSETS へそのまま渡して、これまでと同じ404にする（挙動を変えないため）。
+//   静的アセット（css/・js/・img/ …）は Cloudflare がこのWorkerより先に返す。
+//   例外は「/」だけで、こちらはトップページにも og: と構造化データを入れたいので、
+//   wrangler.jsonc の assets.run_worker_first で先にこのWorkerへ回している。
 //
 // 【動作確認】
-//   npx wrangler dev  → http://localhost:8787/t/{大会ID}
+//   npx wrangler dev  → http://localhost:8787/tournaments/
 //   静的ファイルをそのまま開く方式（file:// や素のhttpサーバー）ではWorkerが
-//   動かないので、共有リンクは404になる。これはデプロイ先でだけ効く機能。
+//   動かないので、トップ以外のURLは404になる。これはデプロイ先でだけ効く機能。
 
-const SITE_NAME = 'IgniteArena';
+// URLとページの対応表も、meta の文言も、ブラウザ側と同じものを読む。
+// 写しを置くと、ページを1つ足したときに「アプリは知っているのにサーバーが404を返す」
+// 「画面の題と検索結果の題が違う」というかたちで必ずずれる。
+// どちらも読み込んだだけでは window に触らないので、Cloudflare 上でも動く。
+import { matchPath, pathFor } from '../js/router.js';
+import { buildPageMeta } from '../js/seo.js';
+
+// 古い共有リンクの入口。中身は /tournaments/{id}/ に移した。
 const SHARE_PREFIX = '/t/';
 
-// 大会IDはUUID（supabase/schema.sql の tournaments.id）。形が違うものは
+// 大会ID・お知らせID・選手IDはどれもUUID（supabase/schema.sql）。形が違うものは
 // DBに問い合わせるまでもなく無いので、ここで弾く。
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// 進行状況の呼び名。js/entries.js の STATUS_LABELS と同じ内容を持っている。
-// あちらはブラウザ用のESモジュールで、Workerからは読めない（importすると
-// supabaseClient.js まで引きずられ、windowが無くて落ちる）ので写しを置く。
-// 増やすときは両方直すこと。
-const STATUS_LABELS = {
-  draft: '準備中',
-  recruiting: '募集中',
-  running: '進行中',
-  finished: '終了',
-};
-
-// プレビュー画像が無い大会のときに使う、サイト共通の絵。
-// ?v= は index.html と同じ版数に合わせておく（/img/* は1年 immutable なので、
-// 中身を差し替えたときは番号も上げる。_headers の説明を参照）。
-const FALLBACK_IMAGE = '/img/icon.png?v=126';
+// 拡張子が付いているURL＝ファイルへの直リンク。ここまで来たということは、そのファイルが
+// 実在しなかったということなので、index.html を返さずに404のままにする
+// （/js/typo.js を index.html で応えると、ブラウザはHTMLをJSとして読んで落ちる）。
+const LOOKS_LIKE_FILE = /\.[a-z0-9]+$/i;
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (!url.pathname.startsWith(SHARE_PREFIX)) return env.ASSETS.fetch(request);
-
-    // 末尾のスラッシュは付いていても付いていなくても同じものとして扱う。
-    // pathname はエスケープされたままなので戻す（戻さないと、UUID以外が来たときの
-    // 「見つかりません」ページで %E3%81%82 のような文字列が二重に符号化される）。
-    const id = safeDecode(url.pathname.slice(SHARE_PREFIX.length).replace(/\/+$/, ''));
-
-    if (!UUID.test(id)) return sharePage(url.origin, id, null, 'missing');
-
-    let tournament = null;
-    try {
-      tournament = await fetchTournament(env, id);
-    } catch (err) {
-      // DBに届かなかっただけで人の導線まで止める理由はない。プレビューは
-      // 中身の無いものになるが、開いた人はいつもどおり大会ページへ着く
-      // （そのときはアプリがDBから読み直すので、普通に大会が出る）。
-      console.error('[share] 大会の取得に失敗', err);
-      return sharePage(url.origin, id, null, 'unavailable');
+    // 古い共有リンクは本来のURLへ送るだけ。IDの形が違っても大会ページへ通す
+    // （そこで「大会が見つかりません」が出る。ここで別の文言を持つ必要はない）。
+    if (url.pathname.startsWith(SHARE_PREFIX)) {
+      const id = safeDecode(url.pathname.slice(SHARE_PREFIX.length).replace(/\/+$/, ''));
+      return Response.redirect(`${url.origin}${pathFor('tournament', id)}`, 301);
     }
 
-    return sharePage(url.origin, id, tournament, tournament ? 'found' : 'missing');
+    // 実在するファイルは Cloudflare がこのWorkerより先に返している。ここへ来る
+    // 拡張子付きのURLは、綴り違いか消したファイル。
+    if (LOOKS_LIKE_FILE.test(url.pathname)) return env.ASSETS.fetch(request);
+
+    // 末尾スラッシュありを正とする。無いものは301で付け直す。
+    //
+    // 2つのURLで同じページが出る状態にしないため。放っておくと、検索エンジンからは
+    // 別々のページに見え、canonical（/tournaments/xxx/）と実際に開かれたURL
+    // （/tournaments/xxx）が食い違う。
+    if (!url.pathname.endsWith('/') && matchPath(`${url.pathname}/`)) {
+      return Response.redirect(`${url.origin}${url.pathname}/${url.search}`, 301);
+    }
+
+    const route = matchPath(url.pathname);
+    // 知らないURL。存在しないページを200で返すと検索エンジンに拾われるので、
+    // これまでどおり静的アセット側の404に任せる。
+    if (!route) return env.ASSETS.fetch(request);
+
+    return appShell(request, env, url, route);
   },
 };
 
 // %が単独で入っているURLでは decodeURIComponent が例外を投げる。
-// そこで止まる理由は無いので、戻せなければ元の文字列のまま先へ渡す（どのみちUUIDに
-// ならないので「見つかりません」になる）。
+// そこで止まる理由は無いので、戻せなければ元の文字列のまま先へ渡す。
 function safeDecode(s) {
   try { return decodeURIComponent(s); } catch { return s; }
 }
 
-// 大会を1件だけ引く。anonキーで読める（supabase/schema.sql の tournaments_select は
-// anon にも開いている）。参加数は js/db.js の一覧と同じ埋め込みカウントで取る。
+// ---- アプリのページ ----
+
+// index.html を取ってきて、<head> の meta だけを差し替えて返す。
+// 本体（SPA）には触らない ── ここが太ると、画面の作りとサーバーの都合が絡み始める。
+async function appShell(request, env, url, route) {
+  // 条件付きリクエスト（If-None-Match など）はそのまま渡さない。渡すと 304 が
+  // 返ってきて本文が無くなるが、こちらは中身のある200を返したい。
+  const method = request.method === 'HEAD' ? 'HEAD' : 'GET';
+  const shell = await env.ASSETS.fetch(new Request(`${url.origin}/index.html`, { method }));
+
+  const data = await pageData(env, route);
+  const meta = buildPageMeta(route.page, { param: route.param, ...data }, url.origin);
+
+  const headers = new Headers(shell.headers);
+  // Cache-Control を上書きするのは、_headers に書いた「/ と /index.html は毎回聞き直す」
+  // が、Worker が組み立てたこの応答には効かないため（あれは静的アセットとして
+  // 配られるときだけの設定）。ここで指定しないと既定の扱いになり、?v= を上げた
+  // 新しい index.html が届かない端末が出る。
+  headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+  // 同じURLでも中身（meta）はDBの状態で変わるので、その旨を伝えておく。
+  headers.delete('ETag');
+
+  // 消えている大会やお知らせのURLは404で返す。200で返すと、検索エンジンは
+  // 「中身のあるページ」として登録し続ける（ソフト404）。本文はいつもの
+  // index.html なので、人が開けば「見つかりません」の画面が普通に出る。
+  const status = data.notFound ? 404 : shell.status;
+
+  return rewriteMeta(new Response(shell.body, { status, headers }), meta);
+}
+
+// そのページの meta を作るのに要るデータをDBから引く。
+//
+// 引きに行くのは詳細ページ（大会・お知らせ・選手）だけ。一覧や読み物ページの
+// 文言は固定なので、通信を1往復増やす理由がない。
+//
+// 【失敗しても人の導線は止めない】DBに届かなかったときは空を返す。プレビューは
+// サイト共通のものになるが、ページ自体はいつもどおり開き、ブラウザ側が読み直す。
+async function pageData(env, { page, param }) {
+  const needsTournament = page === 'tournament' || page === 'bracket' || page === 'entrants';
+  if (!needsTournament && page !== 'news' && page !== 'player') return {};
+
+  // IDの形が違うものは、DBに聞くまでもなく無い。
+  if (!UUID.test(param ?? '')) return { notFound: true };
+
+  try {
+    if (needsTournament) {
+      const row = await fetchOne(env, 'tournaments', param,
+        'name,date,status,match_type,image_url,stream_url,entry_deadline,capacity,'
+        + 'tournament_entries(count),tournament_teams(count)');
+      if (!row) return { notFound: true };
+      return { tournament: toTournament(row), entrantsText: entrantsTextOf(row) };
+    }
+
+    if (page === 'news') {
+      const row = await fetchOne(env, 'announcements', param,
+        'title,body,image_url,created_at,updated_at');
+      if (!row) return { notFound: true };
+      return {
+        announcement: {
+          title: row.title,
+          body: row.body,
+          imageUrl: row.image_url,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        },
+      };
+    }
+
+    // 選手。順位（「公開ランキング7位」）はここでは付けない ── 順位表は
+    // published_rankings に丸ごとJSONで入っていて、1人分を引くために全体を
+    // 取ることになる。ブラウザ側は手元に持っているので、読み込んだ時点で足される。
+    const row = await fetchOne(env, 'players', param, 'display_name,past_names');
+    if (!row) return { notFound: true };
+    return { player: { currentName: row.display_name, pastNames: row.past_names ?? [] } };
+  } catch (err) {
+    console.error('[meta] データの取得に失敗', err);
+    return {};
+  }
+}
+
+// 1行だけ引く。anonキーで読める範囲しか返らない ── これがそのまま公開範囲の境目になる。
 //
 // 【準備中の大会は引けない】公開前（status = 'draft'）の行はRLSが anon に返さない
-// ので、0件＝「見つかりません」になる。共有URLを先に配られても、公開するまでは
-// 大会名も画像も出ない ── 意図した動きで、直す対象ではない。
-async function fetchTournament(env, id) {
-  const query = new URLSearchParams({
-    id: `eq.${id}`,
-    select: 'name,date,status,match_type,image_url,rules,tournament_entries(count),tournament_teams(count)',
-    limit: '1',
-  });
+// （supabase/migration-022.sql の tournaments_select）。0件＝「見つかりません」に
+// なるので、共有URLを先に配られても、公開するまで大会名も画像も漏れない。
+// 絞り込みをここのコードで書かないのは、書き忘れが即漏洩になるため ──
+// 見えてよいかの判断はSQL側（RLS）に一本化しておく。
+async function fetchOne(env, table, id, select) {
+  const query = new URLSearchParams({ id: `eq.${id}`, select, limit: '1' });
 
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/tournaments?${query}`, {
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?${query}`, {
     headers: {
       apikey: env.SUPABASE_ANON_KEY,
       Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
       Accept: 'application/json',
     },
+    // 同じURLへの問い合わせは1分だけ使い回す。人がページを開くたびにここで
+    // 1往復待たせることになるので、連続して開かれたときの待ちを削る。
+    // 大会名を直した直後は最大1分だけ古いままになるが、SNS側はプレビューを
+    // それよりずっと長く抱えるので、体感としての差は出ない。
+    cf: { cacheTtl: 60, cacheEverything: true },
   });
 
   if (!res.ok) throw new Error(`PostgREST ${res.status} ${await res.text()}`);
@@ -107,142 +208,105 @@ async function fetchTournament(env, id) {
   return rows[0] ?? null;
 }
 
-// プレビューに出す1行。js/app.js の tournamentMetaEl と同じ並び（日付・参加数・状況）。
-// 優勝者までは出さない ── あれは対戦表を読まないと分からず、そのために
-// もう1往復するほどの値打ちは無い。
-function summaryLine(t) {
-  const isTeam = t.match_type === '2v2';
-  const participants = t.tournament_entries?.[0]?.count ?? 0;
-  const teams = t.tournament_teams?.[0]?.count ?? 0;
-  const entrants = teams > 0 ? teams : participants;
-
-  const count = isTeam
-    ? `${entrants}チーム（${participants}人）参加`
-    : `${entrants}人参加`;
-
-  return [t.date || '日付未設定', count, STATUS_LABELS[t.status] ?? '—'].join(' ・ ');
+// PostgREST の生の行（snake_case）を js/seo.js が読む形（camelCase）に直す。
+//
+// js/db.js を通さないのは、あれが supabaseClient.js ごとブラウザの世界を
+// 引きずってくるため。変換の境界を1つにするという約束からは外れるが、
+// ここで扱うのは meta に出す数項目だけで、書き込みは一切しない。
+function toTournament(row) {
+  return {
+    name: row.name,
+    date: row.date,
+    status: row.status,
+    matchType: row.match_type,
+    imageUrl: row.image_url,
+    streamUrl: row.stream_url,
+    entryDeadline: row.entry_deadline,
+    // 定員と出場枠の数は、js/tournamentState.js が「満員かどうか」を出すのに使う。
+    // 落とすと、定員に達した大会でも検索結果には「エントリー受付中」と出てしまう。
+    capacity: row.capacity,
+    entrantCount: entrantCountOf(row),
+  };
 }
 
-// 説明文。1行目に日付や参加数、続けてルールの書き出しを添える。
-// Discordは4行ほど、Xは2行ほどしか出さないので、長く積んでも読まれない。
-function description(t) {
-  const line = summaryLine(t);
-  const rules = (t.rules ?? '').replace(/\s+/g, ' ').trim();
-  if (!rules) return line;
-  return `${line}\n${rules.length > 80 ? `${rules.slice(0, 80)}…` : rules}`;
+// 出場枠の数。2v2ではチームを数える（人ではない）。
+// js/state.js の entrantCount と同じ数え方で、あちらはDB側で数えた値を
+// まとめて持っている。ここでは埋め込みカウントの生の値から同じものを作る。
+function entrantCountOf(row) {
+  const people = row.tournament_entries?.[0]?.count ?? 0;
+  const teams = row.tournament_teams?.[0]?.count ?? 0;
+  return row.match_type === '2v2' && teams > 0 ? teams : people;
 }
 
-// DBから来た画像URLをそのまま信用しない。og:image に javascript: のような
-// ものが入っても害は無いが、http: の絵はXやDiscordに弾かれて「画像なし」に
-// 見えるだけなので、https でなければ最初から共通の絵に倒す。
-function imageUrl(origin, t) {
-  const raw = t?.image_url ?? '';
-  try {
-    if (new URL(raw).protocol === 'https:') return raw;
-  } catch { /* 空欄や壊れたURL */ }
-  return `${origin}${FALLBACK_IMAGE}`;
+// 「24人」「12チーム（24人）」のような参加規模。
+// js/app.js の entrantCountLabel と同じ形にそろえる。
+function entrantsTextOf(row) {
+  const people = row.tournament_entries?.[0]?.count ?? 0;
+
+  if (row.match_type === '2v2') {
+    return `${entrantCountOf(row)}チーム（${people}人）`;
+  }
+  return `${people}人`;
 }
 
-function escapeHtml(s) {
+// ---- <head> の差し替え ----
+
+function escapeAttr(s) {
   return String(s)
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+    .replaceAll('"', '&quot;');
 }
 
-// 共有リンクを開いたときに返すページ。
+// index.html に既にある行は中身だけ差し替え、無い行はここで足す。
 //
-// 中身はタグだけで、見せるための画面はほとんど持っていない。人が開いた場合は
-// <head> のスクリプトが即座に /#tournament/{id} へ飛ばすので、この本文が
-// 目に入るのは一瞬（またはJSを止めている人）だけ。
-//
-// 飛ばすのに location.replace を使うのは、履歴を残さないため。push してしまうと、
-// 大会ページで「戻る」を押した人がこの中継ページに戻り、また前へ飛ばされて
-// 一覧まで帰れなくなる。
-//
-// kind は3通り。「無い」と「読めなかった」を分けるのは、DBに届かなかっただけの
-// ときに「削除されています」と言い切ってしまわないため（開けば普通に出る）。
-//   found       … 大会が引けた
-//   missing     … IDの形が違う、または消えている（404を返す）
-//   unavailable … DBに届かなかった。人は開けるので200にしておく
-function sharePage(origin, id, t, kind) {
-  const found = kind === 'found';
-  const heading = found ? t.name
-    : kind === 'missing' ? '大会が見つかりません'
-      : '大会ページを開いています';
-  const title = `${heading}｜${SITE_NAME}`;
-  const desc = found ? description(t)
-    : kind === 'missing' ? 'この大会は存在しないか、削除されています。'
-      : `${SITE_NAME} の大会ページです。`;
-  const status = kind === 'missing' ? 404 : 200;
-  const image = imageUrl(origin, t);
-  const shareUrl = `${origin}${SHARE_PREFIX}${encodeURIComponent(id)}`;
-  const appUrl = `/#tournament/${encodeURIComponent(id)}`;
-
-  // 画像が大会のバナーなら大きく、共通のアイコンなら小さく出す。
-  // アイコンを large_image で出すと、余白だらけの間の抜けた見た目になる。
-  const card = found && image !== `${origin}${FALLBACK_IMAGE}` ? 'summary_large_image' : 'summary';
-
-  const html = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${escapeHtml(title)}</title>
-<meta name="description" content="${escapeHtml(desc)}">
-<link rel="canonical" href="${escapeHtml(shareUrl)}">
-<link rel="icon" href="/img/icon.webp?v=126" type="image/webp">
-
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="${SITE_NAME}">
-<meta property="og:locale" content="ja_JP">
-<meta property="og:url" content="${escapeHtml(shareUrl)}">
-<meta property="og:title" content="${escapeHtml(title)}">
-<meta property="og:description" content="${escapeHtml(desc)}">
-<meta property="og:image" content="${escapeHtml(image)}">
-<meta property="og:image:alt" content="${escapeHtml(found ? `${t.name} の大会画像` : SITE_NAME)}">
-
-<meta name="twitter:card" content="${card}">
-<meta name="twitter:title" content="${escapeHtml(title)}">
-<meta name="twitter:description" content="${escapeHtml(desc)}">
-<meta name="twitter:image" content="${escapeHtml(image)}">
-
-<!-- Discordの埋め込みの左端に入る線の色。サイトの地の色に合わせる -->
-<meta name="theme-color" content="#050505">
-
-<!-- 人が開いたときだけ動く。プレビューを作る側はJSを動かさないので、
-     ここまでのタグを読んだ時点で帰っていく。 -->
-<script>location.replace(${JSON.stringify(appUrl)});</script>
-<!-- JSを止めている人向け。0秒指定でも、上のスクリプトが動いた場合は
-     そちらが先に済んでいるので二重には飛ばない。 -->
-<noscript><meta http-equiv="refresh" content="0; url=${escapeHtml(appUrl)}"></noscript>
-<style>
-  body {
-    margin: 0; min-height: 100vh;
-    display: grid; place-items: center; gap: 0.75rem;
-    background: #050505; color: #f5f5f5;
-    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
-    text-align: center; padding: 2rem;
-  }
-  a { color: #ff7a3d; }
-</style>
-</head>
-<body>
-<p>${escapeHtml(heading)}</p>
-<p><a href="${escapeHtml(appUrl)}">大会ページを開く</a></p>
-</body>
-</html>`;
-
-  return new Response(html, {
-    status,
-    headers: {
-      'Content-Type': 'text/html; charset=UTF-8',
-      // 大会名や画像は運営が直すことがあるので、長くは持たせない。
-      // （XやDiscord側は一度作ったプレビューをこれよりずっと長く抱えるが、
-      //   そちらは各サービスの都合なのでここからは決められない）
-      'Cache-Control': 'public, max-age=300',
-    },
+// 【二重に出さないための約束】下の tags() で足すのは、index.html に「無い」ものだけ。
+// 足す側と差し替える側の両方に同じ meta を書くと、1ページに2つ並んで、
+// どちらが読まれるかは相手次第になる。index.html の <head> を増やしたときは、
+// こちらの振り分けも見直すこと。
+function rewriteMeta(response, meta) {
+  const setContent = (value) => ({
+    element(el) { el.setAttribute('content', value); },
   });
+
+  return new HTMLRewriter()
+    .on('title', { element(el) { el.setInnerContent(meta.title); } })
+    .on('meta[name="description"]', setContent(meta.description))
+    .on('meta[property="og:title"]', setContent(meta.title))
+    .on('meta[property="og:description"]', setContent(meta.description))
+    .on('meta[property="og:image"]', setContent(absoluteImage(meta)))
+    .on('meta[property="og:type"]', setContent(meta.ogType))
+    .on('meta[name="twitter:card"]', setContent(meta.twitterCard))
+    .on('head', { element(el) { el.append(tags(meta), { html: true }); } })
+    .transform(response);
+}
+
+// og:image は絶対URLで出す。相対パスでも多くの相手は貼られたページを基準に
+// 解決してくれるが、しない相手（一部のチャットアプリ）では画像なしになる。
+// 大会のバナーは Supabase の絶対URLなのでそのまま通る。
+function absoluteImage(meta) {
+  return meta.image.startsWith('/')
+    ? new URL(meta.image, meta.canonical).href
+    : meta.image;
+}
+
+// index.html に無い分。canonical・og:url・twitter:site・構造化データ、
+// それに拾わせたくないページだけ robots。
+function tags(meta) {
+  const rows = [
+    `<link rel="canonical" href="${escapeAttr(meta.canonical)}">`,
+    `<meta property="og:url" content="${escapeAttr(meta.canonical)}">`,
+    `<meta name="twitter:site" content="${escapeAttr(meta.twitterSite)}">`,
+  ];
+
+  if (meta.robots) rows.push(`<meta name="robots" content="${escapeAttr(meta.robots)}">`);
+
+  // JSON-LD は属性ではなく <script> の中身なので、エスケープの作法が違う。
+  // 気をつけるのは "</script>" が本文に現れることだけ（大会名に書かれうる）。
+  // < を < にしておけば、JSONとしては同じ文字列のまま、タグは閉じない。
+  const json = JSON.stringify(meta.jsonLd).replaceAll('<', '\\u003c');
+  rows.push(`<script type="application/ld+json">${json}</script>`);
+
+  return rows.join('\n');
 }

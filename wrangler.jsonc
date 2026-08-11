@@ -2,10 +2,11 @@
   // Cloudflare へのデプロイ設定。
   //
   // 画面を作っているのは静的アセット（index.html・css/・js/）だけで、ビルド工程は
-  // 持たない。Worker（main）は1つだけ仕事を持っていて、大会の共有リンク
-  // /t/{大会ID} に og: タグ付きのHTMLを返す（worker/index.js の説明を参照）。
-  // それ以外のURLはこれまでどおり静的アセットがそのまま返る ── 既定では
-  // アセットのほうが先に照合され、当たらなかったURLだけが Worker に渡るため。
+  // 持たない。Worker（main）が受け持つのは、ページのURL（/tournaments/{ID}/ など）に
+  // index.html を返すことと、その <head> に大会名や og: を埋め込むこと
+  // （worker/index.js の説明を参照）。
+  // css/ js/ img/ のような実在するファイルは、これまでどおりアセットが直接返る ──
+  // 既定ではアセットのほうが先に照合され、当たらなかったURLだけが Worker に渡るため。
   //
   // どのファイルを上げないかは同じ階層の .assetsignore で指定している（node_modules 等）。
   "name": "esports-ranking",
@@ -13,15 +14,22 @@
   "main": "worker/index.js",
   "assets": {
     "directory": ".",
-    // Worker から静的アセットを引くための口。/t/ 以外のURLをここへ丸投げして、
-    // Worker が居なかったときと同じ応答（404 など）を返すために使う。
-    "binding": "ASSETS"
+    // Worker から静的アセットを引くための口。ページのURLに対して index.html を
+    // 取り出したり、当たらなかったURLを丸投げして404を返したりするのに使う。
+    "binding": "ASSETS",
+    // 「/」だけは、アセット（index.html）より先に Worker へ回す。
+    //
+    // 既定では実在するファイルのほうが先に返るため、トップページは Worker を
+    // 素通りし、canonical も og:url も構造化データも入らないまま配られてしまう。
+    // ここに挙げたURLだけが例外で、それ以外（/css/* /js/* /img/* …）は
+    // これまでどおりアセットが直接返る ── Worker を通す本数は増やさない。
+    "run_worker_first": ["/"]
   },
   // Worker から見える設定値。中身は js/supabaseClient.js と同じもので、
   // anonキーは公開前提の値（実際の防御はDB側のRLS）。
   // 【接続先を変えるときは js/supabaseClient.js と両方直すこと】
   // ブラウザ側はモジュールを読み、Worker側はここを読むので、片方だけ直すと
-  // 共有リンクのプレビューだけが古いプロジェクトを見に行く。
+  // 検索結果とSNSのプレビューだけが古いプロジェクトを見に行く。
   "vars": {
     "SUPABASE_URL": "https://zgqoeicdnneivzasneez.supabase.co",
     "SUPABASE_ANON_KEY": "sb_publishable_yTrfsOpDxshekZrQtZ8f9Q_m5TKjqfZ"

@@ -203,10 +203,29 @@ p, li, dd, dt, figcaption, caption, blockquote {
   text-wrap: pretty;
 }
 
-/* ページの題。画面幅に連れて大きくし、余白と一緒に「間」を作る。
+/* ---- 見出しの3段 ----
+
+   このサイトの見出しは、意味の階層と見た目の階層をそろえてある。
+
+     1段目 … そのページの題（h1）。大会名・選手名・記事の題。1ページに1つだけ。
+             ホームだけは例外で、h1 はサイト名（ヒーローの大題）になり、
+             各ブロックの題（「注目の大会」など）が2段目に降りる。
+     2段目 … ページの中の区切り（h2）。「大会情報」「最終順位」など
+     3段目 … その中の小分け（h3）。「配信元」「ルール」など
+
+   ページの題とホームのブロックの題は、見出しの深さが違っても同じ大きさで出す。
+   どちらも「ここから新しい話が始まる」という同じ役目を持っているため。
+   見分けは .page-head という器が付いているかどうかで付ける。
+
+   【h1 をヘッダーのサイト名に使わないこと】ロゴは全ページで同じ文字列なので、
+   h1 にすると全ページの題が「IgniteArena」になり、検索結果でもページを見分け
+   られなくなる。ヘッダーのそれは p.site-title で、見出しではない。 */
+
+/* 1段目。画面幅に連れて大きくし、余白と一緒に「間」を作る。
    小さい見出しをたくさん置くより、大きな題を1つ置いて空きを取るほうが
    ページの切り替わりが分かりやすい。 */
-h2 {
+h1,
+.page-head h2 {
   margin: 0 0 1.1rem;
   font-size: clamp(1.5rem, 4.5vw, 2.1rem);
   font-weight: 800;
@@ -214,30 +233,31 @@ h2 {
   line-height: 1.25;
 }
 
-h3 {
+h2, h3 {
   font-size: 1.15rem;
   letter-spacing: 0.03em;
 }
 
-/* 本文の中の小見出し（「大会情報」「最終順位」など）。ページの題との差を、
-   大きさではなく左の線と余白で作る。クラスの付いた見出し（一覧のカードの題、
-   ガイドの章など）はそれぞれ専用の意匠を持つので対象から外す。 */
-main h3:not([class]) {
+/* 2段目（「大会情報」「最終順位」など）。ページの題との差を、大きさではなく
+   左の線と余白で作る。クラスの付いた見出し（一覧のカードの題、ガイドの章など）は
+   それぞれ専用の意匠を持つので対象から外す。 */
+main h2:not([class]) {
   margin: 2.6rem 0 1rem;
   padding-left: 0.75rem;
   border-left: 3px solid var(--accent);
   line-height: 1.4;
 }
 
-/* ホームの3段の見出しは番号が印になっているので、線は付けない */
-.home-step-body h3:not([class]) {
-  margin: 0 0 0.5rem;
+/* .page-head の中の題（ホームのブロックの題）には線を付けない。
+   上の規則より詳しく書かないと勝てないので :not([class]) を重ねてある。 */
+.page-head h2:not([class]) {
+  margin: 0;
   padding-left: 0;
   border-left: none;
 }
 
-/* さらに下の見出し（「配信元」「ルール」など）は、小さく字間を空けた札にする */
-main h4:not([class]) {
+/* 3段目（「配信元」「ルール」など）は、小さく字間を空けた札にする */
+main h3:not([class]) {
   margin: 2rem 0 0.7rem;
   font-size: 0.78rem;
   font-weight: 700;
@@ -280,7 +300,9 @@ main h4:not([class]) {
   box-shadow: 0 0 10px var(--glow);
 }
 
-.page-head h2 {
+/* 題そのものの大きさと余白は「見出しの3段」の節で決めている。
+   ここで揃えるのは、器（.page-head）の中で下に余白を残さないことだけ。 */
+.page-head :is(h1, h2) {
   margin: 0;
 }
 
@@ -346,7 +368,10 @@ header::after {
   gap: 0.75rem;
 }
 
-header h1 {
+/* ヘッダーのサイト名。見出し（h1）にはしない ── 全ページで同じ文字列なので、
+   h1 にすると「そのページが何のページか」を示す枠を潰してしまう。
+   各ページの h1 は <main> の中にあり、大会名や選手名が入る。 */
+header .site-title {
   margin: 0;
   margin-right: auto;
   font-family: var(--font-display);
@@ -356,7 +381,7 @@ header h1 {
   min-width: 0;
 }
 
-header h1 a {
+header .site-title a {
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
@@ -366,7 +391,7 @@ header h1 a {
 }
 
 /* タイトルの前の小さな斜めの光。ロゴ代わりの目印 */
-header h1 a::before {
+header .site-title a::before {
   content: '';
   display: inline-block;
   width: 0.45em;
@@ -692,7 +717,7 @@ section {
   flex-wrap: wrap;
 }
 
-.home-section-head h2 { margin: 0; }
+.home-section-head :is(h1, h2) { margin: 0; }
 
 /* ホームのお知らせ見出し右の「すべて見る」。主役はカードなので控えめに */
 .see-all-link {
@@ -765,9 +790,14 @@ section {
   color: var(--text-faint);
 }
 
-.home-step-body h3 {
+/* ホームの3段の見出し。番号（1・2・3）が印になっているので左の線は付けない。
+   クラスを持たせてあるのは、線を後から打ち消すためではなく、
+   「本文の中の小見出し（main h3:not([class])）」の札の意匠を最初から
+   受け取らないようにするため。 */
+.home-step-title {
   margin: 0 0 0.5rem;
   font-size: clamp(1.05rem, 3vw, 1.25rem);
+  letter-spacing: 0.03em;
 }
 
 .home-step-body p {
@@ -1291,7 +1321,7 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
 
 .setup-column { flex: 1; min-width: 260px; }
 
-.setup-column h3 {
+.setup-column h2 {
   margin: 0 0 0.6rem;
   font-size: 0.92rem;
   color: var(--text-dim);
@@ -1362,6 +1392,59 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   min-height: 1.9rem;
   padding: 0.2rem 0.6rem;
   font-size: 0.8rem;
+}
+
+/* ---------------------------------------------------------------------------
+   読み込み中の仮置き（スケルトン）
+
+   データが届く前に、これから入るものと同じ形・同じ高さの箱を出しておく。
+   狙いは2つ。
+     * 「まだ大会はありません」を読み込み中に出さない（js/util.js の説明を参照）
+     * 中身が入ったときに下のものが押し下げられない（高さを先に取る）
+   中身の無い箱なので読み上げからは外してある（aria-hidden）。
+   --------------------------------------------------------------------------- */
+
+.card.is-skeleton {
+  pointer-events: none;
+  border-color: var(--border-soft);
+}
+
+/* 光が横に流れる。「止まっている」のではなく「待っている」ことを示すための動き。 */
+.skeleton-block,
+.skeleton-line {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-3);
+  border-radius: var(--r-sm);
+}
+
+.skeleton-block::after,
+.skeleton-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  transform: translateX(-100%);
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  to { transform: translateX(100%); }
+}
+
+.skeleton-line {
+  display: block;
+  height: 0.8rem;
+  margin: 0 0 0.6rem;
+}
+
+.skeleton-line-title { width: 70%; height: 1rem; }
+.skeleton-line-meta { width: 45%; margin-bottom: 0; }
+
+/* 動きを止めている人には流さない。待っていることは形だけで伝わる。 */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block::after,
+  .skeleton-line::after { animation: none; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1920,7 +2003,7 @@ td code { font-size: 0.85em; }
   line-height: 1.85;
 }
 
-.guide-step h4 {
+.guide-step :is(h2, h3) {
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -1946,7 +2029,7 @@ td code { font-size: 0.85em; }
   margin-bottom: 1.75rem;
 }
 
-.guide-two-col h4 { margin: 0 0 0.5rem; font-size: 1rem; }
+.guide-two-col h3 { margin: 0 0 0.5rem; font-size: 1rem; }
 
 /* ---- 章0：ページ一覧 ---- */
 
@@ -1967,7 +2050,7 @@ td code { font-size: 0.85em; }
   background: var(--surface-2);
 }
 
-.guide-page-card h4 {
+.guide-page-card h3 {
   margin: 0 0 0.35rem;
   font-size: 0.95rem;
 }
@@ -2226,7 +2309,7 @@ td code { font-size: 0.85em; }
   border-top: none;
 }
 
-.legal-articles h3 {
+.legal-articles h2 {
   margin: 0 0 0.6rem;
   font-size: 1rem;
   color: var(--accent-bright);
@@ -2504,7 +2587,73 @@ a.card:hover {
   border-top: 1px solid var(--border-soft);
 }
 
-/* 大会詳細のエントリー・運営操作。ページ最後に置くので、上に区切りを入れて
+/* ---- エントリーの導線（大会詳細の上部）----
+
+   大会名のすぐ下、対戦表や大会情報より先に置く。募集中の大会を開いた人が最初に
+   知りたいのは「自分は出られるのか、いつまでか」で、それが画面の外にあると
+   一度スクロールしないと分からない。
+
+   囲いを付けて本文から浮かせているのは、この一角だけが「読む場所」ではなく
+   「決める場所」だから。左の縦線はアクセント色で、ページの中でここだけが持つ。 */
+.entry-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+/* 押せないとき（定員に達した）は、枠まで含めて主張を下げる。
+   ボタンだけ灰色にして枠が光っていると、押せそうに見えたまま残る。 */
+.entry-cta.is-blocked {
+  border-left-color: var(--border-strong);
+}
+
+/* 済んでいる人には、急かす色をやめて「もう終わっている」ことを示す。 */
+.entry-cta.is-entered { border-left-color: var(--win); }
+
+/* 押せない理由・残り枠・エントリー済みの知らせは、ボタンと同じ行ではなく
+   別の段に置く（幅いっぱいを取る）。ボタンの隣に長い文を並べると、
+   細い画面でボタンが押し出されて見つけにくくなる。 */
+.entry-cta-reason,
+.entry-cta-slots,
+.entry-cta-entered {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+
+/* 理由は必ず文字で出す（色と非活性だけで意味を伝えない）。
+   警告色にするのは、これが「できない」の説明だから。 */
+.entry-cta-reason { color: var(--warn); }
+
+.entry-cta-slots { color: var(--text-dim); }
+
+/* 済んだことの知らせ。勝ちと同じ色を使うのは、ここが「できた」の合図だから。
+   ボタン（「エントリーを取り消す」）より先に読ませたいので、DOM でも先に置いてある。 */
+.entry-cta-entered {
+  color: var(--win);
+  font-weight: 600;
+}
+
+/* 大会名の隣の状態バッジと、日付・人数の行。バッジが先に目に入るよう左に置く。 */
+.tournament-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+}
+
+.tournament-status-line .meta-line { margin: 0; }
+
+/* 大会詳細の運営操作。ページ最後に置くので、上に区切りを入れて
    本文（大会情報）と切り離す。 */
 .tournament-actions-row {
   display: flex;
@@ -2793,8 +2942,8 @@ a.card:hover {
   gap: 0.7rem;
 }
 
-/* フォームを開くと縦に伸びるので、運営のボタンが上下中央に浮かないよう上揃えにする */
-.tournament-actions-row:has(.team-entry) { align-items: flex-start; }
+/* フォームを開くと縦に伸びるので、隣の締切表示が上下中央に浮かないよう上揃えにする */
+.entry-cta:has(.team-entry) { align-items: flex-start; }
 
 .team-entry-status {
   margin: 0;
@@ -3015,9 +3164,17 @@ a.card:hover {
 /* 詳細ページ（大会・お知らせ）の画像ヘッダー。セクションの左右いっぱいまで
    広げて「見出し」らしく見せる。画像自体は切り抜かず、枠の中に全体を収める
    （下の画像共通ルール）。 */
+/* 【高さを先に決めておくこと】画像は運営がアップロードしたもので、届くまで
+   縦横比が分からない。何も決めずに置くと、読み込めた瞬間にその高さぶんだけ
+   下の中身（大会名・エントリーの導線）が押し下げられる ── 押そうとした指の下で
+   ボタンが動く。中の画像の上限（下の .detail-hero img）と同じ高さを枠に持たせ、
+   絵は切り抜かずその中に収める（小さい絵は上下に余白が出るが、地の色と同じなので
+   枠には見えない）。 */
 .detail-hero {
   display: flex;
+  align-items: center;
   justify-content: center;
+  min-height: 24rem;   /* 画像の上限 22rem ＋ 上下の padding */
   margin: 0 -1.5rem 1.5rem;
   padding: 1rem 1.5rem;
   background: var(--surface-2);
@@ -3040,7 +3197,7 @@ a.card:hover {
   word-break: break-word;
 }
 
-.bracket-title-block h2 { margin-bottom: 0.25rem; }
+.bracket-title-block h1 { margin-bottom: 0.25rem; }
 
 /* 大会詳細の共有ボタン。中身は矢印のアイコンだけで、押した直後はチェックに
    変わる（js/app.js の flashShareBtn）。どちらも同じ大きさの絵なので、
@@ -4063,9 +4220,29 @@ body:has(#view-bracket:not([hidden]) .own-match-bar) button.scroll-top-btn {
     padding: 0.5rem 1.1rem;
   }
 
-  /* 対戦表そのものは狭い画面でも詰めない（列の幅も枠の高さもそのまま）。
-     形を画面ごとに変えると、スマートフォンで覚えた表と大きな画面の表が
-     食い違ってしまう。狭さには倍率で応じる（js/bracketZoom.js）。 */
+  /* ---- 狭い画面の対戦表 ----
+
+     列の幅・列の間隔・枠の高さを詰めて、一度に目に入る範囲を広げる
+     （枠の高さは js/bracketView.js の LEAF_ROW_HEIGHT_NARROW_PX。この境目の値を
+     動かすなら、あちらの NARROW_QUERY も一緒に動かすこと）。
+
+     拡大縮小できるようになった今も詰めたままにする。倍率は「読める大きさ」と
+     「全体を掴む大きさ」を行き来するためのもので、そもそもの寸法が緩いと、
+     全体を見る倍率がそのぶん小さくなって何も読めなくなる。
+
+     対戦カードそのもの（文字の大きさ・ゲームカウント・地模様）には触らない。
+     読むためのものが小さくなっては、詰めた意味が無い。 */
+  .bracket {
+    gap: 1.5rem;
+    padding: 0.5rem;
+  }
+
+  .round-column { width: 244px; }
+
+  .round-controls {
+    min-height: 3.6rem;
+    margin-bottom: 0.4rem;
+  }
 
   /* 表の箱は少し低くする。表の中で指を動かしている間はページが動かないので、
      箱の外（上下）に、ページを送るために触れる場所を残しておく。 */
@@ -4449,7 +4626,7 @@ dialog.dialog-chat {
    線を重ねると「線の下に線」になって、かえって塊が読み取りにくくなる。 */
 .tournament-info { margin-top: 0.5rem; }
 
-.tournament-info h3 {
+.tournament-info h2 {
   margin: 0 0 1rem;
   font-size: 0.78rem;
   font-weight: 700;
@@ -4458,7 +4635,7 @@ dialog.dialog-chat {
   color: var(--text-faint);
 }
 
-.tournament-info h4 {
+.tournament-info h3 {
   margin: 1.5rem 0 0.5rem;
   font-size: 0.78rem;
   font-weight: 700;
@@ -5802,23 +5979,37 @@ dialog.char-picker { max-width: 56rem; }
   .card-body { padding: 0.9rem 1rem 1rem; }
   .card-thumb.is-tall { height: 200px; }
 
-  /* セクションの余白が狭くなるぶん、画像ヘッダーのはみ出し量も合わせる */
+  /* セクションの余白が狭くなるぶん、画像ヘッダーのはみ出し量も合わせる。
+     枠の高さも画像の上限（下）に合わせて下げる（14rem ＋ 上下の padding）。 */
   .detail-hero {
+    min-height: 15.5rem;
     margin: 0 -1rem 1.25rem;
     padding: 0.75rem 1rem;
   }
 
+  /* 狭い画面では画像の上限を下げる。22rem のままだと、その下に置いた
+     エントリーの導線（.entry-cta）が画面の外へ押し出され、大会を開いた人が
+     一度スクロールしないと「出られるのか・いつまでか」に辿り着けない。
+     絵は掴みであって主役ではないので、こちらを譲る。 */
+  .detail-hero img { max-height: 14rem; }
+
   /* 主導線（エントリー）を横いっぱいにして押しやすくする。
      高さは縮めない（詳細ページで一番押させたいボタンのため）。 */
+  .entry-cta > button,
   .tournament-actions-row > button {
     flex: 1 1 100%;
     min-height: 2.75rem;
   }
 
+  .entry-cta > .btn-entry,
   .tournament-actions-row > .btn-entry { min-height: 3rem; }
 
+  .entry-cta > .team-entry,
   .tournament-actions-row > .team-entry { width: 100%; }
   .team-entry > button { width: 100%; }
+
+  /* 締切は狭い画面ではボタンの下に回す（横に並べると日時が折り返して読めない） */
+  .entry-cta > .entry-deadline { flex-basis: 100%; }
 
   .tournament-actions-row .row-actions {
     margin-left: 0;
@@ -6518,7 +6709,7 @@ body.nav-open header::after { opacity: 0; }
    js/stage.js が中身を .stage-mask-body で包み、data-mask を付ける
    （'on' = まだ画面に入っていない / 'in' = 入った）。
    印を class ではなく data 属性にしているのは、見出しに class を生やすと
-   main h3:not([class]) 系の字組みが外れてしまうため。
+   main h2:not([class]) 系の字組みが外れてしまうため。
 
    掛けてはいけない見出しと、その理由:
      .hero-tagline  … ::after に下線バーを持つ。overflow:hidden で切り落とされる

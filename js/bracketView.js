@@ -8,15 +8,30 @@ import { auth, canManageTournament } from './auth.js';
 import { canUseMatchChat, openMatchChat } from './matchChat.js';
 import { makeIconButton } from './icons.js';
 import { attachBracketZoom } from './bracketZoom.js';
+import { pathFor } from './router.js';
 import * as db from './db.js';
 
 // 1回戦（葉ノード）1枠あたりの高さ。深いラウンドほど 2^round 倍のスロット高さになり、
 // 実際のトーナメント表のように中央揃えで配置される。
 //
-// 画面の広さで変えることはしない。狭い画面には拡大縮小（js/bracketZoom.js）で
-// 応じるので、表の形はどの画面でも同じ ── スマートフォンで見た形と、大きな画面で
-// 見た形が食い違わない。
+// 狭い画面では詰める。32枠の表は 32×100px＝3200px あり、拡大縮小できるようになった
+// 今でも、引いて全体を見るときに縦へ間延びして読みにくい。対戦カードそのものは
+// 70pxほどなので、葉を60pxまで詰めてもカードは重ならない
+// （1回戦の枠は葉2つ分＝120pxある）。
 const LEAF_ROW_HEIGHT_PX = 100;
+const LEAF_ROW_HEIGHT_NARROW_PX = 60;
+
+// 「狭い画面」の境目。css/style.css の対戦表まわりのメディアクエリと同じ値にすること
+// （片方だけ動かすと、列の幅と枠の高さが食い違う）。
+const NARROW_QUERY = '(max-width: 640px)';
+
+function isNarrowScreen() {
+  return window.matchMedia(NARROW_QUERY).matches;
+}
+
+function leafRowHeight() {
+  return isNarrowScreen() ? LEAF_ROW_HEIGHT_NARROW_PX : LEAF_ROW_HEIGHT_PX;
+}
 
 // 対戦表の見せ方。
 //
@@ -58,6 +73,12 @@ function redraw() {
   );
 }
 
+// 詰める・詰めないの境目をまたいだときだけ描き直す（列の幅はcss、枠の高さはjsが
+// 持っているので、片方だけ変わると表が食い違う）。resize では画面を回さなくても
+// アドレスバーの出入りで何度も飛んでくるが、こちらは境目を越えたときにしか鳴らない。
+// 倍率と位置は描き直しをまたいで引き継ぐので、見ている場所は変わらない。
+window.matchMedia(NARROW_QUERY).addEventListener('change', redraw);
+
 function slotPlacement(roundIndex, matchIndex) {
   const rowSpan = 2 ** (roundIndex + 1);
   const rowStart = matchIndex * rowSpan + 1;
@@ -91,7 +112,7 @@ function playerNameLink(playerId, name, canLink = !swapCtx.active) {
 
   const link = document.createElement('a');
   link.className = 'player-name-link';
-  link.href = `#player/${encodeURIComponent(playerId)}`;
+  link.href = pathFor('player', playerId);
   link.textContent = name;
   link.title = `${name} のプロフィール`;
   return link;
@@ -721,7 +742,7 @@ function renderRoundList(ctx, containerEl) {
   const head = document.createElement('div');
   head.className = 'bracket-round-head';
 
-  const title = document.createElement('h3');
+  const title = document.createElement('h2');
   title.className = 'bracket-round-name';
   title.textContent = roundLabel(bracket, activeIndex);
 
@@ -795,8 +816,10 @@ function viewModeToggle(mode) {
     wrap.appendChild(btn);
   };
 
-  add('rounds', '回戦ごと', '選んだ回戦の対戦カードだけを縦に並べます');
+  // 既定（トーナメント表）を左に置く。押す前にどちらが今の形かが分かるように、
+  // 並びと選ばれている印を揃えておく。
   add('tree', 'トーナメント表', '勝ち上がりの枝ごと見ます。つまむと拡大・縮小できます');
+  add('rounds', '回戦ごと', '選んだ回戦の対戦カードだけを縦に並べます');
   return wrap;
 }
 
@@ -931,7 +954,7 @@ function renderTree(ctx, containerEl, savedView) {
   wrapper.className = 'bracket';
 
   const matchElements = new Map();
-  const bodyHeight = bracket.bracketSize * LEAF_ROW_HEIGHT_PX;
+  const bodyHeight = bracket.bracketSize * leafRowHeight();
 
   bracket.rounds.forEach((round, roundIndex) => {
     const col = document.createElement('div');

@@ -5,37 +5,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- モバイルのブラウザUI（アドレスバー）も暗い面に揃える -->
 <meta name="theme-color" content="#050505">
-<title>IgniteArena — どこでも熱く、遊べ。</title>
-<!-- XやDiscordにこのサイトのURLを貼ったときに出るプレビュー。
-     ここに書けるのは「トップページを貼ったとき」の分だけ。個々の大会は
-     ハッシュ（#tournament/xxx）で切り替えているので、貼られたURLからは
-     どの大会かがサーバーに届かない ── 大会ごとのプレビューは別のURL
-     /t/{大会ID} を用意して Worker が作っている（worker/index.js）。
-     大会ページの「共有」ボタンが配るのはそちらのURL。
+<!-- 【ここに書いてあるのはトップページの分だけ】
+     title・description・og:・canonical・構造化データは、ページが決まるたびに
+     js/seo.js が書き換える（大会ページなら「大会名 | IgniteArena」になる）。
+     この <head> にあるのは、JSが動く前の一瞬と、トップページのための元の値。
+     文言を直すときは js/seo.js のほうも一緒に見ること。 -->
+<title>IgniteArena｜どこでも熱く、遊べ。</title>
+<!-- 【このファイルの中のURLは、すべて / で始めること】
+     このHTMLは1本しかなく、/tournaments/{大会ID}/ のような深いURLでも同じものが
+     返る（worker/index.js）。相対パスで書くと、そこから見た相対位置で解決されて
+     /tournaments/{大会ID}/css/style.css を取りに行き、CSSもJSも画像も全部404になる。
+     ルートからの絶対パスなら、どの階層のURLで開かれても同じ場所を指す。 -->
 
-     og:image を相対パスで書いているのは、独自ドメインが決まっていないため。
-     X・Discord は貼られたページのURLを基準に解決するので今のままで出るが、
-     置き場所が固まったら絶対URL（https://…/img/icon.png）にしておくと確実。 -->
-<meta name="description" content="コミュニティの大会運営と個人ランキングをまとめて扱う場所。大会を開く・エントリーする・対戦表を追う。">
+<!-- XやDiscordにこのサイトのURLを貼ったときに出るプレビュー。
+     ここに書いてあるのはトップページの分で、大会ページやお知らせのURLを貼ったときは
+     worker/index.js が同じ行を大会名・大会画像に差し替えて返す。
+     canonical・og:url・構造化データもそちら側で足される（この <head> には無い）。
+
+     og:image をルートからの絶対パスで書いているのは、独自ドメインが決まって
+     いないため。X・Discord は貼られたページのURLを基準に解決するのでこれで出る。
+     置き場所が固まったら絶対URL（https://…/img/icon.png）にしておくと確実。
+
+     【1200x630 の絵がまだ無い】いまの icon.png は正方形なので、大会のバナーが
+     登録されていないページでは twitter:card を summary（小さい四角）に落としている
+     （js/seo.js）。横長の共通画像を用意したら、そこの判定ごと見直すこと。 -->
+<meta name="description" content="IgniteArenaは、大会の運営とランキングの集計をひとつにまとめた場所。大会を開く・エントリーする・対戦表を追う。ログインなしで全部のぞけます。">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="IgniteArena">
 <meta property="og:locale" content="ja_JP">
-<meta property="og:title" content="IgniteArena — どこでも熱く、遊べ。">
-<meta property="og:description" content="コミュニティの大会運営と個人ランキングをまとめて扱う場所。大会を開く・エントリーする・対戦表を追う。">
-<meta property="og:image" content="img/icon.png?v=143">
-<meta name="twitter:card" content="summary">
+<meta property="og:title" content="IgniteArena｜どこでも熱く、遊べ。">
+<meta property="og:description" content="IgniteArenaは、大会の運営とランキングの集計をひとつにまとめた場所。大会を開く・エントリーする・対戦表を追う。ログインなしで全部のぞけます。">
+<meta property="og:image" content="/img/icon.png?v=147">
+<meta name="twitter:card" content="summary_large_image">
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。
      タブはWebP。iOSのホーム画面（apple-touch-icon）だけはWebPを読まないのでPNGを残す。 -->
-<link rel="icon" href="img/icon.webp?v=143" type="image/webp">
-<link rel="apple-touch-icon" href="img/icon.png?v=143">
+<link rel="icon" href="/img/icon.webp?v=147" type="image/webp">
+<link rel="apple-touch-icon" href="/img/icon.png?v=147">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
-<link rel="preload" href="fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="css/style.css?v=143">
-<!-- 順位発表の画面（#reveal）だけで使う。style.css は既に長いので分けてある。 -->
-<link rel="stylesheet" href="css/reveal.css?v=143">
+<link rel="stylesheet" href="/css/style.css?v=147">
+<!-- 【css/reveal.css はここで読まない】順位発表の画面（/reveal/・持ち主専用）だけで
+     使う45KBで、しかもほとんどの人は一度も開かない。ここに <link> を置くと、
+     ブラウザはそれを読み終えるまで最初の描画を始めないので、全員の表示が
+     その分だけ遅くなる。読み込みは、その画面を開いたときに1回だけ行う
+     （<section id="view-reveal" data-css="..."> と js/app.js の loadViewCss）。 -->
 
 <!-- スクロールに合わせた登場アニメの「入れ物」を開ける印。
      登場アニメは「最初は透明 → 見えたら不透明」で作るが、その透明を素で
@@ -59,10 +75,13 @@
     //
     // 出す条件（3つすべて）:
     //   1. 動きを止めていない人（上で弾いている）
-    //   2. ホームを開いたとき（#bracket/xxx を直接開いた人には出さない）
+    //   2. ホームを開いたとき（/tournaments/xxx/ を直接開いた人には出さない）
     //   3. そのタブでまだ見ていない
-    var page = location.hash.replace(/^#/, '').split('/')[0];
-    if (page !== '' && page !== 'home') return;
+    //
+    // 旧形式のURL（#tournament/xxx）で着地した人もホーム扱いにしない。
+    // パスとしては「/」だが、この直後に js/router.js が大会ページへ書き換えるので、
+    // ここで幕を出すと、開いた瞬間だけ関係のない演出が挟まることになる。
+    if (location.pathname !== '/' || location.hash) return;
 
     // 見た印は「終わったとき」ではなく「始める前」に書く。
     // 終わりに書くと、演出の途中で再読み込みした人にまた最初から出てしまう。
@@ -127,7 +146,10 @@
             aria-controls="main-nav" aria-expanded="false" aria-label="メニューを開く">
       <span class="nav-toggle-bars"></span>
     </button>
-    <h1><a href="#home">IgniteArena</a></h1>
+    <!-- サイト名は見出しにしない。全ページで同じ文字列なので、h1 にすると
+         どのページを開いても題が「IgniteArena」になり、検索結果でもページを
+         見分けられなくなる。各ページの h1 は <main> の中（大会名・選手名など）。 -->
+    <p class="site-title"><a href="/">IgniteArena</a></p>
     <!-- メニューは「サイトを知る」「競技を見る」「自分のこと」の3グループに
          区切り線で分ける。大会の状態（募集中・進行中・終了）はメニューでは分けず、
          「大会」ページの中のタブに任せる。 -->
@@ -141,26 +163,26 @@
           <span class="nav-close-x" aria-hidden="true"></span>
         </button>
       </div>
-      <a href="#home" data-page="home"><span class="nav-ja">ホーム</span><span class="nav-en">Home</span></a>
-      <a href="#guide" data-page="guide"><span class="nav-ja">はじめに</span><span class="nav-en">Getting Started</span></a>
-      <a href="#news" data-page="newslist"><span class="nav-ja">お知らせ</span><span class="nav-en">News</span></a>
+      <a href="/" data-page="home"><span class="nav-ja">ホーム</span><span class="nav-en">Home</span></a>
+      <a href="/guide/" data-page="guide"><span class="nav-ja">はじめに</span><span class="nav-en">Getting Started</span></a>
+      <a href="/news/" data-page="newslist"><span class="nav-ja">お知らせ</span><span class="nav-en">News</span></a>
       <hr class="nav-sep">
-      <a href="#tournaments" data-page="tournaments"><span class="nav-ja">大会</span><span class="nav-en">Tournaments</span></a>
-      <a href="#players" data-page="players"><span class="nav-ja">選手</span><span class="nav-en">Players</span></a>
+      <a href="/tournaments/" data-page="tournaments"><span class="nav-ja">大会</span><span class="nav-en">Tournaments</span></a>
+      <a href="/players/" data-page="players"><span class="nav-ja">選手</span><span class="nav-en">Players</span></a>
       <!-- 対戦環境の案内。「はじめに」（サイトの使い方）とは役割が違うので、
            操作の話ではなく競技の話として2つ目のグループに置く -->
-      <a href="#setup" data-page="setup"><span class="nav-ja">対戦環境を整える</span><span class="nav-en">Setup</span></a>
-      <a href="#create" data-page="create" id="nav-tournament-link"><span class="nav-ja">大会作成</span><span class="nav-en">Create</span></a>
+      <a href="/setup/" data-page="setup"><span class="nav-ja">対戦環境を整える</span><span class="nav-en">Setup</span></a>
+      <a href="/tournaments/new/" data-page="create" id="nav-tournament-link"><span class="nav-ja">大会作成</span><span class="nav-en">Create</span></a>
       <hr class="nav-sep">
-      <a href="#entries" data-page="entries"><span class="nav-ja">エントリー状況</span><span class="nav-en">My Entries</span></a>
-      <a href="#profile" data-page="profile"><span class="nav-ja">マイページ</span><span class="nav-en">Profile</span></a>
+      <a href="/entries/" data-page="entries"><span class="nav-ja">エントリー状況</span><span class="nav-en">My Entries</span></a>
+      <a href="/profile/" data-page="profile"><span class="nav-ja">マイページ</span><span class="nav-en">Profile</span></a>
       <!-- お問い合わせだけは画面遷移ではなく外部（X）へ飛ぶので、区切り線で分ける -->
       <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer"
          class="nav-contact">お問い合わせ（X）</a>
     </nav>
     <!-- アカウント操作は右端にまとめる。ログイン中は名前ではなくアイコンを出し、
          押すとマイページへ行く。1行に収めて、上段が2段に折り返さないようにしている。 -->
-    <a href="#profile" id="account-avatar" class="account-avatar" title="マイページ" hidden></a>
+    <a href="/profile/" id="account-avatar" class="account-avatar" title="マイページ" hidden></a>
     <button type="button" id="login-btn">ログイン</button>
   </div>
   <!-- 保存中などのメッセージ用。何も無いときは JS が丸ごと隠すので場所を取らない -->
@@ -318,7 +340,7 @@
              画像が無いときは js/app.js がこのブロックごと隠す。 -->
         <div class="hero-game reveal" id="hero-game">
           <!-- alt を空にしてあるのは、この絵が「飾り」だから。
-               すぐ下の <h2> が同じ「IgniteArena」を名乗っているので、ここに
+               すぐ下の <h1> が同じ「IgniteArena」を名乗っているので、ここに
                代替テキストを置くと読み上げが同じ名前を2回言うことになる。
                表示の面でも、alt に文字を入れると画像を読み終えるまでのあいだ
                その文字が描画され、画像に差し替わった瞬間に消える
@@ -332,19 +354,21 @@
                画像を差し替えるときは、この2つの数字も実寸に合わせること
                （img/README.md 参照）。 -->
           <img class="hero-game-logo" id="hero-game-logo"
-               src="img/game-logo.webp?v=143" alt="" width="700" height="623">
+               src="/img/game-logo.webp?v=147" alt="" width="700" height="623">
         </div>
 
         <p class="hero-eyebrow reveal">Tournament &amp; Ranking</p>
         <!-- data-split: js/stage.js が1文字ずつの span に割り、順番に出す。
              読み上げは aria-label で元の1語に戻すので、字は分けても語は割れない。 -->
-        <h2 class="hero-title reveal reveal-chars" data-split>IgniteArena</h2>
+        <!-- ホームの h1。ここだけはページの題がサイト名になる（他のページの
+             h1 は大会名・選手名など、そのページ固有の名前が入る）。 -->
+        <h1 class="hero-title reveal reveal-chars" data-split>IgniteArena</h1>
         <p class="hero-tagline reveal">どこでも熱く、遊べ。</p>
 
         <div class="hero-actions reveal">
-          <a class="as-link" href="#tournaments">募集中の大会を見る</a>
-          <a class="as-link btn-secondary" href="#guide">初めての方へ（使い方）</a>
-          <a class="as-link btn-secondary" href="#players">選手を探す</a>
+          <a class="as-link" href="/tournaments/">募集中の大会を見る</a>
+          <a class="as-link btn-secondary" href="/guide/">初めての方へ（使い方）</a>
+          <a class="as-link btn-secondary" href="/players/">選手を探す</a>
         </div>
       </div>
 
@@ -365,7 +389,7 @@
             <p class="page-eyebrow">Featured</p>
             <h2>注目の大会</h2>
           </div>
-          <a class="see-all-link" href="#tournaments">すべて見る →</a>
+          <a class="see-all-link" href="/tournaments/">すべて見る →</a>
         </div>
       </div>
       <div id="home-featured-slot"></div>
@@ -404,7 +428,7 @@
           <span class="home-step-num">01</span>
           <div class="home-step-body">
             <p class="home-step-label">Watch</p>
-            <h3>ログインなしで、全部のぞける</h3>
+            <h3 class="home-step-title">ログインなしで、全部のぞける</h3>
             <p>対戦表も、選手の戦績も、ランキングも、登録しないまま見られます。どんな相手が出ているのか、自分でも戦えそうかを、先に確かめてから決められます。</p>
           </div>
         </li>
@@ -412,7 +436,7 @@
           <span class="home-step-num">02</span>
           <div class="home-step-body">
             <p class="home-step-label">Enter</p>
-            <h3>出たい大会に、その場で名乗る</h3>
+            <h3 class="home-step-title">出たい大会に、その場で名乗る</h3>
             <p>選手登録をすませておけば、募集中の大会にボタン1つで参加表明。予定が変わっても募集のあいだは取り消せるので、まず押しておいて構いません。</p>
           </div>
         </li>
@@ -420,13 +444,13 @@
           <span class="home-step-num">03</span>
           <div class="home-step-body">
             <p class="home-step-label">Record</p>
-            <h3>勝った分だけ、順位が動く</h3>
+            <h3 class="home-step-title">勝った分だけ、順位が動く</h3>
             <p>試合の結果は自動であなたの戦歴に残り、ランキングに反映されます。出るほどに自分の立ち位置がはっきりして、次に狙う相手が見えてきます。</p>
           </div>
         </li>
       </ol>
 
-      <p class="note reveal">くわしい使い方は<a href="#guide">「はじめに」</a>をどうぞ。</p>
+      <p class="note reveal">くわしい使い方は<a href="/guide/">「はじめに」</a>をどうぞ。</p>
     </div>
 
     <!-- 積み上がってきたものを数字で見せる。写真素材が1枚も無くても成立する、
@@ -447,7 +471,7 @@
             <h2>お知らせ</h2>
           </div>
           <!-- ホームには最新の数件だけを出す。全件はお知らせ一覧ページ（#news）の担当 -->
-          <a class="see-all-link" href="#news">すべて見る →</a>
+          <a class="see-all-link" href="/news/">すべて見る →</a>
         </div>
       </div>
 
@@ -462,7 +486,7 @@
       <div class="home-section-head">
         <div>
           <p class="page-eyebrow">News</p>
-          <h2>お知らせ</h2>
+          <h1>お知らせ</h1>
         </div>
         <button type="button" id="announcement-new-btn" class="btn-secondary" hidden>新しいお知らせ</button>
       </div>
@@ -473,21 +497,21 @@
   <!-- お知らせの詳細。一覧のカードは画像・題名・日付だけの入口にしているので、
        本文はここで読ませる。上から 画像 → 題名 → 日付 → 本文 → 運営操作。 -->
   <section id="view-news" class="view stage" hidden>
-    <a class="back-link" id="news-back-link" href="#news">← お知らせ一覧へ</a>
+    <a class="back-link" id="news-back-link" href="/news/">← お知らせ一覧へ</a>
     <div id="news-hero" class="detail-hero" hidden></div>
-    <h2 id="news-title"></h2>
+    <h1 id="news-title"></h1>
     <p id="news-date" class="meta-line"></p>
     <p id="news-body" class="news-body"></p>
     <div id="news-actions"></div>
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view stage" hidden data-src="pages/guide.html?v=143"></section>
+  <section id="view-guide" class="view stage" hidden data-src="/pages/guide.html?v=147"></section>
 
   <!-- 本番までの環境づくり（回線・コントローラ）。中身は pages/setup.html。
        エントリー済みの大会詳細から誘導する（js/entries.js の setupPrompt）。
        楽天アフィリエイトのリンクを含むので、広告である旨の明示がページ冒頭にある。 -->
-  <section id="view-setup" class="view stage" hidden data-src="pages/setup.html?v=143"></section>
+  <section id="view-setup" class="view stage" hidden data-src="/pages/setup.html?v=147"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -495,12 +519,14 @@
   <section id="view-tournaments" class="view" hidden>
     <div class="page-head">
       <p class="page-eyebrow">Tournaments</p>
-      <h2>大会</h2>
+      <h1>大会</h1>
     </div>
+    <!-- タブは絞り込みの条件なので、押しても履歴を積まない（data-nav-replace）。
+         積むと、3つ見比べてから戻ろうとした人が、戻るボタンを何度も押す羽目になる。 -->
     <div class="page-tabs">
-      <a id="tournaments-tab-recruiting" class="page-tab" href="#tournaments/recruiting">募集中</a>
-      <a id="tournaments-tab-running" class="page-tab" href="#tournaments/running">進行中</a>
-      <a id="tournaments-tab-finished" class="page-tab" href="#tournaments/finished">終了</a>
+      <a id="tournaments-tab-recruiting" class="page-tab" data-nav-replace href="/tournaments/?tab=recruiting">募集中</a>
+      <a id="tournaments-tab-running" class="page-tab" data-nav-replace href="/tournaments/?tab=running">進行中</a>
+      <a id="tournaments-tab-finished" class="page-tab" data-nav-replace href="/tournaments/?tab=finished">終了</a>
     </div>
     <p class="note" id="tournaments-note"></p>
     <div id="tournaments-list"></div>
@@ -511,7 +537,7 @@
   <section id="view-entries" class="view" hidden>
     <div class="page-head">
       <p class="page-eyebrow">My Entries</p>
-      <h2>エントリー状況</h2>
+      <h1>エントリー状況</h1>
       <p class="note" id="entries-note"></p>
     </div>
     <div id="entries-login-panel" hidden>
@@ -523,7 +549,7 @@
   <section id="view-profile" class="view" hidden>
     <div class="page-head">
       <p class="page-eyebrow">Profile</p>
-      <h2 id="profile-title">マイページ</h2>
+      <h1 id="profile-title">マイページ</h1>
       <p class="note" id="profile-note"></p>
     </div>
 
@@ -550,7 +576,7 @@
   <section id="view-tournament" class="view" hidden>
     <div class="page-head">
       <p class="page-eyebrow">Create</p>
-      <h2>大会作成</h2>
+      <h1>大会作成</h1>
     </div>
 
     <form id="tournament-form" class="inline-form panel">
@@ -671,12 +697,12 @@
       <div id="manual-participants" hidden>
         <div class="setup-columns">
           <div class="setup-column">
-            <h3>参加者を選択</h3>
+            <h2>参加者を選択</h2>
             <input type="text" id="participant-search-input" placeholder="選手を検索（ID・プレイヤー名）">
             <div id="participant-checkboxes" class="scroll-box"></div>
           </div>
           <div class="setup-column">
-            <h3>シード順（上が1位シード）<span id="selected-count" class="selected-count"></span></h3>
+            <h2>シード順（上が1位シード）<span id="selected-count" class="selected-count"></span></h2>
             <div class="seed-actions">
               <button type="button" id="shuffle-btn" class="btn-secondary">ランダムに並び替え</button>
               <button type="button" id="seed-by-ranking-btn" class="btn-secondary">ランキング順に並び替え</button>
@@ -703,20 +729,26 @@
        ブラケットは別ページに分けてあり、ここからは入口だけを出す。
        エントリーは内容を確認してから押すものなので最後に置く。 -->
   <section id="view-tournament-detail" class="view" hidden>
-    <a class="back-link" id="tournament-back-link" href="#tournaments">← 大会一覧へ</a>
+    <a class="back-link" id="tournament-back-link" href="/tournaments/">← 大会一覧へ</a>
 
     <!-- 大会画像のヘッダー。画像が無い大会ではJSが丸ごと隠す。 -->
     <div id="tournament-hero" class="detail-hero" hidden></div>
 
     <div class="bracket-page-header">
       <div class="bracket-title-block">
-        <h2 id="tournament-title"></h2>
-        <p id="tournament-meta" class="meta-line"></p>
+        <h1 id="tournament-title"></h1>
+        <!-- 大会の状態。色だけでは伝わらないので、必ず文字を入れる
+             （.status-chip は丸い印と文字を並べる。丸は見分けを速くする補助）。
+             中身と色は js/app.js の tournamentBadge が入れる。 -->
+        <p class="tournament-status-line">
+          <span id="tournament-status-chip" class="status-chip" hidden></span>
+          <span id="tournament-meta" class="meta-line"></span>
+        </p>
       </div>
       <div class="row-actions">
         <!-- 共有は運営でなくても押せる（選手が仲間を誘うためのもの）ので、
-             運営だけの歯車より前に置く。配るURLは /t/{大会ID} で、XやDiscordに
-             貼ると大会画像と大会名が出る（js/app.js の shareTournament）。
+             運営だけの歯車より前に置く。配るのは大会ページのURLそのもので、
+             XやDiscordに貼ると大会画像と大会名が出る（js/app.js の shareTournament）。
              中身（矢印のアイコン）は js/app.js の resetShareBtn が入れる。押した直後だけ
              チェックに変わるので、ここには置かずJS側で一本化している。 -->
         <button type="button" id="tournament-share-btn" class="btn-secondary tournament-share-btn"
@@ -816,8 +848,18 @@
       <button type="submit">保存</button>
       <button type="button" id="tournament-edit-cancel-btn" class="btn-secondary">キャンセル</button>
     </form>
+    <!-- エントリーの導線。募集中の大会でだけJSが中身を入れる（js/entries.js の
+         renderEntryCta）。ページの上に置いてあるのは、募集中の大会を開いた人が
+         最初に知りたいのが「自分は出られるのか、いつまでか」だから ──
+         ルールを読んでから決めたい人は下まで読めるが、決めている人まで
+         下まで歩かせる理由はない。
+         【エントリーの入口はここ1つだけ】下の #tournament-actions には運営の操作
+         （公開する・締め切る）しか置かない。2か所に出すと、片方を押したあとに
+         もう片方が残って「まだ押していない」ように見える。 -->
+    <div id="tournament-entry-cta" hidden></div>
+
     <!-- ブラケット（対戦表）への入口。まだ組まれていない大会ではJSが隠す。 -->
-    <a class="link-card" id="bracket-link" href="#home" hidden>
+    <a class="link-card" id="bracket-link" href="/" hidden>
       <span class="link-card-main">
         <span class="link-card-title">トーナメントを見る</span>
         <span class="link-card-note" id="bracket-link-note"></span>
@@ -829,7 +871,7 @@
          分けてある ── 32枠64枠の顔ぶれをこのページに直に並べると、その下の
          大会情報とエントリーの操作が画面から押し出されてしまうため。
          エントリーが1つも無い大会ではJSが隠す。 -->
-    <a class="link-card" id="entrants-link" href="#home" hidden>
+    <a class="link-card" id="entrants-link" href="/" hidden>
       <span class="link-card-main">
         <span class="link-card-title" id="entrants-link-title">出場選手一覧を見る</span>
         <span class="link-card-note" id="entrants-link-note"></span>
@@ -839,16 +881,16 @@
 
     <div id="tournament-info" class="tournament-info"></div>
 
-    <!-- エントリーと運営の募集操作。募集一覧のカードは入口だけにしたので、
-         実際の操作はこちらに集約している。ルールや参加者を確認したうえで
-         押せるよう、ページの最後に置く。 -->
+    <!-- 運営の募集操作（公開する・締め切ってブラケット生成・準備中の案内）。
+         押す機会は大会に一度あるかどうかなので、ページの最後でよい。
+         エントリーは上の #tournament-entry-cta が受け持つ。 -->
     <div id="tournament-actions"></div>
   </section>
 
   <!-- ブラケット（対戦表）。大会詳細から分けて、対戦表だけに集中できるようにする。 -->
   <section id="view-bracket" class="view" hidden>
-    <a class="back-link" id="bracket-back-link" href="#tournaments">← 大会へ</a>
-    <h2 id="bracket-title"></h2>
+    <a class="back-link" id="bracket-back-link" href="/tournaments/">← 大会へ</a>
+    <h1 id="bracket-title"></h1>
     <p id="bracket-meta" class="meta-line"></p>
     <!-- 出場している人にだけ出す使い方の案内。自分の対戦を開く入口は画面下端に
          貼り付く「あなたの対戦」（js/bracketView.js が bracket-container に入れる）。
@@ -865,8 +907,8 @@
        1枠ずつの見た目は対戦表の対戦カードと同じにしてある（js/bracketView.js の
        buildEntrantRow）── ここで見た枠が、そのまま対戦表の中で見つかるように。 -->
   <section id="view-entrants" class="view" hidden>
-    <a class="back-link" id="entrants-back-link" href="#tournaments">← 大会の詳細へ</a>
-    <h2 id="entrants-title"></h2>
+    <a class="back-link" id="entrants-back-link" href="/tournaments/">← 大会の詳細へ</a>
+    <h1 id="entrants-title"></h1>
     <p id="entrants-meta" class="meta-line"></p>
     <p id="entrants-note" class="note"></p>
     <div id="entrants-container"></div>
@@ -886,7 +928,7 @@
   <section id="view-players" class="view" hidden>
     <div class="page-head">
       <p class="page-eyebrow">Players</p>
-      <h2>選手</h2>
+      <h1>選手</h1>
     </div>
 
     <p class="note">
@@ -909,11 +951,13 @@
        発表を始めると body に .reveal-playing が付き、ヘッダー・ナビ・フッターが消えて
        1920×1080 の画だけになる（あとはブラウザをF11で全画面にして収録する）。
        中身は js/reveal.js、見た目は css/reveal.css。 -->
-  <section id="view-reveal" class="view" hidden>
+  <!-- data-css: この画面を初めて開いたときにだけ読むCSS（js/app.js の loadViewCss）。
+       ?v= は他と同じ版数にそろえること（scripts/check-cache-version.mjs が確認する）。 -->
+  <section id="view-reveal" class="view" hidden data-css="/css/reveal.css?v=147">
     <div id="reveal-setup">
       <div class="page-head">
         <p class="page-eyebrow">Reveal</p>
-        <h2>順位発表</h2>
+        <h1>順位発表</h1>
       </div>
       <p class="note">
         選んだ選手を1人ずつ全画面で発表します。ブラウザをF11で全画面にしてから開始し、
@@ -970,7 +1014,7 @@
       </div>
 
       <div class="reveal-picker-head">
-        <h3>発表する選手</h3>
+        <h2>発表する選手</h2>
         <div class="reveal-presets">
           <button type="button" class="btn-secondary" data-reveal-preset="50">上位50人</button>
           <button type="button" class="btn-secondary" data-reveal-preset="30">上位30人</button>
@@ -1011,7 +1055,7 @@
              2本目に data-src を持たせていないのは、2本が同時に15MBを取りに行くのを
              避けるため ── 1本目が流せる状態になってから js/reveal.js が src を渡す。
              そのときには実体がブラウザのキャッシュにあるので、取り直しは起きない。 -->
-        <video id="reveal-bg" class="reveal-bg" data-src="video/0204.mov?v=143"
+        <video id="reveal-bg" class="reveal-bg" data-src="/video/0204.mov?v=147"
                muted playsinline preload="none" aria-hidden="true"></video>
         <video id="reveal-bg-b" class="reveal-bg"
                muted playsinline preload="auto" aria-hidden="true"></video>
@@ -1030,9 +1074,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal stage" hidden data-src="pages/terms.html?v=143"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="/pages/terms.html?v=147"></section>
 
-  <section id="view-privacy" class="view legal stage" hidden data-src="pages/privacy.html?v=143"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="/pages/privacy.html?v=147"></section>
 
 </main>
 
@@ -1040,8 +1084,8 @@
      お問い合わせはハンバーガーメニューの一番下にも同じ入口がある。 -->
 <footer class="site-footer">
   <nav class="footer-links">
-    <a href="#terms">利用規約</a>
-    <a href="#privacy">プライバシーポリシー</a>
+    <a href="/terms/">利用規約</a>
+    <a href="/privacy/">プライバシーポリシー</a>
     <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">お問い合わせ（X: @tomokkugyu）</a>
   </nav>
 </footer>
@@ -1053,7 +1097,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="js/vendor/supabase.js?v=143"></script>
+<script src="/js/vendor/supabase.js?v=147"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -1065,35 +1109,38 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/auth.js":           "./js/auth.js?v=143",
-    "./js/bracket.js":        "./js/bracket.js?v=143",
-    "./js/bracketView.js":    "./js/bracketView.js?v=143",
-    "./js/bracketZoom.js":    "./js/bracketZoom.js?v=143",
-    "./js/characterData.js":  "./js/characterData.js?v=143",
-    "./js/characterFocus.js": "./js/characterFocus.js?v=143",
-    "./js/characterPicker.js": "./js/characterPicker.js?v=143",
-    "./js/characters.js":     "./js/characters.js?v=143",
-    "./js/db.js":             "./js/db.js?v=143",
-    "./js/entries.js":        "./js/entries.js?v=143",
-    "./js/formDraft.js":      "./js/formDraft.js?v=143",
-    "./js/icons.js":          "./js/icons.js?v=143",
-    "./js/intro.js":          "./js/intro.js?v=143",
-    "./js/matchChat.js":      "./js/matchChat.js?v=143",
-    "./js/organizerPicker.js": "./js/organizerPicker.js?v=143",
-    "./js/playerStats.js":    "./js/playerStats.js?v=143",
-    "./js/players.js":        "./js/players.js?v=143",
-    "./js/profile.js":        "./js/profile.js?v=143",
-    "./js/ranking.js":        "./js/ranking.js?v=143",
-    "./js/rankingEligibility.js": "./js/rankingEligibility.js?v=143",
-    "./js/reveal.js":         "./js/reveal.js?v=143",
-    "./js/stage.js":          "./js/stage.js?v=143",
-    "./js/state.js":          "./js/state.js?v=143",
-    "./js/supabaseClient.js": "./js/supabaseClient.js?v=143",
-    "./js/tournamentTier.js": "./js/tournamentTier.js?v=143",
-    "./js/util.js":           "./js/util.js?v=143"
+    "/js/auth.js":           "/js/auth.js?v=147",
+    "/js/bracket.js":        "/js/bracket.js?v=147",
+    "/js/bracketView.js":    "/js/bracketView.js?v=147",
+    "/js/bracketZoom.js":    "/js/bracketZoom.js?v=147",
+    "/js/characterData.js":  "/js/characterData.js?v=147",
+    "/js/characterFocus.js": "/js/characterFocus.js?v=147",
+    "/js/characterPicker.js": "/js/characterPicker.js?v=147",
+    "/js/characters.js":     "/js/characters.js?v=147",
+    "/js/db.js":             "/js/db.js?v=147",
+    "/js/entries.js":        "/js/entries.js?v=147",
+    "/js/formDraft.js":      "/js/formDraft.js?v=147",
+    "/js/icons.js":          "/js/icons.js?v=147",
+    "/js/intro.js":          "/js/intro.js?v=147",
+    "/js/matchChat.js":      "/js/matchChat.js?v=147",
+    "/js/organizerPicker.js": "/js/organizerPicker.js?v=147",
+    "/js/playerStats.js":    "/js/playerStats.js?v=147",
+    "/js/players.js":        "/js/players.js?v=147",
+    "/js/profile.js":        "/js/profile.js?v=147",
+    "/js/ranking.js":        "/js/ranking.js?v=147",
+    "/js/rankingEligibility.js": "/js/rankingEligibility.js?v=147",
+    "/js/reveal.js":         "/js/reveal.js?v=147",
+    "/js/router.js":         "/js/router.js?v=147",
+    "/js/seo.js":            "/js/seo.js?v=147",
+    "/js/stage.js":          "/js/stage.js?v=147",
+    "/js/state.js":          "/js/state.js?v=147",
+    "/js/supabaseClient.js": "/js/supabaseClient.js?v=147",
+    "/js/tournamentState.js": "/js/tournamentState.js?v=147",
+    "/js/tournamentTier.js": "/js/tournamentTier.js?v=147",
+    "/js/util.js":           "/js/util.js?v=147"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=143"></script>
+<script type="module" src="/js/app.js?v=147"></script>
 </body>
 </html>

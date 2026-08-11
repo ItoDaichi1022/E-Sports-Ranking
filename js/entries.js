@@ -7,24 +7,17 @@
 import {
   state, isTeamTournament, entrantIdOfPlayer, getEntrantMemberIds, getPlayerName,
 } from './state.js';
-import { escapeHtml, cardThumb } from './util.js';
+import { escapeHtml, cardThumb, skeletonCards } from './util.js';
 import { auth, isLoggedIn, canManageTournament } from './auth.js';
 import { computeRankings } from './ranking.js';
 import { createBracket } from './bracket.js';
 import { reportChipHtml } from './matchChat.js';
+import { pathFor, navigate } from './router.js';
+import {
+  STATUS_LABELS, entrantUnit, entryDeadlineAt, remainingSlots, entryState,
+} from './tournamentState.js';
 import * as db from './db.js';
 
-export const STATUS_LABELS = {
-  draft: '準備中',
-  recruiting: '募集中',
-  running: '進行中',
-  finished: '終了',
-};
-
-// 出場枠の数え方の呼び名。チーム戦の定員16は「16チーム」であって16人ではない。
-export function entrantUnit(tournament) {
-  return isTeamTournament(tournament) ? 'チーム' : '人';
-}
 
 // ---- エントリー締切 ----
 //
@@ -41,14 +34,6 @@ const DEADLINE_FORMAT = {
   hour: '2-digit', minute: '2-digit',
 };
 
-// 締切のDate。未設定と、壊れた値（手で書き換えられた場合）はどちらも null にして、
-// 呼び出し側では「締切が無い」と同じ扱いにする。
-function entryDeadlineAt(tournament) {
-  if (!tournament?.entryDeadline) return null;
-  const at = new Date(tournament.entryDeadline);
-  return Number.isNaN(at.getTime()) ? null : at;
-}
-
 // 「2026/8/15(金) 21:00」。見る人の地域時刻に直して出す（DBは timestamptz）。
 export function entryDeadlineText(tournament) {
   const at = entryDeadlineAt(tournament);
@@ -59,7 +44,9 @@ export function entryDeadlineText(tournament) {
 // 「あと2日3時間41分」まで出しても読めないし、毎分書き換わって落ち着かない。
 function remainingLabel(at) {
   const ms = at.getTime() - Date.now();
-  if (ms <= 0) return { text: '締切時刻を過ぎました', passed: true };
+  // 言い方はバッジ（js/tournamentState.js の entryState）とそろえる。
+  // 同じ画面に「過ぎました」と「過ぎています」が並ぶと、別の話に見える。
+  if (ms <= 0) return { text: '締切時刻を過ぎています', passed: true };
 
   const minutes = Math.floor(ms / 60000);
   if (minutes < 1) return { text: 'まもなく締切', soon: true };
@@ -128,13 +115,6 @@ function myEntrantId(tournament) {
   return auth.player ? entrantIdOfPlayer(tournament, auth.player.id) : null;
 }
 
-// 残り枠。数えるのは出場枠なので、チーム戦ではチーム数で見る
-// （DBの定員トリガーが count(distinct coalesce(team_id, player_id)) で数えるのと同じ）。
-function remainingSlots(tournament) {
-  if (tournament.capacity == null) return null;
-  return Math.max(0, tournament.capacity - tournament.entrantCount);
-}
-
 // エントリー済みの出場枠を、現在のランキング順に並べてシード順を決める（⑤）。
 // チームのランクは「メンバーの中で最も上位のランク」とする。ランキングに載っていない
 // 選手・チームは後ろにまとめ、その中では登録順を保つ。
@@ -195,12 +175,19 @@ export async function closeRecruitmentAndStart(tournamentId) {
 
 // ---- 描画 ----
 
-function fullSlotsButton() {
+// 押せないときのボタン。灰色にして止めるだけでは「壊れている」のか
+// 「自分には押せない」のか分からないので、理由は必ず renderEntryCta が
+// 文字でも添える（色と非活性だけで意味を伝えない）。
+//
+// disabled のボタンは読み上げの移動先からも外れるため、理由の文と
+// aria-describedby で結び、ボタンに辿り着かなくても事情が読めるようにしてある。
+function blockedButton(label, reasonId) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'btn-secondary';
-  btn.textContent = '定員に達しました';
+  btn.textContent = label;
   btn.disabled = true;
+  if (reasonId) btn.setAttribute('aria-describedby', reasonId);
   return btn;
 }
 
@@ -215,7 +202,7 @@ function soloEntryButton(tournament, onChanged) {
     btn.className = 'btn-secondary';
     btn.textContent = 'エントリーを取り消す';
   } else if (remainingSlots(tournament) === 0) {
-    return fullSlotsButton();
+    return blockedButton('定員に達しました', BLOCKED_REASON_ID);
   } else {
     btn.className = 'btn-entry';
     btn.textContent = 'エントリーする';
@@ -474,7 +461,7 @@ function teamEntryControls(tournament, onChanged) {
   }
 
   if (remainingSlots(tournament) === 0) {
-    wrap.appendChild(fullSlotsButton());
+    wrap.appendChild(blockedButton('定員に達しました', BLOCKED_REASON_ID));
     return wrap;
   }
 
@@ -525,7 +512,7 @@ function entryControls(tournament, onChanged) {
     btn.type = 'button';
     btn.className = 'btn-entry';
     btn.textContent = '選手登録してエントリー';
-    btn.addEventListener('click', () => { location.hash = '#profile'; });
+    btn.addEventListener('click', () => { navigate('profile'); });
     return btn;
   }
 
@@ -580,9 +567,9 @@ function adminControls(tournament, onChanged) {
       closeBtn.disabled = true;
       try {
         await closeRecruitmentAndStart(tournament.id);
-        location.hash = `#bracket/${encodeURIComponent(tournament.id)}`;
-        // 既にその大会の詳細を開いていた場合は hashchange が起きず再描画されない。
-        // 明示的に更新して、生成されたブラケットを出す。
+        navigate('bracket', tournament.id);
+        // 移動しても、生成されたばかりのブラケットはまだ手元のデータに無い。
+        // 明示的に更新して出し直す。
         await onChanged();
       } catch (err) {
         alert(err.message);
@@ -710,13 +697,6 @@ export function renderTournamentActions(containerEl, tournament, onChanged) {
   const row = document.createElement('div');
   row.className = 'tournament-actions-row';
 
-  if (tournament.status === 'recruiting') {
-    row.appendChild(entryControls(tournament, onChanged));
-    // 締切はエントリーボタンのすぐ隣に置く。押すかどうかを決めるのはこの場所で、
-    // 大会情報の表まで下りないと期限が分からないのでは間に合わない。
-    const deadline = entryDeadlineElement(tournament, { withNote: true });
-    if (deadline) row.appendChild(deadline);
-  }
   // 運営の操作はこの大会の運営に出す。サイト全体の運営かどうかではない
   // （大会は誰でも作れるので、作った本人に出ないと公開できなくなる）。
   if (canManageTournament(tournament.id)) {
@@ -734,6 +714,77 @@ export function renderTournamentActions(containerEl, tournament, onChanged) {
   }
 }
 
+// エントリーの理由文につける印。押せないボタンから aria-describedby で指す。
+const BLOCKED_REASON_ID = 'entry-blocked-reason';
+
+// エントリーの導線（大会詳細の上部）。
+//
+// 【なぜページの上に置くか】以前はルールや参加者を確認したあとに押せるよう、
+// ページの一番下に置いていた。読む順としては正しいが、募集中の大会を開いた人が
+// 最初に知りたいのは「自分は出られるのか、いつまでか」で、それが画面外にあると
+// 一度スクロールしないと分からない。確認したい人は下まで読めるが、
+// 決めている人まで下まで歩かせる理由はない。
+//
+// 【押せる入口はこの1つだけ】下の renderTournamentActions にエントリーは置かない。
+// 2か所に出すと、片方を押した後にもう片方が残って「まだ押していない」ように見える。
+export function renderEntryCta(containerEl, tournament, onChanged) {
+  containerEl.innerHTML = '';
+  containerEl.hidden = true;
+  if (!tournament) return;
+
+  const st = entryState(tournament);
+
+  // エントリーが話題になるのは募集中のあいだだけ。進行中・終了した大会に
+  // 「エントリーできません」と大きく出しても、読む人には何も残らない
+  // （状態は見出しの隣のバッジが伝えている）。準備中は運営向けの案内
+  // （draftNotice）が別に出る。
+  if (tournament.status !== 'recruiting') return;
+
+  const entered = Boolean(myEntrantId(tournament));
+
+  const box = document.createElement('div');
+  box.className = 'entry-cta';
+  if (!st.canEnter && !entered) box.classList.add('is-blocked');
+  if (entered) box.classList.add('is-entered');
+
+  // エントリー済みなら、まずそう言い切る。個人戦のボタンは「エントリーを取り消す」に
+  // 変わるだけなので、それだけでは「済んでいるから取り消せる」のか「間違って
+  // 押しかけている」のかが読み取れない。
+  // チーム戦は .team-entry-status が同じことを（チーム名つきで）言うので重ねない。
+  if (entered && !isTeamTournament(tournament)) {
+    const done = document.createElement('p');
+    done.className = 'entry-cta-entered';
+    done.textContent = 'この大会にエントリー済みです。募集中のあいだはいつでも取り消せます。';
+    box.appendChild(done);
+  }
+
+  box.appendChild(entryControls(tournament, onChanged));
+
+  // 締切はボタンのすぐ隣。押すかどうかを決めるのはこの場所で、
+  // 大会情報の表まで下りないと期限が分からないのでは間に合わない。
+  const deadline = entryDeadlineElement(tournament, { withNote: true });
+  if (deadline) box.appendChild(deadline);
+
+  // 押せない理由は必ず文字で出す。灰色になっているだけでは、
+  // 壊れているのか自分には押せないのかが分からない。
+  if (st.blockedReason) {
+    const reason = document.createElement('p');
+    reason.className = 'entry-cta-reason';
+    reason.id = BLOCKED_REASON_ID;
+    reason.textContent = st.blockedReason;
+    box.appendChild(reason);
+  } else if (st.remaining !== null && st.remaining > 0) {
+    // 残り枠は「押せるうち」だけ添える。埋まってからは上の理由が受け持つ。
+    const left = document.createElement('p');
+    left.className = 'entry-cta-slots';
+    left.textContent = `残り${st.remaining}${entrantUnit(tournament)}（定員${tournament.capacity}${entrantUnit(tournament)}）`;
+    box.appendChild(left);
+  }
+
+  containerEl.appendChild(box);
+  containerEl.hidden = false;
+}
+
 // 募集ページ。運営には準備中の大会も見せる。
 //
 // 一覧は「どの大会があるか」を見渡すための場所なので、大会名・画像・開催日だけを
@@ -748,6 +799,12 @@ export function renderRecruitPage(containerEl) {
     t.status === 'recruiting' || (t.status === 'draft' && canManageTournament(t.id)));
 
   if (visible.length === 0) {
+    // まだ届いていないだけかもしれないので、そのときは仮置きを出す
+    // （「募集中の大会はありません」を読み込み中に出すと、来た人を追い返す）。
+    if (!db.hasLoadedOnce()) {
+      containerEl.appendChild(skeletonCards(3));
+      return;
+    }
     containerEl.innerHTML = '<p class="empty-hint">現在募集中の大会はありません。</p>';
     return;
   }
@@ -761,14 +818,14 @@ export function renderRecruitPage(containerEl) {
     // どこを押しても詳細へ行くため、スマートフォンでも押し外しにくい。
     const card = document.createElement('a');
     card.className = 'card';
-    card.href = `#tournament/${encodeURIComponent(t.id)}`;
+    card.href = pathFor('tournament', t.id);
 
     const body = document.createElement('div');
     body.className = 'card-body';
     // 準備中はまだ公開していない大会。運営にしか見えないので、
     // 募集中のものと取り違えないよう印を付ける。
     body.innerHTML = `
-      <h3 class="card-title">${escapeHtml(t.name)}</h3>
+      <h2 class="card-title">${escapeHtml(t.name)}</h2>
       <p class="card-date">${escapeHtml(t.date || '開催日未定')}</p>
       ${t.status === 'draft' ? `<span class="status-chip status-draft">${STATUS_LABELS.draft}</span>` : ''}
       ${reportChipHtml(t.id)}

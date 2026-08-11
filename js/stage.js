@@ -19,7 +19,8 @@
 
 import { state } from './state.js';
 import { safeUrl } from './util.js';
-import { STATUS_LABELS } from './entries.js';
+import { STATUS_LABELS } from './tournamentState.js';
+import { pathFor } from './router.js';
 
 const reduceMotionQuery = typeof window.matchMedia === 'function'
   ? window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -44,7 +45,7 @@ function getRevealObserver() {
       const el = entry.target;
 
       // マスク開きの見出しには class を足さない。'is-in' を付けてしまうと
-      // class 属性が生えて、既存の main h3:not([class]) 系の字組みが外れる。
+      // class 属性が生えて、既存の main h2:not([class]) 系の字組みが外れる。
       // 印は data 属性で持つ（値を 'on' から 'in' へ進めるだけ）。
       if (el.dataset.mask) el.dataset.mask = 'in';
       else el.classList.add('is-in');
@@ -126,12 +127,14 @@ function splitChars(el) {
 // 包む箱が要るのでJSで挟むが、動きそのものはCSSが受け持つ。
 //
 // 印を class ではなく data 属性で持つのは、見出しに class を生やすと
-// main h3:not([class]) 系の字組み（左の縦線・余白）が外れてしまうため。
+// main h2:not([class]) 系の字組み（左の縦線・余白）が外れてしまうため。
 //
 // 掛けてはいけない見出しがあることに注意（css の「ステージ」節に一覧がある）。
 //   * 擬似要素で下線や光を持つもの … overflow:hidden で切り落とされる
 //   * display:flex で番号と並んでいるもの … 包むと横並びが崩れる
-const MASK_SELECTOR = '.page-head h2, .home-step-body h3';
+// .page-head の中の題は、ページの題（h1）とホームのブロックの題（h2）の
+// どちらもありうる（css/style.css の「見出しの3段」を参照）。両方を拾う。
+const MASK_SELECTOR = '.page-head :is(h1, h2), .home-step-title';
 
 function wrapMask(el) {
   if (el.dataset.mask) return;
@@ -240,7 +243,7 @@ export function renderFeatured(blockEl, slotEl) {
 
   const card = document.createElement('a');
   card.className = `featured-card reveal${imageUrl ? '' : ' is-textonly'}`;
-  card.href = `#tournament/${encodeURIComponent(pick.id)}`;
+  card.href = pathFor('tournament', pick.id);
 
   if (imageUrl) {
     const thumb = document.createElement('div');
@@ -409,14 +412,14 @@ export function initStage(viewEl) {
 
 // 最初の画面には、読み込んだ直後に自分から仕掛ける。
 //
-// 通常の入口は js/app.js の routeFromHash() だが、そこへ辿り着くまでに
+// 通常の入口は js/app.js の routeFromLocation() だが、そこへ辿り着くまでに
 // initAuth() がセッションの確認と選手行の取得を await する（js/auth.js）。
 // つまり通信1往復ぶん待つことになり、そのあいだヒーローは伏せられたまま
 // 空っぽに見え、見出しは「素の文字が出てから割られて消える」ちらつきになる。
 //
 // index.html の時点で開いている画面（＝ホーム）はDOMを読み終えた時点で
 // 分かるので、通信を待たずにここで仕掛けてしまう。
-// initStage は何度呼んでも二重にならないので、後から routeFromHash が
+// initStage は何度呼んでも二重にならないので、後から routeFromLocation が
 // 同じ画面に対して呼び直しても構わない。
 //
 // モジュールスクリプトは defer 扱いなので、ここが動く時点でDOMは揃っている。
