@@ -45,7 +45,7 @@
 // 写しを置くと、ページを1つ足したときに「アプリは知っているのにサーバーが404を返す」
 // 「画面の題と検索結果の題が違う」というかたちで必ずずれる。
 // どちらも読み込んだだけでは window に触らないので、Cloudflare 上でも動く。
-import { matchPath, pathFor } from '../js/router.js';
+import { matchPath, pathFor, VIEW_ID_OF } from '../js/router.js';
 import { buildPageMeta } from '../js/seo.js';
 
 // 古い共有リンクの入口。中身は /tournaments/{id}/ に移した。
@@ -111,6 +111,10 @@ async function appShell(request, env, url, route) {
 
   const data = await pageData(env, route);
   const meta = buildPageMeta(route.page, { param: route.param, ...data }, url.origin);
+  meta.viewId = VIEW_ID_OF[route.page] ?? VIEW_ID_OF.home;
+  // 見出しに入れる名前。JSが動く前に読める文字がここしか無いので、
+  // 大会名・お知らせの題があるページでは先に入れておく。
+  meta.heading = data.tournament?.name ?? data.announcement?.title ?? null;
 
   const headers = new Headers(shell.headers);
   // Cache-Control を上書きするのは、_headers に書いた「/ と /index.html は毎回聞き直す」
@@ -287,6 +291,47 @@ function rewriteMeta(response, meta) {
     .on('meta[property="og:type"]', setContent(meta.ogType))
     .on('meta[name="twitter:card"]', setContent(meta.twitterCard))
     .on('head', { element(el) { el.append(tags(meta), { html: true }); } })
+    // ---- ここから <body> の中 ----
+    //
+    // 【なぜ本体にも手を入れるか】index.html は画面をすべて <section hidden> で
+    // 持っていて、どれを出すかはJSが決める。ホームだけは hidden が付いていないので、
+    // 大会ページのURLを開いても、最初に描かれるのはホームの中身（大きなロゴと
+    // 「IgniteArena」の大見出し）になる。JSが動いた瞬間にそれが消えて空の大会ページに
+    // 変わるので、
+    //   * 一瞬だけ関係のないページが見える
+    //   * 消えて入れ替わるぶん、画面が大きく飛ぶ（CLS）
+    //   * 一番大きい絵が描かれるのはDBの返事のあと ── 表示できたと測られる時刻
+    //     （LCP）が、通信2往復ぶん後ろへずれる
+    // という3つが同時に起きる。返す時点で「出す画面」を決めておけば全部消える。
+    //
+    // 入れるのは絵と名前だけで、あとはこれまでどおりJSが描く。ここで画面を
+    // 組み立て始めると、同じ見た目を2か所で作ることになる。
+    .on('#view-home', {
+      element(el) {
+        if (meta.viewId !== 'view-home') el.setAttribute('hidden', '');
+      },
+    })
+    .on(`#${meta.viewId}`, { element(el) { el.removeAttribute('hidden'); } })
+    // 見出し。対戦表と出場選手一覧も題は大会名なので、まとめて入れる
+    // （出ていない画面のぶんは hidden のままなので害がない）。
+    .on('#tournament-title, #news-title, #bracket-title, #entrants-title', {
+      element(el) {
+        if (meta.heading) el.setInnerContent(meta.heading);
+      },
+    })
+    // ページの先頭に出る絵。ここに実物を置いておくと、ブラウザはHTMLを読んだ
+    // 時点で描ける ── JSもDBも待たない。届いたあと js/app.js が同じURLで描き直すが、
+    // 同じなら何もしないようにしてある（renderHero）。
+    .on('#tournament-hero, #news-hero', {
+      element(el) {
+        if (!meta.heroImage) return;
+        el.removeAttribute('hidden');
+        el.setInnerContent(
+          `<img src="${escapeAttr(meta.heroImage)}" alt="" fetchpriority="high" decoding="async">`,
+          { html: true },
+        );
+      },
+    })
     .transform(response);
 }
 

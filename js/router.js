@@ -58,6 +58,42 @@ export const ROUTES = [
   ['privacy', '/privacy/'],
 ];
 
+// ページ名 → その画面を入れてある <section> のID。
+//
+// ここに置いてあるのは、ブラウザ（js/app.js）と Cloudflare（worker/index.js）の
+// 両方が要るため。あちらは「返すHTMLの時点でどの画面を出しておくか」を決めるのに使う ──
+// 全部 hidden のまま返すと、JSが動き出すまで何も描かれず、そのあいだ画面が空になる。
+export const VIEW_ID_OF = {
+  home: 'view-home',
+  guide: 'view-guide', // はじめに（静的ページ。描画関数は持たない）
+  setup: 'view-setup', // 対戦環境を整える（静的ページ。描画関数は持たない）
+  // /news/ がお知らせ一覧、/news/{id}/ が詳細。URLの形が違うのでページ名も分けてある
+  news: 'view-news',
+  newslist: 'view-news-list',
+  // 大会一覧。募集中・進行中・終了はページ内タブ（/tournaments/?tab={タブ名}）
+  tournaments: 'view-tournaments',
+  // 自分がエントリー・出場した大会のまとめ
+  entries: 'view-entries',
+  // create=大会作成（運営）、tournament=大会詳細、bracket=対戦表。
+  // 詳細と対戦表は別ページに分けてある。
+  create: 'view-tournament',
+  tournament: 'view-tournament-detail',
+  bracket: 'view-bracket',
+  // 出場選手一覧。詳細・対戦表と同じく大会ごとのページ
+  entrants: 'view-entrants',
+  player: 'view-player-detail',
+  // 選手を探すページ。ランキングの表を置いていた頃の #ranking から来た人も、
+  // pathFromLegacyHash が読み替えてここへ着く。
+  players: 'view-players',
+  // 順位発表（運営専用）。ランキングの表とは見せ方も操作もまるで違うので、
+  // 同じページのモードにせず別のページにしてある（js/reveal.js）。
+  reveal: 'view-reveal',
+  profile: 'view-profile',
+  // 規約類（静的ページ。フッターから開く。描画関数は持たない）
+  terms: 'view-terms',
+  privacy: 'view-privacy',
+};
+
 // パスを「/」で切って空を捨てる。前後のスラッシュの有無を気にせず比べられるようにする。
 function segments(path) {
   return path.split('/').filter(Boolean);

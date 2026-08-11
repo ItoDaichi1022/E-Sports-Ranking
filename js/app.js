@@ -38,8 +38,8 @@ import { isConfigured } from './supabaseClient.js';
 import { initStage, renderFeatured, renderStats, prefersReducedMotion } from './stage.js';
 import { iconSvg, makeIconButton, setButtonIcon } from './icons.js';
 import {
-  TOURNAMENT_TABS, ROUTE_CHANGE_EVENT, matchPath, pathFor, navigate, startRouter,
-  migrateLegacyUrl,
+  TOURNAMENT_TABS, ROUTE_CHANGE_EVENT, VIEW_ID_OF, matchPath, pathFor, navigate,
+  startRouter, migrateLegacyUrl,
 } from './router.js';
 import { applyPageMeta } from './seo.js';
 import * as db from './db.js';
@@ -280,39 +280,9 @@ function applyAuthUI() {
 
 // ---- ルーティング ----
 
-// ページ名 → その画面を入れてある <section> のID。
-// ページ名とURLの対応は js/router.js の ROUTES にある（両方に同じ名前が並ぶので、
-// ページを増やすときは2か所そろえること）。
-const VIEW_IDS = {
-  home: 'view-home',
-  guide: 'view-guide', // はじめに（静的ページ。描画関数は持たない）
-  setup: 'view-setup', // 対戦環境を整える（静的ページ。描画関数は持たない）
-  // /news/ がお知らせ一覧、/news/{id}/ が詳細。URLの形が違うのでページ名も分けてある
-  news: 'view-news',
-  newslist: 'view-news-list',
-  // 大会一覧。募集中・進行中・終了はページ内タブ（/tournaments/?tab={タブ名}）
-  tournaments: 'view-tournaments',
-  // 自分がエントリー・出場した大会のまとめ
-  entries: 'view-entries',
-  // create=大会作成（運営）、tournament=大会詳細、bracket=対戦表。
-  // 詳細と対戦表は別ページに分けてある。
-  create: 'view-tournament',
-  tournament: 'view-tournament-detail',
-  bracket: 'view-bracket',
-  // 出場選手一覧。詳細・対戦表と同じく大会ごとのページ（/tournaments/{大会ID}/entrants/）
-  entrants: 'view-entrants',
-  player: 'view-player-detail',
-  // 選手を探すページ。ランキングの表を置いていた頃の #ranking から来た人も、
-  // router.js が読み替えてここへ着く。
-  players: 'view-players',
-  // 順位発表（運営専用）。ランキングの表とは見せ方も操作もまるで違うので、
-  // 同じページのモードにせず別のページにしてある（js/reveal.js）。
-  reveal: 'view-reveal',
-  profile: 'view-profile',
-  // 規約類（静的ページ。フッターから開く。描画関数は持たない）
-  terms: 'view-terms',
-  privacy: 'view-privacy',
-};
+// ページ名 → 画面の <section> のID は js/router.js が持っている。
+// Worker（worker/index.js）も同じ表を見て、返すHTMLの時点で出す画面を決める。
+const VIEW_IDS = VIEW_ID_OF;
 
 // ナビのハイライト用：詳細ページは親メニューに対応付ける
 const NAV_PAGE_OF = {
@@ -1430,6 +1400,14 @@ function renderHero(el, imageUrl) {
   // 空の帯だけが居座る。描くたびに実際の絵の有無に合わせ直す。
   document.documentElement.classList.toggle('has-hero', Boolean(url));
 
+  // 同じ絵が既に入っているなら何もしない。
+  // サーバーが返したHTMLに実物が入っていることがあり（worker/index.js）、
+  // ここで作り直すと、せっかく描き終えた絵を捨ててもう一度描くことになる。
+  if (url && el.firstElementChild?.getAttribute('src') === url) {
+    el.hidden = false;
+    return;
+  }
+
   if (url) {
     el.innerHTML = `<img src="${escapeHtml(url)}" alt="" fetchpriority="high" decoding="async">`;
     el.hidden = false;
@@ -1568,7 +1546,10 @@ async function renderEntrantsPage(tournamentId) {
   if (!tournament) {
     // 届く前に「無い」と言い切らない（renderTournamentDetailLoading と同じ理由）
     if (!db.hasLoadedOnce()) {
-      entrantsTitleEl.innerHTML = '<span class="skeleton-line skeleton-text"></span>';
+      // サーバーが題を先に入れていることがある（worker/index.js）。あれば残す。
+      if (!entrantsTitleEl.textContent.trim()) {
+        entrantsTitleEl.innerHTML = '<span class="skeleton-line skeleton-text"></span>';
+      }
       entrantsMetaEl.textContent = '';
       entrantsNoteEl.textContent = '';
       entrantsContainerEl.innerHTML = '';
@@ -1661,7 +1642,12 @@ function backToListLink(tournament) {
 // 場所を空けてある（worker/index.js の has-hero）。ここで消すと、いったん潰れてから
 // 絵が届いてまた開く ── 二度動くことになり、直したかった揺れがかえって増える。
 function renderTournamentDetailLoading() {
-  tournamentTitleEl.innerHTML = '<span class="skeleton-line skeleton-text"></span>';
+  // サーバーが大会名を先に入れていることがある（worker/index.js）。
+  // 入っているならそのまま残す ── ここで仮置きに差し替えると、
+  // 「名前 → 灰色の棒 → 名前」と二度動くことになる。
+  if (!tournamentTitleEl.textContent.trim()) {
+    tournamentTitleEl.innerHTML = '<span class="skeleton-line skeleton-text"></span>';
+  }
   tournamentStatusChipEl.hidden = true;
   tournamentMetaEl.innerHTML = '<span class="skeleton-line skeleton-text is-short"></span>';
   tournamentInfoEl.innerHTML = '<div class="skeleton-line skeleton-panel"></div>';
@@ -1890,7 +1876,10 @@ async function renderBracketPage(tournamentId) {
   if (!tournament) {
     // 届く前に「無い」と言い切らない（renderTournamentDetailLoading と同じ理由）
     if (!db.hasLoadedOnce()) {
-      bracketTitleEl.innerHTML = '<span class="skeleton-line skeleton-text"></span>';
+      // サーバーが題を先に入れていることがある（worker/index.js）。あれば残す。
+      if (!bracketTitleEl.textContent.trim()) {
+        bracketTitleEl.innerHTML = '<span class="skeleton-line skeleton-text"></span>';
+      }
       bracketMetaEl.textContent = '';
       bracketOwnHintEl.hidden = true;
       bracketAdminToolsEl.hidden = true;
