@@ -271,6 +271,14 @@ function rewriteMeta(response, meta) {
   });
 
   return new HTMLRewriter()
+    // このページの先頭に大きな絵が出ることを、HTMLの時点で知らせる印。
+    // css/style.css がこれを見て、絵が届く前からその場所を空けておく
+    // （空けておかないと、届いた瞬間に下の中身が丸ごと押し下げられる）。
+    .on('html', {
+      element(el) {
+        if (meta.heroImage) el.setAttribute('class', 'has-hero');
+      },
+    })
     .on('title', { element(el) { el.setInnerContent(meta.title); } })
     .on('meta[name="description"]', setContent(meta.description))
     .on('meta[property="og:title"]', setContent(meta.title))
@@ -301,6 +309,17 @@ function tags(meta) {
   ];
 
   if (meta.robots) rows.push(`<meta name="robots" content="${escapeAttr(meta.robots)}">`);
+
+  // ページの先頭に出る絵を、HTMLを読んだ時点で取りに行かせる。
+  //
+  // これが無いと、ブラウザがこの絵の在り処を知るのは
+  // 「JSを30本読む → 認証 → Supabaseに問い合わせる → src を入れる」より後になる。
+  // 画面で一番大きい絵＝表示できたと測られる相手（LCP）が、一番最後に始まっていた。
+  if (meta.heroImage) {
+    rows.push(
+      `<link rel="preload" as="image" fetchpriority="high" href="${escapeAttr(meta.heroImage)}">`,
+    );
+  }
 
   // JSON-LD は属性ではなく <script> の中身なので、エスケープの作法が違う。
   // 気をつけるのは "</script>" が本文に現れることだけ（大会名に書かれうる）。

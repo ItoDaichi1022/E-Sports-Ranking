@@ -1441,6 +1441,26 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
 .skeleton-line-title { width: 70%; height: 1rem; }
 .skeleton-line-meta { width: 45%; margin-bottom: 0; }
 
+/* 見出しや本文の行に埋める仮置き。高さを 1em にして、入っている文字の行の高さに
+   合わせる ── px で決め打ちすると、字の大きさが画面幅で変わるこのサイトでは
+   合わなくなり、文字が入った瞬間に行の高さが動く。 */
+.skeleton-text {
+  height: 1em;
+  width: 60%;
+  margin: 0;
+  vertical-align: middle;
+}
+
+.skeleton-text.is-short { width: 35%; }
+
+/* 大きな塊（大会情報・選手ページ）の仮置き。中身の高さは内容で変わるので
+   ぴたりとは合わないが、何も置かないよりは動く量が小さくなる。 */
+.skeleton-panel {
+  height: 12rem;
+  margin: 2rem 0 0;
+  border-radius: var(--r);
+}
+
 /* 動きを止めている人には流さない。待っていることは形だけで伝わる。 */
 @media (prefers-reduced-motion: reduce) {
   .skeleton-block::after,
@@ -5910,6 +5930,19 @@ dialog.char-picker { max-width: 56rem; }
   width: auto;
   height: auto;
   border-radius: var(--r-sm);
+}
+
+/* 絵が届く前から、その場所だけを空けておく。
+   .has-hero は「このページには先頭に絵が出る」という印で、HTMLを返すときに
+   worker/index.js が付ける（DBを引いた結果を知っているのはあちらだけなので、
+   ブラウザ側では絵の有無が分かるのがJSの実行後になってしまう）。
+   絵が無いページには印が付かないので、空の帯が残ることはない。
+
+   !important は [hidden] の打ち消しに要る（上の 106 行目、こちらも !important）。
+   場所を空けたいだけで、中身はまだ無い ── 空の器を見せるのが目的。 */
+.has-hero #tournament-hero[hidden],
+.has-hero #news-hero[hidden] {
+  display: flex !important;
 }
 
 /* フォームのプレビュー。選択した画像や既存画像の確認用。 */

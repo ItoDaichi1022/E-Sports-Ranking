@@ -1423,6 +1423,13 @@ function deadlineInputValue(iso) {
 // 逆に一覧のカードや対戦表の中の絵は lazy のままでよい（画面の外にあるため）。
 function renderHero(el, imageUrl) {
   const url = safeUrl(imageUrl);
+
+  // 「先頭に絵が出るページ」の印。最初に付けるのは worker/index.js（HTMLを返すとき）で、
+  // その時点の1ページぶんしか知らない。ここで付け直すのは、画面を移っても
+  // ページを読み直さないため ── 絵のある大会から無い大会へ移ったときに印が残ると、
+  // 空の帯だけが居座る。描くたびに実際の絵の有無に合わせ直す。
+  document.documentElement.classList.toggle('has-hero', Boolean(url));
+
   if (url) {
     el.innerHTML = `<img src="${escapeHtml(url)}" alt="" fetchpriority="high" decoding="async">`;
     el.hidden = false;
@@ -1559,6 +1566,14 @@ async function renderEntrantsPage(tournamentId) {
 
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
+    // 届く前に「無い」と言い切らない（renderTournamentDetailLoading と同じ理由）
+    if (!db.hasLoadedOnce()) {
+      entrantsTitleEl.innerHTML = '<span class="skeleton-line skeleton-text"></span>';
+      entrantsMetaEl.textContent = '';
+      entrantsNoteEl.textContent = '';
+      entrantsContainerEl.innerHTML = '';
+      return;
+    }
     entrantsBackLink.href = pathFor('tournaments');
     entrantsBackLink.textContent = '← 大会一覧へ';
     entrantsTitleEl.textContent = '大会が見つかりません';
@@ -1640,6 +1655,24 @@ function backToListLink(tournament) {
   return { href: pathFor('tournaments', null, { tab }), text: '← 大会一覧へ' };
 }
 
+// データが届く前の大会詳細。実物と同じ形・同じ高さの箱を先に置く。
+//
+// 【画像の枠には触らない】サーバーが「このページには先頭に絵が出る」と印を付けて
+// 場所を空けてある（worker/index.js の has-hero）。ここで消すと、いったん潰れてから
+// 絵が届いてまた開く ── 二度動くことになり、直したかった揺れがかえって増える。
+function renderTournamentDetailLoading() {
+  tournamentTitleEl.innerHTML = '<span class="skeleton-line skeleton-text"></span>';
+  tournamentStatusChipEl.hidden = true;
+  tournamentMetaEl.innerHTML = '<span class="skeleton-line skeleton-text is-short"></span>';
+  tournamentInfoEl.innerHTML = '<div class="skeleton-line skeleton-panel"></div>';
+  tournamentActionsEl.innerHTML = '';
+  renderEntryCta(tournamentEntryCtaEl, null);
+  // 行き先が決まっていないリンクは出さない（押せてしまう空のリンクを作らない）
+  bracketLinkEl.hidden = true;
+  entrantsLinkEl.hidden = true;
+  tournamentShareBtn.hidden = true;
+}
+
 // 大会詳細。対戦表（/tournaments/{id}/bracket/）と出場選手一覧（同 entrants/）は別ページに
 // 分けてあり、ここにはそこへの入口だけを置く。
 //
@@ -1664,6 +1697,13 @@ async function renderTournamentDetail(tournamentId) {
 
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
+    // まだDBから何も届いていないなら「無い」とは言えない。ここで言い切ると、
+    // 実在する大会を開いた人に「大会が見つかりません」が一瞬見える ── そのあと
+    // 中身が出ても、最初に読んだ一言のほうが残る。
+    if (!db.hasLoadedOnce()) {
+      renderTournamentDetailLoading();
+      return;
+    }
     // 無い大会のリンクを配っても仕方がないので、ここだけは隠す
     tournamentShareBtn.hidden = true;
     renderHero(tournamentHeroEl, null);
@@ -1848,6 +1888,16 @@ async function onBracketSwapPick(tournamentId, entrantId) {
 async function renderBracketPage(tournamentId) {
   const tournament = state.tournaments.find((t) => t.id === tournamentId);
   if (!tournament) {
+    // 届く前に「無い」と言い切らない（renderTournamentDetailLoading と同じ理由）
+    if (!db.hasLoadedOnce()) {
+      bracketTitleEl.innerHTML = '<span class="skeleton-line skeleton-text"></span>';
+      bracketMetaEl.textContent = '';
+      bracketOwnHintEl.hidden = true;
+      bracketAdminToolsEl.hidden = true;
+      bracketContainer.innerHTML = '';
+      resultSectionEl.innerHTML = '';
+      return;
+    }
     bracketTitleEl.textContent = '大会が見つかりません';
     bracketMetaEl.textContent = '';
     bracketOwnHintEl.hidden = true;
@@ -2271,7 +2321,10 @@ function profileFooterHtml(player) {
 async function renderPlayerDetail(playerId) {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) {
-    playerDetailEl.innerHTML = '<p class="empty-hint">選手が見つかりません。</p>';
+    // 届く前に「無い」と言い切らない（renderTournamentDetailLoading と同じ理由）
+    playerDetailEl.innerHTML = db.hasLoadedOnce()
+      ? '<p class="empty-hint">選手が見つかりません。</p>'
+      : '<div class="skeleton-line skeleton-panel"></div>';
     return;
   }
 

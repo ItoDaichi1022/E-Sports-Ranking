@@ -39,7 +39,7 @@ const SITE_DESCRIPTION = 'コミュニティの大会運営と個人ランキン
 
 // プレビュー画像が無いときの絵。?v= は index.html と同じ版数に合わせる
 // （/img/* は1年 immutable なので、差し替えたら番号も上げること）。
-const FALLBACK_IMAGE = '/img/icon.png?v=147';
+const FALLBACK_IMAGE = '/img/icon.png?v=148';
 
 // ページの題（h1）と同じ言葉を使う。検索結果とページの中身で名前が違うと、
 // 開いた人に「別のページに来た」と思わせる。
@@ -343,6 +343,10 @@ export function buildPageMeta(page, data = {}, origin) {
   let description = STATIC_DESCRIPTIONS[page] ?? SITE_DESCRIPTION;
   let image = fallbackImage;
   let extraNode = null;
+  // ページの先頭に大きく出る絵（大会・お知らせのヘッダー画像）。
+  // og:image と違ってサイト共通の代わりを入れない ── 「この画面に実際に出る絵」
+  // だけを指す。無いのに場所を取ると、空の帯が残ってしまう。
+  let heroImage = null;
 
   if (notFound) {
     heading = 'ページが見つかりません';
@@ -350,7 +354,7 @@ export function buildPageMeta(page, data = {}, origin) {
   } else if (page === 'tournament' && tournament) {
     heading = tournament.name;
     description = tournamentDescription(tournament, entrantsText);
-    if (tournament.imageUrl) image = tournament.imageUrl;
+    if (tournament.imageUrl) { image = tournament.imageUrl; heroImage = tournament.imageUrl; }
     extraNode = eventNode(tournament, { url, image, description, origin });
   } else if (page === 'bracket' && tournament) {
     heading = `${tournament.name} の対戦表`;
@@ -373,7 +377,7 @@ export function buildPageMeta(page, data = {}, origin) {
   } else if (page === 'news' && announcement) {
     heading = announcement.title;
     description = announcementDescription(announcement);
-    if (announcement.imageUrl) image = announcement.imageUrl;
+    if (announcement.imageUrl) { image = announcement.imageUrl; heroImage = announcement.imageUrl; }
     extraNode = newsArticleNode(announcement, { url, image, description, origin });
   } else if (page === 'home') {
     heading = '';
@@ -396,6 +400,10 @@ export function buildPageMeta(page, data = {}, origin) {
     description: trimDescription(description),
     canonical: url,
     image,
+    // 画面の先頭に出る絵。サーバー側（worker/index.js）が、これを先に取りに行かせ、
+    // 場所も先に取っておくために使う ── ブラウザ任せにすると、この絵のURLが
+    // 分かるのはJSがDBに問い合わせたあとで、一番大きい絵が一番遅く出ることになる。
+    heroImage,
     ogType: page === 'news' ? 'article' : 'website',
     // カードの形。大会のバナーやお知らせの絵があるときだけ横長にする。
     // 正方形のサイト共通アイコンを横長で出すと、余白だらけの間の抜けた見た目になる。
