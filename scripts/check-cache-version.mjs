@@ -274,6 +274,186 @@ if (fontPreloads !== 1) {
   console.log('OK   ロゴの preload を差し込む足場（フォントの preload）が1件ある');
 }
 
+// ---- 画面ごとに分けたCSS（data-css）の持ち主 ----
+//
+// css/bracket.css と css/characters.css は、その画面を開いた人だけが読む
+// （js/app.js の loadViewCss）。読まない画面がそこにしか無いクラスを使うと、
+// その画面だけ崩れる。
+//
+// 【これが自分では気付けない種類の壊れ方であること】開発中は先に別の画面を
+// 開いていることが多く、一度読んだCSSはそのまま残る ── 手元では正しく見える。
+// 崩れるのは「その画面を最初に開いた人」だけなので、リロードして確かめない限り
+// 出てこない。だから機械で見る。
+
+const cssText = (name) =>
+  readFileSync(path.join(ROOT, 'css', name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+const classesIn = (name) =>
+  new Set([...cssText(name).matchAll(/\.([A-Za-z][\w-]*)/g)].map((m) => m[1]));
+
+const baseClasses = classesIn('style.css');
+// data-css で読むCSSごとの、そこにしか無いクラス
+const splitClasses = new Map(
+  [...new Set(viewCssRefs.map(([, file]) => file.replace(/^css\//, '')))]
+    .map((name) => [name, classesIn(name)]),
+);
+
+// index.html を上から読み、その位置がどの画面（または開くきっかけの持ち主）に
+// 属するかを決める。<section id="view-..."> は入れ子にならないので、開始タグから
+// 次の </section> までとする。
+const htmlNoComment = html.replace(/<!--[\s\S]*?-->/g, (m) => ' '.repeat(m.length));
+
+// ダイアログは <section> の外にあるので、どの画面から開くかを名指しで決める。
+// 対戦のチャットは対戦表からしか開かない（js/bracketView.js の openMatchChat）。
+const DIALOG_OWNER = { 'match-chat-dialog': 'bracket.css' };
+
+const owners = [];  // [開始位置, 終了位置, そこが読むCSS]
+for (const m of htmlNoComment.matchAll(/<section id="(view-[\w-]+)"([^>]*)>/g)) {
+  const end = htmlNoComment.indexOf('</section>', m.index);
+  const css = /data-css="\/css\/([\w.-]+\.css)/.exec(m[2])?.[1] ?? null;
+  owners.push([m.index, end === -1 ? htmlNoComment.length : end, css]);
+}
+for (const m of htmlNoComment.matchAll(/<dialog id="([\w-]+)"/g)) {
+  const end = htmlNoComment.indexOf('</dialog>', m.index);
+  owners.push([m.index, end === -1 ? htmlNoComment.length : end, DIALOG_OWNER[m[1]] ?? null]);
+}
+const ownerAt = (i) => owners.find(([a, b]) => i >= a && i < b);
+
+let splitProblems = 0;
+let splitChecked = 0;
+const seen = new Set();
+for (const m of htmlNoComment.matchAll(/class="([^"]+)"/g)) {
+  const owner = ownerAt(m.index);
+  const loaded = owner?.[2] ?? null;
+  for (const name of m[1].trim().split(/\s+/)) {
+    if (baseClasses.has(name)) continue;   // style.css にあるなら誰が使ってもよい
+    splitChecked += 1;
+    for (const [file, set] of splitClasses) {
+      if (!set.has(name) || loaded === file) continue;
+      const key = `${name}|${file}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      splitProblems += 1;
+      fail(`."${name}" は css/${file} にしか無いのに、それを読まない場所で使われています`
+        + `\n     （${loaded ? `この画面が読むのは css/${loaded}` : 'この場所はどの data-css にも属していません'}）。`
+        + '\n     その画面を最初に開いた人にだけ崩れて見えます。'
+        + `\n     直し方は2つ: css/style.css へ戻すか、使う側の <section> に data-css で css/${file} を読ませる。`);
+    }
+  }
+}
+if (splitProblems === 0) {
+  console.log(`OK   分けたCSSにしか無いクラス（index.html の${splitChecked}件を確認）は、`
+    + 'すべて読む画面の中だけで使われている');
+}
+
+// 【上書きは、上書きされる側と同じファイルに置くこと】
+// data-css で読むCSSは style.css より必ず後に来る。狭い画面の上書きを style.css に
+// 残したまま、上書きされる側だけを分けると、後から来たほうが勝って上書きが効かなくなる
+// ── @media は詳細度を上げないので、同じセレクタなら並び順だけで決まる。
+// 実際 .row-art がこの形で壊れかけた（v172）。
+//
+// 【クラス名ではなくセレクタの字面で比べること】クラス名だけで見ると
+// .tournament-actions-row .row-actions（style.css）と .chat-result .row-actions
+// （bracket.css）が同じ扱いになり、無関係な組み合わせまで挙げてしまう。
+// 実際に取り合いになるのは、同じセレクタが両方に書かれているときだけ。
+// { } の外側にある字＝セレクタか @規則。宣言（color: red）は必ず } の手前で終わるので、
+// 「直前の括弧から次の { まで」を拾えば、宣言が混ざることはない。
+function selectorsOf(css) {
+  const found = new Set();
+  for (const [, head] of css.matchAll(/(?:^|[{}])([^{}]*)\{/g)) {
+    for (const one of head.split(',')) {
+      const s = one.replace(/\s+/g, ' ').trim();
+      if (s && !s.startsWith('@')) found.add(s);
+    }
+  }
+  return found;
+}
+const narrowBlock = /@media \(max-width: 720px\) \{([\s\S]*?)\n\}/.exec(cssText('style.css'))?.[1];
+if (narrowBlock === undefined) {
+  fail('css/style.css に @media (max-width: 720px) の節が見つかりません');
+} else {
+  const narrowSelectors = selectorsOf(narrowBlock);
+  const strays = [];
+  for (const [file] of splitClasses) {
+    for (const s of selectorsOf(cssText(file))) {
+      if (narrowSelectors.has(s)) strays.push(`${s}（css/${file} にもある）`);
+    }
+  }
+  if (strays.length) {
+    fail('css/style.css の狭い画面の節が、分けたCSSと同じセレクタを持っています:\n       '
+      + strays.join('\n       ')
+      + '\n     分けたCSSは style.css より後に読まれるので、この上書きは効きません。'
+      + '\n     上書きも、上書きされる側と同じファイルの末尾へ移すこと。');
+  } else {
+    console.log('OK   狭い画面の上書きは、上書きされる側と同じファイルにある');
+  }
+}
+
+// 【どの画面がどの分割CSSを読むかを、ここに書き出しておく】
+//
+// 上の検査は index.html に直接書いてある class しか見られない。中身をJSが組み立てる
+// 画面 ── 大会詳細の参加メンバー一覧（js/app.js）、マイページのキャラクター選択
+// （js/characterPicker.js）── は、data-css を外しても素通りしてしまう。
+// なので「読むべき画面」を名指しで持ち、消えたら気付けるようにする。
+// 画面を増やしたときはここにも足すこと。
+const VIEW_CSS_EXPECTED = {
+  // 参加メンバー一覧の1枠が対戦カード（.match-box + .match-player）そのまま
+  'view-tournament-detail': 'css/bracket.css',
+  'view-bracket': 'css/bracket.css',
+  // 1枠ずつの見た目を対戦表とそろえている（js/bracketView.js の buildEntrantRow）
+  'view-entrants': 'css/bracket.css',
+  // 使用キャラクターを選ぶ欄と、そこから開く一覧（js/characterPicker.js）
+  'view-profile': 'css/characters.css',
+  // 一覧の行に敷く絵（js/players.js の characterRowArtHtml）
+  'view-players': 'css/characters.css',
+  // プロフィールの島と背景（js/app.js の playerHeroHtml）
+  'view-player-detail': 'css/characters.css',
+  // 順位発表の全画面演出（持ち主専用）
+  'view-reveal': 'css/reveal.css',
+};
+const actualViewCss = new Map(
+  [...html.matchAll(/<section id="(view-[\w-]+)"[^>]*data-css="\/(css\/[\w.-]+\.css)/g)]
+    .map((m) => [m[1], m[2]]),
+);
+let viewCssProblems = 0;
+for (const [view, want] of Object.entries(VIEW_CSS_EXPECTED)) {
+  const got = actualViewCss.get(view);
+  if (got === want) continue;
+  viewCssProblems += 1;
+  fail(`${view} が ${want} を読んでいません（実際: ${got ?? 'data-css なし'}）。`
+    + '\n     この画面の中身はJSが組み立てるので、上のクラスの検査には映りません。'
+    + '\n     外したままにすると、その画面を最初に開いた人にだけ崩れて見えます。');
+}
+for (const [view, got] of actualViewCss) {
+  if (VIEW_CSS_EXPECTED[view]) continue;
+  viewCssProblems += 1;
+  fail(`${view} が ${got} を読んでいますが、この表に載っていません。`
+    + '\n     scripts/check-cache-version.mjs の VIEW_CSS_EXPECTED に、'
+    + '\n     なぜその画面に要るのかを添えて足すこと。');
+}
+if (viewCssProblems === 0) {
+  console.log(`OK   画面ごとに分けたCSSを読む${Object.keys(VIEW_CSS_EXPECTED).length}画面が、表のとおりになっている`);
+}
+
+// 【2か所に書き写したルールが、同じ内容のままか】
+// 元は .match-art-cell img と .row-art img を1本のルールにまとめていた。
+// ファイルを分けたので同じ内容を2つに書いている ── 片方だけ直すと、
+// 対戦表と一覧で顔の位置がずれる。画面を見比べないと気付けないので、ここで見る。
+const artRule = (file, selector) =>
+  new RegExp(`\\${selector} \\{([^}]*)\\}`).exec(cssText(file))?.[1]?.replace(/\s+/g, ' ').trim();
+const artBracket = artRule('bracket.css', '.match-art-cell img');
+const artChars = artRule('characters.css', '.row-art img');
+if (artBracket === undefined || artChars === undefined) {
+  fail('行に敷く絵のルールが見つかりません'
+    + `\n     css/bracket.css の ".match-art-cell img": ${artBracket === undefined ? '無し' : '有り'}`
+    + `\n     css/characters.css の ".row-art img": ${artChars === undefined ? '無し' : '有り'}`);
+} else if (artBracket !== artChars) {
+  fail('行に敷く絵のルールが2か所で食い違っています（顔の位置が対戦表と一覧でずれます）。'
+    + `\n     css/bracket.css    .match-art-cell img { ${artBracket} }`
+    + `\n     css/characters.css .row-art img { ${artChars} }`);
+} else {
+  console.log('OK   行に敷く絵のルールが、対戦表と一覧で同じ内容になっている');
+}
+
 // ---- 先読みとインポートマップの並び順 ----
 //
 // 【インポートマップは、どのモジュールの読み込みより先に置くこと】
