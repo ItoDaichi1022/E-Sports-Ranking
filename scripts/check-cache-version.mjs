@@ -88,11 +88,25 @@ if (versions.size > 1) {
 
 const jsFiles = readdirSync(path.join(ROOT, 'js')).filter((n) => n.endsWith('.js'));
 
+// 静的な import 文から読み込み先を拾う正規表現。
+//
+// 【途中を [^'"] に限ること】import 文は
+//     import {
+//       a, b,
+//     } from './state.js';
+// のように複数行にまたがるので、途中は行をまたげる必要がある。しかし [\s\S] で
+// 書くと、その手前にある副作用だけの import
+//     import './intro.js';
+// の行から探し始めたときに、引用符を越えて次の文の from まで一気に飲み込み、
+// intro.js が「無かったこと」になる（実際にそうなっていた）。
+// [^'"] にしておけば引用符で必ず止まるので、文をまたげない。
+const STATIC_IMPORT = /^\s*import\s+(?:[^'"]*?\s+from\s+)?'\.\/([^']+)'/gm;
+
 // 実際にどのモジュールが import されているかを集める
 const used = new Set();
 for (const f of jsFiles) {
   const src = readFileSync(path.join(ROOT, 'js', f), 'utf8');
-  for (const m of src.matchAll(/from\s+'\.\/([^']+)'/g)) used.add(m[1]);
+  for (const m of src.matchAll(STATIC_IMPORT)) used.add(m[1]);
   // 開いたときに取りに行くモジュール（await import('/js/xxx.js')）。
   // こちらも版数の差し替えが要るので、同じように登録漏れを見る ── 見落とすと、
   // その画面だけが古いコピーのまま動き続ける。
@@ -129,7 +143,7 @@ for (const key of Object.keys(imports)) {
 const staticDeps = new Map();
 for (const f of jsFiles) {
   const src = readFileSync(path.join(ROOT, 'js', f), 'utf8');
-  staticDeps.set(f, [...src.matchAll(/^\s*import\s+(?:[\s\S]*?\s+from\s+)?'\.\/([^']+)'/gm)].map((m) => m[1]));
+  staticDeps.set(f, [...src.matchAll(STATIC_IMPORT)].map((m) => m[1]));
 }
 
 // app.js から静的importだけで辿り着ける集合＝起動時に必ず落ちてくるもの。
@@ -159,6 +173,33 @@ overPreloaded.forEach((f) => fail(
 ));
 if (notPreloaded.length === 0 && overPreloaded.length === 0) {
   console.log(`OK   起動時に要る${eager.size}モジュールすべてが先読みされている`);
+}
+
+// ---- 先読みとインポートマップの並び順 ----
+//
+// 【インポートマップは、どのモジュールの読み込みより先に置くこと】
+// <link rel="modulepreload"> はモジュールの読み込みそのものなので、これを
+// インポートマップより前に書くと「読み込みが始まったあとに追加された
+// インポートマップ」となり、ブラウザに無視される。
+// そうなると import './db.js' は ?v= の付かない /js/db.js に解決され、
+// _headers で1年 immutable にしている場所を版数なしで配ることになる
+// ── つまりキャッシュの更新手段が丸ごと死ぬ。
+// 実際に v158 でこれを踏んだ。画面は正常に動いてしまうので気付けない。
+
+const posMap = html.indexOf('<script type="importmap">');
+const posPreload = html.indexOf('<link rel="modulepreload"');
+const posModule = html.indexOf('<script type="module" src=');
+if (posMap === -1) {
+  fail('インポートマップが見つかりません');
+} else if (posPreload !== -1 && posPreload < posMap) {
+  fail('<link rel="modulepreload"> がインポートマップより前にあります。'
+    + '\n     モジュールの読み込みが先に始まるとインポートマップは無視され、'
+    + '\n     ?v= の付かないURLで配られてキャッシュを更新できなくなります。'
+    + '\n     インポートマップの <script> より後ろへ移すこと。');
+} else if (posModule !== -1 && posModule < posMap) {
+  fail('<script type="module"> がインポートマップより前にあります（同上）');
+} else {
+  console.log('OK   インポートマップが、どのモジュール読み込みより先にある');
 }
 
 // data-src の指す読み物ページが実在するか。綴りを間違えると、そのページを
