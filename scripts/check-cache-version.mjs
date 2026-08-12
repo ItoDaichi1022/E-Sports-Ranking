@@ -438,15 +438,18 @@ if (existsSync(imgDir)) {
 // ありながら、スマホでの表示幅は 200 CSS px（css/style.css の .hero-game-logo）。
 // 大会の写真より重い絵を、全員に、毎回配っていた。絵は見た目では重さが分からず、
 // 差し替えるときにも気付けない ── 数字で止めるしかない。
+// のちに計測で、これがホームのLCPの89%を占めていることが分かった
+// （3,820ms のうち 3,390ms がこの1枚の取得）。書き出し直して 40,376 バイトにした。
 const IMAGE_BUDGET = 40 * 1024;
 
 // 【差し替え待ちの控え】いま基準を超えているが、差し替えが決まっているもの。
 // 大きさ（バイト数）まで書いて留めてあるので、**中身が1バイトでも変われば
 // この控えは効かなくなり、基準で測られる**。つまり、差し替えた絵が軽くなって
 // いなければここで止まる。差し替えが済んだらこの行ごと消すこと。
-const BUDGET_PINNED = new Map([
-  ['img/game-logo.webp', 93724],
-]);
+//
+// いまは空。game-logo.webp は 93,724 → 40,376 バイトに書き出し直したので、
+// 控えずに基準で測れるようになった。
+const BUDGET_PINNED = new Map();
 
 const htmlImages = [...new Set(
   [...html.matchAll(/["'(]\/(img\/[\w./-]+\.(?:webp|png|jpe?g|gif|avif))(?:\?v=\d+)?/g)].map((m) => m[1]),
@@ -532,6 +535,55 @@ if (/\.intro-on\b/.test(css)) {
   } else {
     console.log("OK   'intro-on' は <head> で付き、途中で外れない");
   }
+}
+
+// ---- <img> の width/height が実寸と合っているか ----
+//
+// 【なぜ要るか】width/height は「画像の実寸」を書く決まりにしている（img/README.md）。
+// ブラウザはこの比率で場所を先に取るので、実寸とずれると
+//   * 場所の取り方がずれる … 画像が届いた瞬間に行が跳ねる（CLS）
+//   * 縦横比がずれる      … 絵が伸びる／潰れる
+// のどちらかになる。しかも絵を差し替えるときは src だけ直して数字を忘れやすい。
+// 実際、ロゴを 700×623 から 466×415 に書き出し直したときに直す必要があった。
+// 画面を見ても「なんとなく違う」としか分からないので、実物から読んで突き合わせる。
+
+// WebPの見出しから縦横を読む。RIFF....WEBP のあとに続く塊の種類で書き方が違う。
+function webpSize(buf) {
+  if (buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WEBP') return null;
+  const tag = buf.toString('ascii', 12, 16);
+  if (tag === 'VP8X') return { w: buf.readUIntLE(24, 3) + 1, h: buf.readUIntLE(27, 3) + 1 };
+  if (tag === 'VP8 ') return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };
+  if (tag === 'VP8L') {
+    const v = buf.readUInt32LE(21);
+    return { w: (v & 0x3fff) + 1, h: ((v >> 14) & 0x3fff) + 1 };
+  }
+  return null;
+}
+
+let sizeChecked = 0;
+let sizeProblems = 0;
+for (const tag of html.match(/<img[^>]*>/g) ?? []) {
+  const src = /src="\/(img\/[^"?]+)/.exec(tag)?.[1];
+  const w = Number(/\bwidth="(\d+)"/.exec(tag)?.[1]);
+  const h = Number(/\bheight="(\d+)"/.exec(tag)?.[1]);
+  if (!src || !w || !h) continue;
+
+  const full = path.join(ROOT, src);
+  if (!existsSync(full)) continue; // 実在するかは上の別の検査が見ている
+  const real = webpSize(readFileSync(full));
+  if (!real) continue; // WebP以外は読めないので見送る（img/ はWebPに統一済み）
+
+  sizeChecked += 1;
+  if (real.w !== w || real.h !== h) {
+    sizeProblems += 1;
+    fail(`index.html の <img src="/${src}"> が width="${w}" height="${h}" ですが、`
+      + `実物は ${real.w}×${real.h} です。`
+      + '\n     ブラウザはこの数字で場所を取るので、届いた瞬間に行が跳ねるか、絵が伸びます。'
+      + '\n     画像を差し替えたら、この2つも実寸に書き直すこと（img/README.md）。');
+  }
+}
+if (sizeChecked && sizeProblems === 0) {
+  console.log(`OK   index.html の <img> ${sizeChecked}件の width/height が実寸と一致`);
 }
 
 // ---- 版数を過去に使った値へ戻していないか ----
