@@ -235,6 +235,45 @@ if (!appTag) {
   console.log('OK   入口の app.js も fetchpriority="low"');
 }
 
+// ---- ホームのロゴの preload（Worker側）と <img>（index.html側）のURL一致 ----
+//
+// 【なぜ要るか】ホームのロゴは、<head> では worker/index.js が preload として、
+// <body> では index.html が <img src> として、それぞれ別の場所にURLを書いている。
+// 1文字でも食い違うと、ブラウザは別々のURLとして二重に取りに行く
+// ── 40KBを2回配ったうえ、preload が LCP の役に立たなくなる。しかも画面は
+// 普通に出るので気付けない。版数を上げるときに片方だけ直し忘れるのが典型。
+
+const workerSrc = readFileSync(path.join(ROOT, 'worker/index.js'), 'utf8');
+const workerLogo = /const HOME_LOGO = '([^']*)'/.exec(workerSrc)?.[1];
+const logoImgTag = /<img[^>]*id="hero-game-logo"[^>]*>/.exec(html)?.[0] ?? '';
+const logoImgSrc = /\ssrc="([^"]*)"/.exec(logoImgTag)?.[1];
+
+if (workerLogo === undefined) {
+  fail("worker/index.js に const HOME_LOGO = '...' がありません"
+    + '\n     ホームのロゴを <head> で先に取りに行かせる preload の指し先です。');
+} else if (logoImgSrc === undefined) {
+  fail('index.html の id="hero-game-logo" の <img> に src がありません');
+} else if (workerLogo !== logoImgSrc) {
+  fail('ホームのロゴのURLが食い違っています。'
+    + `\n     index.html の <img src>      : ${logoImgSrc}`
+    + `\n     worker/index.js の HOME_LOGO : ${workerLogo}`
+    + '\n     別々のURLとして二重に取りに行くので、40KBを2回配ることになります'
+    + '\n     （しかも preload が LCP に効きません）。両方を同じにすること。');
+} else {
+  console.log(`OK   ホームのロゴの preload と <img> が同じURL（${workerLogo}）`);
+}
+
+// preload を差し込む足場。worker/index.js は link[rel=preload][as=font] の直後へ
+// 置いている。この行が消えたり増えたりすると、差し込み先が無くなる／二重になる。
+const fontPreloads = (html.match(/<link[^>]*rel="preload"[^>]*as="font"[^>]*>/g) ?? []).length;
+if (fontPreloads !== 1) {
+  fail(`<link rel="preload" as="font"> が${fontPreloads}件あります（1件であること）。`
+    + '\n     worker/index.js はこの行の直後にホームのロゴの preload を差し込みます。'
+    + '\n     0件なら差し込まれず、2件以上なら二重に差し込まれます。');
+} else {
+  console.log('OK   ロゴの preload を差し込む足場（フォントの preload）が1件ある');
+}
+
 // ---- 先読みとインポートマップの並び順 ----
 //
 // 【インポートマップは、どのモジュールの読み込みより先に置くこと】

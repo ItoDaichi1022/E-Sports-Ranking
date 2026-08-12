@@ -263,6 +263,14 @@ function escapeAttr(s) {
     .replaceAll('"', '&quot;');
 }
 
+// ホームのロゴ。<head> の preload と <body> の <img> で同じURLを指す必要がある。
+//
+// 【index.html の <img src> と1文字も違えないこと】違えば別のURLとして二重に
+// 取りに行く ── 40KBを2回配ったうえ、preload が LCP の役に立たなくなる。
+// 画面は普通に出るので気付けない。版数を上げるときは、こちらも一緒に上げること
+// （scripts/check-cache-version.mjs が両者を突き合わせて止める）。
+const HOME_LOGO = '/img/game-logo.webp?v=171';
+
 // index.html に既にある行は中身だけ差し替え、無い行はここで足す。
 //
 // 【二重に出さないための約束】下の tags() で足すのは、index.html に「無い」ものだけ。
@@ -281,6 +289,34 @@ function rewriteMeta(response, meta) {
     .on('html', {
       element(el) {
         if (meta.heroImage) el.setAttribute('class', 'has-hero');
+      },
+    })
+    // ホームのロゴを、<head> を読んだ時点で取りに行かせる。
+    //
+    // 【なぜ要るか】この絵の <img> は index.html の32%地点（18,181バイト目）にある。
+    // <head> が終わるのは5,504バイト目なので、ブラウザはヘッダーを読み終えたあと、
+    // さらに13KB ぶんのHTMLを受け取るまでこの絵の存在を知らない。
+    // <img> に付けた fetchpriority="high" は「見つけたあと、どの順で取るか」の指示なので、
+    // 見つけるのが遅ければ効かない ── 実測（Slow 4G・ホーム）で、
+    // HTMLの先頭が届いてから取りに行き始めるまでに 500ms かかっていた。
+    // 同じ計測で大会詳細は130ms。あちらのヘッダー写真は下の tags() が <head> に
+    // preload を出しているからで、それと同じことをホームにもする。
+    //
+    // 【なぜ index.html に直接書かないか】index.html は全ルートに同じものを返している。
+    // 直接書くと、大会詳細を開いた人にも40KBのロゴを配ることになる
+    // ── 下の #hero-game-logo でわざわざ止めたこと（v168）を元に戻す形になる。
+    // だからホームのときだけ足す。
+    //
+    // 【フォントの preload の直後に置く理由】<head> の末尾に足すと
+    // css/style.css の <link> より後ろになる。preload走査は前から順に要求を出すので、
+    // 前に置くほど早く出る。フォントの preload は index.html の <head> の
+    // いちばん前寄りにある同じ種類の行で、足場としてちょうどよい
+    // （その行が1件だけ存在することは scripts/check-cache-version.mjs が見ている）。
+    .on('link[rel="preload"][as="font"]', {
+      element(el) {
+        if (meta.viewId !== 'view-home') return;
+        el.after(`\n<link rel="preload" as="image" href="${HOME_LOGO}" fetchpriority="high">`,
+          { html: true });
       },
     })
     .on('title', { element(el) { el.setInnerContent(meta.title); } })

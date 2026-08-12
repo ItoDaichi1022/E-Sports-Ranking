@@ -35,13 +35,13 @@
 <meta property="og:locale" content="ja_JP">
 <meta property="og:title" content="IgniteArena｜どこでも熱く、遊べ。">
 <meta property="og:description" content="IgniteArenaは、大会の運営とランキングの集計をひとつにまとめた場所。大会を開く・エントリーする・対戦表を追う。ログインなしで全部のぞけます。">
-<meta property="og:image" content="/img/icon.png?v=170">
+<meta property="og:image" content="/img/icon.png?v=171">
 <meta name="twitter:card" content="summary_large_image">
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。
      タブはWebP。iOSのホーム画面（apple-touch-icon）だけはWebPを読まないのでPNGを残す。 -->
-<link rel="icon" href="/img/icon.webp?v=170" type="image/webp">
-<link rel="apple-touch-icon" href="/img/icon.png?v=170">
+<link rel="icon" href="/img/icon.webp?v=171" type="image/webp">
+<link rel="apple-touch-icon" href="/img/icon.png?v=171">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="/fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- 大会の画像とデータの取りに行き先。CSSを読んでいるあいだに名前解決とTLSの
@@ -55,7 +55,7 @@
 <link rel="preconnect" href="https://zgqoeicdnneivzasneez.supabase.co" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="/css/style.css?v=170">
+<link rel="stylesheet" href="/css/style.css?v=171">
 <!-- 【css/reveal.css はここで読まない】順位発表の画面（/reveal/・持ち主専用）だけで
      使う45KBで、しかもほとんどの人は一度も開かない。ここに <link> を置くと、
      ブラウザはそれを読み終えるまで最初の描画を始めないので、全員の表示が
@@ -404,12 +404,19 @@
                ── 絵は見た目では重さが分からないので、これは気付けない。
                scripts/check-cache-version.mjs が 40KB を上限として見張っている。
 
+               【<head> の preload と対になっている】このURLは worker/index.js の
+               HOME_LOGO にも書いてあり、ホームのときだけ <head> に
+               rel="preload" as="image" の link として差し込まれる（この注記の中に
+               タグの形で書かないこと。grep が実物と見分けられなくなる）。
+               1文字でも違えば二重に取りに行くので、版数を上げるときは両方そろえること
+               （scripts/check-cache-version.mjs が突き合わせて止める）。
+
                【ドット絵なので圧縮の勘が効かない】輪郭が全部くっきり立っているため、
                非可逆WebPは写真より高いビットレートを要る。可逆WebPはもっと悪い
                （縮小で中間色が大量に生まれるため、実測で非可逆の6倍）。
                差し替えるときは quality を上げ下げして実測すること。 -->
           <img class="hero-game-logo" id="hero-game-logo" fetchpriority="high"
-               src="/img/game-logo.webp?v=170" alt="" width="466" height="415">
+               src="/img/game-logo.webp?v=171" alt="" width="466" height="415">
         </div>
 
         <p class="hero-eyebrow">Tournament &amp; Ranking</p>
@@ -563,12 +570,12 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view stage" hidden data-src="/pages/guide.html?v=170"></section>
+  <section id="view-guide" class="view stage" hidden data-src="/pages/guide.html?v=171"></section>
 
   <!-- 本番までの環境づくり（回線・コントローラ）。中身は pages/setup.html。
        エントリー済みの大会詳細から誘導する（js/entries.js の setupPrompt）。
        楽天アフィリエイトのリンクを含むので、広告である旨の明示がページ冒頭にある。 -->
-  <section id="view-setup" class="view stage" hidden data-src="/pages/setup.html?v=170"></section>
+  <section id="view-setup" class="view stage" hidden data-src="/pages/setup.html?v=171"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -1010,7 +1017,7 @@
        中身は js/reveal.js、見た目は css/reveal.css。 -->
   <!-- data-css: この画面を初めて開いたときにだけ読むCSS（js/app.js の loadViewCss）。
        ?v= は他と同じ版数にそろえること（scripts/check-cache-version.mjs が確認する）。 -->
-  <section id="view-reveal" class="view" hidden data-css="/css/reveal.css?v=170">
+  <section id="view-reveal" class="view" hidden data-css="/css/reveal.css?v=171">
     <div id="reveal-setup">
       <div class="page-head">
         <p class="page-eyebrow">Reveal</p>
@@ -1112,7 +1119,7 @@
              2本目に data-src を持たせていないのは、2本が同時に15MBを取りに行くのを
              避けるため ── 1本目が流せる状態になってから js/reveal.js が src を渡す。
              そのときには実体がブラウザのキャッシュにあるので、取り直しは起きない。 -->
-        <video id="reveal-bg" class="reveal-bg" data-src="/video/0204.mov?v=170"
+        <video id="reveal-bg" class="reveal-bg" data-src="/video/0204.mov?v=171"
                muted playsinline preload="none" aria-hidden="true"></video>
         <video id="reveal-bg-b" class="reveal-bg"
                muted playsinline preload="auto" aria-hidden="true"></video>
@@ -1131,9 +1138,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal stage" hidden data-src="/pages/terms.html?v=170"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="/pages/terms.html?v=171"></section>
 
-  <section id="view-privacy" class="view legal stage" hidden data-src="/pages/privacy.html?v=170"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="/pages/privacy.html?v=171"></section>
 
 </main>
 
@@ -1164,7 +1171,7 @@
      実行されるため、この行は必ず下の app.js より先に走る。
      js/supabaseClient.js は window.supabase がある前提で書いてあるので、
      この順番が崩れると起動時に例外で止まる ── 動かすときは必ずそこを確かめること。 -->
-<script defer src="/js/vendor/supabase.js?v=170"></script>
+<script defer src="/js/vendor/supabase.js?v=171"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -1176,36 +1183,36 @@
 <script type="importmap">
 {
   "imports": {
-    "/js/auth.js":           "/js/auth.js?v=170",
-    "/js/bracket.js":        "/js/bracket.js?v=170",
-    "/js/bracketView.js":    "/js/bracketView.js?v=170",
-    "/js/bracketZoom.js":    "/js/bracketZoom.js?v=170",
-    "/js/characterData.js":  "/js/characterData.js?v=170",
-    "/js/characterFocus.js": "/js/characterFocus.js?v=170",
-    "/js/characterPicker.js": "/js/characterPicker.js?v=170",
-    "/js/characters.js":     "/js/characters.js?v=170",
-    "/js/db.js":             "/js/db.js?v=170",
-    "/js/entries.js":        "/js/entries.js?v=170",
-    "/js/formDraft.js":      "/js/formDraft.js?v=170",
-    "/js/icons.js":          "/js/icons.js?v=170",
-    "/js/imageUrl.js":       "/js/imageUrl.js?v=170",
-    "/js/intro.js":          "/js/intro.js?v=170",
-    "/js/matchChat.js":      "/js/matchChat.js?v=170",
-    "/js/organizerPicker.js": "/js/organizerPicker.js?v=170",
-    "/js/playerStats.js":    "/js/playerStats.js?v=170",
-    "/js/players.js":        "/js/players.js?v=170",
-    "/js/profile.js":        "/js/profile.js?v=170",
-    "/js/ranking.js":        "/js/ranking.js?v=170",
-    "/js/rankingEligibility.js": "/js/rankingEligibility.js?v=170",
-    "/js/reveal.js":         "/js/reveal.js?v=170",
-    "/js/router.js":         "/js/router.js?v=170",
-    "/js/seo.js":            "/js/seo.js?v=170",
-    "/js/stage.js":          "/js/stage.js?v=170",
-    "/js/state.js":          "/js/state.js?v=170",
-    "/js/supabaseClient.js": "/js/supabaseClient.js?v=170",
-    "/js/tournamentState.js": "/js/tournamentState.js?v=170",
-    "/js/tournamentTier.js": "/js/tournamentTier.js?v=170",
-    "/js/util.js":           "/js/util.js?v=170"
+    "/js/auth.js":           "/js/auth.js?v=171",
+    "/js/bracket.js":        "/js/bracket.js?v=171",
+    "/js/bracketView.js":    "/js/bracketView.js?v=171",
+    "/js/bracketZoom.js":    "/js/bracketZoom.js?v=171",
+    "/js/characterData.js":  "/js/characterData.js?v=171",
+    "/js/characterFocus.js": "/js/characterFocus.js?v=171",
+    "/js/characterPicker.js": "/js/characterPicker.js?v=171",
+    "/js/characters.js":     "/js/characters.js?v=171",
+    "/js/db.js":             "/js/db.js?v=171",
+    "/js/entries.js":        "/js/entries.js?v=171",
+    "/js/formDraft.js":      "/js/formDraft.js?v=171",
+    "/js/icons.js":          "/js/icons.js?v=171",
+    "/js/imageUrl.js":       "/js/imageUrl.js?v=171",
+    "/js/intro.js":          "/js/intro.js?v=171",
+    "/js/matchChat.js":      "/js/matchChat.js?v=171",
+    "/js/organizerPicker.js": "/js/organizerPicker.js?v=171",
+    "/js/playerStats.js":    "/js/playerStats.js?v=171",
+    "/js/players.js":        "/js/players.js?v=171",
+    "/js/profile.js":        "/js/profile.js?v=171",
+    "/js/ranking.js":        "/js/ranking.js?v=171",
+    "/js/rankingEligibility.js": "/js/rankingEligibility.js?v=171",
+    "/js/reveal.js":         "/js/reveal.js?v=171",
+    "/js/router.js":         "/js/router.js?v=171",
+    "/js/seo.js":            "/js/seo.js?v=171",
+    "/js/stage.js":          "/js/stage.js?v=171",
+    "/js/state.js":          "/js/state.js?v=171",
+    "/js/supabaseClient.js": "/js/supabaseClient.js?v=171",
+    "/js/tournamentState.js": "/js/tournamentState.js?v=171",
+    "/js/tournamentTier.js": "/js/tournamentTier.js?v=171",
+    "/js/util.js":           "/js/util.js?v=171"
   }
 }
 </script>
@@ -1258,33 +1265,33 @@
      取ってくる画面では「絵は早く、中身は遅く」という交換になる。承知のうえで入れてある。
      効きが悪ければ、この属性を27本から消すだけで元に戻せる
      （scripts/check-cache-version.mjs の「先読みの優先度」の検査も一緒に外すこと）。 -->
-<link rel="modulepreload" href="/js/auth.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/bracket.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/characterData.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/characterFocus.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/characterPicker.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/characters.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/db.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/entries.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/formDraft.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/icons.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/imageUrl.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/intro.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/matchChat.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/organizerPicker.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/playerStats.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/players.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/profile.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/ranking.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/rankingEligibility.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/router.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/seo.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/stage.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/state.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/supabaseClient.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/tournamentState.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/tournamentTier.js?v=170" fetchpriority="low">
-<link rel="modulepreload" href="/js/util.js?v=170" fetchpriority="low">
+<link rel="modulepreload" href="/js/auth.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/bracket.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/characterData.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/characterFocus.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/characterPicker.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/characters.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/db.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/entries.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/formDraft.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/icons.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/imageUrl.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/intro.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/matchChat.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/organizerPicker.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/playerStats.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/players.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/profile.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/ranking.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/rankingEligibility.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/router.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/seo.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/stage.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/state.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/supabaseClient.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/tournamentState.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/tournamentTier.js?v=171" fetchpriority="low">
+<link rel="modulepreload" href="/js/util.js?v=171" fetchpriority="low">
 <!-- 【fetchpriority="low" を消さないこと（v170で追加）】
      app.js は上に並べた27本の静的importが全部そろうまで1行も実行できない。その27本は
      v169で「低」に落としてある。だからこの1本だけを「高」で先に届けても、残りの26本を
@@ -1300,6 +1307,6 @@
      【css/style.css は同じ手では下げられない】残る最大の先客はCSSだが、あちらは
      レンダリングを止める <link> なので優先度が「最高」で、画像より上にいる。
      下げると画面が白いまま待たされる。あちらは分割するしかない。 -->
-<script type="module" src="/js/app.js?v=170" fetchpriority="low"></script>
+<script type="module" src="/js/app.js?v=171" fetchpriority="low"></script>
 </body>
 </html>
