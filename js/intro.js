@@ -16,7 +16,10 @@
 // 合図は2段階に分けてある。
 //
 //   release() … 門が「開き始めた」ところ。intro-hold を外し、'intro-done' を投げる。
-//               js/stage.js がこれを待って、ホームの登場アニメを始める。
+//               js/stage.js がこれを待って、画面より下の登場アニメを始める。
+//               ホームのヒーローはここを待たない ── css/style.css の
+//               「ヒーローの登場（JSを通さない）」がCSSだけで出す。このファイルが
+//               1バイトも届かなくてもヒーローは出る、という状態を崩さないこと。
 //               閉じきるまで待たせると、開いていく0.6秒のあいだ中身が空っぽの
 //               ホームが見えてしまう。開きながら中身が立ち上がるほうが自然。
 //   finish()  … 幕そのものを片付ける。印を外し、器をDOMから外す。
@@ -28,14 +31,36 @@ const SAFETY_MS = 4000;
 const root = document.documentElement;
 const introEl = document.getElementById('intro');
 
+// 開門を載せてある器。「幕がいつ動き出すか」の基準がここの animation にある。
+const gate = introEl?.querySelector('.intro-half-r') ?? null;
+
 let released = false;
 let done = false;
+
+// 幕を飛ばされたとき、ヒーローの待ちも一緒に解く。
+//
+// ヒーローの登場は css/style.css の「ヒーローの登場（JSを通さない）」に載っていて、
+// <html class="intro-on"> が付いているあいだは開門と同じだけ待つ。飛ばした人に
+// その待ち時間をそのまま押しつけると、幕が消えたあとに何も無い画面が残る。
+//
+// 【まだ開門が始まっていないときだけ外すこと】animation-delay を決めている指定が
+// 当たらなくなると、アニメーションは頭から掛け直される。始まったあとに外すと、
+// 立ち上がりかけたヒーローが一度伏せてやり直す（目に見えるちらつきになる）。
+//
+// 待ち時間の値は幕の animation から読む。ここに 1.9 を書き写すと、CSS側だけを
+// 直したときに気付けないずれになる。
+function unlockHero() {
+  const anim = typeof gate?.getAnimations === 'function' ? gate.getAnimations()[0] : null;
+  if (anim && (anim.currentTime ?? 0) >= (anim.effect?.getTiming?.().delay ?? 0)) return;
+  root.classList.remove('intro-on');
+}
 
 // 門が開き始めた ── ホームに「もう動いていい」と伝える
 function release() {
   if (released) return;
   released = true;
   root.classList.remove('intro-hold');
+  unlockHero();
   document.dispatchEvent(new CustomEvent('intro-done'));
 }
 
@@ -72,7 +97,6 @@ if (introEl && root.classList.contains('intro-playing')) {
   // 2.5秒より後になったとき、イベントを取り逃して保険タイマーまで待つことになる。
   // getAnimations() は「もう終わっている」場合も finished が解決済みで返るので、
   // 遅れて読み込まれても即座に追いつける。
-  const gate = introEl.querySelector('.intro-half-r');
 
   // 開門の始まり。animationstart は待ち時間（animation-delay）が明けたときに来るので、
   // これがそのまま「門が動き出した瞬間」になる。

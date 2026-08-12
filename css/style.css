@@ -6204,7 +6204,12 @@ dialog.char-picker { max-width: 56rem; }
 /* ---- スクロールに合わせた登場 ----
    少し下から、わずかに傾いて起き上がる。js/stage.js が画面に入った順に
    .is-in を付ける。一度付いたら外れないので、背景の自動更新で描き直されても
-   再生し直さない。 */
+   再生し直さない。
+
+   【最初の1画面には使わないこと】この仕組みは opacity:0 をJSでしか解けない。
+   読み込んだ時点で既に画面の中にいる要素（ホームのヒーロー）に付けると、
+   モジュールが全部届くまでそこが白紙になり、届かなければ永久に出ない。
+   ヒーローは下の「ヒーローの登場（JSを通さない）」でCSSだけで出している。 */
 .stage-ready .reveal {
   opacity: 0;
   transform: translateY(22px) rotate(0.35deg);
@@ -6219,37 +6224,11 @@ dialog.char-picker { max-width: 56rem; }
 .stage-ready .stat-item:nth-child(2) { transition-delay: 0.08s; }
 .stage-ready .stat-item:nth-child(3) { transition-delay: 0.16s; }
 
-/* ---- 見出しの1文字送り ----
-   塊ごとではなく1文字ずつ動かす見出し。js/stage.js が文字を span に割り、
-   --char-i に何番目かを入れる。読み上げは親の aria-label が受け持つので、
-   字が分かれても語は割れない。
-
-   【data-split-done が付くまで伏せておくこと】
-   この解除を無条件に書くと、JSが文字を割る前の「素のままの見出し」が
-   一瞬表示され、割った瞬間に消えて、そのあと1文字ずつ出直す ── という
-   ちらつきになる（.stage-char の側は opacity:0 から始まるため）。
-   分割が済むまでは .reveal の opacity:0 をそのまま活かして伏せておき、
-   済んでから塊としてだけ見せる。出方は .stage-char が受け持つ。 */
-.stage-ready .reveal-chars[data-split-done="1"] {
-  opacity: 1;
-  transform: none;
-}
-
-.stage-char {
-  display: inline-block;
-  transition: opacity 0.5s ease-out, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.stage-ready .reveal-chars .stage-char {
-  opacity: 0;
-  transform: translateY(0.45em);
-}
-
-.stage-ready .reveal-chars.is-in .stage-char {
-  opacity: 1;
-  transform: none;
-  transition-delay: calc(var(--char-i, 0) * 45ms);
-}
+/* 【見出しの1文字送りは廃止した】ホームの <h1> だけが使っていた仕組みで、
+   js/stage.js が文字を span に割り、--char-i の順に出していた（.reveal-chars /
+   .stage-char / data-split）。ヒーローをJSの到着から切り離すにあたり、CSSだけでは
+   文字を割れないので塊ごとのフェードに変えた。使う側が1つも無くなったため、
+   CSS・JSとも消してある（要るときは git から戻せる）。 */
 
 /* ---------------------------------------------------------------------------
    ホームのヒーロー（画面いっぱいの名乗り）
@@ -6783,7 +6762,9 @@ body.nav-open header::after { opacity: 0; }
      .hero-tagline  … ::after に下線バーを持つ。overflow:hidden で切り落とされる
      .page-eyebrow  … ::before に斜めの光を持つ。同上（こちらは下の視差の担当）
      .guide-chapter … display:flex で章番号と横に並ぶ。包むと横並びが崩れる
-     .hero-title    … 既に1文字送りが掛かっている。二重に動かさない */
+     .hero-title    … ヒーローの登場（下の「ヒーローの登場（JSを通さない）」）が
+                       既に動かしている。二重に動かさない。そもそも MASK_SELECTOR は
+                       .page-head の中しか見ないので、ここには届かない */
 
 .stage-mask-body { display: block; }
 
@@ -6807,23 +6788,87 @@ body.nav-open header::after { opacity: 0; }
 
    拡大率をカスタムプロパティに逃がしているのは、ホバーの拡大と喧嘩させないため。
    transform を直接上書きし合うと、詳細度の勝った側がホバーを殺してしまう。 */
-.stage-ready .featured-thumb,
-.stage-ready .hero-game {
+.stage-ready .featured-thumb {
   clip-path: inset(0 0 100% 0);
   transition: clip-path 0.9s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.stage-ready .featured-card.is-in .featured-thumb,
-.stage-ready .hero-game.is-in {
+.stage-ready .featured-card.is-in .featured-thumb {
   clip-path: inset(0 0 0 0);
 }
 
 .stage-ready .featured-card:not(.is-in) .featured-thumb img { --thumb-scale: 1.12; }
 
-/* ロゴは開く動きだけに任せ、塊ごとのフェードは打ち消す（二重に動かさない） */
+/* 【ヒーローのロゴ（.hero-game）をここに戻さないこと】同じ「下から開く」動きだが、
+   .is-in を付けるのは js/stage.js なので、この形にするとロゴがJSの到着まで
+   閉じたままになる。ヒーローだけは下の節でCSSだけで開く。 */
+
+/* ---------------------------------------------------------------------------
+   ヒーローの登場（JSを通さない）
+   ---------------------------------------------------------------------------
+
+   ホームの最初の1画面だけは、上の .reveal（js/stage.js が .is-in を付ける）に
+   載せない。
+
+   【なぜ分けたか】.reveal は「最初は透明 → 画面に入ったら不透明」を
+   IntersectionObserver で切り替える仕組みで、透明を解けるのは js/stage.js だけ。
+   ところがヒーローは読み込んだ瞬間から画面の中にいるので、そもそもスクロールを
+   待つ理由が無い。にもかかわらず、約148KiBのモジュールが全部届くまでホームに
+   1文字も描かれない状態になっていた ── 実測で、ダウンロードするものが何も無い
+   文字が出るまでに 3,390ms（Slow 4G・CPU4倍）。
+   さらに悪いことに、JSが最後まで届かなければホームは永久に真っ黒だった。保険は
+   js/intro.js（4秒）と js/stage.js（5秒）にもあるが、どちらもモジュールの中なので
+   届かなければ動けず、index.html の6秒の保険は intro-playing / intro-hold を
+   外すだけで .is-in は付けない。
+
+   CSSのアニメーションに移すと、最初の描画と同時に動き出す。JSの到着どころか、
+   JSが動くことすら要らない。
+
+   【画面より下は今までどおり】.reveal はスクロールして初めて見える要素のための
+   仕組みで、そちらは正しく働いている。外したのはヒーローの中だけ。
+   --------------------------------------------------------------------------- */
+
+/* 幕（js/intro.js の開門）を出す回は、開門と同じ時刻に立ち上げる。
+   目印に .intro-playing ではなく .intro-on を使うのは、こちらが一度付いたら
+   外れない印だから ── .intro-playing は幕が消えるとき（約2.5秒）に外れるが、
+   animation-delay を決めている指定が途中で当たらなくなると、アニメーションは
+   頭から掛け直される（＝立ち上がりかけたヒーローが伏せてやり直す）。
+
+   1.9s は下の「導入の演出（開門）」にある .intro-half-* の animation-delay と
+   同じ値。片方だけ動かすと、幕が開いた先に空っぽのホームが見える（または逆に、
+   幕の裏でヒーローが立ち上がり終える）。直すときは必ず両方いっしょに直すこと。 */
+.stage-ready.intro-on .hero { --hero-gate: 1.9s; }
+
+.stage-ready .hero-body > :not(.hero-game) {
+  animation: hero-in 0.65s cubic-bezier(0.2, 0.8, 0.2, 1)
+             calc(var(--hero-gate, 0s) + var(--hero-i, 0) * 90ms) both;
+}
+
+/* 上から順にわずかにずらす。要素に番号を書かず nth-child で振るのは、画像が
+   無いときに js/app.js が .hero-game を隠しても番号が動かないため
+   （display:none になっても nth-child の数え方は変わらない）。 */
+.stage-ready .hero-body > :nth-child(2) { --hero-i: 1; }
+.stage-ready .hero-body > :nth-child(3) { --hero-i: 2; }
+.stage-ready .hero-body > :nth-child(4) { --hero-i: 3; }
+.stage-ready .hero-body > :nth-child(5) { --hero-i: 4; }
+
+@keyframes hero-in {
+  from { opacity: 0; transform: translateY(22px) rotate(0.35deg); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ロゴは下から広がって開く（フェードは重ねない。二重に動かすと落ち着かない）。
+
+   【閉じた状態を素の clip-path で書かないこと】書くと、動きを止めている人向けの
+   一括停止（animation: none）を掛けたときにロゴが閉じたまま残る。backwards の
+   効き目で待ち時間のあいだも from の状態が保たれるので、キーフレームの中だけで足りる。 */
 .stage-ready .hero-game {
-  opacity: 1;
-  transform: none;
+  animation: hero-game-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) var(--hero-gate, 0s) both;
+}
+
+@keyframes hero-game-in {
+  from { clip-path: inset(0 0 100% 0); }
+  to   { clip-path: inset(0 0 0 0); }
 }
 
 /* ---------------------------------------------------------------------------
@@ -6965,7 +7010,6 @@ body.nav-open header::after { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .stage-ready .reveal,
   .stage-ready .reveal.is-in,
-  .stage-ready .reveal-chars .stage-char,
   .stage-ready [data-mask] .stage-mask-body {
     opacity: 1 !important;
     transform: none !important;
@@ -6981,6 +7025,9 @@ body.nav-open header::after { opacity: 0; }
      0.01ms に潰す指定では止まらない。名前ごと外して確実に止める。 */
   .stage-ready .hero-bg-word,
   .stage-ready .hero-body,
+  /* ヒーローの登場（hero-in / hero-game-in）。ロゴの閉じた状態はキーフレームの
+     中にしか無いので、名前ごと外せばそのまま開いた状態で出る。 */
+  .stage-ready .hero-body > *,
   .stage-ready .hero-game-logo,
   .stage-ready .hero-scroll,
   .stage-ready .stage .page-eyebrow,
@@ -7011,8 +7058,15 @@ body.nav-open header::after { opacity: 0; }
 
    【出す・出さないは index.html の <head> が決める】ここは既定を display:none に
    しておくだけ。印（.intro-playing）が付かなければ一瞬も表示されない。
-   <head> はもう1つ .intro-hold という印も付けるが、そちらはCSSでは使わない
-   （ホームの登場アニメを待たせるための印。js/stage.js が見ている）。
+   <head> はもう2つ印を付ける。
+     .intro-hold … 画面より下の登場アニメを待たせる。CSSでは使わない（js/stage.js）
+     .intro-on   … ヒーローの登場を開門と同じ時刻まで待たせる。上の
+                   「ヒーローの登場（JSを通さない）」が使う
+
+   【1.9s を動かすときは --hero-gate も一緒に動かすこと】下の .intro-half-* の
+   待ち時間と、ヒーローの --hero-gate は同じ値でなければならない。片方だけ変えると、
+   幕が開いた先に空っぽのホームが出る（または逆に、幕の裏でヒーローが立ち上がり
+   終える）。scripts/check-cache-version.mjs が両者を突き合わせて見張っている。
 
    【スクロールは止めない】止めると縦スクロールバーが消えて本文が横にずれる。
    代わりに js/intro.js が「スクロールしたら飛ばす」を受け持っている。

@@ -471,6 +471,69 @@ if (budgetProblems === 0) {
   console.log(`OK   index.html が指す画像${htmlImages.length}件は大きさの基準内（${IMAGE_BUDGET} バイト）`);
 }
 
+// ---- ホームの最初の1画面がJSを待たないか ----
+//
+// ホームのヒーロー（ロゴ・名乗り・サブタイトル・ボタン）は css/style.css の
+// 「ヒーローの登場（JSを通さない）」がCSSだけで出している。ここに .reveal を
+// 付け直すと、透明を解けるのが js/stage.js だけになり、約148KiBのモジュールが
+// 全部届くまでホームが白紙になる ── 届かなければ永久に真っ黒。
+// 実際にそうなっていて、ダウンロードするものが何も無い文字が出るまでに
+// 3,390ms かかっていた（Slow 4G・CPU4倍）。画面上は「なんとなく遅い」だけで、
+// 壊れないぶん気付けないので、ここで弾く。
+
+const css = readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+
+const heroBody = /<div class="hero-body">([\s\S]*?)\n      <\/div>/.exec(html)?.[1];
+if (!heroBody) {
+  fail('index.html に <div class="hero-body"> が見つかりません（検査できません）');
+} else if (/class="[^"]*\breveal\b/.test(heroBody)) {
+  fail('ホームのヒーローに class="reveal" が付いています。'
+    + '\n     .reveal の opacity:0 を解けるのは js/stage.js だけなので、'
+    + '\n     モジュールが全部届くまでホームが白紙になります（届かなければ永久に）。');
+// 名前の終わりは \b ではなく \s*\{ で見る。\b はハイフンの手前でも成立するので、
+// hero-in を hero-in-unused に書き換えても素通りしてしまう（実際に素通りした）。
+} else if (!/@keyframes hero-in\s*\{/.test(css) || !/@keyframes hero-game-in\s*\{/.test(css)
+  || !/\.stage-ready \.hero-body > :not\(\.hero-game\)/.test(css)) {
+  fail('css/style.css の「ヒーローの登場（JSを通さない）」が見当たりません。'
+    + '\n     .reveal から外したヒーローを出すものが無くなると、ホームが永久に白紙になります。');
+} else {
+  console.log('OK   ホームのヒーローはJSを待たずに出る（.reveal に載っていない）');
+}
+
+// 幕の待ち時間（.intro-half-* の animation-delay）と、ヒーローの待ち時間
+// （--hero-gate）は同じ値でなければならない。片方だけ動かすと、幕が開いた先に
+// 空っぽのホームが出る（または逆に、幕の裏でヒーローが立ち上がり終える）。
+// 同じ数字が離れた2か所にあり、しかも画面を見比べないと分からないずれ方をする。
+const gateDelays = [...css.matchAll(/animation: intro-open-[lr] [^;]*?([\d.]+)s both;/g)].map((m) => m[1]);
+const heroGate = /--hero-gate:\s*([\d.]+)s/.exec(css)?.[1];
+if (gateDelays.length !== 2 || !heroGate) {
+  fail(`幕の animation-delay（${gateDelays.length}件）か --hero-gate（${heroGate ?? 'なし'}）が読めません`);
+} else if (new Set([...gateDelays, heroGate]).size !== 1) {
+  fail(`幕の待ち時間（${gateDelays.join(' / ')}s）とヒーローの待ち時間（${heroGate}s）が違います。`
+    + '\n     幕が開いた先に空っぽのホームが出るか、幕の裏でヒーローが立ち上がり終えます。'
+    + '\n     css/style.css の .intro-half-* と --hero-gate を同じ値にすること。');
+} else {
+  console.log(`OK   幕とヒーローの待ち時間がそろっている（${heroGate}s）`);
+}
+
+// ヒーローの待ち時間は <html class="intro-on"> が決める。付け忘れると幕より先に
+// ヒーローが立ち上がり、幕の裏で登場が終わってしまう。
+// 逆に、幕の後始末でこの印まで外すと animation-delay の指定が当たらなくなり、
+// アニメーションが頭から掛け直される（立ち上がりかけたヒーローが伏せてやり直す）。
+if (/\.intro-on\b/.test(css)) {
+  if (!/classList\.add\([^)]*'intro-on'[^)]*\)/.test(html)) {
+    fail("index.html の <head> が 'intro-on' を付けていません。"
+      + '\n     ヒーローが幕より先に立ち上がり、幕の裏で登場が終わります。');
+  } else if (/classList\.remove\([^)]*'intro-on'[^)]*\)/.test(html)) {
+    fail("index.html が 'intro-on' を外しています。"
+      + '\n     待ち時間の指定が途中で当たらなくなり、ヒーローの登場が頭から掛け直されます'
+      + '\n     （立ち上がりかけた文字が一度伏せてやり直す）。外すのは js/intro.js の'
+      + '\n     unlockHero だけで、あちらは開門が始まる前かどうかを確かめている。');
+  } else {
+    console.log("OK   'intro-on' は <head> で付き、途中で外れない");
+  }
+}
+
 // ---- 版数を過去に使った値へ戻していないか ----
 //
 // 【一度配ったURLは二度と別の中身にできない】_headers で /js/ /css/ /img/ /pages/ を

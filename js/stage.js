@@ -16,6 +16,12 @@
 //   そこで <html class="stage-ready"> が付いているときだけ透明にする形にし、
 //   その印は index.html の <head> の1行が、動きを許す人にだけ付ける。
 //   結果、止めている人には「最初から全部見えている」状態になる。
+//
+// 【ホームの最初の1画面はここでは扱わない】ヒーローは読み込んだ時点で既に画面の
+//   中にいるので、スクロールを待つ理由が無い。それをこのファイルの .reveal に
+//   載せていたせいで、モジュールが全部届くまでホームが白紙のままだった（実測
+//   3,390ms、届かなければ永久）。いまは css/style.css の「ヒーローの登場
+//   （JSを通さない）」がCSSだけで出している。ここへ戻さないこと。
 
 import { state } from './state.js';
 import { safeUrl } from './util.js';
@@ -79,42 +85,6 @@ function observeReveals(root) {
 
   const observer = getRevealObserver();
   root.querySelectorAll('.reveal:not(.is-in), [data-mask="on"]').forEach((el) => observer.observe(el));
-}
-
-/* ---------------------------------------------------------------------------
-   大見出しの1文字送り
-   --------------------------------------------------------------------------- */
-
-// 文字を1つずつ <span> に割って、順番に出す。
-//
-// 読み上げには元の1語として伝えたいので、親に aria-label を置き、
-// バラした文字は aria-hidden にする（そうしないと「I・g・n・i…」と
-// 1文字ずつ読まれる）。
-function splitChars(el) {
-  if (el.dataset.splitDone === '1') return;
-
-  const text = el.textContent.trim();
-  if (!text) return;
-
-  el.dataset.splitDone = '1';
-  el.setAttribute('aria-label', text);
-
-  const frag = document.createDocumentFragment();
-  // スプレッドで回すのは、絵文字などの表現を途中で割らないため
-  // （text[i] だと1文字が2つに割れることがある）。
-  [...text].forEach((ch, i) => {
-    const span = document.createElement('span');
-    span.className = 'stage-char';
-    span.setAttribute('aria-hidden', 'true');
-    // 出る順番。CSS側で transition-delay に使う。
-    span.style.setProperty('--char-i', String(i));
-    // 空白は span に入れると潰れるので、潰れない空白に置き換える
-    span.textContent = ch === ' ' ? ' ' : ch;
-    frag.appendChild(span);
-  });
-
-  el.textContent = '';
-  el.appendChild(frag);
 }
 
 /* ---------------------------------------------------------------------------
@@ -387,24 +357,24 @@ export function initStage(viewEl) {
   if (!viewEl) return;
 
   // 導入の演出（js/intro.js）が幕を張っているあいだは仕掛けない。
-  // ここで仕掛けてしまうと、ヒーローの1文字送りが幕の裏で終わってしまい、
-  // 開門したときには静止したホームが出てくる。
+  // ここで仕掛けてしまうと、登場アニメが幕の裏で終わってしまい、開門したときには
+  // 静止した画面が出てくる。
   // 印は intro-playing ではなく intro-hold を見る ── 幕が消えきるのを待つと、
   // 門が開いていく0.6秒のあいだ、中身が空っぽのホームが見えてしまうため。
+  //
+  // 【ヒーローはここに載っていない】ホームの最初の1画面は css/style.css の
+  // 「ヒーローの登場（JSを通さない）」がCSSだけで出す。ここで待たせているのは
+  // 画面より下のものだけで、どのみちスクロールしなければ見えない位置にある。
   if (document.documentElement.classList.contains('intro-hold')) {
     pendingViews.add(viewEl);
     armPendingSafety();
     return;
   }
 
-  if (!prefersReducedMotion()) {
-    viewEl.querySelectorAll('[data-split]').forEach(splitChars);
-
-    // マスク開きは見出しの形で拾うが、その形は大会一覧など「使う面」にもある。
-    // .stage が付いた画面（ホーム・はじめに・規約類・お知らせ）だけを対象にする。
-    if (viewEl.classList.contains('stage')) {
-      viewEl.querySelectorAll(MASK_SELECTOR).forEach(wrapMask);
-    }
+  // マスク開きは見出しの形で拾うが、その形は大会一覧など「使う面」にもある。
+  // .stage が付いた画面（ホーム・はじめに・規約類・お知らせ）だけを対象にする。
+  if (!prefersReducedMotion() && viewEl.classList.contains('stage')) {
+    viewEl.querySelectorAll(MASK_SELECTOR).forEach(wrapMask);
   }
 
   observeReveals(viewEl);
