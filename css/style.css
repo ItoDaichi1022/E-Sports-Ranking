@@ -1461,12 +1461,20 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   border-radius: var(--r);
 }
 
-/* 大会詳細の仮置き。エントリーの導線（.entry-cta）の場所に立つので、前後の空きも
-   そちらに揃える ── 上の余白が食い違うと、中身が入った瞬間に上端の位置がずれ、
-   場所を空けておいた意味がなくなる。高さは .entry-cta のおおよその高さ。 */
+/* 大会詳細の仮置き。3枚まとめてエントリーの枠（#tournament-entry-cta）の中に置く。
+   1枚目が .entry-cta、2枚目3枚目が対戦表・出場選手一覧への入口（.link-card）の
+   場所に立ち、届いた中身と同じ形・同じ並びになる。
+   【3枚とも同じ枠の中に入れること】下の枠（大会情報）に分けて置くと、届いた中身が
+   その上に割り込んで仮置きを突き落とす。上端の位置も .entry-cta に揃えてある ──
+   余白が食い違うと、入れ替わった瞬間にその差ぶんだけずれる。 */
 .skeleton-panel-cta {
   height: 9rem;
   margin: 0 0 1.5rem;
+}
+
+.skeleton-panel-link {
+  height: 4.5rem;
+  margin: 0 0 1rem;
 }
 
 /* 動きを止めている人には流さない。待っていることは形だけで伝わる。 */

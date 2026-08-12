@@ -1667,7 +1667,11 @@ function renderTournamentDetailLoading() {
   // 下の空きに足されるだけになる。動くものが無いので、ずれようがない。
   // 逆に、下の枠は読み込み中は空のままにしておくこと。
   renderEntryCta(tournamentEntryCtaEl, null);
-  tournamentEntryCtaEl.innerHTML = '<div class="skeleton-line skeleton-panel skeleton-panel-cta"></div>';
+  tournamentEntryCtaEl.innerHTML = [
+    '<div class="skeleton-line skeleton-panel skeleton-panel-cta"></div>',
+    '<div class="skeleton-line skeleton-panel skeleton-panel-link"></div>',
+    '<div class="skeleton-line skeleton-panel skeleton-panel-link"></div>',
+  ].join('');
   tournamentEntryCtaEl.hidden = false;
   tournamentInfoEl.innerHTML = '';
 }
