@@ -22,6 +22,7 @@ import { tournamentTier } from './tournamentTier.js';
 import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
 import { renderProfileForm, profileMetaHtml, profileBioHtml, isProfileFormMounted } from './profile.js';
 import { characterImageUrl } from './characters.js';
+import { heroImageUrl } from './imageUrl.js';
 import { keepFormDraft, clearFormDraft } from './formDraft.js';
 import { mountOrganizerPicker } from './organizerPicker.js';
 import {
@@ -1416,7 +1417,11 @@ function deadlineInputValue(iso) {
 // 一番見せたい絵が一番遅く出ることになる。fetchpriority で先に取らせる。
 // 逆に一覧のカードや対戦表の中の絵は lazy のままでよい（画面の外にあるため）。
 function renderHero(el, imageUrl) {
-  const url = safeUrl(imageUrl);
+  // 【必ず heroImageUrl を通すこと】サーバーが返したHTMLの中の <img> も、
+  // 同じ関数を通したURLで書かれている（js/seo.js の heroImage → worker/index.js）。
+  // ここで通し忘れると、下の「同じ絵なら何もしない」の比較が必ず外れ、
+  // せっかく届いた絵を捨てて、別のURLとして同じ絵をもう一度取りに行くことになる。
+  const url = safeUrl(heroImageUrl(imageUrl));
 
   // 「先頭に絵が出るページ」の印。最初に付けるのは worker/index.js（HTMLを返すとき）で、
   // その時点の1ページぶんしか知らない。ここで付け直すのは、画面を移っても

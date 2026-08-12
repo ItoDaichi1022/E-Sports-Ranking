@@ -23,6 +23,9 @@ import { pathFor } from './router.js';
 // 二重に判定すると、画面には「終了」と出ているのに検索結果は「開催予定」のまま、
 // という形でずれる。
 import { eventStatusOf, entryState } from './tournamentState.js';
+// 先頭に出る絵は、表示する大きさで配ってもらう。og:image はここを通さない
+// （SNSのプレビューは大きいまま渡したい。理由は下の heroImage の指定を参照）。
+import { heroImageUrl } from './imageUrl.js';
 
 export const SITE_NAME = 'IgniteArena';
 export const SITE_TAGLINE = 'どこでも熱く、遊べ。';
@@ -39,7 +42,7 @@ const SITE_DESCRIPTION = 'コミュニティの大会運営と個人ランキン
 
 // プレビュー画像が無いときの絵。?v= は index.html と同じ版数に合わせる
 // （/img/* は1年 immutable なので、差し替えたら番号も上げること）。
-const FALLBACK_IMAGE = '/img/icon.png?v=160';
+const FALLBACK_IMAGE = '/img/icon.png?v=161';
 
 // ページの題（h1）と同じ言葉を使う。検索結果とページの中身で名前が違うと、
 // 開いた人に「別のページに来た」と思わせる。
@@ -346,6 +349,11 @@ export function buildPageMeta(page, data = {}, origin) {
   // ページの先頭に大きく出る絵（大会・お知らせのヘッダー画像）。
   // og:image と違ってサイト共通の代わりを入れない ── 「この画面に実際に出る絵」
   // だけを指す。無いのに場所を取ると、空の帯が残ってしまう。
+  //
+  // 【og:image（上の image）とは別に持つ理由がもう1つある】
+  // こちらは heroImageUrl を通して、画面に出る大きさで配ってもらう（js/imageUrl.js）。
+  // og:image は通さない ── SNSのプレビューは相手のレイアウトしだいで大きく出るし、
+  // 一度取り込まれると差し替えが効かない。こちらの都合で小さくする場所ではない。
   let heroImage = null;
 
   if (notFound) {
@@ -354,7 +362,7 @@ export function buildPageMeta(page, data = {}, origin) {
   } else if (page === 'tournament' && tournament) {
     heading = tournament.name;
     description = tournamentDescription(tournament, entrantsText);
-    if (tournament.imageUrl) { image = tournament.imageUrl; heroImage = tournament.imageUrl; }
+    if (tournament.imageUrl) { image = tournament.imageUrl; heroImage = heroImageUrl(tournament.imageUrl); }
     extraNode = eventNode(tournament, { url, image, description, origin });
   } else if (page === 'bracket' && tournament) {
     heading = `${tournament.name} の対戦表`;
@@ -377,7 +385,7 @@ export function buildPageMeta(page, data = {}, origin) {
   } else if (page === 'news' && announcement) {
     heading = announcement.title;
     description = announcementDescription(announcement);
-    if (announcement.imageUrl) { image = announcement.imageUrl; heroImage = announcement.imageUrl; }
+    if (announcement.imageUrl) { image = announcement.imageUrl; heroImage = heroImageUrl(announcement.imageUrl); }
     extraNode = newsArticleNode(announcement, { url, image, description, origin });
   } else if (page === 'home') {
     heading = '';

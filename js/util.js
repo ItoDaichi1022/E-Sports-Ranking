@@ -2,6 +2,8 @@
 // 表示に関わる小さな道具をここに集めておくことで、players.js と profile.js が
 // 互いに import し合う（循環参照）のを避けている。
 
+import { cardImageUrl } from './imageUrl.js';
+
 export function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str ?? '';
@@ -92,7 +94,9 @@ export function cardThumb(imageUrl, fallbackName, { tall = false } = {}) {
   const el = document.createElement('div');
   el.className = `card-thumb${tall ? ' is-tall' : ''}`;
 
-  const url = safeUrl(imageUrl);
+  // 枠は160px（お知らせは260px）しかないので、原本ではなく枠に見合う大きさで
+  // 配ってもらう（js/imageUrl.js）。一覧には何枚も並ぶので、ここが一番効く。
+  const url = safeUrl(cardImageUrl(imageUrl));
   if (url) {
     el.innerHTML = `<img src="${escapeHtml(url)}" alt="" loading="lazy">`;
   } else {
