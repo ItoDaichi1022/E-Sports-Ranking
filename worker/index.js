@@ -311,6 +311,28 @@ function rewriteMeta(response, meta) {
         if (meta.viewId !== 'view-home') el.setAttribute('hidden', '');
       },
     })
+    // ホームのロゴ（約40KB）を、ホームを開かない人に配らない。
+    //
+    // 【なぜ要るか】<img> は display:none の中にあっても取りに行かれる。取得を
+    // 決めるのはDOM上の src であって、表示されているかどうかではない。上の
+    // #view-home に hidden を付けても、この絵だけは全ページで落ちてくる
+    // ── 実際、大会詳細のネットワーク一覧に出ていることを確認した。
+    // 大会詳細のLCPは自前のヘッダー写真なので、この40KBはただ回線を奪っていた。
+    //
+    // 【なぜ src を消すのではなく loading="lazy" か】src を消すと、あとから
+    // ホームへ移った人のためにJS側で戻す必要があり、js/app.js の「画像が無ければ
+    // ブロックごと隠す」判定とも噛み合わせなければならない。lazy なら
+    // 画面に入るまで取りに行かず、SPAがホームを出した瞬間に自分で取りに行く
+    // ── JS側に手を入れずに済む。
+    //
+    // 【ホームには付けないこと】ホームではこの絵がLCP要素そのもの。lazy を
+    // 付けると最優先で取るべきものを後回しにする（index.html の <img> 側にも
+    // 同じ注意書きがある）。
+    .on('#hero-game-logo', {
+      element(el) {
+        if (meta.viewId !== 'view-home') el.setAttribute('loading', 'lazy');
+      },
+    })
     .on(`#${meta.viewId}`, { element(el) { el.removeAttribute('hidden'); } })
     // 見出し。対戦表と出場選手一覧も題は大会名なので、まとめて入れる
     // （出ていない画面のぶんは hidden のままなので害がない）。

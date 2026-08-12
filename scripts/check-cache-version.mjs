@@ -560,6 +560,26 @@ function webpSize(buf) {
   return null;
 }
 
+// ホームのロゴに loading="lazy" を書き込まないこと。ホームではこの絵が
+// LCP要素そのもので、lazy を付けると最優先で取るべきものを後回しにする。
+// ホーム以外のルートでだけ lazy を足すのは worker/index.js の役目で、
+// あちらは配られる直前のHTMLに書き込むので、この元のHTMLには現れない。
+const logoTag = /<img[^>]*id="hero-game-logo"[^>]*>/.exec(html)?.[0] ?? '';
+if (!logoTag) {
+  fail('index.html に id="hero-game-logo" の <img> がありません');
+} else if (/\bloading=/.test(logoTag)) {
+  fail('ホームのロゴに loading 属性が付いています。'
+    + '\n     ホームではこの絵がLCP要素そのものなので、後回しにしてはいけません。'
+    + '\n     ホーム以外で取りに行かせない手当ては worker/index.js が受け持ちます。');
+} else if (!/\bfetchpriority="high"/.test(logoTag)) {
+  fail('ホームのロゴに fetchpriority="high" がありません。'
+    + '\n     ホームのLCP要素はこの絵で、実測でLCPの89%がこの1枚の取得でした。'
+    + '\n     外すなら、ホームで最後に出るものが絵でなくなったことを先に確かめること'
+    + '\n     （index.html のこのタグの上に経緯が書いてあります）。');
+} else {
+  console.log('OK   ホームのロゴは即取得（fetchpriority=high・loading なし）');
+}
+
 let sizeChecked = 0;
 let sizeProblems = 0;
 for (const tag of html.match(/<img[^>]*>/g) ?? []) {
