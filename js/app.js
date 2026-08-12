@@ -3236,6 +3236,43 @@ async function start() {
     return;
   }
 
+  // 【この画面が要るデータの問い合わせを、ここで先に始める】
+  //
+  // 大会詳細・出場者一覧・対戦表は、どれも loadAll では中身が届かない
+  // （増え続けるデータなので、開いた大会のぶんだけ取りに行く作りになっている）。
+  // これまではページを描く段になって初めて投げていたので、回線の往復が
+  //     HTML → app.js → loadAll → この2〜3本
+  // と3回、順番待ちで並んでいた。実測（Slow 4G・大会詳細）では loadAll の最後が
+  // 届くのが 5.47秒、そこから投げ直して 6.11秒 ── 中身は2KBも無いのに、
+  // 往復1回ぶん（約640ms）がまるまる待ち時間だった。
+  //
+  // 必要な大会IDはURLに入っているので、起動した瞬間から分かる。ここで投げておけば
+  // loadAll と同時に流れ、往復が1回減る。実際に中身を使うのはこれまでどおり
+  // ページを描くところ（db.js の ensure〜 が、ここで始めた問い合わせを待つ）。
+  //
+  // 【認証より前に置くこと】initAuth はログイン状態が確定するまで戻らないので、
+  // 後ろに置くとその待ち時間ぶんだけ出遅れる。
+  //
+  // 認証より先に投げても、ログイン中の人がログアウト扱いになることはない。
+  // supabase-js は問い合わせを送る直前に auth.getSession() を呼んで
+  // Authorization ヘッダーを組み立てる（vendor/supabase.js の fetchWithAuth と
+  // _getAccessToken）ので、トークンは initAuth の完了ではなく localStorage から
+  // 決まる。準備中（draft）の大会も、その運営が開けばこれまでどおり中身が返る
+  // ── ここを「どうせ誰でも読めるから」で済ませてはいけない。draft の
+  // エントリーは RLS（is_tournament_visible）で運営にしか返らない。
+  //
+  // OAuth から戻ってきた直後（?code= 付き）と競合しないのは、戻り先が常に
+  // トップだから（supabaseClient.js の redirectUrl）。下の3ページには着地しない。
+  {
+    const { page, param } = currentRoute();
+    if (param && (page === 'tournament' || page === 'entrants' || page === 'bracket')) {
+      db.prefetchTournamentDetail(param);
+      // 試合結果を使うのは対戦表だけ。大会詳細でも取りに行くと、開かない人にも
+      // 配ることになる（開いた分だけ読む、という方針がここで崩れる）。
+      if (page === 'bracket') db.prefetchTournamentMatches(param);
+    }
+  }
+
   // ログイン状態が変わるたびに、UIの出し分けと表示中ページの描画をやり直す
   //
   // ここで例外を外へ逃がさないこと。逃がすと start() ごと止まり、この下の

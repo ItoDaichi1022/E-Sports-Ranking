@@ -521,16 +521,62 @@ export async function loadAll(parts = null) {
   if (want.has('roomCodes')) state.roomCodes = r.roomCodes.data.map(toRoomCode);
 }
 
+// 大会詳細の問い合わせを「始めただけ」の状態で覚えておく置き場。
+//
+// 【なぜ通信と組み立てを分けるか】
+// この2本は、組み立てる先（state.tournaments のその大会の行）が loadAll で
+// 出来ていないと最後まで進めない。ところが「問い合わせを投げる」だけなら
+// 大会IDさえあれば足りる ── URLに入っているので、起動した瞬間から分かる。
+//
+// 分ける前は routeFromLocation（= loadAll の完了後）で初めて投げていたので、
+// 回線の往復が2回、順番待ちで並んでいた。実測（Slow 4G・大会詳細）では
+// loadAll の最後が届くのが 5.47秒、そこから投げ直して 6.11秒 ── 中身は
+// 合わせて2KBも無いのに、往復1回ぶん（約640ms）がまるまる待ち時間だった。
+//
+// 起動時に prefetchTournamentDetail を呼んでおけば、この2本は loadAll と
+// 同時に流れ出す。ensureTournamentDetail は届いた結果を組み立てるだけになる。
+const detailRequests = new Map(); // tournamentId -> Promise<{ teams, entries }>
+
+// 大会詳細の問い合わせだけを先に始める。組み立ては ensureTournamentDetail が行う。
+//
+// 待たない・例外を投げないこと。ここは「ついでに始めておく」場所で、
+// 失敗したかどうかを見るのは、実際に中身を要る ensureTournamentDetail の役目。
+// ここで throw すると、起動処理そのものが道連れになる。
+export function prefetchTournamentDetail(tournamentId) {
+  if (!tournamentId) return;
+  if (fullDataLoaded || loadedDetailIds.has(tournamentId)) return;
+  if (detailRequests.has(tournamentId)) return;
+
+  const request = Promise.all([
+    supabase.from('tournament_teams').select('*').eq('tournament_id', tournamentId),
+    supabase.from('tournament_entries').select('*').eq('tournament_id', tournamentId),
+  ]).then(([teams, entries]) => ({ teams, entries }));
+
+  // 誰も await しないまま失敗すると unhandledrejection になる。捕まえておいて、
+  // 中身は捨てない（ensureTournamentDetail が改めて await して、そこで throw する）。
+  request.catch(() => {});
+
+  detailRequests.set(tournamentId, request);
+}
+
 // 大会のエントリー・チームの行を読み込み、entrantIds などを実際の配列にする。
 // 「誰が出ているか」を出すページ（大会詳細・対戦表）の入り口で呼ぶ。
 // 一度読めば以後の loadAll が取り直すため、開いている間は最新に保たれる。
 export async function ensureTournamentDetail(tournamentId) {
   if (fullDataLoaded || loadedDetailIds.has(tournamentId)) return;
 
-  const [teams, entries] = await Promise.all([
-    supabase.from('tournament_teams').select('*').eq('tournament_id', tournamentId),
-    supabase.from('tournament_entries').select('*').eq('tournament_id', tournamentId),
-  ]);
+  // 起動時に先に投げてあればそれを待つ。無ければここで投げる（画面の中で
+  // 大会を開いた場合はこちらの経路になる）。
+  prefetchTournamentDetail(tournamentId);
+  let teams;
+  let entries;
+  try {
+    ({ teams, entries } = await detailRequests.get(tournamentId));
+  } finally {
+    // 成否によらず捨てる。残すと、失敗した問い合わせの結果を次の呼び出しが
+    // そのまま受け取り、画面を開き直しても同じエラーが出続ける。
+    detailRequests.delete(tournamentId);
+  }
   check(teams.error, 'チームの読み込み');
   check(entries.error, 'エントリーの読み込み');
 
@@ -558,16 +604,43 @@ export async function ensureTournamentDetail(tournamentId) {
   });
 }
 
+// 試合結果の問い合わせを「始めただけ」の状態で覚えておく置き場。
+// 分ける理由は detailRequests と同じ（対戦表のURLで着地したときの往復を1回減らす）。
+const matchRequests = new Map(); // tournamentId -> Promise<PostgRESTの応答>
+
+// その大会の試合結果の問い合わせだけを先に始める。
+// 待たない・例外を投げない（prefetchTournamentDetail と同じ約束）。
+export function prefetchTournamentMatches(tournamentId) {
+  if (!tournamentId) return;
+  if (fullDataLoaded || loadedMatchIds.has(tournamentId)) return;
+  if (matchRequests.has(tournamentId)) return;
+
+  // 【Promise.resolve で包むこと】supabase-js のクエリビルダーは Promise ではなく
+  // 遅延 thenable で、通信は then() が呼ばれた中で初めて始まる（vendor/supabase.js の
+  // PostgrestBuilder.then）。組み立てただけの値を Map に入れても何も飛ばないので、
+  // ここで then() を1回踏ませて実際に走らせる。
+  // （detailRequests 側は Promise.all が then() を呼ぶので、そちらは包む必要がない）
+  const started = Promise.resolve(supabase.from('matches').select('*').eq('tournament_id', tournamentId));
+  started.catch(() => {});
+
+  matchRequests.set(tournamentId, started);
+}
+
 // その大会の試合結果を state.matches に読み込む。対戦表ページの入り口で呼ぶ。
 // syncTournamentProgress は state.matches とDBの差分で保存するため、
 // 対戦表を操作する前に必ずその大会の分が手元に揃っていなければならない。
 export async function ensureTournamentMatches(tournamentId) {
   if (fullDataLoaded || loadedMatchIds.has(tournamentId)) return;
 
-  const { data, error } = await supabase
-    .from('matches')
-    .select('*')
-    .eq('tournament_id', tournamentId);
+  prefetchTournamentMatches(tournamentId);
+  let data;
+  let error;
+  try {
+    ({ data, error } = await matchRequests.get(tournamentId));
+  } finally {
+    // 失敗した結果を次の呼び出しへ持ち越さない（detailRequests と同じ理由）
+    matchRequests.delete(tournamentId);
+  }
   check(error, '試合結果の読み込み');
 
   loadedMatchIds.add(tournamentId);
