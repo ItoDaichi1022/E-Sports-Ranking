@@ -9,9 +9,9 @@
 //
 // Supabase Storage には、保存してある原本から指定の幅で作り直して返す口がある。
 //   原本   /storage/v1/object/public/{バケット}/{パス}
-//   作り直し /storage/v1/render/image/public/{バケット}/{パス}?width=…&quality=…
+//   作り直し /storage/v1/render/image/public/{バケット}/{パス}?width=…&resize=contain&quality=…
 // 実測（1280×720・原本72,138バイト）:
-//   width=960 → 46,432バイト（-36%） / width=768 → 39,528バイト（-45%）
+//   width=960 → 960×540・36,492バイト（-49%） / width=768 → 768×432・29,050バイト（-60%）
 //
 // 【原本より優れている点がもう1つある】
 // 原本は Cache-Control: no-cache で返ってくる（Supabase側の既定）。同じ人が
@@ -46,6 +46,24 @@ const CARD_WIDTH = 768;
 // 60 まで落とすとさらに15%小さくなるが、平坦な面にムラが出る。
 const QUALITY = 75;
 
+// 【resize=contain を絶対に外さないこと】
+// この口の既定は cover（枠を埋めて、はみ出した分を切り落とす）。しかも height を
+// 省くと原本の高さがそのまま使われるので、width=960 だけを渡すと
+// 「1280×720 の絵を 960×720 の枠に cover」＝ 縦は無加工のまま横だけ 320px
+// 切り落とされる、という結果になる。実際にそれを本番に出してしまい、
+// 大会ヘッダーの絵が左右で欠けた。
+//
+// contain なら縦横比を保って枠に収めるので 960×540 になる。切らずに済むうえ、
+// 本当に縮小されるぶんファイルも小さい（46,432 → 36,492バイト）。
+//
+// height を省いたままで問題ない ── contain の倍率は
+// min(960/横, 原本の高さ/原本の高さ=1) なので、原本が 960px より細い絵は
+// 1倍のまま（引き伸ばされない）、縦長の絵も縦横比を保ったまま収まる。
+//
+// なお、URLの文字列だけを見る検査ではこの取り違えは絶対に見つからない
+// （URLは正しく組み立てられていた）。返ってきた絵の実寸を測ること。
+const RESIZE = 'contain';
+
 // 指定の幅で作り直してもらうURLにする。
 //
 // 次のものはそのまま返す（書き換えない）:
@@ -62,7 +80,7 @@ function sized(url, width) {
   // 「?」で始めてしまうと2つ並んで、幅の指定ごと読み飛ばされる。
   const joiner = url.includes('?') ? '&' : '?';
 
-  return `${url.replace(OBJECT_MARK, RENDER_MARK)}${joiner}width=${width}&quality=${QUALITY}`;
+  return `${url.replace(OBJECT_MARK, RENDER_MARK)}${joiner}width=${width}&resize=${RESIZE}&quality=${QUALITY}`;
 }
 
 // ページの先頭に大きく出る絵。LCPで測られる当の相手。
