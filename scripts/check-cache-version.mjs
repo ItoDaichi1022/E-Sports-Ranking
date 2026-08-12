@@ -11,7 +11,7 @@
 //   存在しないexportを参照して起動に失敗する。
 //   import文の解決先はインポートマップで差し替えているので、そこに漏れがないかを見る。
 
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -392,6 +392,50 @@ if (existsSync(imgDir)) {
   const strays = walkImages(imgDir).filter((f) => !ALLOWED_NON_WEBP.has(f));
   for (const f of strays) fail(`${f} がWebPではありません（img/README.md を参照）`);
   if (strays.length === 0) console.log('OK   img/ の画像はWebPにそろっている（icon.png のみ例外）');
+}
+
+// ---- index.html が直に指している画像の大きさ ----
+//
+// 【なぜ index.html の分だけを見るか】ここに書かれた画像は、最初の1本のHTMLに
+// 載って全員に届く。ホームのロゴは画面に最初に出る大きなものなので、そのまま
+// LCP（表示できたと測られる時刻）の相手になる。一方 img/ の奥にあるキャラクター
+// 画像などは、その画面を開いた人だけが後から取りに行くので同じ物差しでは測れない。
+//
+// 【なぜこの検査が要るか】実際に見落とした。game-logo.webp は 93,724 バイト
+// ありながら、スマホでの表示幅は 200 CSS px（css/style.css の .hero-game-logo）。
+// 大会の写真より重い絵を、全員に、毎回配っていた。絵は見た目では重さが分からず、
+// 差し替えるときにも気付けない ── 数字で止めるしかない。
+const IMAGE_BUDGET = 40 * 1024;
+
+// 【差し替え待ちの控え】いま基準を超えているが、差し替えが決まっているもの。
+// 大きさ（バイト数）まで書いて留めてあるので、**中身が1バイトでも変われば
+// この控えは効かなくなり、基準で測られる**。つまり、差し替えた絵が軽くなって
+// いなければここで止まる。差し替えが済んだらこの行ごと消すこと。
+const BUDGET_PINNED = new Map([
+  ['img/game-logo.webp', 93724],
+]);
+
+const htmlImages = [...new Set(
+  [...html.matchAll(/["'(]\/(img\/[\w./-]+\.(?:webp|png|jpe?g|gif|avif))(?:\?v=\d+)?/g)].map((m) => m[1]),
+)].sort();
+
+let budgetProblems = 0;
+for (const rel of htmlImages) {
+  const full = path.join(ROOT, rel);
+  if (!existsSync(full)) continue; // 実在するかは上の別の検査が見ている
+  const size = statSync(full).size;
+  if (size <= IMAGE_BUDGET) continue;
+
+  if (BUDGET_PINNED.get(rel) === size) {
+    console.log(`--   ${rel} は ${size} バイト（基準 ${IMAGE_BUDGET} 超）。差し替え待ちとして留めてあります`);
+    continue;
+  }
+  fail(`${rel} が ${size} バイトあります（基準 ${IMAGE_BUDGET} バイト）。`
+    + '最初のHTMLに載る画像なので、表示される大きさに合わせて書き出し直してください');
+  budgetProblems += 1;
+}
+if (budgetProblems === 0) {
+  console.log(`OK   index.html が指す画像${htmlImages.length}件は大きさの基準内（${IMAGE_BUDGET} バイト）`);
 }
 
 // ---- 版数を過去に使った値へ戻していないか ----
