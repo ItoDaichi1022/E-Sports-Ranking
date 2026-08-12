@@ -161,7 +161,9 @@ const eager = new Set();
 })('app.js');
 
 const preloaded = new Set(
-  [...html.matchAll(/<link rel="modulepreload" href="\/js\/([\w.-]+\.js)\?v=\d+">/g)].map((m) => m[1]),
+  // [^>]* を挟んであるのは、属性が増えても拾い続けるため（fetchpriority="low" を足した）。
+  // ここが読めなくなると、27本全部が「先読みがない」という的外れな指摘に化ける。
+  [...html.matchAll(/<link rel="modulepreload" href="\/js\/([\w.-]+\.js)\?v=\d+"[^>]*>/g)].map((m) => m[1]),
 );
 
 const notPreloaded = [...eager].filter((f) => !preloaded.has(f)).sort();
@@ -176,6 +178,33 @@ overPreloaded.forEach((f) => fail(
 ));
 if (notPreloaded.length === 0 && overPreloaded.length === 0) {
   console.log(`OK   起動時に要る${eager.size}モジュールすべてが先読みされている`);
+}
+
+// ---- 先読みの優先度 ----
+//
+// 【なぜ下げてあるのか】<link rel="modulepreload"> はブラウザの中で「高」の
+// 優先度で走る。ここには27本並んでいるので、LCPになる画像に fetchpriority="high"
+// を付けても、27本と横並びになって細い回線が等分されるだけだった
+// ── 実測（Slow 4G・大会詳細）で、preload も high も付いている36.5KBのヘッダー写真が、
+// 取得だけで 2,280ms かかっていた。転送そのものは180ms ぶんしかない。
+// 残りは順番待ちで、3回測って幅40msという再現性だった（＝混雑ではなく構造）。
+// low を付けると、この27本はLCPの絵より後ろへ回る。
+//
+// 【代償を承知で入れてある】app.js の起動はそのぶん遅れる。大会詳細のように
+// 中身をJSがDBから取ってくる画面では「絵は早く、中身は遅く」という交換になる。
+// 戻すなら27本からこの属性を消すだけでよい ── そのときはこの検査も一緒に外すこと。
+
+const preloadTags = html.match(/<link rel="modulepreload"[^>]*href=[^>]*>/g) ?? [];
+const notLow = preloadTags.filter((t) => !/\bfetchpriority="low"/.test(t));
+if (preloadTags.length === 0) {
+  fail('<link rel="modulepreload"> が1本もありません');
+} else if (notLow.length) {
+  fail(`<link rel="modulepreload"> のうち${notLow.length}本に fetchpriority="low" がありません。`
+    + '\n     「高」のままだと、LCPになる画像と同じ列に並んで回線を等分します'
+    + '\n     （index.html のこの並びの上に経緯が書いてあります）。'
+    + `\n     例: ${notLow[0]}`);
+} else {
+  console.log(`OK   先読み${preloadTags.length}本すべてが fetchpriority="low"`);
 }
 
 // ---- 先読みとインポートマップの並び順 ----
