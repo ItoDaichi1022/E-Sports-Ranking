@@ -207,6 +207,34 @@ if (preloadTags.length === 0) {
   console.log(`OK   先読み${preloadTags.length}本すべてが fetchpriority="low"`);
 }
 
+// ---- 入口（app.js）の優先度 ----
+//
+// 【なぜ下げてあるのか】app.js は27本の静的importが全部そろうまで1行も実行できない。
+// その27本は上の検査のとおり fetchpriority="low" に落としてある。つまり app.js だけを
+// 「高」で先に届けても、残りの26本を待って手持ち無沙汰にしているだけで、
+// 起動が早まることはない ── その間、LCPになる画像から回線を奪い続ける。
+// 実測（Slow 4G・大会詳細）では、27本を低くした時点で画像の取得が 2,280ms → 1,260ms。
+// 残り1,080ms のうち48KiB ぶんがこの1本だった。
+//
+// 【代償は画像1枚ぶん】JSの到着は、画像の転送時間（36.5KBで約180ms）だけ後ろへずれる。
+// 戻すならこの属性を消すだけでよい ── そのときはこの検査も一緒に外すこと。
+//
+// 【css/style.css は下げないこと】残る最大の先客はCSSだが、あちらは
+// レンダリングを止める <link> なので優先度が「最高」で、画像より上にいる。
+// 下げると画面が白いまま待たされる。あちらは分割するしかない。
+
+const appTag = /<script[^>]*\ssrc="\/js\/app\.js\?v=\d+"[^>]*>/.exec(html)?.[0] ?? '';
+if (!appTag) {
+  fail('index.html に /js/app.js の <script> がありません');
+} else if (!/\bfetchpriority="low"/.test(appTag)) {
+  fail('/js/app.js の <script> に fetchpriority="low" がありません。'
+    + '\n     app.js は27本の依存がそろうまで動けないので、先に届いても意味がなく、'
+    + '\n     その間 LCPになる画像から回線を奪います'
+    + '\n     （index.html のこのタグの上に経緯が書いてあります）。');
+} else {
+  console.log('OK   入口の app.js も fetchpriority="low"');
+}
+
 // ---- 先読みとインポートマップの並び順 ----
 //
 // 【インポートマップは、どのモジュールの読み込みより先に置くこと】
