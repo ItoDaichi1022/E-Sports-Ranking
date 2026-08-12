@@ -115,6 +115,52 @@ for (const key of Object.keys(imports)) {
   if (!known.has(key)) fail(`"${key}" は存在しないファイルを指しています`);
 }
 
+// ---- 先読み（modulepreload）の過不足 ----
+//
+// ES モジュールは、親を読み終えて解析するまで子のURLが分からない。app.js から
+// 静的にimportしているものを index.html で先に宣言しておかないと、その1本だけが
+// 1往復ぶん遅れて届き、しかも app.js は静的importの木が全部そろうまで動き出さない
+// ── つまり、たった1本の書き忘れがサイト全体の起動を待たせる。
+// 画面上は「なんとなく遅い」だけで、壊れないぶん気付けないので、ここで数を合わせる。
+//
+// 逆に、開いた人だけが取りに行くもの（動的import）をここに並べてしまうと、その画面を
+// 開かない人にも配ることになり、分けた意味が消える。そちらも余分として弾く。
+
+const staticDeps = new Map();
+for (const f of jsFiles) {
+  const src = readFileSync(path.join(ROOT, 'js', f), 'utf8');
+  staticDeps.set(f, [...src.matchAll(/^\s*import\s+(?:[\s\S]*?\s+from\s+)?'\.\/([^']+)'/gm)].map((m) => m[1]));
+}
+
+// app.js から静的importだけで辿り着ける集合＝起動時に必ず落ちてくるもの。
+// app.js 自身は <script type="module"> が取りに行くので、先読みの対象から外す。
+const eager = new Set();
+(function walk(f) {
+  for (const d of staticDeps.get(f) ?? []) {
+    if (eager.has(d)) continue;
+    eager.add(d);
+    walk(d);
+  }
+})('app.js');
+
+const preloaded = new Set(
+  [...html.matchAll(/<link rel="modulepreload" href="\/js\/([\w.-]+\.js)\?v=\d+">/g)].map((m) => m[1]),
+);
+
+const notPreloaded = [...eager].filter((f) => !preloaded.has(f)).sort();
+const overPreloaded = [...preloaded].filter((f) => !eager.has(f)).sort();
+notPreloaded.forEach((f) => fail(
+  `"/js/${f}" は起動時に必ず要るのに <link rel="modulepreload"> がない`
+  + '（その1本だけ1往復ぶん遅れ、app.js の起動全体がそれを待ちます）',
+));
+overPreloaded.forEach((f) => fail(
+  `"/js/${f}" は起動時には要らないのに <link rel="modulepreload"> がある`
+  + '（その画面を開かない人にも配ることになります）',
+));
+if (notPreloaded.length === 0 && overPreloaded.length === 0) {
+  console.log(`OK   起動時に要る${eager.size}モジュールすべてが先読みされている`);
+}
+
 // data-src の指す読み物ページが実在するか。綴りを間違えると、そのページを
 // 開いたときに初めて白紙になるので、ここで気付けるようにする。
 const pageFiles = new Set(
