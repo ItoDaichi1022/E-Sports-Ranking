@@ -93,6 +93,10 @@ const used = new Set();
 for (const f of jsFiles) {
   const src = readFileSync(path.join(ROOT, 'js', f), 'utf8');
   for (const m of src.matchAll(/from\s+'\.\/([^']+)'/g)) used.add(m[1]);
+  // 開いたときに取りに行くモジュール（await import('/js/xxx.js')）。
+  // こちらも版数の差し替えが要るので、同じように登録漏れを見る ── 見落とすと、
+  // その画面だけが古いコピーのまま動き続ける。
+  for (const m of src.matchAll(/\bimport\(\s*'\/js\/([^']+)'\s*\)/g)) used.add(m[1]);
 }
 
 // インポートマップの見出しは "/js/xxx.js"。モジュールの中の import './state.js' は

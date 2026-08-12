@@ -15,10 +15,8 @@ import {
   createBracket, updateTournament, allMatchesDecided, finalStandings, finalPlacements,
   swapBracketEntrants,
 } from './bracket.js';
-import { renderBracket, buildEntrantRow } from './bracketView.js';
 import { reportChipHtml, syncOpenChat } from './matchChat.js';
 import { computeRankings, rankChangeInfo } from './ranking.js';
-import { renderRevealPage, closeRevealStage } from './reveal.js';
 import { getPlayerStats, championLabel, placementLabelOf } from './playerStats.js';
 import { tournamentTier } from './tournamentTier.js';
 import { matchTypeLabel, rankingEligibility, RANKED_MIN_PARTICIPANTS } from './rankingEligibility.js';
@@ -43,6 +41,30 @@ import {
 } from './router.js';
 import { applyPageMeta } from './seo.js';
 import * as db from './db.js';
+
+// ---- 開いた人だけが取りに行くモジュール ----
+//
+// 対戦表と順位発表は、どちらもサイトの中では大きい部類（生で 56KB と 48KB）で、
+// しかも「その画面を開いた人」しか要らない。上の import に並べておくと、
+// トップページを見にきただけの人の回線と、そのうえ解析にかかる時間まで
+// 使ってしまう ── 開いたときに初めて取りに行けば、その分だけ最初の表示が早くなる。
+//
+// URLを '/js/…' と根から書いているのは、インポートマップの見出しと同じ形に
+// するため（?v= の差し替えを効かせる。相対で書くと、深いURLで開いたときに
+// /tournaments/{ID}/js/… を取りに行って404になる）。
+//
+// 一度読んだら覚えておく。2回目からは待ち時間なしで返る。
+let bracketViewMod = null;
+async function loadBracketView() {
+  bracketViewMod ??= await import('/js/bracketView.js');
+  return bracketViewMod;
+}
+
+let revealMod = null;
+async function loadReveal() {
+  revealMod ??= await import('/js/reveal.js');
+  return revealMod;
+}
 
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
 let selectedParticipantIds = [];
@@ -493,7 +515,9 @@ function routeFromLocation() {
   const applyRoute = () => {
     // 発表中に別のページへ移ったら、全画面を先に畳む。畳まないと body に
     // .reveal-playing が残り、移った先でヘッダーもナビも消えたままになる。
-    if (target !== 'reveal') closeRevealStage();
+    // まだ順位発表を開いていなければ（revealMod が null）畳むものも無いので、
+    // ここで取りに行かせない ── そうしないと、どのページへ移っても48KBを読むことになる。
+    if (target !== 'reveal') revealMod?.closeRevealStage();
 
     // 比べるのはページ名ではなく要素のID。2つのページ名が同じ画面を指すことがあり
     // （かつて #players と #ranking がそうだった）、名前で比べると、後から回ってきた
@@ -540,7 +564,7 @@ function routeFromLocation() {
     else if (target === 'entrants') draw(renderEntrantsPage(param));
     else if (target === 'player') draw(renderPlayerDetail(param));
     else if (target === 'players') refreshPlayerUI();
-    else if (target === 'reveal') draw(renderRevealPage());
+    else if (target === 'reveal') draw(loadReveal().then((m) => m.renderRevealPage()));
     else if (target === 'profile') renderProfilePage();
 
     // 別の画面へ移ったときは先頭から見せる。ページを読み直さずURLだけを書き換える
@@ -1597,6 +1621,12 @@ async function renderEntrantsPage(tournamentId) {
     ? `${unit}の五十音順に並んでいます。左の番号はシード順です。名前を押すと、その選手のプロフィールが見られます。`
     : `${unit}の五十音順に並んでいます。シードは募集を締め切った時点で決まります。名前を押すと、その選手のプロフィールが見られます。`;
 
+  // 1枠ずつの見た目は対戦表と同じものを使う（js/bracketView.js）。
+  // 取りに行っている間に別の画面へ移っていることがあるので、DBの読み込みと同じく
+  // ここでも行き先を確かめ直す。
+  const { buildEntrantRow } = await loadBracketView();
+  if (!isCurrentRoute('entrants', tournamentId)) return;
+
   const list = document.createElement('div');
   list.className = 'entrant-roster';
   sortEntrantsByName(tournamentId, tournament.entrantIds, seeds)
@@ -1961,6 +1991,11 @@ async function renderBracketPage(tournamentId) {
     // 読み込んでいる間に別のページへ移っていたら、そこへ古い表を描かない
     if (!isCurrentRoute('bracket', tournamentId)) return;
   }
+
+  // 対戦表を描く部品は、このページを開いた人だけが取りに行く（生 56KB）。
+  // DBの読み込みと同じく、待っている間に別の画面へ移っていないかを確かめ直す。
+  const { renderBracket } = await loadBracketView();
+  if (!isCurrentRoute('bracket', tournamentId)) return;
 
   renderBracketAdminTools(tournamentId);
   const swapping = bracketSwap?.tournamentId === tournamentId;

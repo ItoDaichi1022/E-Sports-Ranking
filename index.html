@@ -35,13 +35,13 @@
 <meta property="og:locale" content="ja_JP">
 <meta property="og:title" content="IgniteArena｜どこでも熱く、遊べ。">
 <meta property="og:description" content="IgniteArenaは、大会の運営とランキングの集計をひとつにまとめた場所。大会を開く・エントリーする・対戦表を追う。ログインなしで全部のぞけます。">
-<meta property="og:image" content="/img/icon.png?v=156">
+<meta property="og:image" content="/img/icon.png?v=157">
 <meta name="twitter:card" content="summary_large_image">
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。
      タブはWebP。iOSのホーム画面（apple-touch-icon）だけはWebPを読まないのでPNGを残す。 -->
-<link rel="icon" href="/img/icon.webp?v=156" type="image/webp">
-<link rel="apple-touch-icon" href="/img/icon.png?v=156">
+<link rel="icon" href="/img/icon.webp?v=157" type="image/webp">
+<link rel="apple-touch-icon" href="/img/icon.png?v=157">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="/fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- 大会の画像とデータの取りに行き先。CSSを読んでいるあいだに名前解決とTLSの
@@ -55,7 +55,7 @@
 <link rel="preconnect" href="https://zgqoeicdnneivzasneez.supabase.co" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="/css/style.css?v=156">
+<link rel="stylesheet" href="/css/style.css?v=157">
 <!-- 【css/reveal.css はここで読まない】順位発表の画面（/reveal/・持ち主専用）だけで
      使う45KBで、しかもほとんどの人は一度も開かない。ここに <link> を置くと、
      ブラウザはそれを読み終えるまで最初の描画を始めないので、全員の表示が
@@ -363,7 +363,7 @@
                画像を差し替えるときは、この2つの数字も実寸に合わせること
                （img/README.md 参照）。 -->
           <img class="hero-game-logo" id="hero-game-logo"
-               src="/img/game-logo.webp?v=156" alt="" width="700" height="623">
+               src="/img/game-logo.webp?v=157" alt="" width="700" height="623">
         </div>
 
         <p class="hero-eyebrow reveal">Tournament &amp; Ranking</p>
@@ -515,12 +515,12 @@
   </section>
 
   <!-- 初めての人向けの使い方。中身は pages/guide.html（初回に開いたとき読み込む） -->
-  <section id="view-guide" class="view stage" hidden data-src="/pages/guide.html?v=156"></section>
+  <section id="view-guide" class="view stage" hidden data-src="/pages/guide.html?v=157"></section>
 
   <!-- 本番までの環境づくり（回線・コントローラ）。中身は pages/setup.html。
        エントリー済みの大会詳細から誘導する（js/entries.js の setupPrompt）。
        楽天アフィリエイトのリンクを含むので、広告である旨の明示がページ冒頭にある。 -->
-  <section id="view-setup" class="view stage" hidden data-src="/pages/setup.html?v=156"></section>
+  <section id="view-setup" class="view stage" hidden data-src="/pages/setup.html?v=157"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -962,7 +962,7 @@
        中身は js/reveal.js、見た目は css/reveal.css。 -->
   <!-- data-css: この画面を初めて開いたときにだけ読むCSS（js/app.js の loadViewCss）。
        ?v= は他と同じ版数にそろえること（scripts/check-cache-version.mjs が確認する）。 -->
-  <section id="view-reveal" class="view" hidden data-css="/css/reveal.css?v=156">
+  <section id="view-reveal" class="view" hidden data-css="/css/reveal.css?v=157">
     <div id="reveal-setup">
       <div class="page-head">
         <p class="page-eyebrow">Reveal</p>
@@ -1064,7 +1064,7 @@
              2本目に data-src を持たせていないのは、2本が同時に15MBを取りに行くのを
              避けるため ── 1本目が流せる状態になってから js/reveal.js が src を渡す。
              そのときには実体がブラウザのキャッシュにあるので、取り直しは起きない。 -->
-        <video id="reveal-bg" class="reveal-bg" data-src="/video/0204.mov?v=156"
+        <video id="reveal-bg" class="reveal-bg" data-src="/video/0204.mov?v=157"
                muted playsinline preload="none" aria-hidden="true"></video>
         <video id="reveal-bg-b" class="reveal-bg"
                muted playsinline preload="auto" aria-hidden="true"></video>
@@ -1083,9 +1083,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal stage" hidden data-src="/pages/terms.html?v=156"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="/pages/terms.html?v=157"></section>
 
-  <section id="view-privacy" class="view legal stage" hidden data-src="/pages/privacy.html?v=156"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="/pages/privacy.html?v=157"></section>
 
 </main>
 
@@ -1106,7 +1106,7 @@
 
 <!-- supabase-jsは同梱している（CDN障害でサイトが止まらないように）。
      モジュールスクリプトはdefer扱いなので、この通常スクリプトが必ず先に実行される。 -->
-<script src="/js/vendor/supabase.js?v=156"></script>
+<script src="/js/vendor/supabase.js?v=157"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -1118,38 +1118,38 @@
 <script type="importmap">
 {
   "imports": {
-    "/js/auth.js":           "/js/auth.js?v=156",
-    "/js/bracket.js":        "/js/bracket.js?v=156",
-    "/js/bracketView.js":    "/js/bracketView.js?v=156",
-    "/js/bracketZoom.js":    "/js/bracketZoom.js?v=156",
-    "/js/characterData.js":  "/js/characterData.js?v=156",
-    "/js/characterFocus.js": "/js/characterFocus.js?v=156",
-    "/js/characterPicker.js": "/js/characterPicker.js?v=156",
-    "/js/characters.js":     "/js/characters.js?v=156",
-    "/js/db.js":             "/js/db.js?v=156",
-    "/js/entries.js":        "/js/entries.js?v=156",
-    "/js/formDraft.js":      "/js/formDraft.js?v=156",
-    "/js/icons.js":          "/js/icons.js?v=156",
-    "/js/intro.js":          "/js/intro.js?v=156",
-    "/js/matchChat.js":      "/js/matchChat.js?v=156",
-    "/js/organizerPicker.js": "/js/organizerPicker.js?v=156",
-    "/js/playerStats.js":    "/js/playerStats.js?v=156",
-    "/js/players.js":        "/js/players.js?v=156",
-    "/js/profile.js":        "/js/profile.js?v=156",
-    "/js/ranking.js":        "/js/ranking.js?v=156",
-    "/js/rankingEligibility.js": "/js/rankingEligibility.js?v=156",
-    "/js/reveal.js":         "/js/reveal.js?v=156",
-    "/js/router.js":         "/js/router.js?v=156",
-    "/js/seo.js":            "/js/seo.js?v=156",
-    "/js/stage.js":          "/js/stage.js?v=156",
-    "/js/state.js":          "/js/state.js?v=156",
-    "/js/supabaseClient.js": "/js/supabaseClient.js?v=156",
-    "/js/tournamentState.js": "/js/tournamentState.js?v=156",
-    "/js/tournamentTier.js": "/js/tournamentTier.js?v=156",
-    "/js/util.js":           "/js/util.js?v=156"
+    "/js/auth.js":           "/js/auth.js?v=157",
+    "/js/bracket.js":        "/js/bracket.js?v=157",
+    "/js/bracketView.js":    "/js/bracketView.js?v=157",
+    "/js/bracketZoom.js":    "/js/bracketZoom.js?v=157",
+    "/js/characterData.js":  "/js/characterData.js?v=157",
+    "/js/characterFocus.js": "/js/characterFocus.js?v=157",
+    "/js/characterPicker.js": "/js/characterPicker.js?v=157",
+    "/js/characters.js":     "/js/characters.js?v=157",
+    "/js/db.js":             "/js/db.js?v=157",
+    "/js/entries.js":        "/js/entries.js?v=157",
+    "/js/formDraft.js":      "/js/formDraft.js?v=157",
+    "/js/icons.js":          "/js/icons.js?v=157",
+    "/js/intro.js":          "/js/intro.js?v=157",
+    "/js/matchChat.js":      "/js/matchChat.js?v=157",
+    "/js/organizerPicker.js": "/js/organizerPicker.js?v=157",
+    "/js/playerStats.js":    "/js/playerStats.js?v=157",
+    "/js/players.js":        "/js/players.js?v=157",
+    "/js/profile.js":        "/js/profile.js?v=157",
+    "/js/ranking.js":        "/js/ranking.js?v=157",
+    "/js/rankingEligibility.js": "/js/rankingEligibility.js?v=157",
+    "/js/reveal.js":         "/js/reveal.js?v=157",
+    "/js/router.js":         "/js/router.js?v=157",
+    "/js/seo.js":            "/js/seo.js?v=157",
+    "/js/stage.js":          "/js/stage.js?v=157",
+    "/js/state.js":          "/js/state.js?v=157",
+    "/js/supabaseClient.js": "/js/supabaseClient.js?v=157",
+    "/js/tournamentState.js": "/js/tournamentState.js?v=157",
+    "/js/tournamentTier.js": "/js/tournamentTier.js?v=157",
+    "/js/util.js":           "/js/util.js?v=157"
   }
 }
 </script>
-<script type="module" src="/js/app.js?v=156"></script>
+<script type="module" src="/js/app.js?v=157"></script>
 </body>
 </html>
