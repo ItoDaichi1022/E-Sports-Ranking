@@ -1,0 +1,140 @@
+/* ============================================================================
+   規約類（利用規約・プライバシーポリシー）
+
+   #terms と #privacy を開いた人だけが読むCSS。本文も pages/terms.html・
+   pages/privacy.html から data-src で読み込んでいる。
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   規約類（利用規約・プライバシーポリシー）
+
+   読み物なので、装飾はほとんど付けない。長い条文が続くため、
+   ・1行の幅を詰めて（max-width）目が迷わないようにする
+   ・行間を広めに取る
+   ・条ごとに区切り線を引いて、どこからどこまでが1つの条か見えるようにする
+   の3点だけで組む。
+   --------------------------------------------------------------------------- */
+
+.legal {
+  /* 全角の日本語で40字前後。これ以上長いと次の行の頭を見失いやすい */
+  max-width: 46rem;
+  line-height: 1.9;
+}
+
+.legal-lead {
+  margin: 0 0 0.75rem;
+  color: var(--text-dim);
+}
+
+.legal-meta {
+  margin: 0 0 2rem;
+  color: var(--text-faint);
+  font-size: 0.82rem;
+}
+
+.legal-articles > article {
+  margin-top: 1.75rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.legal-articles > article:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.legal-articles h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  color: var(--accent-bright);
+}
+
+.legal-articles p { margin: 0 0 0.6rem; }
+.legal-articles p:last-child { margin-bottom: 0; }
+
+/* 条の中の項番。括弧つきの数字にして、条番号（第N条）と見分けられるようにする */
+.legal-items {
+  margin: 0;
+  padding-left: 2.2rem;
+  list-style: none;
+  counter-reset: legal-item;
+}
+
+.legal-items > li {
+  position: relative;
+  margin-bottom: 0.5rem;
+  counter-increment: legal-item;
+}
+
+.legal-items > li::before {
+  content: "(" counter(legal-item) ")";
+  position: absolute;
+  left: -2.2rem;
+  width: 2rem;
+  text-align: right;
+  color: var(--text-faint);
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.legal-items > li:last-child { margin-bottom: 0; }
+
+/* 条文そのものではない補足。本文より一段落とす */
+.legal-note {
+  margin-top: 0.75rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+/* 「情報が表示される範囲」の表 */
+.legal-table {
+  width: 100%;
+  margin: 0.75rem 0 0;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.legal-table th,
+.legal-table td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+.legal-table th {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* 右の列（見られる範囲）は文字数が少ないので、左の説明に幅を譲る */
+.legal-table td:last-child {
+  width: 34%;
+  color: var(--text-dim);
+}
+
+.legal-nav {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-soft);
+  font-size: 0.9rem;
+}
+
+/* ---------------------------------------------------------------------------
+   狭い画面の調整（規約類のぶん）
+
+   css/style.css の「狭い画面の調整」から移してきた。上書きは上書きされる側と
+   同じファイルに置く ── 別ファイルに残すと、後から読まれるこちらが勝ってしまう。
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  /* 項番のぶら下げ幅を詰め、表は2列を等分にして横スクロールを避ける */
+  .legal-items { padding-left: 1.8rem; }
+  .legal-items > li::before { left: -1.8rem; width: 1.6rem; }
+  .legal-table td:last-child { width: 40%; }
+}

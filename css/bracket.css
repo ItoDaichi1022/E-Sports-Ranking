@@ -1434,6 +1434,159 @@ dialog.dialog-chat {
 
 
 /* ---------------------------------------------------------------------------
+   大会情報（対戦表の下）
+
+   【対戦表を開いた人にも配っている】この節が要るのは大会詳細だけ。
+   data-css は空白区切りで複数書けるので別ファイルにもできるが、1.4KBのために
+   取得をもう1回増やすほうが高くつく。対戦表・出場選手一覧にも一緒に配っている。
+
+   【.ranking-mark はここに無い】css/style.css に残してある。
+   使い方ガイド（pages/guide.html）でも使うため。
+   --------------------------------------------------------------------------- */
+
+/* 区切りは見出し（左の線）と余白が受け持つので、ここに横線は引かない。
+   線を重ねると「線の下に線」になって、かえって塊が読み取りにくくなる。 */
+.tournament-info { margin-top: 0.5rem; }
+
+.tournament-info h2 {
+  margin: 0 0 1rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.tournament-info h3 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* 項目を等幅のカードに並べ、ラベルと値の関係を崩さない */
+.tournament-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1px;
+  margin: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--border-soft);
+  overflow: hidden;
+}
+
+.tournament-info-grid > div {
+  padding: 0.8rem 1rem;
+  background: var(--surface);
+}
+
+.tournament-info-grid dt {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.tournament-info-grid dd {
+  margin: 0.3rem 0 0;
+  font-weight: 700;
+  font-size: 0.95rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.tournament-rules {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  line-height: 1.75;
+  font-size: 0.9rem;
+}
+
+/* 配信元。外部サイトへ出る導線なので、行き先のドメインを必ず添える
+   （押す前にどこへ飛ぶか分かるようにするため） */
+.stream-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  max-width: 100%;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stream-link:hover {
+  background: var(--surface-3);
+  box-shadow: 0 0 16px -6px var(--glow);
+  color: var(--text);
+}
+
+.stream-link-label {
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+.stream-link-host {
+  font-size: 0.85rem;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------------------
+   結果の確定と最終順位
+   --------------------------------------------------------------------------- */
+
+.result-section { margin: 1.5rem 0; }
+
+.result-pending {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid rgba(245, 181, 68, 0.4);
+  border-radius: var(--r);
+  background: rgba(245, 181, 68, 0.08);
+}
+
+.result-pending p {
+  margin: 0;
+  flex: 1 1 20rem;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+.standings-table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 30rem;
+}
+
+.standings-table th,
+.standings-table td {
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+}
+
+.standings-table .rank-cell { width: 4rem; }
+
+/* ---------------------------------------------------------------------------
    狭い画面の調整（対戦表のぶん）
 
    style.css の同名の節から移してきた。上書きは上書きされる側と同じファイルに

@@ -287,14 +287,44 @@ if (fontPreloads !== 1) {
 
 const cssText = (name) =>
   readFileSync(path.join(ROOT, 'css', name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-const classesIn = (name) =>
-  new Set([...cssText(name).matchAll(/\.([A-Za-z][\w-]*)/g)].map((m) => m[1]));
 
-const baseClasses = classesIn('style.css');
-// data-css で読むCSSごとの、そこにしか無いクラス
+// { } の外側にある字＝セレクタか @規則。宣言（color: red）は必ず } の手前で終わるので、
+// 「直前の括弧から次の { まで」を拾えば、宣言が混ざることはない。
+function selectorsOf(css) {
+  const found = new Set();
+  for (const [, head] of css.matchAll(/(?:^|[{}])([^{}]*)\{/g)) {
+    for (const one of head.split(',')) {
+      const s = one.replace(/\s+/g, ' ').trim();
+      if (s && !s.startsWith('@')) found.add(s);
+    }
+  }
+  return found;
+}
+
+// そのファイルが「本体を持っている」クラス。
+//
+// 【先祖付きのセレクタを数えないこと】css/guide.css の
+// .guide-chat-mock .chat-tab は、本体（css/bracket.css の .chat-tab）に対する
+// 上書きであって、本体ではない。全部のクラス名を拾うと、これを guide.css の
+// 持ち物と数えてしまい、チャットのダイアログが「guide.css を読んでいない」という
+// 的外れな指摘に化ける。セレクタの先頭のかたまりだけを見る。
+function providedClasses(name) {
+  const out = new Set();
+  for (const sel of selectorsOf(cssText(name))) {
+    for (const [, c] of sel.split(/[\s>+~]+/)[0].matchAll(/\.([A-Za-z][\w-]*)/g)) out.add(c);
+  }
+  return out;
+}
+
+// style.css は「どこかに出てくれば良し」とする。誰でも読むファイルなので、
+// 緩く見ておくほうが的外れな指摘を出さない。
+const baseClasses = new Set(
+  [...cssText('style.css').matchAll(/\.([A-Za-z][\w-]*)/g)].map((m) => m[1]),
+);
+// data-css で読むCSSごとの、そこにしか本体が無いクラス
 const splitClasses = new Map(
   [...new Set(viewCssRefs.map(([, file]) => file.replace(/^css\//, '')))]
-    .map((name) => [name, classesIn(name)]),
+    .map((name) => [name, providedClasses(name)]),
 );
 
 // index.html を上から読み、その位置がどの画面（または開くきっかけの持ち主）に
@@ -306,42 +336,69 @@ const htmlNoComment = html.replace(/<!--[\s\S]*?-->/g, (m) => ' '.repeat(m.lengt
 // 対戦のチャットは対戦表からしか開かない（js/bracketView.js の openMatchChat）。
 const DIALOG_OWNER = { 'match-chat-dialog': 'bracket.css' };
 
-const owners = [];  // [開始位置, 終了位置, そこが読むCSS]
+// data-css は空白区切りで複数書ける（js/app.js の loadViewCss）。
+const cssListOf = (attrs) =>
+  [...(/data-css="([^"]*)"/.exec(attrs)?.[1] ?? '').matchAll(/\/css\/([\w.-]+\.css)/g)].map((m) => m[1]);
+
+const owners = [];  // [開始位置, 終了位置, そこが読むCSSの一覧, 名前]
+const viewOfPage = new Map();   // pages/xxx.html -> その画面が読むCSSの一覧
 for (const m of htmlNoComment.matchAll(/<section id="(view-[\w-]+)"([^>]*)>/g)) {
   const end = htmlNoComment.indexOf('</section>', m.index);
-  const css = /data-css="\/css\/([\w.-]+\.css)/.exec(m[2])?.[1] ?? null;
-  owners.push([m.index, end === -1 ? htmlNoComment.length : end, css]);
+  const list = cssListOf(m[2]);
+  owners.push([m.index, end === -1 ? htmlNoComment.length : end, list, m[1]]);
+  // 本文を別ファイルに置いている画面（data-src）は、その中身もこの画面のもの。
+  const src = /data-src="\/(pages\/[\w.-]+\.html)/.exec(m[2])?.[1];
+  if (src) viewOfPage.set(src, [list, m[1]]);
 }
 for (const m of htmlNoComment.matchAll(/<dialog id="([\w-]+)"/g)) {
   const end = htmlNoComment.indexOf('</dialog>', m.index);
-  owners.push([m.index, end === -1 ? htmlNoComment.length : end, DIALOG_OWNER[m[1]] ?? null]);
+  const owner = DIALOG_OWNER[m[1]];
+  owners.push([m.index, end === -1 ? htmlNoComment.length : end, owner ? [owner] : [], m[1]]);
 }
 const ownerAt = (i) => owners.find(([a, b]) => i >= a && i < b);
+
+// 見るのは index.html だけではない。
+//
+// 【読み物ページ（pages/*.html）を必ず含めること】使い方ガイドの本文には、
+// 対戦カードやチャットの「見本」が本物と同じクラスで埋め込んである。
+// index.html しか見ていなかったため、対戦表のCSSを分けた v172 で、
+// ガイドの見本が素の見た目のまま配られた ── 見に行かなければ気付けなかった。
+const placesToCheck = [
+  ['index.html', htmlNoComment, (i) => ownerAt(i)?.[2] ?? [], (i) => ownerAt(i)?.[3] ?? '画面の外'],
+  ...readdirSync(path.join(ROOT, 'pages')).map((n) => {
+    const rel = `pages/${n}`;
+    const [list, view] = viewOfPage.get(rel) ?? [[], null];
+    const body = readFileSync(path.join(ROOT, rel), 'utf8').replace(/<!--[\s\S]*?-->/g, ' ');
+    return [rel, body, () => list, () => view ?? 'どの画面からも読み込まれていない'];
+  }),
+];
 
 let splitProblems = 0;
 let splitChecked = 0;
 const seen = new Set();
-for (const m of htmlNoComment.matchAll(/class="([^"]+)"/g)) {
-  const owner = ownerAt(m.index);
-  const loaded = owner?.[2] ?? null;
-  for (const name of m[1].trim().split(/\s+/)) {
-    if (baseClasses.has(name)) continue;   // style.css にあるなら誰が使ってもよい
-    splitChecked += 1;
-    for (const [file, set] of splitClasses) {
-      if (!set.has(name) || loaded === file) continue;
-      const key = `${name}|${file}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      splitProblems += 1;
-      fail(`."${name}" は css/${file} にしか無いのに、それを読まない場所で使われています`
-        + `\n     （${loaded ? `この画面が読むのは css/${loaded}` : 'この場所はどの data-css にも属していません'}）。`
-        + '\n     その画面を最初に開いた人にだけ崩れて見えます。'
-        + `\n     直し方は2つ: css/style.css へ戻すか、使う側の <section> に data-css で css/${file} を読ませる。`);
+for (const [where, body, cssAt, nameAt] of placesToCheck) {
+  for (const m of body.matchAll(/class="([^"]+)"/g)) {
+    const loaded = cssAt(m.index);
+    for (const name of m[1].trim().split(/\s+/)) {
+      if (baseClasses.has(name)) continue;   // style.css にあるなら誰が使ってもよい
+      splitChecked += 1;
+      for (const [file, set] of splitClasses) {
+        if (!set.has(name) || loaded.includes(file)) continue;
+        const key = `${where}|${name}|${file}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        splitProblems += 1;
+        fail(`${where} の ."${name}" は css/${file} にしか無いのに、それを読まない場所で使われています`
+          + `\n     （${nameAt(m.index)} が読むのは ${loaded.length ? loaded.map((f) => 'css/' + f).join(' ') : '分割CSSなし'}）。`
+          + '\n     その画面を最初に開いた人にだけ崩れて見えます。'
+          + `\n     直し方は2つ: css/style.css へ戻すか、使う側の <section> の data-css に css/${file} を足す`
+          + '\n     （data-css は空白区切りで複数書ける）。');
+      }
     }
   }
 }
 if (splitProblems === 0) {
-  console.log(`OK   分けたCSSにしか無いクラス（index.html の${splitChecked}件を確認）は、`
+  console.log(`OK   分けたCSSにしか無いクラス（index.html と読み物ページの${splitChecked}件を確認）は、`
     + 'すべて読む画面の中だけで使われている');
 }
 
@@ -355,18 +412,7 @@ if (splitProblems === 0) {
 // .tournament-actions-row .row-actions（style.css）と .chat-result .row-actions
 // （bracket.css）が同じ扱いになり、無関係な組み合わせまで挙げてしまう。
 // 実際に取り合いになるのは、同じセレクタが両方に書かれているときだけ。
-// { } の外側にある字＝セレクタか @規則。宣言（color: red）は必ず } の手前で終わるので、
-// 「直前の括弧から次の { まで」を拾えば、宣言が混ざることはない。
-function selectorsOf(css) {
-  const found = new Set();
-  for (const [, head] of css.matchAll(/(?:^|[{}])([^{}]*)\{/g)) {
-    for (const one of head.split(',')) {
-      const s = one.replace(/\s+/g, ' ').trim();
-      if (s && !s.startsWith('@')) found.add(s);
-    }
-  }
-  return found;
-}
+// （selectorsOf は上の「持ち主」の検査で定義してある）
 const narrowBlock = /@media \(max-width: 720px\) \{([\s\S]*?)\n\}/.exec(cssText('style.css'))?.[1];
 if (narrowBlock === undefined) {
   fail('css/style.css に @media (max-width: 720px) の節が見つかりません');
@@ -397,36 +443,47 @@ if (narrowBlock === undefined) {
 // 画面を増やしたときはここにも足すこと。
 const VIEW_CSS_EXPECTED = {
   // 参加メンバー一覧の1枠が対戦カード（.match-box + .match-player）そのまま
-  'view-tournament-detail': 'css/bracket.css',
-  'view-bracket': 'css/bracket.css',
+  'view-tournament-detail': ['bracket.css'],
+  'view-bracket': ['bracket.css'],
   // 1枠ずつの見た目を対戦表とそろえている（js/bracketView.js の buildEntrantRow）
-  'view-entrants': 'css/bracket.css',
+  'view-entrants': ['bracket.css'],
   // 使用キャラクターを選ぶ欄と、そこから開く一覧（js/characterPicker.js）
-  'view-profile': 'css/characters.css',
+  'view-profile': ['characters.css'],
   // 一覧の行に敷く絵（js/players.js の characterRowArtHtml）
-  'view-players': 'css/characters.css',
+  'view-players': ['characters.css'],
   // プロフィールの島と背景（js/app.js の playerHeroHtml）
-  'view-player-detail': 'css/characters.css',
+  'view-player-detail': ['characters.css'],
+  // ガイド本文に埋め込んだ対戦カード・チャット・報告の「見本」が、本物と
+  // 同じクラスで組んである（pages/guide.html の .guide-chat-mock ほか）ので、
+  // ガイド自身のCSSだけでは足りない
+  'view-guide': ['guide.css', 'bracket.css'],
+  'view-setup': ['guide.css'],
+  'view-terms': ['legal.css'],
+  'view-privacy': ['legal.css'],
   // 順位発表の全画面演出（持ち主専用）
-  'view-reveal': 'css/reveal.css',
+  'view-reveal': ['reveal.css'],
 };
 const actualViewCss = new Map(
-  [...html.matchAll(/<section id="(view-[\w-]+)"[^>]*data-css="\/(css\/[\w.-]+\.css)/g)]
-    .map((m) => [m[1], m[2]]),
+  [...html.matchAll(/<section id="(view-[\w-]+)"([^>]*)>/g)]
+    .map((m) => [m[1], cssListOf(m[2])])
+    .filter(([, list]) => list.length),
 );
+const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 let viewCssProblems = 0;
 for (const [view, want] of Object.entries(VIEW_CSS_EXPECTED)) {
-  const got = actualViewCss.get(view);
-  if (got === want) continue;
+  const got = actualViewCss.get(view) ?? [];
+  if (sameList(got, want)) continue;
   viewCssProblems += 1;
-  fail(`${view} が ${want} を読んでいません（実際: ${got ?? 'data-css なし'}）。`
-    + '\n     この画面の中身はJSが組み立てるので、上のクラスの検査には映りません。'
+  fail(`${view} が読むCSSが表と違います。`
+    + `\n     表: ${want.map((f) => 'css/' + f).join(' ')}`
+    + `\n     実際: ${got.length ? got.map((f) => 'css/' + f).join(' ') : 'data-css なし'}`
+    + '\n     この画面の中身はJSか別ファイルが組み立てるので、上のクラスの検査だけでは足りません。'
     + '\n     外したままにすると、その画面を最初に開いた人にだけ崩れて見えます。');
 }
 for (const [view, got] of actualViewCss) {
   if (VIEW_CSS_EXPECTED[view]) continue;
   viewCssProblems += 1;
-  fail(`${view} が ${got} を読んでいますが、この表に載っていません。`
+  fail(`${view} が ${got.map((f) => 'css/' + f).join(' ')} を読んでいますが、この表に載っていません。`
     + '\n     scripts/check-cache-version.mjs の VIEW_CSS_EXPECTED に、'
     + '\n     なぜその画面に要るのかを添えて足すこと。');
 }

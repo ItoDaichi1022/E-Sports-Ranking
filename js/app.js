@@ -408,17 +408,26 @@ let lastRouteKey = null;
 // 【一瞬だけ素の見た目が出る】CSSが届く前に画面を描くので、ごく短いあいだ
 // 装飾の無い状態が見える。開くのは操作のあと（持ち主がボタンを押す）で、
 // その先の全画面演出まではさらに一手あるので、ここでは待たせないほうを採る。
+//
+// 【1画面に複数書ける】data-css は空白区切りで並べられる。使い方ガイドが
+// その例で、ガイド自身のCSSに加えて、本文に埋め込んだ対戦カードやチャットの
+// 見本のために css/bracket.css も要る。1つしか書けなかったころ、ガイドの
+// 見本が素の見た目のまま配られた（v172）。
 const viewCssLoaded = new Set();
 
 function loadViewCss(viewId) {
-  const href = $(viewId)?.dataset.css;
-  if (!href || viewCssLoaded.has(href)) return;
-  viewCssLoaded.add(href);
+  const list = $(viewId)?.dataset.css;
+  if (!list) return;
 
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = href;
-  document.head.appendChild(link);
+  for (const href of list.trim().split(/\s+/)) {
+    if (viewCssLoaded.has(href)) continue;   // 別の画面が先に読んでいれば取り直さない
+    viewCssLoaded.add(href);
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  }
 }
 
 const pageLoads = new Map(); // viewId -> Promise（二重取得を防ぐ）

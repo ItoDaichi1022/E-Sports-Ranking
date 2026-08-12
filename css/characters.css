@@ -812,6 +812,79 @@ dialog.char-picker { max-width: 56rem; }
 
 
 /* ---------------------------------------------------------------------------
+   選手個人ページ
+
+   選手ページ（#players/{id}）とマイページ（#profile）の、名前まわりと
+   アカウント操作。どちらも既にこのファイルを読んでいる。
+   --------------------------------------------------------------------------- */
+
+/* 自分の名前の横に置く「プロフィールを編集」への入口。名前のすぐ隣なので、
+   ボタンの塗り（発光グラデ）は名前より目立ってしまう。線画だけの控えめな入口にする。 */
+.profile-edit-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-left: 0.3rem;
+  padding: 0;
+  border-radius: var(--r-sm);
+  color: var(--text-faint);
+  vertical-align: middle;
+}
+
+.profile-edit-link svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.profile-edit-link:hover {
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+}
+
+/* マイページの編集アイコンは button なので、ボタンの塗り・影を打ち消して
+   選手ページのリンク版と同じ見た目にそろえる */
+.profile-edit-btn {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  min-height: 0;
+}
+
+.profile-edit-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  filter: none;
+}
+
+/* 出場した大会の続きを開くボタン。表の続きであることが分かるよう、
+   表のすぐ下に幅いっぱいで置く。 */
+.player-bio {
+  margin: 0.75rem 0 1.25rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+/* マイページ下部のアカウント操作（ログアウトなど） */
+.profile-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.profile-account-actions .meta-line { margin: 0; }
+
+/* ---------------------------------------------------------------------------
    行に敷く絵の見せ方（一覧の .row-art）
 
    【css/bracket.css の .match-art-cell img と対になっている】元は1本のルールに
