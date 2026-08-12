@@ -52,8 +52,11 @@ const collect = (v, what) => {
 // ここの正規表現も「/」始まりだけを見る ── 相対パスに戻してしまったら、
 // 版数が見つからず「?v= が付いていません」で止まる。
 collect(html.match(/href="\/css\/style\.css\?v=(\d+)"/)?.[1], '/css/style.css');
-collect(html.match(/<script type="module" src="\/js\/app\.js\?v=(\d+)"/)?.[1], '/js/app.js');
-collect(html.match(/<script src="\/js\/vendor\/supabase\.js\?v=(\d+)"/)?.[1], '/js/vendor/supabase.js');
+// [^>]* を挟んであるのは、defer など属性が増えても拾い続けるため。
+// ここが読めなくなると「?v= が付いていません」という的外れな指摘に化ける
+// （実際、supabase.js に defer を足したときにそうなった）。
+collect(html.match(/<script[^>]*\ssrc="\/js\/app\.js\?v=(\d+)"/)?.[1], '/js/app.js');
+collect(html.match(/<script[^>]*\ssrc="\/js\/vendor\/supabase\.js\?v=(\d+)"/)?.[1], '/js/vendor/supabase.js');
 for (const [key, value] of Object.entries(imports)) {
   collect(value.match(/\?v=(\d+)$/)?.[1], `インポートマップの "${key}"`);
 }
@@ -200,6 +203,36 @@ if (posMap === -1) {
   fail('<script type="module"> がインポートマップより前にあります（同上）');
 } else {
   console.log('OK   インポートマップが、どのモジュール読み込みより先にある');
+}
+
+// ---- supabase-js が app.js より先に実行されるか ----
+//
+// js/supabaseClient.js は window.supabase がある前提で書いてあり、無ければ
+// モジュールの評価中に例外を投げる（＝サイトが起動しない）。それを保証している
+// のは「defer 付きの通常スクリプトと type="module" は同じ列に並び、書いてある順に
+// 実行される」というHTMLの決まりだけで、コードの上にはどこにも現れない。
+//
+// 崩れ方は2通りあり、どちらも静かに起きる:
+//   * async を付ける … 列から外れて、読み終わり次第すぐ走る（app.js より後になり得る）
+//   * app.js より下へ移す … 列の中の順番が逆になる
+// defer を消すのは動作としては安全side（より早く走る）だが、そのぶん最初の描画を
+// 止めて帯域を奪うので、消したことに気付けるようここで見る。
+
+const posSupabase = html.indexOf('/js/vendor/supabase.js');
+const supabaseTag = html.match(/<script([^>]*)src="\/js\/vendor\/supabase\.js[^"]*"[^>]*>/)?.[1] ?? '';
+if (posSupabase === -1) {
+  fail('js/vendor/supabase.js の <script> が見つかりません');
+} else if (/\basync\b/.test(supabaseTag)) {
+  fail('js/vendor/supabase.js に async が付いています。'
+    + '\n     app.js より後に実行され得るため、起動時に window.supabase が無くて止まります。');
+} else if (posModule !== -1 && posSupabase > posModule) {
+  fail('js/vendor/supabase.js が app.js のモジュールより後ろにあります。'
+    + '\n     js/supabaseClient.js が window.supabase を見つけられず、起動時に止まります。');
+} else if (!/\bdefer\b/.test(supabaseTag)) {
+  fail('js/vendor/supabase.js に defer がありません。'
+    + '\n     HTMLの読み取りを止め、最優先で回線を取るため、最初の描画とLCPが遅れます。');
+} else {
+  console.log('OK   supabase-js は defer 付きで、app.js より先に実行される位置にある');
 }
 
 // data-src の指す読み物ページが実在するか。綴りを間違えると、そのページを
