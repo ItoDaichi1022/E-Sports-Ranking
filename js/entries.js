@@ -862,15 +862,15 @@ export function renderRecruitPage(containerEl) {
       containerEl.appendChild(skeletonCards(3));
       return;
     }
-    // 【ここが一番「自分で開く」に近い瞬間】出たい大会を探しに来て、無かった直後。
-    // 誘い文句は足さず、開けることだけを伝える。出す相手は題の隣の入口と同じ
-    // 条件（選手登録が済んでいて、利用停止中でない人）にそろえる。
+    // 【島を2つにしないこと】無いことを言う節と、作れることを言う節に分けていたが、
+    // 空の画面に囲みが2つ並ぶと、それだけで画面が塞がって見える。同じ一言の中に
+    // 行き先を置けば足りる。誘い文句（「誰でも開けます」）も要らない ──
+    // 押せる形で置いてあること自体が、開けるという意味になる。
+    // 出す相手は右下の＋と同じ条件（選手登録が済んでいて、利用停止中でない人）。
     const canCreate = Boolean(auth.player) && !isBannedPlayer(auth.player);
-    containerEl.innerHTML = '<p class="empty-hint">現在募集中の大会はありません。</p>'
-      + (canCreate
-        ? '<p class="empty-hint">大会は誰でも開けます。'
-          + '<a href="/tournaments/new/">大会を作成する</a></p>'
-        : '');
+    containerEl.innerHTML = '<p class="empty-hint">募集中の大会はありません。'
+      + (canCreate ? '<a href="/tournaments/new/">大会を作成する</a>' : '')
+      + '</p>';
     return;
   }
 

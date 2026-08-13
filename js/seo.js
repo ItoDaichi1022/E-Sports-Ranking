@@ -42,7 +42,7 @@ const SITE_DESCRIPTION = 'コミュニティの大会運営と個人ランキン
 
 // プレビュー画像が無いときの絵。?v= は index.html と同じ版数に合わせる
 // （/img/* は1年 immutable なので、差し替えたら番号も上げること）。
-const FALLBACK_IMAGE = '/img/icon.png?v=191';
+const FALLBACK_IMAGE = '/img/icon.png?v=192';
 
 // ページの題（h1）と同じ言葉を使う。検索結果とページの中身で名前が違うと、
 // 開いた人に「別のページに来た」と思わせる。
