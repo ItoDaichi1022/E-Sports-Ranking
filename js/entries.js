@@ -862,7 +862,15 @@ export function renderRecruitPage(containerEl) {
       containerEl.appendChild(skeletonCards(3));
       return;
     }
-    containerEl.innerHTML = '<p class="empty-hint">現在募集中の大会はありません。</p>';
+    // 【ここが一番「自分で開く」に近い瞬間】出たい大会を探しに来て、無かった直後。
+    // 誘い文句は足さず、開けることだけを伝える。出す相手は題の隣の入口と同じ
+    // 条件（選手登録が済んでいて、利用停止中でない人）にそろえる。
+    const canCreate = Boolean(auth.player) && !isBannedPlayer(auth.player);
+    containerEl.innerHTML = '<p class="empty-hint">現在募集中の大会はありません。</p>'
+      + (canCreate
+        ? '<p class="empty-hint">大会は誰でも開けます。'
+          + '<a href="/tournaments/new/">大会を作成する</a></p>'
+        : '');
     return;
   }
 

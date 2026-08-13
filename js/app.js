@@ -246,6 +246,7 @@ const accountAvatarEl = $('account-avatar');
 const loginBtn = $('login-btn');
 const logoutBtn = $('logout-btn');
 const navTournamentLink = $('nav-tournament-link');
+const tournamentsCreateLinkEl = $('tournaments-create-link');
 const mainNav = $('main-nav');
 const navToggle = $('nav-toggle');
 const navCloseBtn = $('nav-close');
@@ -318,6 +319,9 @@ function applyAuthUI() {
   const canManageCurrent = canManageTournament(currentBracketTournamentId);
 
   navTournamentLink.hidden = !canCreateTournament;
+  // 大会一覧の題の隣にも同じ入口を出す。条件はメニューと必ずそろえること ──
+  // 片方だけ出ると「メニューには無いのに一覧にはある」という食い違いになる。
+  tournamentsCreateLinkEl.hidden = !canCreateTournament;
   announcementNewBtn.hidden = !admin;
   // ランキングの集計と順位発表は持ち主だけ。大会を開ける人が増えても、
   // 全大会を横断して順位を決める操作は1人に閉じておく。
