@@ -2675,6 +2675,17 @@ a.card:hover {
   margin-bottom: 1rem;
 }
 
+/* 共有と歯車は、折り返しても右に置く。
+   【左に来ると歯車の一覧が画面の外へ出る】.action-menu-list は right: 0 で
+   ボタンの右端に揃え、そこから左へ開く（下のその節を参照）。狭い画面では
+   この行が題の下へ折り返し、既定では左端から並ぶ ── そうなると一覧は
+   さらに左へ開こうとして、「大会情報を編集」の文字が画面の外で切れる。
+   折り返した行でも右端に寄せておけば、開く先は必ず画面の内側になる。 */
+.bracket-page-header .row-actions {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
 .bracket-title-block {
   min-width: 0;
   overflow-wrap: break-word;

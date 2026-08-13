@@ -22,7 +22,7 @@ import { pathFor } from './router.js';
 // 大会の状態は画面のバッジと同じところから取る（js/tournamentState.js）。
 // 二重に判定すると、画面には「終了」と出ているのに検索結果は「開催予定」のまま、
 // という形でずれる。
-import { eventStatusOf, entryState } from './tournamentState.js';
+import { eventStatusOf } from './tournamentState.js';
 // 先頭に出る絵は、表示する大きさで配ってもらう。og:image はここを通さない
 // （SNSのプレビューは大きいまま渡したい。理由は下の heroImage の指定を参照）。
 import { heroImageUrl } from './imageUrl.js';
@@ -42,7 +42,7 @@ const SITE_DESCRIPTION = 'コミュニティの大会運営と個人ランキン
 
 // プレビュー画像が無いときの絵。?v= は index.html と同じ版数に合わせる
 // （/img/* は1年 immutable なので、差し替えたら番号も上げること）。
-const FALLBACK_IMAGE = '/img/icon.png?v=181';
+const FALLBACK_IMAGE = '/img/icon.png?v=182';
 
 // ページの題（h1）と同じ言葉を使う。検索結果とページの中身で名前が違うと、
 // 開いた人に「別のページに来た」と思わせる。
@@ -182,36 +182,40 @@ function deadlineText(iso) {
   return `${d.getMonth() + 1}/${d.getDate()}(${week}) ${hh}:${mm}`;
 }
 
-// 検索結果に出す状態の言い方。画面のバッジ（entryState の label）とほぼ同じだが、
-// 「募集中」だけは「エントリー受付中」に開く ── 検索結果は前後の文脈が無いところに
-// 1行で出るので、何を募集しているのかまで書かないと伝わらない。
-const SEARCH_STATE_TEXT = {
-  draft: '準備中',
-  open: 'エントリー受付中',
-  'deadline-passed': 'エントリー受付中（締切時刻は過ぎています）',
-  full: '定員に達しました',
-  running: '進行中',
-  finished: '終了',
-};
+// 【SEARCH_STATE_TEXT はここにあった】説明文に「募集中」「進行中」「終了」を
+// 出すための言い換えの表で、下の tournamentDescription が使っていた。
+//
+// 消したのは、説明文から進行状況そのものを外したから。カードは一度取り込まれると
+// 長く残るので、募集中に貼られたリンクが大会の終了後も「エントリー受付中」と
+// 言い続けていた。理由は tournamentDescription の注記に書いてある。
+//
+// 構造化データ（JSON-LD）のほうには今も状態を入れている（下の eventStatusOf）。
+// あちらは文章ではなくデータで、読む側が最新を取り直す前提のもの。
 
-// 大会ページの説明文。重要なものから順に置く（開催日 → 状態 → 規模 → 締切）。
-// 後ろは切られる前提なので、切られて困る情報を後ろに置かない。
-export function tournamentDescription(t, entrantsText = '') {
+// 大会ページの説明文。出すのは大会名・開催日・エントリー締切の3つだけ。
+//
+// 【あとから変わるものを入れないこと】ここは og:description になり、XやDiscordは
+// 一度取り込んだカードを長く持ち続ける。募集中に貼られたリンクは、大会が終わっても
+// 「エントリー受付中」と言い続ける ── 貼った本人にも直しようがない。
+// 検索結果も同じで、次に巡回されるまで古い文言が出たままになる。
+//
+// だからここに置くのは、時間が経っても嘘にならないものに限る。
+//   大会名     … 変わらない
+//   開催日     … 変わらない
+//   締切の日時 … 「いつまでだったか」は過ぎても事実のまま
+// 外したのは進行状況（募集中・進行中・終了）と参加人数。どちらも動く値で、
+// カードに焼き付くと必ず食い違う。いまの状態はページを開けば正しいものが出る。
+export function tournamentDescription(t) {
   if (!t) return SITE_DESCRIPTION;
 
   const parts = [];
   const when = dateText(t.date);
   parts.push(when ? `${when}開催の大会「${t.name}」。` : `大会「${t.name}」。`);
 
-  // 状態は画面のバッジと同じ判定から取る（js/tournamentState.js）
-  const state = entryState(t);
-  const stateText = SEARCH_STATE_TEXT[state.key];
-  if (stateText) parts.push(`${stateText}。`);
-  if (entrantsText) parts.push(`${entrantsText}参加。`);
-
-  // 締切を書くのは、まだ入れる大会だけ。終わった大会の締切は誰の役にも立たない。
+  // 締切は、過ぎていても書く。「いつまでだったか」は変わらない事実で、
+  // 締切だけを状態で出し分けると、その出し分け自体がカードに焼き付いてしまう。
   const deadline = deadlineText(t.entryDeadline);
-  if (deadline && state.canEnter && !state.deadlinePassed) parts.push(`エントリー締切は${deadline}。`);
+  if (deadline) parts.push(`エントリー締切は${deadline}。`);
 
   return trimDescription(parts.join(''));
 }
@@ -361,7 +365,7 @@ export function buildPageMeta(page, data = {}, origin) {
     description = 'このページは存在しないか、削除されています。';
   } else if (page === 'tournament' && tournament) {
     heading = tournament.name;
-    description = tournamentDescription(tournament, entrantsText);
+    description = tournamentDescription(tournament);
     if (tournament.imageUrl) { image = tournament.imageUrl; heroImage = heroImageUrl(tournament.imageUrl); }
     extraNode = eventNode(tournament, { url, image, description, origin });
   } else if (page === 'bracket' && tournament) {
