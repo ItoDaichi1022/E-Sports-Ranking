@@ -121,6 +121,7 @@ const manualParticipantsEl = $('manual-participants');
 const tournamentForm = $('tournament-form');
 const tournamentNameInput = $('tournament-name-input');
 const tournamentDateInput = $('tournament-date-input');
+const tournamentFormErrorEl = $('tournament-form-error');
 const tournamentCapacityInput = $('tournament-capacity-input');
 const tournamentDeadlineInput = $('tournament-deadline-input');
 const tournamentRulesInput = $('tournament-rules-input');
@@ -1762,6 +1763,66 @@ const FORMAT_LABELS = {
   round_robin: '総当たり',
 };
 
+// ---- 入力の足りないところを、まとめて見せる ----
+//
+// 【1件ずつ止めないこと】以前は上から順に調べて、最初に見つけた1件を alert で
+// 出していた。直して押すと次の1件が出る、を繰り返すことになり、あと何件あるのかが
+// 最後まで分からない。しかも alert には行き先が無いので、長いフォームのどこの話
+// なのかを自分で探す羽目になる。ここでは全部数えてから、まとめて出す。
+
+// その欄に印を付ける。
+//
+// 【囲っている label や枠には付けないこと】見出しごと色を変えたくなるが、
+// 参加者を選ぶ欄のように中に入力欄を何十個も抱えている枠があり、そこに付けると
+// 選手のチェックボックス全部が赤くなる。印は必ず、指している欄そのものに。
+function setFieldInvalid(el, on) {
+  el?.classList.toggle('is-invalid', on);
+}
+
+// 足りない欄の一覧を、ボタンの真上に出す。
+// problems は [{ el, message }]。el は行き先（押すとそこへ運ぶ）。
+function showFormErrors(boxEl, formEl, problems) {
+  // 前回の印を全部落としてから付け直す（直した欄に印が残らないように）
+  formEl.querySelectorAll('.is-invalid').forEach((n) => n.classList.remove('is-invalid'));
+
+  if (problems.length === 0) {
+    boxEl.hidden = true;
+    boxEl.innerHTML = '';
+    return;
+  }
+
+  problems.forEach((p) => setFieldInvalid(p.el, true));
+
+  boxEl.hidden = false;
+  boxEl.innerHTML = `${problems.length}件、入力を確かめてください。`;
+
+  const list = document.createElement('ul');
+  list.className = 'form-error-list';
+  problems.forEach((p) => {
+    const li = document.createElement('li');
+    if (p.el) {
+      // 押して飛べるようにする。長いフォームでは、文字で場所を言われても
+      // 探すこと自体が手間になる。
+      const jump = document.createElement('button');
+      jump.type = 'button';
+      jump.textContent = p.message;
+      jump.addEventListener('click', () => {
+        p.el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        p.el.focus({ preventScroll: true });
+      });
+      li.appendChild(jump);
+    } else {
+      li.textContent = p.message;
+    }
+    list.appendChild(li);
+  });
+  boxEl.appendChild(list);
+
+  // 最初の1件へ運ぶ。一覧を読む前に直し始められるように。
+  problems[0].el?.focus({ preventScroll: true });
+  boxEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
 // 配信元の入力欄を読む。空欄はそのまま空、書式が違えば知らせて止める。
 //
 // javascript: のようなURLを弾くのは表示側（safeUrl）でもやっているが、
@@ -3084,6 +3145,16 @@ tournamentForm.addEventListener('change', (e) => {
   syncEntryMode();
 });
 
+// 直し始めたら、その欄の印はすぐ外す。押すまで赤いままだと、直したのか
+// どうかが分からず、もう一度押して確かめることになる。
+// 一覧のほうは残す ── 消すと「あと何件あるのか」が消えてしまう。
+tournamentForm.addEventListener('input', (e) => {
+  setFieldInvalid(e.target, false);
+  // 参加者は選ぶもので、指している欄（検索欄）とは別のところが動く。
+  // 選手を選び足したら、検索欄に付けた印も一緒に外す。
+  if (manualParticipantsEl.contains(e.target)) setFieldInvalid(participantSearchInput, false);
+});
+
 rankingRevealBtn.addEventListener('click', () => { navigate('reveal'); });
 
 // 「その他」を選んだときだけ説明欄を出す。他の選択肢では書いても表示に使われない。
@@ -3125,43 +3196,62 @@ keepFormDraft(tournamentForm, TOURNAMENT_DRAFT_KEY);
 // 離れた人の画面が、募集の設定なのに選手検索を出したままになる）。
 syncEntryMode();
 
-tournamentForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
+// 大会作成の入力を上から順に全部見て、直してほしいところを集める。
+// 【途中で返さないこと】1件目で止めると、直して押すたびに次の1件が出る。
+function collectTournamentFormProblems() {
+  const problems = [];
+  const add = (el, message) => problems.push({ el, message });
 
-  const name = tournamentNameInput.value.trim();
-  if (!name) {
-    alert('大会名を入力してください。');
-    return;
-  }
+  if (!tournamentNameInput.value.trim()) add(tournamentNameInput, '大会名が空です。');
 
   const matchType = tournamentMatchTypeInput.value;
-  if (!matchType) {
-    alert('対戦方法を選んでください。');
-    return;
-  }
+  if (!matchType) add(tournamentMatchTypeInput, '対戦方法が選ばれていません。');
 
   const manual = tournamentForm.elements['entry-mode'].value === 'manual';
   if (manual && matchType === '2v2') {
-    alert('2v2はチーム編成が必要なため、「エントリーを募集する」で作成してください。');
-    return;
+    add(tournamentMatchTypeInput,
+      '2v2はチーム編成が必要なため、「エントリーを募集する」を選んでください。');
   }
   if (manual && selectedParticipantIds.length < 2) {
-    alert('参加者を2人以上選択してください。');
-    return;
+    // 行き先は検索欄。参加者の一覧そのものには焦点を当てられない
+    add(participantSearchInput,
+      `参加者があと${2 - selectedParticipantIds.length}人以上必要です（いまは${selectedParticipantIds.length}人）。`);
   }
 
   const capacityRaw = tournamentCapacityInput.value.trim();
   const capacity = capacityRaw === '' ? null : Number(capacityRaw);
   if (capacity != null && (!Number.isInteger(capacity) || capacity < 2)) {
-    alert('定員は2以上の整数で入力してください。');
-    return;
+    add(tournamentCapacityInput, '定員は2以上の整数で入力してください。');
   }
 
-  const streamUrl = readStreamUrl(tournamentStreamInput);
-  if (streamUrl === INVALID_URL) return;
+  // URLと締切は、書式が違うときだけ。空欄は問題にしない（どちらも任意）
+  if (tournamentStreamInput.value.trim() && !safeUrl(tournamentStreamInput.value.trim())) {
+    add(tournamentStreamInput, '配信元は http:// または https:// から始まるURLで入力してください。');
+  }
+  const deadlineRaw = tournamentDeadlineInput.value.trim();
+  if (deadlineRaw && Number.isNaN(new Date(deadlineRaw).getTime())) {
+    add(tournamentDeadlineInput, 'エントリー締切の日時が正しくありません。');
+  }
 
-  const entryDeadline = readDeadline(tournamentDeadlineInput);
-  if (entryDeadline === INVALID_DEADLINE) return;
+  return problems;
+}
+
+tournamentForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const problems = collectTournamentFormProblems();
+  showFormErrors(tournamentFormErrorEl, tournamentForm, problems);
+  if (problems.length > 0) return;
+
+  const name = tournamentNameInput.value.trim();
+  const matchType = tournamentMatchTypeInput.value;
+  const manual = tournamentForm.elements['entry-mode'].value === 'manual';
+  const capacityRaw = tournamentCapacityInput.value.trim();
+  const capacity = capacityRaw === '' ? null : Number(capacityRaw);
+  const streamUrl = safeUrl(tournamentStreamInput.value.trim()) || '';
+  const entryDeadline = tournamentDeadlineInput.value.trim()
+    ? new Date(tournamentDeadlineInput.value.trim()).toISOString()
+    : null;
 
   const tournament = {
     id: newId(),
@@ -3252,6 +3342,8 @@ tournamentForm.addEventListener('submit', async (e) => {
   tournamentImagePicker.setCurrent('');
   ensureCreateOrganizerPicker({ reset: true });
   selectedParticipantIds = [];
+  // 足りない欄の一覧と印を片付ける（次に作る人の画面に前回の指摘が残らないように）
+  showFormErrors(tournamentFormErrorEl, tournamentForm, []);
   // 作れたので下書きは用済み（残すと次に大会を作るとき前回の内容が入ってくる）
   clearFormDraft(TOURNAMENT_DRAFT_KEY);
 

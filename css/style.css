@@ -1270,6 +1270,47 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   border-radius: 999px;
 }
 
+/* 必ず入れてもらう欄の印。「任意」の印（上）と対にして、押す前に
+   どこを埋めればよいかが分かるようにする。 */
+.required-tag {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--loss);
+  background: rgba(255, 111, 133, 0.12);
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+}
+
+/* 送信をやり直してもらう欄の印（js/app.js の setFieldInvalid が付け外しする）。
+   【色だけで示さないこと】枠の色が変わっただけでは、色の見え方が違う人にも
+   離れた場所を見ている人にも届かない。何が足りないのかは、必ずボタンの真上の
+   一覧（.form-message.error）が文字で言う。ここはその行き先の目印。 */
+input.is-invalid,
+select.is-invalid,
+textarea.is-invalid {
+  border-color: var(--loss);
+  box-shadow: 0 0 0 2px rgba(255, 111, 133, 0.18);
+}
+
+/* 足りない欄への行き先。一覧の中の1件を押すと、その欄へ運んで印を当てる。 */
+.form-message .form-error-list {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.form-message .form-error-list button {
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* フォーム内のメッセージ。flexコンテナの中で幅を指定しないと、
    他の項目の間に押し込まれて潰れ、エラーが出ていても読めなくなる。 */
 .form-message {
