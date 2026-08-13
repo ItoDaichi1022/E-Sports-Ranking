@@ -579,9 +579,13 @@ function adminControls(tournament, onChanged) {
 
     // 既定のボタン（アクセント色）のまま。.btn-entry の光る扱いは
     // 「エントリー」だけのもので、ここで借りると印の意味が薄まる。
+    // 【何が起きるかはボタンに書かない】以前は「公開して募集を開始」
+    //「公開して大会を開始」と出し分けていたが、作成のボタン（「作成して確認する」）
+    // から続けて読むと、言葉が増えるほど「で、これは何をするのか」が遠くなる。
+    // 押すと何が起きるかは、真上の帯（draftNotice）と押したあとの確認が言う。
     const openBtn = document.createElement('button');
     openBtn.type = 'button';
-    openBtn.textContent = ready ? '公開して大会を開始' : '公開して募集を開始';
+    openBtn.textContent = '公開する';
     openBtn.addEventListener('click', async () => {
       const message = ready
         ? `「${tournament.name}」を公開して開始します。対戦表が選手とゲストに見えるようになります。よろしいですか？`
@@ -711,11 +715,15 @@ function draftNotice(tournament) {
   title.className = 'draft-notice-title';
   title.textContent = 'この大会はまだ公開されていません';
 
+  // 公開すると何が起きるかは、ここで言い切る。ボタンは「公開する」の一言に
+  // してあるので、その先を説明する場所はここしかない。
   const text = document.createElement('p');
   text.className = 'draft-notice-text';
   text.textContent = state.bracketIds.has(tournament.id)
-    ? '見えているのは運営だけです。選手とゲストには大会も対戦表も出ません。内容と組み合わせを確かめてから、下のボタンで公開してください。'
-    : '見えているのは運営だけです。選手とゲストには大会一覧にも共有リンクにも出ません。内容を確かめてから、下のボタンで公開してください。';
+    ? '見えているのは運営だけです。選手とゲストには大会も対戦表も出ません。'
+      + '内容と組み合わせを確かめてから「公開する」を押すと、大会が始まり、対戦表が誰にでも見えるようになります。'
+    : '見えているのは運営だけです。選手とゲストには大会一覧にも共有リンクにも出ません。'
+      + '内容を確かめてから「公開する」を押すと、大会一覧に並び、エントリーの受付が始まります。';
 
   box.append(title, text);
   return box;

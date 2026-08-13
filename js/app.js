@@ -3025,12 +3025,11 @@ reportForm.addEventListener('submit', async (e) => {
 shuffleBtn.addEventListener('click', shuffleSelected);
 seedByRankingBtn.addEventListener('click', seedBySelectedRanking);
 
-// 参加者の集め方の切り替え（エントリー募集 / 運営が直接選ぶ）
+// 参加者の集め方の切り替え（エントリー募集 / 運営が直接選ぶ）。
+// ボタンの文言は変えない（index.html のその行の注記を参照）。
 tournamentForm.addEventListener('change', (e) => {
   if (e.target.name !== 'entry-mode') return;
-  const manual = e.target.value === 'manual';
-  manualParticipantsEl.hidden = !manual;
-  tournamentSubmitBtn.textContent = manual ? 'ブラケットを生成' : '大会を作成';
+  manualParticipantsEl.hidden = e.target.value !== 'manual';
 });
 
 rankingRevealBtn.addEventListener('click', () => { navigate('reveal'); });
@@ -3060,7 +3059,6 @@ function syncEntryModeForMatchType() {
   if (isTeam && manualRadio.checked) {
     modes.find((r) => r.value === 'recruit').checked = true;
     manualParticipantsEl.hidden = true;
-    tournamentSubmitBtn.textContent = '大会を作成';
   }
 }
 tournamentMatchTypeInput.addEventListener('change', syncEntryModeForMatchType);
