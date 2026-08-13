@@ -5,14 +5,22 @@
      図の中のボタン風の要素は span なので押しても何も起きない（.guide-inert）。
 
      章立て:
+       冒頭. このサイトでできること
        0. アカウントの作り方  1. このサイトの各ページ  2. 大会へのエントリー
        3. ランキングの仕組み  4. 大会を開きたい人へ  5. 困ったとき・通報
+
+     【使えるCSSは3枚だけ】この画面が読むのは style.css / guide.css / bracket.css
+     （index.html の view-guide の data-css）。characters.css と reveal.css は
+     読んでいないので、.char-chip や .reveal-* をここに書いても無地で出る。
+     scripts/check-cache-version.mjs がこれを見張っている。
+     position: fixed の部品（.own-match-bar など）も図に持ち込まないこと ──
+     画面に貼り付いてしまう。
 
      【画面と食い違わせないこと】ここは操作の手順書なので、ボタンの文言や
      メニューの並びを変えたら、このファイルも一緒に直す。読んだ人が画面に
      無いボタンを探すことになり、探している間はサイトが壊れて見える。
-     過去に「公開して募集を開始」（現・公開する）と「ランキング・選手」
-     （現・選手）でそれが起きている。
+     過去に「公開して募集を開始」（現・公開する）、「ランキング・選手」
+     （現・選手）、対戦表の「全体」（実際は拡大縮小のボタン）でそれが起きている。
 
      このファイルを直したら index.html の data-src の ?v= を上げること。 -->
 
@@ -20,9 +28,25 @@
   <p class="page-eyebrow">Getting Started</p>
   <h1>はじめに — このサイトの使い方</h1>
 </div>
+
+<!-- 冒頭。何ができる場所なのかを先に言う ── 目次から読み始めた人は
+     「大会エントリー方法」から入ることになり、サイト全体の姿を掴まないまま
+     手順だけを読むことになる。長さは4行まで。ここは案内板で、説明は下にある。 -->
+<p class="guide-chapter-lead">
+  IgniteArenaは、<strong>大会を開く・大会に出る・戦績が残る</strong>を1か所にまとめた場所です。
+  対戦表づくりから当日の進行、順位の集計までをサイトの中で完結できます。
+</p>
+<ul class="guide-list">
+  <li><strong>見る</strong> — 大会の対戦表、選手のプロフィールと戦歴、順位。<strong>ログインなしで全部見られます</strong>。</li>
+  <li><strong>出る</strong> — 募集中の大会にボタン1つでエントリー。
+    対戦相手との連絡・ルームコードの受け渡し・結果の報告まで、すべてこの中でできます。</li>
+  <li><strong>開く</strong> — 大会は<strong>誰でも開けます</strong>。参加者を集め、対戦表を自動で作り、
+    回戦を進めて結果を確定するところまで用意してあります。</li>
+  <li><strong>残る</strong> — 試合の結果はそのまま戦歴になり、条件を満たした大会はスコアとして順位に反映されます。</li>
+</ul>
 <p class="note">
-  大会の対戦表・選手の戦績・ランキングは、ログインなしで誰でも見られます。
-  大会に<strong>参加する</strong>ときだけ、ログインと選手登録が必要です。
+  ログインと選手登録が要るのは、大会に<strong>参加する</strong>ときと<strong>開く</strong>ときだけです。
+  見るだけなら何も要りません。
 </p>
 
 <!-- ハッシュ（#〜）はページの切り替えに使っているので、href に見出しのIDを書くと
@@ -57,6 +81,11 @@
         初めてでも、アカウントを新しく作る手続きはありません。
         パスワードをこのサイトが預かることもありません。
       </p>
+      <p>
+        大会ページの<strong>「ログインしてエントリー」</strong>からでも同じ画面が開きます。
+        そちらは<strong>見ていた大会から離れずに</strong>ログインできるので、
+        出たい大会が決まっているならそのまま押して構いません。
+      </p>
     </div>
     <figure class="guide-figure">
       <div class="guide-login-mock">
@@ -85,10 +114,22 @@
         不適切と判断した場合、<strong>順位発表での紹介や配信台での紹介を見送ることがあります</strong>。
         迷ったら、配信でそのまま読み上げられても困らない名前にしてください。
       </p>
+      <p>
+        <strong>使用キャラクター</strong>は、名前を打つのではなく<strong>絵から選びます</strong>。
+        「キャラクターを選ぶ」を押すと一覧が開くので、キャラクターを選び、続けて
+        <strong>スキン</strong>まで選びます。数が多いので、上の欄に
+        <strong>名前の一部</strong>を入れて絞り込めます（「シビ」「sivi」「剣道」など）。
+      </p>
+      <p>
+        選べるのは<strong>6人まで</strong>で、<strong>並びに意味があります</strong> ──
+        先頭が「<strong>メイン</strong>」で、選手ページに<strong>大きく出るのはこの1人だけ</strong>です。
+        あとから選び直したいときは、札の「メインにする」で先頭に動かせます。
+      </p>
       <ul class="guide-list">
-        <li><strong>プレイヤー名</strong> — 対戦表・選手ページ・配信に出る名前</li>
+        <li><strong>プレイヤー名</strong> — 対戦表・選手ページ・配信に出る名前（必須）</li>
         <li>ゲームアカウントID — フレンド申請に使う番号</li>
-        <li>使用キャラクター — カンマ区切りで複数書けます</li>
+        <li>使用キャラクター — 絵から選びます（6人まで・先頭がメイン）</li>
+        <li>アイコン — 画像を1枚</li>
         <li>X / YouTube・自己紹介 — 任意（自己紹介は500文字まで）</li>
       </ul>
     </div>
@@ -96,10 +137,14 @@
       <div class="guide-form-mock">
         <span class="guide-form-label">プレイヤー名</span>
         <span class="guide-form-input">Gyu</span>
+        <!-- 【文字を打つ欄ではない】使用キャラクターは絵から選ぶ部品
+             （js/characterPicker.js）。実物の .char-chip などは
+             css/characters.css にあり、この画面では読んでいないので
+             ここに持ち込めない ── ボタンだけを出して、中身は本文で説明する。 -->
         <span class="guide-form-label">
           使用キャラクター
         </span>
-        <span class="guide-form-input">シビ, ソフィア</span>
+        <span class="as-link btn-secondary guide-inert">キャラクターを選ぶ</span>
         <span class="guide-form-label">
           X <span class="optional-tag">任意</span>
         </span>
@@ -118,8 +163,14 @@
         保存すると、また見え方の確認に戻ります。
       </p>
       <p>
-        <strong>アイコンを設定しておく</strong>と、対戦表やランキングで見つけてもらいやすくなります。
+        <strong>アイコンを設定しておく</strong>と、対戦表や検索結果で見つけてもらいやすくなります。
+        選んだ<strong>メインのキャラクター</strong>は、ここに大きく出るほか、
+        対戦表や検索結果の行にもうっすらと敷かれます。
         プレイヤー名を変えても戦績は消えません（前の名前は「過去名」として残ります）。
+      </p>
+      <p>
+        マイページに出るのは<strong>プロフィールだけ</strong>です。
+        自分がエントリーした大会や出場した大会は、<strong>「エントリー状況」</strong>にまとまっています。
       </p>
     </div>
     <figure class="guide-figure">
@@ -135,7 +186,7 @@
               </svg>
             </span>
           </span>
-          <span class="guide-profile-sub">使用キャラクター: シビ、ソフィア</span>
+          <span class="guide-profile-sub">過去名: Gyu.</span>
         </div>
       </div>
       <figcaption>マイページ。鉛筆から編集に切り替わります</figcaption>
@@ -169,13 +220,13 @@
       <span class="guide-nav-item guide-nav-contact">お問い合わせ（X）</span>
     </div>
   </div>
-  <figcaption>左上の☰を押すと、この一覧が開きます</figcaption>
+  <figcaption>左上の☰を押すと、この一覧が開きます（選手登録すると「大会作成」が増えます）</figcaption>
 </figure>
 
 <ul class="guide-pages">
   <li class="guide-page-card">
     <h3>ホーム</h3>
-    <p>サイトの紹介と、これまでの大会数・登録者数、運営からの<strong>最新のお知らせ</strong>。まずここを見れば、いま何が動いているか分かります。</p>
+    <p>サイトの紹介と、<strong>注目の大会</strong>、これまでの積み上げ（登録選手・開催した大会・延べ出場）、運営からの<strong>最新のお知らせ</strong>。まずここを見れば、いま何が動いているか分かります。</p>
   </li>
   <li class="guide-page-card">
     <h3>お知らせ</h3>
@@ -183,11 +234,11 @@
   </li>
   <li class="guide-page-card">
     <h3>大会</h3>
-    <p>大会の一覧です。<strong>募集中・進行中・終了</strong>のタブで切り替えます。<strong>参加は募集中タブから</strong>。大会を開くとルール・参加者・<strong>対戦表</strong>が見られます。</p>
+    <p>大会の一覧です。<strong>募集中・進行中・終了</strong>のタブで切り替えます。<strong>参加は募集中タブから</strong>。大会を開くと、ルールや参加人数と、<strong>対戦表</strong>・<strong>出場選手一覧</strong>への入口があります。</p>
   </li>
   <li class="guide-page-card">
     <h3>選手</h3>
-    <p><strong>名前を入れて探す</strong>ページです。一覧は出ません ── 検索した名前に当たった選手だけが並びます。<strong>ゲームアカウントIDや以前の名前でも</strong>見つかります。</p>
+    <p><strong>名前を入れて探す</strong>ページです。一覧は出ません ── 検索した名前に当たった選手だけが並びます。<strong>ゲームアカウントIDや以前の名前でも</strong>見つかります。選手を開くと順位・戦歴・使用キャラクターが見られます。</p>
   </li>
   <li class="guide-page-card">
     <h3>対戦環境を整える</h3>
@@ -195,7 +246,7 @@
   </li>
   <li class="guide-page-card">
     <h3>エントリー状況</h3>
-    <p>自分がエントリー・出場した大会のまとめです。<strong>自分の大会へはここから</strong>が早道です。</p>
+    <p>自分がエントリー・出場した大会が<strong>エントリー中／出場中／過去に出場</strong>に分かれて並びます。<strong>自分の大会へはここから</strong>が早道です。</p>
   </li>
   <li class="guide-page-card">
     <h3>マイページ</h3>
@@ -210,8 +261,9 @@
 <!-- ================= 2. 大会エントリー方法 ================= -->
 <h2 class="guide-chapter reveal" id="guide-entry"><span class="guide-chapter-num">2</span>大会エントリー方法</h2>
 <p class="guide-chapter-lead">
-  エントリー → 対戦 → 結果の報告、という流れです。
-  先に<a href="/guide/" data-guide-target="guide-account">0. アカウントの作り方</a>を済ませておいてください。
+  エントリー → 対戦 → 結果の入力、という流れです。
+  ログインと選手登録がまだでも、エントリーのボタンからそのまま済ませられます
+  （<a href="/guide/" data-guide-target="guide-account">0. アカウントの作り方</a>）。
 </p>
 
 <ol class="guide-steps">
@@ -219,15 +271,27 @@
     <div class="guide-step-body">
       <h3><span class="guide-step-num">1</span>大会にエントリー</h3>
       <p>
-        「大会」の<strong>募集中タブ</strong>から大会を開き、ルールを確認して「エントリーする」を押すだけです。
-        <strong>募集中の間は何度でも取り消せます</strong>。
+        「大会」の<strong>募集中タブ</strong>から大会を開き、ルールを確認して「エントリーする」を押します。
+        押すと一度確認が出ます。<strong>募集中の間は何度でも取り消せます</strong>
+        （「エントリーを取り消す」に変わります）。
         締め切られると、それまでの戦績をもとに対戦表（トーナメント表）が作られます。
+      </p>
+      <p>
+        定員が決まっている大会で埋まってしまうと、ボタンは<strong>「定員に達しました」</strong>になり押せません。
+        ログインしていなければ<strong>「ログインしてエントリー」</strong>、選手登録がまだなら
+        <strong>「選手登録してエントリー」</strong>が出るので、そこから続けられます。
       </p>
       <p>
         運営が<strong>エントリー締切</strong>を決めている大会では、エントリーボタンの隣に
         締切の日時と<strong>残り時間</strong>が出ます。実際に締め切るのは運営なので、
         時刻を少し過ぎても押せることがありますが、間に合わないことも当然あります。
         締切までに入っておいてください。
+      </p>
+      <p>
+        エントリーが済むと、<strong>「本番までにできることがあります」</strong>という小さな案内が出ます。
+        当日までに回線やコントローラーを見直したい人向けの
+        <a href="/setup/">対戦環境を整える</a>への入口です。要らなければ×で閉じられます
+        （閉じた大会では二度と出ません）。
       </p>
       <p>
         大会名の右にある<strong>共有のボタン</strong>を押すと、その大会のURLがコピーされます。
@@ -238,6 +302,7 @@
     <figure class="guide-figure">
       <div class="guide-figure-stack">
         <span class="as-link btn-entry guide-inert">エントリーする</span>
+        <span class="as-link btn-secondary guide-inert">エントリーを取り消す</span>
       </div>
       <figcaption>大会ページのいちばん目立つボタンがこれです</figcaption>
     </figure>
@@ -245,17 +310,61 @@
 
   <li class="guide-step reveal">
     <div class="guide-step-body">
-      <h3><span class="guide-step-num">2</span>対戦表で自分を見つける</h3>
+      <h3><span class="guide-step-num">2</span>2v2の大会に出るとき</h3>
       <p>
-        大会が始まったら対戦表を開きます。<strong>色の付いた行があなた</strong>です。
-        対戦カードの右端にある<strong>鉛筆アイコン</strong>を押すと、その対戦の画面
-        （ルームコード・チャット・ゲームカウント）が開きます。
-        選手名を押すと、その選手のプロフィールが見られます。
+        対戦方法が<strong>2v2</strong>の大会は、1人ではエントリーできません。
+        ボタンが<strong>「チームでエントリー」</strong>になっていて、押すと
+        <strong>チーム名</strong>（24文字まで）と<strong>相方</strong>を決める欄が開きます。
       </p>
       <p>
-        スマートフォンでは<strong>「回戦ごと」</strong>で開きます。上の札で回戦を選ぶと、
-        その回戦の対戦カードだけが縦に並ぶので、横に送らずに読めます。
-        勝ち上がりの枝ごと見たいときは、右上の<strong>「全体」</strong>に切り替えてください。
+        相方は<strong>検索して選びます</strong>。名前かゲームIDを入れると候補が出るので、
+        その中から押してください。<strong>自分と、すでにこの大会に出ている人は候補に出ません</strong>
+        ── 誰かのチームに入っている人を選んでしまわないようになっています。
+      </p>
+      <p>
+        <strong>取り消すとチームごと消えます。</strong>2人組は片方が抜けると成立しないので、
+        あなたが取り消すと<strong>相方の参加も一緒に取り消されます</strong>。
+        押す前の確認で相方の名前が出るので、そこで確かめてください。
+      </p>
+      <p>
+        なお、相方の側の承認は要りません。組んだ時点でエントリーが成立します。
+        声を掛けてから組むようにしてください。
+      </p>
+    </div>
+    <figure class="guide-figure">
+      <div class="guide-form-mock">
+        <span class="guide-form-label">チーム名</span>
+        <span class="guide-form-input">チームぐんぐん</span>
+        <span class="guide-form-label">相方</span>
+        <span class="guide-form-input guide-form-empty">選手を検索（名前・ゲームID）</span>
+      </div>
+      <figcaption>「チームでエントリー」を押すと開きます</figcaption>
+    </figure>
+  </li>
+
+  <li class="guide-step reveal">
+    <div class="guide-step-body">
+      <h3><span class="guide-step-num">3</span>自分の対戦を開く</h3>
+      <p>
+        大会ページの<strong>「トーナメントを見る」</strong>から対戦表に移ります
+        （顔ぶれだけ見たいときは、その下の「出場選手一覧を見る」から）。
+      </p>
+      <p>
+        出場していると、対戦表のページの<strong>いちばん下に帯が貼り付きます</strong>。
+        これが<strong>「あなたの対戦」</strong>で、
+        <strong>回戦・対戦相手・開始したかどうか</strong>が並び、
+        右の<strong>「対戦を開く」</strong>から、その対戦の画面
+        （ルームコード・チャット・ゲームカウント）に入れます。
+      </p>
+      <p>
+        <strong>表の中から自分を探す必要はありません。</strong>
+        帯はページのどこを見ていても同じ位置に出ていて、回戦が進んで自分の枠が
+        表の端へ寄っていっても、開き方は変わりません。
+      </p>
+      <p>
+        表の中では、<strong>色の付いた行があなた</strong>です。
+        <strong>選手名を押すとその選手のプロフィール</strong>が開き、
+        カード右端の<strong>鉛筆アイコン</strong>からは<strong>自分以外の対戦</strong>も開けます。
       </p>
     </div>
     <figure class="guide-figure">
@@ -278,22 +387,64 @@
           </svg>
         </span>
       </div>
-      <figcaption>対戦カード。色付きの行が自分、右端の鉛筆が入口です</figcaption>
+      <!-- 【.own-match-bar は使えない】実物は position: fixed で画面に貼り付くので、
+           図に置くとこのページの下端に居座ってしまう。中身だけを並べて示す。 -->
+      <div class="guide-flow">
+        <span class="guide-flow-step">あなたの対戦</span>
+        <span class="guide-flow-step">R1</span>
+        <span class="guide-flow-step">vs 対戦相手</span>
+        <span class="guide-flow-step">試合開始</span>
+      </div>
+      <figcaption>上：対戦カード。下：画面の下に貼り付く「あなたの対戦」</figcaption>
     </figure>
   </li>
 
   <li class="guide-step reveal">
     <div class="guide-step-body">
-      <h3><span class="guide-step-num">3</span>開始の合図を待って対戦</h3>
+      <h3><span class="guide-step-num">4</span>表の見せ方を変える</h3>
+      <p>
+        対戦表の上には切り替えが2つあります。
+      </p>
+      <ul class="guide-list">
+        <li><strong>トーナメント表</strong> — 勝ち上がりの枝ごと見る、いつもの形（既定）</li>
+        <li><strong>回戦ごと</strong> — 選んだ回戦の対戦カードだけを縦に並べる。
+          横に送らずに読めるので、<strong>スマートフォンではこちらが読みやすい</strong>です</li>
+      </ul>
+      <p>
+        トーナメント表は<strong>つまんで拡大・縮小</strong>できます
+        （マウスなら Ctrl＋ホイール）。表の右下にある
+        <strong>−</strong>・<strong>＋</strong>・<strong>全体</strong>のボタンでも同じことができ、
+        <strong>「全体」は表全体が画面に入る大きさに戻すボタン</strong>です。
+      </p>
+    </div>
+    <figure class="guide-figure">
+      <div class="guide-flow">
+        <span class="guide-flow-step">トーナメント表</span>
+        <span class="guide-flow-step">回戦ごと</span>
+      </div>
+      <div class="guide-flow">
+        <span class="guide-flow-step">−</span>
+        <span class="guide-flow-step">＋</span>
+        <span class="guide-flow-step">全体</span>
+      </div>
+      <figcaption>上：表の見せ方。下：右下にある拡大縮小</figcaption>
+    </figure>
+  </li>
+
+  <li class="guide-step reveal">
+    <div class="guide-step-body">
+      <h3><span class="guide-step-num">5</span>開始の合図を待って対戦</h3>
       <p>
         対戦を始めてよいかは、対戦画面のいちばん上で分かります。
         運営がその回戦を開始すると、<strong>「開始待ち」が「試合開始」に変わります</strong>。
         画面を開いたまま待っていて構いません（変わった瞬間に切り替わります）。
+        「あなたの対戦」の帯にも同じ合図が出ます。
       </p>
       <p>
         その下に<strong>ルームコード欄</strong>があります。
         配信される試合では運営が先に記入していることもあります。
-        空いていれば、部屋を建てた側がコードを記入してください。
+        空いていれば、部屋を建てた側がコードを記入してください
+        （<strong>どちらが書いても構いません</strong>）。
         待ち合わせの連絡は同じ画面のチャットでできます。
       </p>
     </div>
@@ -319,13 +470,17 @@
 
   <li class="guide-step reveal">
     <div class="guide-step-body">
-      <h3><span class="guide-step-num">4</span>ゲームカウントを入力</h3>
+      <h3><span class="guide-step-num">6</span>ゲームカウントを入力</h3>
       <p>
         試合が終わったら、対戦画面の「ゲームカウント」タブで結果を入力します。
         入力できるのは<strong>勝った側・負けた側のどちらでも</strong>かまいません。
         入れた時点で確定し、対戦表が自動で進みます（相手の承認は要りません）。
         入力後の訂正は運営しかできないので、数字を確かめてから押してください。
         間違えたときや結果が食い違うときは、次の「困ったときは」を読んでください。
+      </p>
+      <p>
+        回戦がまだ始まっていないうちは、この欄は開きません
+        （<strong>「運営がこの回戦を開始すると、ここから結果を入力できます」</strong>と出ます）。
       </p>
       <div class="guide-flow">
         <span class="guide-flow-step">どちらかが入力</span>
@@ -348,7 +503,7 @@
 
   <li class="guide-step reveal">
     <div class="guide-step-body">
-      <h3><span class="guide-step-num">5</span>困ったときは</h3>
+      <h3><span class="guide-step-num">7</span>困ったときは</h3>
       <p>
         相手と連絡がつかない・入力したカウントを間違えた・結果が食い違うなど、
         <strong>その対戦の中で起きたこと</strong>は、対戦画面の
@@ -366,7 +521,7 @@
       <div class="guide-figure-stack">
         <span class="as-link btn-report guide-inert">運営に報告</span>
       </div>
-      <figcaption>対戦画面の左下にあります</figcaption>
+      <figcaption>対戦画面の下にあります</figcaption>
     </figure>
   </li>
 </ol>
@@ -394,6 +549,7 @@
     </ul>
     <p>
       対象かどうかは、各大会の詳細ページに印で出ています。エントリーする前に確認できます。
+      参加人数は募集中に増えるので、<strong>16人に届いていない大会の印は、集まれば変わります</strong>。
     </p>
   </div>
   <figure class="guide-figure">
@@ -447,13 +603,13 @@
     </p>
     <p>
       自分や、気になる選手の順位は<strong>その選手のページ</strong>で見られます。
-      名前の隣に「<strong>12位</strong>」のように出て、その下に前回からの動き
+      名前の隣に「<strong>12位</strong>」のように出て、その下にスコアと前回からの動き
       （<strong>▲▼</strong>、今回から入った選手は<strong>NEW</strong>）が並びます。
     </p>
     <p>
       出るのは<strong>集計に入った選手全員</strong>です。上位だけが対象ということはなく、
       100番台でもその数字がそのまま出ます。反対に、ランキング対象の大会に
-      一度も出ていない選手には、順位そのものが付きません。
+      一度も出ていない選手は「<strong>—</strong>」と「対象の大会に参加していません」になります。
     </p>
     <p>
       順位は自動では変わりません。<strong>運営が集計して発表したとき</strong>に切り替わります。
@@ -500,8 +656,9 @@
       </p>
       <p>
         大会を作った人は、そのまま<strong>その大会の運営</strong>になります。当日いっしょに進行する人が
-        いれば、大会作成の<strong>「この大会の運営」</strong>欄から選手名簿で指名できます。
-        <strong>運営としてできることは、その大会の中だけ</strong>です ──
+        いれば、大会作成の<strong>「この大会の運営」</strong>欄から選手を検索して指名できます。
+        指名された人は、その大会の<strong>対戦表・回戦の開始・結果の確定・チャットの管理</strong>ができます。
+        <strong>できることはその大会の中だけ</strong>です ──
         他の人の大会を触ったり、サイト全体の設定を変えたりはできません。
       </p>
       <p>
@@ -513,7 +670,7 @@
     <figure class="guide-figure">
       <div class="guide-nav-menu guide-nav-menu-sm">
         <span class="guide-nav-item">大会</span>
-        <span class="guide-nav-item">ランキング・選手</span>
+        <span class="guide-nav-item">選手</span>
         <span class="guide-nav-item is-new">大会作成</span>
       </div>
       <figcaption>選手登録すると増えるメニュー</figcaption>
@@ -524,18 +681,32 @@
     <div class="guide-step-body">
       <h3><span class="guide-step-num">2</span>大会を作る</h3>
       <p>
-        「大会作成」で、大会名・開催日・<strong>対戦方法</strong>・定員・<strong>エントリー締切</strong>・
-        ルール・<strong>配信元のURL</strong>・画像を入力します。対戦方法と配信元は
-        <strong>ランキングの対象かどうかを決める</strong>ので、必ず実態に合わせてください
-        （配信元がYouTubeのURLでないと、他の条件を満たしていても対象になりません）。
+        「大会作成」で中身を決めます。<strong>必須は大会名と対戦方法だけ</strong>で、あとは任意です。
       </p>
+      <ul class="guide-list">
+        <li><strong>対戦方法</strong> — 1v1／リレー／2v2／その他。
+          <strong>ランキングの対象かどうかを決めます</strong>（対象は1v1とリレー）</li>
+        <li><strong>ランキングへの反映</strong> — 既定は入り。
+          エキシビションや練習会は<strong>チェックを外して外せます</strong></li>
+        <li><strong>定員</strong> — 空欄なら無制限</li>
+        <li><strong>エントリー締切</strong> — 「あと○日」として出ます（自動では締まりません）</li>
+        <li><strong>配信元のURL</strong> — <strong>YouTubeのURLでないとランキングの対象になりません</strong></li>
+        <li><strong>ルール</strong>・<strong>画像</strong>（5MBまで）・<strong>この大会の運営</strong></li>
+        <li><strong>三位決定戦</strong> — 準決勝の敗者どうしで3位を決めるかどうか。
+          <strong>あとから変えても対戦表は作り直されない</strong>ので、ここで決めてください</li>
+      </ul>
       <p>
         参加者の集め方は2通りです。
       </p>
       <ul class="guide-list">
         <li><strong>エントリーを募集する</strong> — 選手が自分で参加登録する（通常はこちら）</li>
-        <li><strong>運営が参加者を直接選ぶ</strong> — その場で対戦表まで作る</li>
+        <li><strong>運営が参加者を直接選ぶ</strong> — 選手を検索して選び、
+          シード順（<strong>ランダム</strong>／<strong>ランキング順</strong>に並び替えられます）まで決めて、その場で対戦表を作ります</li>
       </ul>
+      <p>
+        <strong>2v2は「エントリーを募集する」でしか作れません。</strong>
+        選手を並べるだけではチームが組めないためです（チームは選手どうしが組みます）。
+      </p>
       <p>
         どちらを選んでも、<strong>「作成して確認する」</strong>を押した時点ではまだ公開されません。
         大会は<strong>準備中（非公開）</strong>で作られ、この間に見えるのは
@@ -554,7 +725,11 @@
         <span class="guide-form-label">配信元（任意・URL）</span>
         <span class="guide-form-input">https://www.youtube.com/…</span>
       </div>
-      <figcaption>大会作成の入力欄（一部）</figcaption>
+      <div class="guide-figure-stack">
+        <span class="as-link guide-inert">作成して確認する</span>
+        <span class="as-link guide-inert">公開する</span>
+      </div>
+      <figcaption>作ってから、確かめて、公開します</figcaption>
     </figure>
   </li>
 
@@ -572,6 +747,11 @@
         締め切るのはこのボタンを押したときだけにしてあります。
       </p>
       <p>
+        募集を一度取り下げたいときは「<strong>募集を止めて非公開に戻す</strong>」です。
+        大会は準備中に戻り、<strong>選手とゲストには大会ごと見えなくなります</strong>
+        （エントリーは残っているので、公開し直せばそのまま続けられます）。
+      </p>
+      <p>
         自動の組み合わせを直したいときは、対戦表ページの
         <strong>「組み合わせを調整する」</strong>から、選手を2人ずつ選んで入れ替えられます
         （<strong>回戦を開始する前まで</strong>）。
@@ -580,9 +760,10 @@
     <figure class="guide-figure">
       <div class="guide-figure-stack">
         <span class="as-link guide-inert">締め切ってブラケット生成</span>
+        <span class="as-link btn-secondary guide-inert">募集を止めて非公開に戻す</span>
         <span class="as-link btn-secondary guide-inert">組み合わせを調整する</span>
       </div>
-      <figcaption>締め切りと、組み合わせの手直し</figcaption>
+      <figcaption>締め切りと、その手前でできること</figcaption>
     </figure>
   </li>
 
@@ -591,11 +772,20 @@
       <h3><span class="guide-step-num">4</span>配信台を決めて回戦を開始する</h3>
       <p>
         回戦ごとに、<strong>配信に乗せる試合（配信台）</strong>を選んでから
-        「開始」を押します。開始して初めて、選手はゲームカウントを報告できるようになります。
+        「<strong>R1 を開始</strong>」のように押します。
+        <strong>開始して初めて、選手はゲームカウントを入力できるようになります。</strong>
+      </p>
+      <p>
+        配信台は<strong>選ばなくても開始できます</strong>（配信しない大会・その回戦だけ配信しない大会もあるため）。
+        選び忘れたまま押した場合は、確認に「配信台なしで開始します」と出るので、そこで気づけます。
       </p>
       <p>
         配信台の試合は、開始前に<strong>ルームコードを先に記入</strong>しておけます。
         選手は開始と同時にコードを確認できます。
+      </p>
+      <p>
+        間違えて開始したときは「<strong>開始を取り消す</strong>」で戻せます
+        （まだ確定していない対戦の入力欄が閉じます）。
       </p>
     </div>
     <figure class="guide-figure">
@@ -613,11 +803,13 @@
       <h3><span class="guide-step-num">5</span>結果を確認して大会を確定する</h3>
       <p>
         選手どうしで確定した結果は自動で進みます。運営は対戦カードの鉛筆から
-        <strong>その場で結果を入れる</strong>ことも、<strong>不戦勝で確定</strong>することもできます。
+        <strong>その場で結果を入れる</strong>ことも、<strong>不戦勝で確定</strong>することもできます
+        （不戦勝はスコアなしで勝者だけを決めます）。回戦の開始前でも入れられます。
       </p>
       <p>
         すべての対戦が終わると「結果を確定する」が出ます。押すと最終順位が決まり、
-        各選手の戦歴に反映されます。
+        各選手の戦歴に<strong>「優勝」「準優勝」「ベスト4」</strong>のように残ります。
+        <strong>確定するまで優勝者は表に出ません</strong> ── 入力ミスを直す余地を残すためです。
       </p>
     </div>
     <figure class="guide-figure">
@@ -669,6 +861,11 @@
       <p>
         選手から「運営に報告」が届くと、<strong>大会のカードと対戦表に印</strong>が出ます。
         対戦のチャットを開いて内容を確認し、「対応済みにする」を押すと印が消えます。
+      </p>
+      <p>
+        なお、<strong>あなたの大会そのものへの通報は、あなたには届きません</strong>
+        （宛先はサイトの運営です）。
+        詳しくは<a href="/guide/" data-guide-target="guide-trouble">5. 困ったとき・通報</a>を読んでください。
       </p>
     </div>
     <figure class="guide-figure">
@@ -764,6 +961,7 @@
 
 <div class="hero-actions guide-cta">
   <a class="as-link" href="/tournaments/">募集中の大会を見る</a>
+  <a class="as-link btn-secondary" href="/players/">選手を探す</a>
   <a class="as-link btn-secondary" href="/profile/">ログイン・選手登録へ</a>
   <a class="as-link btn-secondary" href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">お問い合わせ（X）</a>
 </div>
