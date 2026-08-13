@@ -6,7 +6,13 @@
 
      章立て:
        0. アカウントの作り方  1. このサイトの各ページ  2. 大会へのエントリー
-       3. ランキングの仕組み  4. 大会を開きたい人へ
+       3. ランキングの仕組み  4. 大会を開きたい人へ  5. 困ったとき・通報
+
+     【画面と食い違わせないこと】ここは操作の手順書なので、ボタンの文言や
+     メニューの並びを変えたら、このファイルも一緒に直す。読んだ人が画面に
+     無いボタンを探すことになり、探している間はサイトが壊れて見える。
+     過去に「公開して募集を開始」（現・公開する）と「ランキング・選手」
+     （現・選手）でそれが起きている。
 
      このファイルを直したら index.html の data-src の ?v= を上げること。 -->
 
@@ -28,6 +34,7 @@
   <a href="/guide/" data-guide-target="guide-entry">2. 大会エントリー方法</a>
   <a href="/guide/" data-guide-target="guide-ranking">3. ランキングの仕組み</a>
   <a href="/guide/" data-guide-target="guide-host">4. 大会を開きたい人へ</a>
+  <a href="/guide/" data-guide-target="guide-trouble">5. 困ったとき・通報</a>
 </nav>
 
 <!-- ================= 0. アカウントの作り方 ================= -->
@@ -72,17 +79,17 @@
         「任意」と付いている欄は空のままでも構いません。あとからいつでも足せます。
       </p>
       <p>
-        プレイヤー名は、対戦表だけでなく<strong>ランキングの一覧・順位発表の動画・配信の画面</strong>にも
+        プレイヤー名は、対戦表だけでなく<strong>選手ページ・順位発表の動画・配信の画面</strong>にも
         そのまま出ます。わいせつな表現・差別的な表現・他人を指す名前など、
         公の場に出せない名前は使えません。
-        不適切と判断した場合、<strong>ランキングへの掲載や配信台での紹介を見送ることがあります</strong>。
+        不適切と判断した場合、<strong>順位発表での紹介や配信台での紹介を見送ることがあります</strong>。
         迷ったら、配信でそのまま読み上げられても困らない名前にしてください。
       </p>
       <ul class="guide-list">
-        <li><strong>プレイヤー名</strong> — 対戦表・ランキング・配信に出る名前</li>
+        <li><strong>プレイヤー名</strong> — 対戦表・選手ページ・配信に出る名前</li>
         <li>ゲームアカウントID — フレンド申請に使う番号</li>
         <li>使用キャラクター — カンマ区切りで複数書けます</li>
-        <li>X / YouTube・自己紹介 — 任意</li>
+        <li>X / YouTube・自己紹介 — 任意（自己紹介は500文字まで）</li>
       </ul>
     </div>
     <figure class="guide-figure">
@@ -154,7 +161,8 @@
       <span class="guide-nav-item">お知らせ</span>
       <span class="guide-nav-sep"></span>
       <span class="guide-nav-item">大会</span>
-      <span class="guide-nav-item">ランキング・選手</span>
+      <span class="guide-nav-item">選手</span>
+      <span class="guide-nav-item">対戦環境を整える</span>
       <span class="guide-nav-sep"></span>
       <span class="guide-nav-item">エントリー状況</span>
       <span class="guide-nav-item">マイページ</span>
@@ -167,7 +175,7 @@
 <ul class="guide-pages">
   <li class="guide-page-card">
     <h3>ホーム</h3>
-    <p>サイトの紹介と、運営からの<strong>最新のお知らせ</strong>。まずここを見れば、いま何が動いているか分かります。</p>
+    <p>サイトの紹介と、これまでの大会数・登録者数、運営からの<strong>最新のお知らせ</strong>。まずここを見れば、いま何が動いているか分かります。</p>
   </li>
   <li class="guide-page-card">
     <h3>お知らせ</h3>
@@ -178,8 +186,12 @@
     <p>大会の一覧です。<strong>募集中・進行中・終了</strong>のタブで切り替えます。<strong>参加は募集中タブから</strong>。大会を開くとルール・参加者・<strong>対戦表</strong>が見られます。</p>
   </li>
   <li class="guide-page-card">
-    <h3>ランキング・選手</h3>
-    <p>公開中のランキング。上の検索欄に名前を入れると、<strong>その選手のページ</strong>を探せます。</p>
+    <h3>選手</h3>
+    <p><strong>名前を入れて探す</strong>ページです。一覧は出ません ── 検索した名前に当たった選手だけが並びます。<strong>ゲームアカウントIDや以前の名前でも</strong>見つかります。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>対戦環境を整える</h3>
+    <p>回線・コントローラーなど、大会当日までに整えておきたいものの案内です（広告を含みます）。</p>
   </li>
   <li class="guide-page-card">
     <h3>エントリー状況</h3>
@@ -216,6 +228,11 @@
         締切の日時と<strong>残り時間</strong>が出ます。実際に締め切るのは運営なので、
         時刻を少し過ぎても押せることがありますが、間に合わないことも当然あります。
         締切までに入っておいてください。
+      </p>
+      <p>
+        大会名の右にある<strong>共有のボタン</strong>を押すと、その大会のURLがコピーされます。
+        XやDiscordに貼ると大会名と画像が出るので、<strong>仲間を誘うとき</strong>はこれが早いです。
+        ログインしていなくても押せます。
       </p>
     </div>
     <figure class="guide-figure">
@@ -334,10 +351,15 @@
       <h3><span class="guide-step-num">5</span>困ったときは</h3>
       <p>
         相手と連絡がつかない・入力したカウントを間違えた・結果が食い違うなど、
-        困ったときは対戦画面の
-        <strong>「運営に報告」</strong>を押してください。運営の画面にすぐ印が付きます。
+        <strong>その対戦の中で起きたこと</strong>は、対戦画面の
+        <strong>「運営に報告」</strong>を押してください。<strong>その大会の運営</strong>の画面にすぐ印が付きます。
         確定した結果を直せるのは運営だけなので、間違いに気づいたらそのままにせず、
         必ずここから連絡してください。
+      </p>
+      <p>
+        対戦していない相手のことや、大会そのものが進まないといった
+        <strong>対戦の外の困りごと</strong>には、別の入口があります ──
+        <a href="/guide/" data-guide-target="guide-trouble">5. 困ったとき・通報</a>を読んでください。
       </p>
     </div>
     <figure class="guide-figure">
@@ -389,7 +411,7 @@
 
 <div class="guide-two-col">
   <div class="guide-step-body">
-    <h3>スコアと順位の見かた</h3>
+    <h3>スコアの決まりかた</h3>
     <p>
       スコアは<strong>相手の強さで重み付け</strong>して計算します。強い選手に勝つほど大きく上がり、
       格下に負けるほど大きく下がります。大会の規模（参加人数）も重みになります。
@@ -400,14 +422,6 @@
       また、<strong>試合数が少ないうちは大きく動きません</strong> ── 1試合の結果だけで
       上位に来ないよう、出場を重ねるほど成績どおりの位置に近づく作りにしています。
     </p>
-    <p>
-      順位の右にある<strong>▲▼の印</strong>は、前回公開したランキングと比べた動きです。
-      <strong>NEW</strong> は今回から入った選手です。
-    </p>
-    <p>
-      ランキングは自動では変わりません。<strong>運営が集計して公開したとき</strong>に切り替わります。
-      集計期間はページ上部に出ています。
-    </p>
   </div>
   <figure class="guide-figure">
     <table class="ranking-table guide-inert guide-rank-mock">
@@ -417,7 +431,54 @@
         <tr class="rank-3"><td class="rank-cell">3</td><td>Rin</td><td><span class="rank-change new">NEW</span></td></tr>
       </tbody>
     </table>
-    <figcaption>上位3名は金・銀・銅で示されます</figcaption>
+    <!-- 【これは実物ではない】サイトに順位の一覧表は無い（発表は動画・配信とお知らせ）。
+         ここは順位と変動記号の読み方を示すための図として置いている。 -->
+    <figcaption>順位と、前回からの動き（▲▼・NEW）の読み方</figcaption>
+  </figure>
+</div>
+
+<div class="guide-two-col">
+  <div class="guide-step-body">
+    <h3>順位はどこで見られるか</h3>
+    <p>
+      <strong>順位の一覧表は、このサイトには置いていません。</strong>
+      順位は<strong>順位発表</strong>（動画・配信）と<strong>お知らせ</strong>で発表します
+      ── 一覧をいつでも見られるようにすると、発表そのものが先に読まれてしまうためです。
+    </p>
+    <p>
+      自分や、気になる選手の順位は<strong>その選手のページ</strong>で見られます。
+      名前の隣に「<strong>12位</strong>」のように出て、その下に前回からの動き
+      （<strong>▲▼</strong>、今回から入った選手は<strong>NEW</strong>）が並びます。
+    </p>
+    <p>
+      出るのは<strong>集計に入った選手全員</strong>です。上位だけが対象ということはなく、
+      100番台でもその数字がそのまま出ます。反対に、ランキング対象の大会に
+      一度も出ていない選手には、順位そのものが付きません。
+    </p>
+    <p>
+      順位は自動では変わりません。<strong>運営が集計して発表したとき</strong>に切り替わります。
+      次の発表までは、その大会に勝っても選手ページの数字は動きません
+      （試合の結果自体は、その場で戦歴に残ります）。
+    </p>
+    <div class="guide-flow">
+      <span class="guide-flow-step">大会の結果が確定</span>
+      <span class="guide-flow-arrow" aria-hidden="true">→</span>
+      <span class="guide-flow-step">戦歴にはすぐ残る</span>
+      <span class="guide-flow-arrow" aria-hidden="true">→</span>
+      <span class="guide-flow-step">運営が集計して発表</span>
+      <span class="guide-flow-arrow" aria-hidden="true">→</span>
+      <span class="guide-flow-step">選手ページの順位が動く</span>
+    </div>
+  </div>
+  <figure class="guide-figure">
+    <div class="guide-profile-mock">
+      <span class="avatar avatar-md guide-inert">G</span>
+      <div>
+        <span class="guide-profile-name">Gyu</span>
+        <span class="guide-profile-sub">12位 <span class="rank-change up">▲2</span></span>
+      </div>
+    </div>
+    <figcaption>選手ページに出る順位</figcaption>
   </figure>
 </div>
 
@@ -569,18 +630,23 @@
 
   <li class="guide-step reveal">
     <div class="guide-step-body">
-      <h3><span class="guide-step-num">6</span>ランキングを公開する</h3>
+      <h3><span class="guide-step-num">6</span>順位を発表する</h3>
       <p class="note">
         ここだけは<strong>サイトの持ち主だけの操作</strong>です。大会は誰でも開けますが、
         全大会を横断して順位を決めるところは1人に閉じてあります。
       </p>
       <p>
-        「ランキング・選手」ページの<strong>「ランキングを作成する」</strong>から、
-        集計する期間を<strong>カレンダーで指定</strong>します。その場で結果を確かめられます
-        （この時点ではまだ閲覧者には見えません）。
+        「選手」ページの<strong>「順位発表の画面を開く」</strong>から入ります。
+        集計する期間を<strong>カレンダーで指定</strong>し、発表する人数
+        （<strong>上位50人・30人・10人</strong>）と発表順を決めて
+        <strong>「発表を開始する」</strong>を押すと、収録・配信用の画面になります
+        （<strong>Space / →</strong> 次へ、<strong>←</strong> 戻る、<strong>Esc</strong> 終了）。
       </p>
       <p>
-        <strong>「このランキングを公開する」</strong>を押すと切り替わります。
+        発表が終わったら<strong>「この集計を『前回の順位』として保存する」</strong>を押します。
+        <strong>選手ページに出る順位はこれで切り替わり</strong>、次に集計したときの
+        ▲▼はこの順位を基準に出ます。<strong>押すまでは何も変わりません</strong> ──
+        発表より先に順位が見えてしまわないよう、この順番にしてあります。
       </p>
     </div>
     <figure class="guide-figure">
@@ -591,9 +657,9 @@
         <span class="guide-form-input">2026-06-30</span>
       </div>
       <div class="guide-figure-stack">
-        <span class="as-link guide-inert guide-mini-btn">このランキングを公開する</span>
+        <span class="as-link guide-inert guide-mini-btn">この集計を「前回の順位」として保存する</span>
       </div>
-      <figcaption>集計期間を決めて公開します</figcaption>
+      <figcaption>発表を終えてから押します</figcaption>
     </figure>
   </li>
 
@@ -615,15 +681,85 @@
   </li>
 </ol>
 
-<!-- 章立てには入れていない（目次を増やすほどの分量ではない）。
-     置き場所をここにしたのは、直前が運営側の「もめごとへの対応」だから ──
-     対戦の中と外で、どちらの入口を使うのかが並べて読める。 -->
-<p class="note" id="guide-report">
-  <strong>対戦の外で困ったときは</strong> ── 対戦チャットの「運営に報告」は、その対戦の
-  当事者だけが使えるものです。対戦していない相手や、大会の外での迷惑行為については、
-  その選手のページの<strong>「この選手を通報する」</strong>から知らせてください。
-  通報は運営だけが見ます（相手には、通報されたことも誰が通報したかも伝わりません）。
-  件数だけで自動的に処分されることはなく、運営が内容を読んで判断します。
+<!-- ================= 5. 困ったとき・通報 =================
+     直前が運営側の「もめごとへの対応」なので、その続きとしてここに置く ──
+     対戦の中と外で、どちらの入口を使うのかが並べて読める。
+     入口が3つに増えた（対戦チャット／選手／大会）ので、以前の短い注記から
+     章に格上げした。届く相手が入口ごとに違うことが、この章の要点。 -->
+<h2 class="guide-chapter reveal" id="guide-trouble"><span class="guide-chapter-num">5</span>困ったとき・通報</h2>
+<p class="guide-chapter-lead">
+  知らせる入口は<strong>3つ</strong>あります。どこから出すかで<strong>届く相手が変わります</strong>。
+</p>
+
+<div class="guide-two-col">
+  <div class="guide-step-body">
+    <h3>どこから知らせるか</h3>
+    <ul class="guide-list">
+      <li>
+        <strong>対戦の中のこと</strong>（連絡がつかない・カウントを間違えた・結果が食い違う）<br>
+        → 対戦画面の<strong>「運営に報告」</strong>。<strong>その大会の運営</strong>に届きます。
+        使えるのは<strong>その対戦の当事者だけ</strong>です。
+      </li>
+      <li>
+        <strong>選手のこと</strong>（暴言・なりすまし・不適切なプロフィールなど）<br>
+        → その選手のページの<strong>「この選手を通報する」</strong>。<strong>サイトの運営</strong>に届きます。
+      </li>
+      <li>
+        <strong>大会そのもののこと</strong>（開いたきり進行しない・規約に反する内容）<br>
+        → 大会ページの<strong>⚙</strong>から<strong>「この大会を通報する」</strong>。
+        <strong>サイトの運営</strong>に届きます。<strong>その大会の運営には、通報があったことも見えません</strong> ──
+        大会は誰でも開けるので、運営を通さずに知らせる道を別に用意してあります。
+      </li>
+    </ul>
+    <p>
+      ⚙は、<strong>その大会の運営には「編集・削除」、それ以外の人には「通報」</strong>が入っています。
+      同じ場所ですが、押した人によって中身が違います。
+    </p>
+  </div>
+  <figure class="guide-figure">
+    <div class="guide-figure-stack">
+      <span class="as-link btn-report guide-inert">この選手を通報する</span>
+      <span class="as-link btn-report guide-inert">この大会を通報する</span>
+    </div>
+    <figcaption>どちらもサイトの運営に届きます</figcaption>
+  </figure>
+</div>
+
+<div class="guide-two-col">
+  <div class="guide-step-body">
+    <h3>通報するとどうなるか</h3>
+    <p>
+      通報には<strong>ログインと選手登録</strong>が必要です（誰からの知らせかが分からないと、
+      運営が確かめようがないためです）。理由を選び、
+      <strong>いつ・どの大会で・何があったか</strong>を500文字まで書けます。
+      日付と大会名が入っていると、運営がその対戦まで辿れます。
+    </p>
+    <p>
+      <strong>通報は運営だけが見ます。</strong>相手には、通報されたことも、
+      誰が通報したかも伝わりません。
+    </p>
+    <p>
+      同じ相手・同じ大会に<strong>2回目は出せません</strong>。運営が対応するまでは、
+      ボタンが「<strong>通報済みです</strong>」に変わります。
+      件数だけで自動的に処分されることはなく、<strong>運営が内容を読んで判断します</strong>。
+    </p>
+  </div>
+  <figure class="guide-figure">
+    <div class="guide-figure-stack">
+      <span class="as-link btn-report guide-inert">通報済みです</span>
+    </div>
+    <figcaption>受け付けたあとの見た目</figcaption>
+  </figure>
+</div>
+
+<p class="note">
+  <strong>利用停止について</strong> ── 運営が必要と判断したときは、アカウントを
+  <strong>利用停止</strong>にすることがあります。停止のあいだは
+  <strong>エントリー・大会作成・対戦チャットへの書き込み・プロフィールの編集</strong>ができなくなり、
+  選手の検索にも出なくなります（大会や対戦表を見ること自体はできます）。
+  停止中はマイページにその旨が出ます。心当たりがない場合や解除を求める場合は、
+  <a href="https://x.com/tomokkugyu" target="_blank" rel="noopener noreferrer">お問い合わせ（X）</a>
+  から運営にご連絡ください。<strong>解除もできます</strong> ── 停止は取り返しのつかない処分ではありません。
 </p>
 
 <div class="hero-actions guide-cta">
