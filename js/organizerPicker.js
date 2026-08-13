@@ -11,8 +11,9 @@
 // 大会を編集できなくなり、サイト全体の運営に頼むしかなくなる（DB側は外すことを
 // 禁じていない ── 運営を入れ替える正当な操作と区別がつかないため、画面側で止める）。
 
-import { state, activePlayers } from './state.js';
-import { escapeHtml } from './util.js';
+import { state } from './state.js';
+import { escapeHtml, createSearchRunner } from './util.js';
+import * as db from './db.js';
 
 // 検索結果に出す上限。多すぎると押す前に読み切れないので、絞り込みを促す。
 const MAX_RESULTS = 12;
@@ -28,7 +29,6 @@ function playerLabel(player) {
 export function mountOrganizerPicker(containerEl, { selectedIds = [], lockedId = null } = {}) {
   const selected = new Set(selectedIds);
   if (lockedId) selected.add(lockedId);
-  let query = '';
 
   containerEl.innerHTML = '';
   containerEl.className = 'organizer-picker';
@@ -83,25 +83,39 @@ export function mountOrganizerPicker(containerEl, { selectedIds = [], lockedId =
     });
   }
 
+  // 検索の状態。'idle'（未入力） / 'loading' / 'done' / 'error'
+  // 【結果を覚えておく必要がある】DBに問い合わせる形になったので、
+  // 描き直し（選んだ・外した）のたびに投げ直さずに済むよう手元に置く。
+  let hits = [];
+  let status = 'idle';
+  let errorText = '';
+
   function renderResults() {
     resultsEl.innerHTML = '';
-    const q = query.trim().toLowerCase();
-    if (!q) return;
+    if (status === 'idle') return;
 
-    // 利用停止中の選手は候補に出さない（指名しても、その大会の操作は
-    // ポリシー側で止まる）。既に選ばれている札は消さない ── 停止する前から
+    if (status === 'error') {
+      resultsEl.innerHTML = `<p class="empty-hint">${escapeHtml(errorText)}</p>`;
+      return;
+    }
+
+    // 通信の途中に「一致する選手がいません」を挟まない（打つたびに一瞬出る）
+    if (status === 'loading') {
+      resultsEl.innerHTML = '<p class="status-line loading">検索しています...</p>';
+      return;
+    }
+
+    // 既に選ばれている人は候補から外す。札のほうは消さない ── 停止する前から
     // 運営に入っていた人を、編集のたびに黙って外してしまわないため。
-    const hits = activePlayers()
-      .filter((p) => !selected.has(p.id))
-      .filter((p) => p.currentName.toLowerCase().includes(q)
-        || p.pastNames.slice(-2).some((n) => n.toLowerCase().includes(q)));
+    // 利用停止中の選手はそもそも db.searchPlayers が返さない。
+    const visible = hits.filter((p) => !selected.has(p.id));
 
-    if (hits.length === 0) {
+    if (visible.length === 0) {
       resultsEl.innerHTML = '<p class="empty-hint">一致する選手がいません。</p>';
       return;
     }
 
-    hits.slice(0, MAX_RESULTS).forEach((p) => {
+    visible.slice(0, MAX_RESULTS).forEach((p) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'organizer-result';
@@ -114,17 +128,25 @@ export function mountOrganizerPicker(containerEl, { selectedIds = [], lockedId =
       resultsEl.appendChild(btn);
     });
 
-    if (hits.length > MAX_RESULTS) {
+    if (visible.length > MAX_RESULTS) {
       const more = document.createElement('p');
       more.className = 'empty-hint';
-      more.textContent = `他 ${hits.length - MAX_RESULTS}人。名前をもう少し入れて絞ってください。`;
+      more.textContent = `他 ${visible.length - MAX_RESULTS}人。名前をもう少し入れて絞ってください。`;
       resultsEl.appendChild(more);
     }
   }
 
+  // 打鍵ごとに投げない・古い応答に上書きさせない（js/util.js の注記を参照）
+  const runSearch = createSearchRunner({
+    search: (q) => db.searchPlayers(q),
+    onStart: () => { status = 'loading'; errorText = ''; renderResults(); },
+    onEmpty: () => { hits = []; status = 'idle'; renderResults(); },
+    onResult: ({ players }) => { hits = players; status = 'done'; renderResults(); },
+    onError: (err) => { status = 'error'; errorText = err.message; renderResults(); },
+  });
+
   search.addEventListener('input', () => {
-    query = search.value;
-    renderResults();
+    runSearch(search.value);
   });
 
   // 検索欄でEnterを押しただけでフォームが送信されないようにする

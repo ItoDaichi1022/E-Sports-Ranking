@@ -1,5 +1,5 @@
 import { state, isBannedPlayer } from './state.js';
-import { avatarHtml } from './util.js';
+import { avatarHtml, escapeHtml } from './util.js';
 import { characterRowArtHtml } from './characters.js';
 import { makeIconButton } from './icons.js';
 import { pathFor } from './router.js';
@@ -47,18 +47,28 @@ export async function canRemovePlayer(id) {
 // プレイヤー名の編集もこの表には置かない。自分の行は名前をクリックして選手ページ経由で、
 // 他人の行は運営が選手ページから編集する。一覧は「見る」ことに専念させる。
 //
+// 【絞り込みはこの関数の仕事ではない】以前はここで state.players を手元で
+// フィルタしていたが、そのためには全選手を配る必要があった。いまは呼ぶ側が
+// db.searchPlayers（DB側で当たった人だけを返す）を通し、その結果を渡す。
+// 検索対象（名前・ゲームID・過去名の直近2件）は players.search_text が持っている。
+//
 // options:
 //   ownPlayerId      -> ログイン中の本人の選手ID。その行を目立たせる
 //   isAdmin          -> 削除・アカウント統合などの運営操作を出すか
-//   filterQuery      -> プレイヤー名・過去名（直近2件）の部分一致で絞り込む（改名しても見つかるように過去名も対象）。
-//                        空のときは一覧を出さず、検索を促す案内だけ表示する
+//   players          -> 表に出す選手（検索結果）。呼ぶ側が用意する
+//   status           -> 'idle'（未入力） / 'loading' / 'done' / 'error'
+//   errorMessage     -> status が 'error' のときに出す文言
+//   hasMore          -> 上限に収まりきらなかったか（「絞り込んでください」を出す）
 //   onDelete(player) -> 削除するとき
 //   onMerge(source, target) -> 代理登録された行に本人のアカウントを統合するとき
 export function renderPlayerTable(containerEl, options = {}) {
   const {
     ownPlayerId = null,
     isAdmin = false,
-    filterQuery = '',
+    players = [],
+    status = 'idle',
+    errorMessage = '',
+    hasMore = false,
     onDelete = async () => {},
     onMerge = async () => {},
   } = options;
@@ -67,32 +77,25 @@ export function renderPlayerTable(containerEl, options = {}) {
 
   // 検索していないときは一覧を出さない。全員を並べても探している人は見つからず、
   // 選手が増えるほど重くなるだけだから（名前で絞ってから見せる）。
-  const query = filterQuery.trim().toLowerCase();
-  if (!query) {
+  if (status === 'idle') {
     containerEl.innerHTML = '<p class="empty-hint">上の欄に名前を入力すると、選手を検索できます。</p>';
     return;
   }
 
-  if (state.players.length === 0) {
-    // まだ届いていないだけかもしれない。読み込み中に「登録されていません」と
-    // 出すと、初めて来た人には誰も居ないサイトに見える。
-    if (!db.hasLoadedOnce()) {
-      containerEl.innerHTML = '<p class="status-line loading">選手を読み込んでいます...</p>';
-      return;
-    }
-    containerEl.innerHTML = '<p class="empty-hint">まだ選手が登録されていません。</p>';
+  if (status === 'error') {
+    containerEl.innerHTML = `<p class="empty-hint">${escapeHtml(errorMessage || '検索に失敗しました。')}</p>`;
     return;
   }
 
-  const visiblePlayers = state.players
-    // 利用停止中の選手は検索に出さない。運営には「停止中」の札を付けて残す ──
-    // 解除する相手を探せる場所がここしかないため。
-    // 過去の大会の対戦表と戦績には今までどおり名前が出る（記録は消さない）。
-    .filter((p) => isAdmin || !isBannedPlayer(p))
-    .filter((p) => p.currentName.toLowerCase().includes(query)
-      // 選手ページに出す過去名（直近2件）と検索対象をそろえる。全履歴を対象にすると、
-      // 画面には出ていない古い名前で見つかってしまい、利用者から見て不可解になる。
-      || p.pastNames.slice(-2).some((n) => n.toLowerCase().includes(query)));
+  // 【「見つかりません」を先に言わないこと】通信の途中はまだ何も分かっていない。
+  // ここで「一致する選手がいません」と出すと、打つたびに一瞬その文言が挟まり、
+  // 探している人には「居ない」と読めてしまう。
+  if (status === 'loading') {
+    containerEl.innerHTML = '<p class="status-line loading">選手を検索しています...</p>';
+    return;
+  }
+
+  const visiblePlayers = players;
 
   if (visiblePlayers.length === 0) {
     containerEl.innerHTML = '<p class="empty-hint">検索条件に一致する選手がいません。</p>';
@@ -146,6 +149,11 @@ export function renderPlayerTable(containerEl, options = {}) {
       actionTd.className = 'row-actions';
 
       // 代理登録された行に、本人が自分で作ったアカウントを統合する（移行してきた選手の初回だけ）。
+      //
+      // 【ここはまだ state.players を全部見ている】統合先の候補を選ぶ欄で、
+      // いまは起動時に全選手が手元にあるので成り立っている。loadAll から
+      // players を外したら（次の段階）、この候補は「これまでに見かけた人」だけに
+      // なってしまう ── そのときは、ここも検索して選ぶ形に変えること。
       if (isAdmin && !p.userId) {
         const candidates = state.players.filter((c) => c.userId && c.id !== p.id);
         if (candidates.length > 0) {
@@ -209,4 +217,14 @@ export function renderPlayerTable(containerEl, options = {}) {
   scrollWrap.className = 'table-scroll';
   scrollWrap.appendChild(table);
   containerEl.appendChild(scrollWrap);
+
+  // 上限に収まりきらなかったことを伝える。黙って切ると、探している人が
+  // 一覧に出ていないだけなのに「登録されていない」と読まれる。
+  if (hasMore) {
+    const more = document.createElement('p');
+    more.className = 'empty-hint';
+    more.textContent = '一致する選手が多いため、先頭だけを出しています。'
+      + 'もう少し詳しく入力すると絞り込めます。';
+    containerEl.appendChild(more);
+  }
 }

@@ -791,6 +791,72 @@ export async function loadPlayerEntries(playerId) {
   }));
 }
 
+// 選手の検索。打った文字に当たった人だけをDBから受け取る。
+//
+// 【全選手を手元に持たないための唯一の経路】画面の検索欄は4か所ある
+// （選手検索・運営の参加者選び・相方選び・運営の指名）。どれも以前は
+// state.players を手元で絞っていて、そのために全行を配る必要があった。
+// 新しい検索欄を作るときも、手元で絞らずここを通すこと。
+//
+// 当たったかどうかを見るのは players.search_text（生成列。名前・ゲームID・
+// 過去名の直近2件を小文字でつないだもの。supabase/schema.sql を参照）。
+// 大文字小文字の区別が無いのは、列の側で lower 済みだから。
+//
+// 取ってきた行は state.players に混ぜる（下の mergePlayers）。混ぜておくと、
+// 名前を引くだけの箇所（getPlayerName など）が、検索で見かけた人を
+// そのまま引けるようになる。
+export async function searchPlayers(query, { includeBanned = false, limit = 50 } = {}) {
+  const q = query.trim().toLowerCase();
+  // 空欄では問い合わせない。戻りの形は当たったときと同じにしておく
+  // ── ここだけ配列で返すと、呼ぶ側の分割代入（{ players }）が黙って undefined になる。
+  if (!q) return { players: [], hasMore: false };
+
+  // 【% と _ を潰すこと】ilike のワイルドカード。潰さないと、検索欄に「%」と
+  // 打っただけで全員が返る（絞るための欄が、全件取得の入口になる）。
+  const escaped = q.replace(/([\\%_])/g, '\\$1');
+
+  let request = supabase
+    .from('players')
+    .select(PLAYER_LIST_COLUMNS)
+    .ilike('search_text', `%${escaped}%`)
+    .order('display_name')
+    // 上限を置くのは、1文字だけ打たれたときに全員返るのを防ぐため。
+    // 溢れたことは呼ぶ側に伝える（下の戻り値）ので、画面で「絞り込んでください」と出せる。
+    .limit(limit + 1);
+
+  // 利用停止中の選手は運営にだけ出す。解除する相手を探せる場所が
+  // 選手検索しかないので、運営の画面からは消せない。
+  if (!includeBanned) request = request.is('banned_at', null);
+
+  const { data, error } = await request;
+  check(error, '選手の検索');
+
+  const players = data.map(toPlayer);
+  const hasMore = players.length > limit;
+  return { players: rememberPlayers(players.slice(0, limit)), hasMore };
+}
+
+// 取ってきた選手を state.players に混ぜ、混ぜたあとの行を返す。
+//
+// 既にある行は中身を更新する（作り直さない）。作り直すと、画面が掴んでいる
+// 参照が古いものになり、そちらを見ている表示だけが更新から取り残される。
+//
+// 【下の mergePlayers（運営のアカウント統合）とは別物】あちらは2人の選手を
+// DB上で1人にまとめる操作。こちらは取得結果を手元に覚えるだけ。
+function rememberPlayers(players) {
+  return players.map((incoming) => {
+    const existing = state.players.find((p) => p.id === incoming.id);
+    if (!existing) {
+      state.players.push(withPlayerDetail(incoming));
+      return state.players[state.players.length - 1];
+    }
+    // 詳細（自己紹介・SNS）は一覧の問い合わせでは取れていない。
+    // 既に持っているものを、空で塗り潰さない。
+    const { bio, snsX, snsTwitch, snsYoutube, detailLoaded, ...rest } = incoming;
+    return Object.assign(existing, rest);
+  });
+}
+
 // 選手ページ用。その選手の試合と出場記録だけを取る（全試合は読まない）。
 // チーム戦の試合は選手IDが入っていないためここには含まれないが、
 // 個人の通算成績にチーム戦を混ぜない方針なので、これで足りる。

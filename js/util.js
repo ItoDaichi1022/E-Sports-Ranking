@@ -228,3 +228,60 @@ export function setupImagePicker({ fileInput, preview, removeBtn }) {
     },
   };
 }
+
+// 検索欄の共通の受け皿。
+//
+// 画面に4つある選手の検索欄（選手検索・運営の参加者選び・相方選び・運営の指名）は、
+// どれも手元の配列を絞るのをやめてDBに問い合わせる形になった。通信が挟まると、
+// 手元で絞っていたころには無かった2つの問題が出る。
+//
+// 【1. 打鍵ごとに投げない】input イベントは1文字ごとに来る。「たろう」と打てば
+// 3回。そのまま投げると、要らない問い合わせが2回走る。入力が止まってから投げる。
+//
+// 【2. 古い応答に上書きさせない】通信の戻る順番は投げた順とは限らない。
+// 「た」の結果が「たろう」の結果より後に返ると、画面には「た」の結果が残る
+// ── 打ち終えたのに絞り込まれていない、という形で出る。要求に番号を振り、
+// 最後の要求以外は捨てる。
+//
+//   search(query) -> Promise<結果>   実際に問い合わせる関数
+//   onStart(query)                  投げる直前（「検索中...」を出す）
+//   onResult(結果, query)           最新の応答が返ったとき
+//   onEmpty()                       検索欄が空になったとき（問い合わせない）
+//   onError(err)                    最新の要求が失敗したとき
+//
+// 戻り値は「問い合わせを予約する関数」。入力のたびに呼ぶ。
+export function createSearchRunner({
+  delay = 250,
+  search,
+  onStart = () => {},
+  onResult = () => {},
+  onEmpty = () => {},
+  onError = () => {},
+}) {
+  let timer = null;
+  let latest = 0;
+
+  return function requestSearch(query) {
+    clearTimeout(timer);
+    // 番号は空欄のときも進める。そうしないと、打ってすぐ消した場合に、
+    // 飛んでいった問い合わせの結果が空の画面へ後から流れ込む。
+    const id = ++latest;
+
+    if (!String(query ?? '').trim()) {
+      onEmpty();
+      return;
+    }
+
+    onStart(query);
+    timer = setTimeout(async () => {
+      try {
+        const result = await search(query);
+        if (id !== latest) return;   // 追い越された
+        onResult(result, query);
+      } catch (err) {
+        if (id !== latest) return;
+        onError(err);
+      }
+    }, delay);
+  };
+}

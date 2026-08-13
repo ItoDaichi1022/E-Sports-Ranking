@@ -6,9 +6,9 @@
 
 import {
   state, isTeamTournament, entrantIdOfPlayer, getEntrantMemberIds, getPlayerName,
-  activePlayers, isBannedPlayer,
+  isBannedPlayer,
 } from './state.js';
-import { escapeHtml, cardThumb, skeletonCards } from './util.js';
+import { escapeHtml, cardThumb, skeletonCards, createSearchRunner } from './util.js';
 import { auth, isLoggedIn, canManageTournament } from './auth.js';
 import { computeRankings } from './ranking.js';
 import { createBracket } from './bracket.js';
@@ -251,7 +251,9 @@ function playerLabel(player) {
 //
 // 検索欄が空のうちは候補を出さない。選んだ相手は一覧から消えても分かるよう、
 // 常に上に出しておく。
-function partnerPicker(candidates) {
+// excludeIds には自分と、既にこの大会に出ている選手を入れる。
+// （検索そのものはDB側。利用停止中の選手は db.searchPlayers が返さない）
+function partnerPicker(excludeIds) {
   const wrap = document.createElement('div');
   wrap.className = 'partner-picker';
 
@@ -272,26 +274,41 @@ function partnerPicker(candidates) {
   const list = document.createElement('div');
   list.className = 'scroll-box';
 
+  // 選んだ相手は state.players から引く。検索の結果は db.searchPlayers が
+  // state.players に混ぜているので、一度見かけた人はここで引ける。
   const syncChosen = () => {
-    const picked = candidates.find((p) => p.id === openTeamForm.partnerId);
+    const picked = state.players.find((p) => p.id === openTeamForm.partnerId);
     chosen.textContent = picked ? `相方: ${playerLabel(picked)}` : '相方が選ばれていません';
     chosen.classList.toggle('is-empty', !picked);
   };
 
+  // 検索の状態。'idle'（未入力） / 'loading' / 'done' / 'error'
+  let hits = [];
+  let status = 'idle';
+  let errorText = '';
+
   const renderList = () => {
     list.innerHTML = '';
 
-    const query = search.value.trim().toLowerCase();
-
     // 何も打っていないうちは候補を出さない。全員を並べても目当ての人は結局探せず、
     // たまたま先頭に来た人を押し間違えるほうが起きやすいため。
-    if (!query) {
+    if (status === 'idle') {
       list.innerHTML = '<p class="empty-hint">名前かゲームIDを入力すると候補が出ます。</p>';
       return;
     }
 
-    const visible = candidates.filter((p) => p.currentName.toLowerCase().includes(query)
-      || (p.gameAccountId ?? '').toLowerCase().includes(query));
+    if (status === 'error') {
+      list.innerHTML = `<p class="empty-hint">${escapeHtml(errorText)}</p>`;
+      return;
+    }
+
+    // 通信の途中に「一致する選手がいません」を挟まない（打つたびに一瞬出る）
+    if (status === 'loading') {
+      list.innerHTML = '<p class="status-line loading">検索しています...</p>';
+      return;
+    }
+
+    const visible = hits.filter((p) => !excludeIds.has(p.id));
 
     if (visible.length === 0) {
       list.innerHTML = '<p class="empty-hint">条件に一致する選手がいません。</p>';
@@ -317,13 +334,25 @@ function partnerPicker(candidates) {
     });
   };
 
+  // 打鍵ごとに投げない・古い応答に上書きさせない（js/util.js の注記を参照）
+  const runSearch = createSearchRunner({
+    search: (q) => db.searchPlayers(q),
+    onStart: () => { status = 'loading'; errorText = ''; renderList(); },
+    onEmpty: () => { hits = []; status = 'idle'; renderList(); },
+    onResult: ({ players }) => { hits = players; status = 'done'; renderList(); },
+    onError: (err) => { status = 'error'; errorText = err.message; renderList(); },
+  });
+
   search.addEventListener('input', () => {
     openTeamForm.partnerQuery = search.value;
-    renderList();
+    runSearch(search.value);
   });
 
   renderList();
   syncChosen();
+  // 画面が描き直されても（Realtimeで他の人のエントリーが届くたびに起きる）、
+  // 打ってあった文字から候補を出し直す。
+  if (openTeamForm.partnerQuery) runSearch(openTeamForm.partnerQuery);
 
   wrap.append(chosen, search, list);
   return wrap;
@@ -350,11 +379,10 @@ function teamEntryForm(tournament, onChanged, onCancel) {
   // 自分と、既にこの大会に出ている選手は選べない（DB側でも弾かれるが、
   // 選べてしまうと送信して初めてエラーになり分かりにくい）。
   // 利用停止中の選手も同じ理由で候補に出さない（enter_tournament_as_team が弾く）。
-  const taken = new Set(tournament.participantIds);
-  const candidates = activePlayers().filter((p) => p.id !== auth.player.id && !taken.has(p.id));
+  const excludeIds = new Set([...tournament.participantIds, auth.player.id]);
 
   // 選んでいた相手が先に他のチームで埋まっていたら、選択を空に戻す
-  if (openTeamForm.partnerId && !candidates.some((p) => p.id === openTeamForm.partnerId)) {
+  if (openTeamForm.partnerId && excludeIds.has(openTeamForm.partnerId)) {
     openTeamForm.partnerId = '';
   }
 
@@ -363,16 +391,13 @@ function teamEntryForm(tournament, onChanged, onCancel) {
   const partnerHeading = document.createElement('span');
   partnerHeading.className = 'partner-heading';
   partnerHeading.textContent = '相方';
-  partnerField.append(partnerHeading, partnerPicker(candidates));
+  partnerField.append(partnerHeading, partnerPicker(excludeIds));
 
   form.append(nameLabel, partnerField);
 
-  if (candidates.length === 0) {
-    const note = document.createElement('p');
-    note.className = 'note';
-    note.textContent = '組める相手がいません。相方がまだ選手登録していない場合は、運営に連絡してください。';
-    form.appendChild(note);
-  }
+  // 【「組める相手がいません」を先に出さない】以前は候補の配列を持っていたので
+  // 0人かどうかが分かったが、検索がDB側に移り、探す前に「居ない」とは言えなくなった。
+  // 探した結果が0件なら、候補欄が「条件に一致する選手がいません」と出す。
 
   const actions = document.createElement('div');
   actions.className = 'row-actions';
@@ -381,7 +406,8 @@ function teamEntryForm(tournament, onChanged, onCancel) {
   submitBtn.type = 'submit';
   submitBtn.className = 'btn-entry';
   submitBtn.textContent = 'エントリーする';
-  submitBtn.disabled = candidates.length === 0;
+  // 相方が選ばれていないまま押されたら submit 側で止める（下の form.submit）。
+  // 候補が0人かどうかは探すまで分からないので、ここでは伏せない。
 
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';

@@ -45,6 +45,23 @@ create table if not exists players (
   -- 理由にあたるものは player_reports に残る。
   banned_at       timestamptz,
   banned_by       uuid references players(id) on delete set null,
+  -- 検索用。名前・ゲームID・過去名（直近2件）を1本の小文字の文字列にまとめる。
+  --
+  -- 画面の検索欄（選手検索・参加者選び・相方選び・運営の指名）はここを ilike で
+  -- 引く。ブラウザへ全選手を配らずに済ませるための列で、js/db.js の searchPlayers が
+  -- 唯一の利用者。生成列なので書き込みは要らず、元の列を変えれば必ず追随する。
+  --
+  -- 【array_to_string でまとめないこと】あれは IMMUTABLE ではないため、生成列の式に
+  -- 書くと弾かれる。添字（array_length と subscript）は IMMUTABLE なので通る。
+  --
+  -- 【直近2件だけなのは画面に合わせるため】選手ページに出す過去名も直近2件。
+  -- 全履歴を対象にすると、画面のどこにも出ていない名前で見つかることになる。
+  search_text     text generated always as (
+    lower(display_name)
+    || ' ' || lower(coalesce(game_account_id, ''))
+    || ' ' || lower(coalesce(past_names[array_length(past_names, 1)], ''))
+    || ' ' || lower(coalesce(past_names[array_length(past_names, 1) - 1], ''))
+  ) stored,
   -- owner はサイトの持ち主で1人だけ（ランキングの公開を握る）。
   -- admin はサイト全体の運営で、すべての大会を触れる。
   -- player は一般の選手だが、大会は誰でも作れる（作った大会の運営になる）。
@@ -346,6 +363,17 @@ create index if not exists chat_room_idx          on match_chat_messages (tourna
 create index if not exists reports_open_idx       on match_chat_reports (tournament_id) where resolved_at is null;
 create index if not exists player_reports_open_idx on player_reports (target_id) where resolved_at is null;
 create index if not exists players_banned_idx     on players (id) where banned_at is not null;
+
+-- 選手検索（players.search_text）。前方一致ではなく部分一致なので、普通のbtreeでは
+-- 効かない。三文字組（trigram）の索引を張る。
+--
+-- 【ここで失敗したら、この2文は飛ばしてよい】拡張機能の置き場所は環境によって違い
+-- （Supabaseは extensions スキーマに置く運用）、gin_trgm_ops が見つからないことがある。
+-- その場合は `with schema extensions` を付け、opclass も extensions.gin_trgm_ops と
+-- 書く。どちらも通らなければ索引無しで構わない ── 検索は全表走査になるが結果は同じで、
+-- 数千人までは体感の差も出ない。search_text の列さえあれば機能は動く。
+create extension if not exists pg_trgm;
+create index if not exists players_search_trgm on players using gin (search_text gin_trgm_ops);
 
 -- 【同じ人からの連投を1件に潰す】BANの判定は「何件届いたか」ではなく
 -- 「何人から届いたか」で行う。1人が10回押しても1件にしかならないようにしておかないと、

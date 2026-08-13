@@ -6,11 +6,12 @@ import './intro.js';
 import {
   state, newId, getPlayerName, isTeamTournament, getEntrantName, getEntrantMemberIds,
   openChatReports, organizerIdsOf,
-  activePlayers, isBannedPlayer, playerReportSummaries, hasOpenReportFrom, BAN_THRESHOLD,
+  isBannedPlayer, playerReportSummaries, hasOpenReportFrom, BAN_THRESHOLD,
 } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
 import {
   escapeHtml, avatarHtml, safeUrl, cardThumb, setupImagePicker, skeletonCards,
+  createSearchRunner,
 } from './util.js';
 import {
   createBracket, updateTournament, allMatchesDecided, finalStandings, finalPlacements,
@@ -70,9 +71,18 @@ async function loadReveal() {
 
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
 let selectedParticipantIds = [];
-let participantSearchQuery = '';
-let playerSearchQuery = '';
 let currentBracketTournamentId = null;
+
+// 検索欄の状態。
+//
+// 【結果を覚えておく必要がある】以前は state.players を手元で絞っていたので、
+// 描き直すたびに同じ結果を作り直せた。DBに問い合わせる形になったいまは、
+// 描き直し（Realtimeの更新でも起きる）のたびに投げ直すわけにいかないので、
+// 直前の結果をここに置いて、そこから描く。
+//
+// status: 'idle'（未入力） / 'loading' / 'done' / 'error'
+const playerSearch = { query: '', players: [], status: 'idle', error: '', hasMore: false };
+const participantSearch = { query: '', players: [], status: 'idle', error: '', hasMore: false };
 
 // 「この大会の運営」欄の操作卓（js/organizerPicker.js）。作成用と編集用で別に持つ。
 // 建て直すと選んだ顔ぶれが消えるので、画面を描き直すたびには作らない
@@ -955,20 +965,64 @@ function refreshPlayerUI() {
   renderPlayerTable(playerListEl, {
     ownPlayerId: auth.player?.id ?? null,
     isAdmin: isAdmin(),
-    filterQuery: playerSearchQuery,
+    players: playerSearch.players,
+    status: playerSearch.status,
+    errorMessage: playerSearch.error,
+    hasMore: playerSearch.hasMore,
     onDelete: async (player) => {
       await db.deletePlayer(player.id);
       selectedParticipantIds = selectedParticipantIds.filter((id) => id !== player.id);
       await refreshFromDb();
+      // 消した人が結果に残ったままにしない（結果は手元の控えなので、
+      // 取り直さない限り消えない）。
+      runPlayerSearch(playerSearch.query);
     },
     onMerge: async (sourceId, targetId) => {
       await db.mergePlayers(sourceId, targetId);
       await reloadOwnPlayer();
       await refreshFromDb();
+      runPlayerSearch(playerSearch.query);
     },
   });
   renderParticipantCheckboxes();
 }
+
+// 検索欄2つの動かし方。どちらも js/util.js の createSearchRunner に任せる
+// （打鍵ごとに投げない・古い応答に上書きさせない、の2点を1か所で持つため）。
+//
+// 【利用停止中の扱いが2つで違う】選手検索は運営にだけ停止中の人を出す ──
+// 解除する相手を探せる場所がここしかないため。参加者選びには出さない
+// （停止中の人を大会に入れられてしまう）。
+function bindSearch(box, render, optionsOf = () => ({})) {
+  return createSearchRunner({
+    // 問い合わせる直前に組み立てる。運営かどうかはログインの状態で変わるので、
+    // ここを作った時点の値で固めてしまうと、ログインしても切り替わらない。
+    search: (q) => db.searchPlayers(q, optionsOf()),
+    onStart: (q) => { box.query = q; box.status = 'loading'; box.error = ''; render(); },
+    onEmpty: () => {
+      box.query = '';
+      box.players = [];
+      box.status = 'idle';
+      box.error = '';
+      box.hasMore = false;
+      render();
+    },
+    onResult: ({ players, hasMore }) => {
+      box.players = players;
+      box.hasMore = hasMore;
+      box.status = 'done';
+      render();
+    },
+    onError: (err) => { box.status = 'error'; box.error = err.message; render(); },
+  });
+}
+
+const runPlayerSearch = bindSearch(
+  playerSearch, () => refreshPlayerUI(), () => ({ includeBanned: isAdmin() }),
+);
+const runParticipantSearch = bindSearch(
+  participantSearch, () => renderParticipantCheckboxes(),
+);
 
 // 大会作成の「この大会の運営」欄。
 //
@@ -984,22 +1038,35 @@ function ensureCreateOrganizerPicker({ reset = false } = {}) {
   });
 }
 
+// 運営が参加者を直接選ぶ欄。
+//
+// 【空欄のときに全員を並べないこと】以前はそうしていたが、それには全選手を
+// 手元に持つ必要があった。いまは打った文字でDBに問い合わせる（db.searchPlayers）。
+// 選手が増えるほど、全員を並べても目当ての人は結局探せない ── 他の3つの検索欄
+// （選手検索・相方選び・運営の指名）と同じ「打つと出る」形にそろえた。
+//
+// 利用停止中の選手は候補に出さない（db.searchPlayers の既定。停止中の人を
+// 大会に入れられてしまうため）。
 function renderParticipantCheckboxes() {
   participantCheckboxesEl.innerHTML = '';
 
-  if (state.players.length === 0) {
-    participantCheckboxesEl.innerHTML = '<p class="empty-hint">先に選手を登録してください。</p>';
+  if (participantSearch.status === 'idle') {
+    participantCheckboxesEl.innerHTML = '<p class="empty-hint">名前かゲームIDを入力すると候補が出ます。</p>';
     return;
   }
 
-  // 運営が参加者を直接選ぶ欄。利用停止中の選手は候補に出さない
-  const selectable = activePlayers();
-  const query = participantSearchQuery.trim().toLowerCase();
-  const visiblePlayers = query
-    ? selectable.filter((p) =>
-        (p.gameAccountId ?? '').toLowerCase().includes(query)
-        || p.currentName.toLowerCase().includes(query))
-    : selectable;
+  if (participantSearch.status === 'error') {
+    participantCheckboxesEl.innerHTML = `<p class="empty-hint">${escapeHtml(participantSearch.error)}</p>`;
+    return;
+  }
+
+  // 通信の途中に「一致する選手がいません」を挟まない（打つたびに一瞬出る）
+  if (participantSearch.status === 'loading') {
+    participantCheckboxesEl.innerHTML = '<p class="status-line loading">選手を検索しています...</p>';
+    return;
+  }
+
+  const visiblePlayers = participantSearch.players;
 
   if (visiblePlayers.length === 0) {
     participantCheckboxesEl.innerHTML = '<p class="empty-hint">検索条件に一致する選手がいません。</p>';
@@ -2796,14 +2863,14 @@ setInterval(flushHeldRefresh, 5000);
 
 // ---- イベント配線 ----
 
+// 検索欄は打鍵ごとにDBへ投げるわけにいかない。予約だけして、入力が止まってから
+// 1回投げる（js/util.js の createSearchRunner）。描き直しは応答が返ってから。
 participantSearchInput.addEventListener('input', () => {
-  participantSearchQuery = participantSearchInput.value;
-  renderParticipantCheckboxes();
+  runParticipantSearch(participantSearchInput.value);
 });
 
 playerSearchInput.addEventListener('input', () => {
-  playerSearchQuery = playerSearchInput.value;
-  refreshPlayerUI();
+  runPlayerSearch(playerSearchInput.value);
 });
 
 // 選手の通報。

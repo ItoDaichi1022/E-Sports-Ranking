@@ -124,14 +124,18 @@ export function isBannedPlayer(player) {
   return Boolean(player?.bannedAt);
 }
 
-// 停止されていない選手だけ。一覧・検索・相方選び・運営の指名はこれを通す。
+// 【activePlayers() はここにあった】停止されていない選手だけを返す関数で、
+// 一覧・検索・相方選び・運営の指名が使っていた。
 //
-// state.players そのものを絞らないのは、対戦表と戦績が名前を引けなくなるため
-// （停止しても過去の記録は残す、というのがこの機能の前提）。見せる場所を選ぶのは
-// 呼ぶ側の仕事で、名前解決（getPlayerName）は全員を対象にし続ける。
-export function activePlayers() {
-  return state.players.filter((p) => !isBannedPlayer(p));
-}
+// 消したのは、これが「手元に全選手が居る」ことを前提にした形だから。4か所の
+// 検索欄はDB側で絞る形になり（js/db.js の searchPlayers。利用停止中を出すかは
+// includeBanned で決める）、手元の配列を舐める必要が無くなった。
+// 残しておくと、次に検索欄を足す人がこれを使い、全選手を配る作りに戻る。
+//
+// 【state.players そのものは絞らないこと】この方針は今も変わらない。絞ると
+// 対戦表と戦績が名前を引けなくなる（停止しても過去の記録は残す、というのが
+// BANの前提）。見せる場所を選ぶのは呼ぶ側の仕事で、名前解決（getPlayerName）は
+// 停止中かどうかに関わらず全員を対象にし続ける。
 
 // まだ運営が見ていない通報。選手を指定するとその人宛てのものだけ。
 export function openPlayerReports(targetId = null) {
