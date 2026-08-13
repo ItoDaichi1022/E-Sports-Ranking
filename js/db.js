@@ -659,10 +659,18 @@ export async function loadAll(parts = null) {
     // 大会への通報。運営の画面に通報者名が出る
     state.tournamentReports.forEach((x) => referenced.add(x.reporterId));
   }
-  if (want.has('ranking')) {
-    // 公開済みランキング（順位発表・お知らせ）。中身は選手IDの並び
-    (state.publishedRanking?.rankings ?? []).forEach((e) => referenced.add(e.id));
-  }
+  // 【公開済みランキングの選手は、ここで取らないこと】
+  //
+  // 一度そうしていた（v180）が、あれは無駄だった。公開のスナップショットは
+  // 集計に載った選手を全員持っているので、ここへ入れると「ランキング対象者の
+  // 人数ぶん」を、誰がどのページを開いても毎回取ることになる ── 全選手を配るのを
+  // やめた意味が薄れる。
+  //
+  // そして取る必要が無い。スナップショットは公開した時点の名前を各エントリに
+  // 焼き込んである（js/ranking.js の computeRankings が name を入れている）ので、
+  // 名前を出すのに players を引かない。選手ページが使うのも rank と score だけ。
+  // 立ち絵が要るのは順位発表の画面だけで、そこは自分で50人ぶん取りに行く
+  // （js/reveal.js の fillPickerNames）。
   referenced.delete(null);
   referenced.delete(undefined);
   await ensurePlayers([...referenced]);

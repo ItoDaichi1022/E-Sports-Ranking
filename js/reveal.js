@@ -42,10 +42,15 @@ const STAGE_HEIGHT = 1080;
 // 1人あたりに並べる好成績の件数。
 const ACHIEVEMENT_COUNT = 3;
 
-// 「発表する選手」の一覧に出す上限。選手が増えるほど一覧は長くなるが、
-// 発表は1人ずつ順に見せるもので、100人ぶんを流す収録はまず無い。
-// 目で探せる長さに区切っておく（発表できるのもここに出ている人まで）。
-const PICKER_LIMIT = 100;
+// 「発表する選手」の一覧に出す上限。発表できるのも、ここに出ている人まで。
+//
+// プリセットのいちばん大きいものが「上位50人」（index.html の
+// data-reveal-preset）なので、それに合わせてある。増やしても選べないし、
+// 発表は1人ずつ順に見せるものなので、50人を超える収録はまず無い。
+//
+// 【この数がそのまま通信量になる】名前はこの人数ぶんだけ取りに行く
+// （下の fillPickerNames）。全選手を配るのをやめた代わりに、ここが上限になる。
+const PICKER_LIMIT = 50;
 
 const setupEl = $('reveal-setup');
 const statusEl = $('reveal-status');
@@ -102,8 +107,8 @@ function setRevealStatus(text, type) {
 // 大会画像は実在の大会を持てないので、サイトに同梱した画像を借りて充てている。
 // ?v= は index.html と同じ版数に合わせること（/img/* は _headers で1年 immutable。
 // 付け忘れると、絵を差し替えても古いものが配られ続ける）。
-const SAMPLE_ART_A = '/img/game-logo.webp?v=180';
-const SAMPLE_ART_B = '/img/icon.webp?v=180';
+const SAMPLE_ART_A = '/img/game-logo.webp?v=181';
+const SAMPLE_ART_B = '/img/icon.webp?v=181';
 
 const SAMPLE_PLAYERS = [
   { name: 'サンプル選手A', score: 100.0, previousRank: 2, achievements: [
