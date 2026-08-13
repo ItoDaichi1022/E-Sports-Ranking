@@ -7,6 +7,7 @@ import {
   state, newId, getPlayerName, isTeamTournament, getEntrantName, getEntrantMemberIds,
   openChatReports, organizerIdsOf,
   isBannedPlayer, playerReportSummaries, hasOpenReportFrom, BAN_THRESHOLD,
+  tournamentReportSummaries, hasOpenTournamentReportFrom,
   UNKNOWN_PLAYER_NAME,
 } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
@@ -98,6 +99,7 @@ const playerSearchInput = $('player-search-input');
 
 // 選手の通報（ダイアログ）と、届いた通報の一覧（運営専用）
 const reportDialog = $('report-dialog');
+const reportDialogTitleEl = $('report-dialog-title');
 const reportTargetEl = $('report-target');
 const reportForm = $('report-form');
 const reportReasonInput = $('report-reason-input');
@@ -168,6 +170,7 @@ const bracketAdminToolsEl = $('bracket-admin-tools');
 const bracketContainer = $('bracket-container');
 const tournamentEditBtn = $('tournament-edit-btn');
 const tournamentDeleteBtn = $('tournament-delete-btn');
+const tournamentReportBtn = $('tournament-report-btn');
 // 編集・削除をしまってある歯車。3つで1組（外枠・押す場所・中身）
 const tournamentManageEl = $('tournament-manage');
 const tournamentManageBtn = $('tournament-manage-btn');
@@ -305,11 +308,10 @@ function applyAuthUI() {
   // ランキングの集計と順位発表は持ち主だけ。大会を開ける人が増えても、
   // 全大会を横断して順位を決める操作は1人に閉じておく。
   rankingRevealBtn.hidden = !owner;
-  tournamentManageEl.hidden = !canManageCurrent;
-  if (!canManageCurrent) {
-    setManageMenuOpen(false);
-    tournamentEditForm.hidden = true;
-  }
+  // 歯車の中身はログインの状態で変わる（運営なら編集・削除、それ以外は通報）。
+  // 大会詳細を開いたままログイン・ログアウトされることがあるので、ここでも見る。
+  syncTournamentManageMenu(currentBracketTournamentId, canManageCurrent);
+  if (!canManageCurrent) tournamentEditForm.hidden = true;
   // 運営でなくなったら投稿フォームも畳む
   if (!admin) closeAnnouncementForm();
 
@@ -822,12 +824,23 @@ const REPORT_REASONS = {
 
 const reasonLabel = (reason) => REPORT_REASONS[reason] ?? 'その他';
 
-// 通報ダイアログを開く。対象はいま見ている選手ページの人。
-let reportTargetId = null;
+// 通報ダイアログを開く。対象は選手（選手ページ）か、大会（大会詳細の歯車）。
+//
+// 【1つのダイアログを使い回している】理由の選択肢も、状況を書いてもらう欄も、
+// 「運営だけが見る」という約束も同じ。2つ建てると、片方だけ文言が古くなる。
+// 何に対する通報かは reportTarget が持つ。
+let reportTarget = null;   // { kind: 'player' | 'tournament', id, name }
 
-function openReportDialog(player) {
-  reportTargetId = player.id;
-  reportTargetEl.textContent = `通報する相手: ${player.currentName}`;
+function openReportDialog(target) {
+  reportTarget = target;
+  const isTournament = target.kind === 'tournament';
+  reportDialogTitleEl.textContent = isTournament ? '大会を通報する' : '選手を通報する';
+  reportTargetEl.textContent = isTournament
+    ? `通報する大会: ${target.name}`
+    : `通報する相手: ${target.name}`;
+  reportBodyInput.placeholder = isTournament
+    ? '例: 開催日を過ぎても対戦表が作られず、運営に連絡しても返答がありません。'
+    : '例: 〇月〇日の第5回大会の対戦チャットで、繰り返し暴言を受けました。';
   reportReasonInput.value = 'harassment';
   reportBodyInput.value = '';
   reportFormErrorEl.textContent = '';
@@ -836,7 +849,7 @@ function openReportDialog(player) {
 }
 
 function closeReportDialog() {
-  reportTargetId = null;
+  reportTarget = null;
   reportDialog.close();
 }
 
@@ -855,8 +868,9 @@ function renderBanReview() {
 
   const summaries = playerReportSummaries();
   const banned = state.players.filter(isBannedPlayer);
+  const tournamentSummaries = tournamentReportSummaries();
 
-  if (summaries.length === 0 && banned.length === 0) {
+  if (summaries.length === 0 && banned.length === 0 && tournamentSummaries.length === 0) {
     reportReviewEl.hidden = true;
     reportReviewEl.innerHTML = '';
     return;
@@ -912,6 +926,48 @@ function renderBanReview() {
       </ul>
     </details>`;
 
+  // 大会への通報。選手への通報と同じ形で並べるが、押せる手は「消す」か「却下」だけ
+  // （大会には利用停止にあたるものが無い）。消すのは大会詳細の歯車から。
+  const tournamentCards = tournamentSummaries.map((s) => {
+    const tournament = state.tournaments.find((t) => t.id === s.tournamentId);
+    const name = tournament ? tournament.name : '削除された大会';
+    const items = s.reports.map((r) => {
+      const reporter = state.players.find((p) => p.id === r.reporterId);
+      return `
+        <li class="report-item">
+          <span class="report-item-head">
+            <span class="report-reason">${escapeHtml(reasonLabel(r.reason))}</span>
+            <span class="meta-line">${escapeHtml(reporter ? reporter.currentName : '退会した選手')}・${escapeHtml(formatDateTime(r.createdAt))}</span>
+          </span>
+          ${r.body ? `<p class="report-item-body">${escapeHtml(r.body)}</p>` : ''}
+        </li>`;
+    }).join('');
+
+    return `
+      <article class="report-card">
+        <header class="report-card-head">
+          <a class="report-card-name" href="${pathFor('tournament', s.tournamentId)}">${escapeHtml(name)}</a>
+          <span class="report-count">通報 ${s.reporterCount}人</span>
+        </header>
+        <details class="report-details">
+          <summary>通報の内容（${s.reports.length}件）</summary>
+          <ul class="report-list">${items}</ul>
+        </details>
+        <div class="row-actions">
+          <button type="button" class="btn-secondary dismiss-tournament-btn" data-id="${escapeHtml(s.tournamentId)}">通報を却下する</button>
+        </div>
+      </article>`;
+  }).join('');
+
+  const tournamentBlock = tournamentSummaries.length === 0 ? '' : `
+    <h3 class="report-review-title">大会への通報</h3>
+    <p class="note">
+      大会そのものへの通報です。消すかどうかは内容を読んで決めてください
+      ── 消すのはその大会のページの歯車から行います（通報も一緒に消えます）。
+      問題が無ければ却下すると、同じ人がまた通報できるようになります。
+    </p>
+    ${tournamentCards}`;
+
   reportReviewEl.hidden = false;
   reportReviewEl.innerHTML = `
     <h2 class="report-review-title">届いている通報</h2>
@@ -922,7 +978,19 @@ function renderBanReview() {
       選手の検索からも消えます（過去の対戦表と戦績はそのまま残ります）。
     </p>
     ${cards}
-    ${bannedList}`;
+    ${bannedList}
+    ${tournamentBlock}`;
+
+  reportReviewEl.querySelectorAll('.dismiss-tournament-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const tournament = state.tournaments.find((t) => t.id === btn.dataset.id);
+      if (!confirm(`「${tournament?.name ?? 'この大会'}」への通報をすべて却下します。よろしいですか？`)) return;
+      btn.disabled = true;
+      const ok = await persist(() => db.dismissTournamentReports(btn.dataset.id), '通報の却下');
+      if (ok) await refreshFromDb();
+      else btn.disabled = false;
+    });
+  });
 
   reportReviewEl.querySelectorAll('.ban-btn').forEach((btn) => {
     btn.addEventListener('click', () => setBan(btn, btn.dataset.id, true));
@@ -1540,6 +1608,31 @@ function championOf(t) {
   return championLabel(t.id);
 }
 
+// 大会詳細の歯車の中身を、見ている人に合わせて出し分ける。
+//
+// 【歯車ごと隠さないこと】以前は運営でなければ歯車そのものを出さなかった。
+// いまは通報の入口を兼ねるので、ログインしていれば誰にでも出す。
+// 出さないのは、押しても何もできない人だけ ── ログインしていない人と、
+// 選手登録がまだの人（通報には名乗りが要る。DB側のポリシーでも弾かれる）。
+function syncTournamentManageMenu(tournamentId, canManage) {
+  const canReport = Boolean(auth.player) && !canManage && !isBannedPlayer(auth.player);
+
+  tournamentManageEl.hidden = !canManage && !canReport;
+  tournamentEditBtn.hidden = !canManage;
+  tournamentDeleteBtn.hidden = !canManage;
+  tournamentReportBtn.hidden = !canReport;
+
+  if (canReport) {
+    // 2回目は出せない（DB側の部分ユニーク索引でも弾かれる）。押せる見た目のまま
+    // 弾かれるより、済んでいることを先に見せる。
+    const done = hasOpenTournamentReportFrom(auth.player.id, tournamentId);
+    tournamentReportBtn.disabled = done;
+    tournamentReportBtn.textContent = done ? '通報済みです' : 'この大会を通報する';
+  }
+
+  if (tournamentManageEl.hidden) setManageMenuOpen(false);
+}
+
 // 大会情報の「進行状況」欄用。1行に収めたいので優勝者も含めて文字列にする。
 function tournamentStatusLabel(t) {
   const champion = championOf(t);
@@ -2010,10 +2103,13 @@ async function renderTournamentDetail(tournamentId) {
   currentBracketTournamentId = tournamentId;
   tournamentEditForm.hidden = true;
 
-  // 編集・削除（歯車）はこの大会の運営だけ。大会は誰でも開けるので、ここの出し分けは
-  // 「サイトの運営か」ではなく「この大会の運営か」で決まる。
+  // 歯車の中身を、この大会の運営かどうかで入れ替える。大会は誰でも開けるので、
+  // 出し分けは「サイトの運営か」ではなく「この大会の運営か」で決まる。
+  //
+  //   運営     … 大会情報を編集／大会を削除
+  //   それ以外 … この大会を通報する（宛先はサイト全体の運営）
   const canManage = canManageTournament(tournamentId);
-  tournamentManageEl.hidden = !canManage;
+  syncTournamentManageMenu(tournamentId, canManage);
   // 別の大会を開いたときに開きっぱなしにしない
   setManageMenuOpen(false);
   // 共有は運営でなくても押せる。無い大会のときだけ、下で隠す。
@@ -2735,7 +2831,7 @@ async function renderPlayerDetail(playerId) {
 
   // 通報する。押すとダイアログが開く（送信は下の reportForm の submit）。
   playerDetailEl.querySelector('.player-report-btn')?.addEventListener('click', () => {
-    openReportDialog(player);
+    openReportDialog({ kind: 'player', id: player.id, name: player.currentName });
   });
 
   playerDetailEl.querySelector('.admin-ban-btn')?.addEventListener('click', (e) => {
@@ -2895,7 +2991,7 @@ reportDialog.addEventListener('close', () => { reportTargetId = null; });
 
 reportForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!reportTargetId || !auth.player) return;
+  if (!reportTarget || !auth.player) return;
 
   const body = reportBodyInput.value.trim();
   if (!body) {
@@ -2907,9 +3003,12 @@ reportForm.addEventListener('submit', async (e) => {
   reportFormErrorEl.textContent = '';
   reportSubmitBtn.disabled = true;
 
-  const targetId = reportTargetId;
+  const { kind, id } = reportTarget;
+  const reason = reportReasonInput.value;
   const ok = await persist(
-    () => db.reportPlayer(targetId, auth.player.id, reportReasonInput.value, body),
+    () => (kind === 'tournament'
+      ? db.reportTournament(id, auth.player.id, reason, body)
+      : db.reportPlayer(id, auth.player.id, reason, body)),
     '通報の送信',
   );
 
@@ -3284,6 +3383,15 @@ tournamentEditForm.addEventListener('submit', async (e) => {
     await refreshFromDb();
   }
   renderTournamentDetail(currentBracketTournamentId);
+});
+
+// この大会を通報する（その大会の運営でない人にだけ、歯車の中に出る）。
+// 宛先はサイト全体の運営で、その大会の運営には届いたことも見えない。
+tournamentReportBtn.addEventListener('click', () => {
+  const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
+  if (!tournament || !auth.player) return;
+  setManageMenuOpen(false);
+  openReportDialog({ kind: 'tournament', id: tournament.id, name: tournament.name });
 });
 
 tournamentDeleteBtn.addEventListener('click', async () => {

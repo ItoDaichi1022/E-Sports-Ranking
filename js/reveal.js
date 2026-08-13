@@ -20,7 +20,7 @@
 // 「なぜこの順位なのか」の説明にならない ── 少人数の大会での優勝より、
 // 強豪ぞろいの大会で上位に食い込んだほうがスコアには効いている。
 
-import { state, findTournament } from './state.js';
+import { state, findTournament, UNKNOWN_PLAYER_NAME } from './state.js';
 import { escapeHtml, safeUrl, initialOf } from './util.js';
 import {
   computeRankingsForRange, withRankChange, rankChangeInfo,
@@ -102,8 +102,8 @@ function setRevealStatus(text, type) {
 // 大会画像は実在の大会を持てないので、サイトに同梱した画像を借りて充てている。
 // ?v= は index.html と同じ版数に合わせること（/img/* は _headers で1年 immutable。
 // 付け忘れると、絵を差し替えても古いものが配られ続ける）。
-const SAMPLE_ART_A = '/img/game-logo.webp?v=179';
-const SAMPLE_ART_B = '/img/icon.webp?v=179';
+const SAMPLE_ART_A = '/img/game-logo.webp?v=180';
+const SAMPLE_ART_B = '/img/icon.webp?v=180';
 
 const SAMPLE_PLAYERS = [
   { name: 'サンプル選手A', score: 100.0, previousRank: 2, achievements: [
@@ -235,12 +235,47 @@ function changeBadgeHtml(entry, showChange) {
   return `<span class="rank-change ${className}">${label}</span>`;
 }
 
+// 候補に出す選手の名前を、必要になった時点で取りに行く。
+//
+// 【集計に全選手は要らない】ランキングの計算に使うのは選手IDとスコアだけで、
+// 名前が要るのはここに並べる人と、実際に発表する人だけ ── 発表は10〜50人。
+// 全選手を配ってしまうと、登録者が増えるほどこの画面を開くだけで重くなる。
+//
+// 一度頼んだIDは覚えておく。覚えないと、取ったあとの描き直しでもう一度頼み、
+// 終わらない繰り返しになる（消された選手はいつまでも手元に来ないため）。
+const pickerNamesRequested = new Set();
+
+// 名前がまだ届いていない行の見せ方。
+//
+// 【(不明) を一瞬でも出さないこと】まだ取りに行っている最中というだけなのに、
+// あの文字は「その選手は消えた」と読める。順位とスコアは先に出せるので、
+// 名前の欄だけを待ちの姿にしておく。
+function pickerName(entry) {
+  return entry.name === UNKNOWN_PLAYER_NAME ? '…' : entry.name;
+}
+
+function fillPickerNames(rankings) {
+  const ids = rankings
+    .map((r) => r.id)
+    .filter((id) => id && !pickerNamesRequested.has(id));
+  if (ids.length === 0) return;
+
+  ids.forEach((id) => pickerNamesRequested.add(id));
+  db.ensurePlayers(ids)
+    .then(() => renderPlayerPicker())
+    .catch((err) => setRevealStatus(err.message, 'error'));
+}
+
 function renderPlayerPicker() {
   // 集計はここで一度だけ。切り詰めた件数を知るために全体の長さも要る
   // （pickerRankings を呼ぶと同じ集計をもう一度回すことになる）。
   const all = currentRankings();
   const rankings = all.slice(0, PICKER_LIMIT);
   const showChange = hasRankChange(rankings);
+
+  // 名前が揃っていなければ取りに行く（届いたらここへ戻ってくる）。
+  // 先に描いてから頼むので、順位とスコアは待たずに出る。
+  fillPickerNames(rankings);
 
   if (rankings.length === 0) {
     playerListEl.innerHTML = '<p class="empty-hint">'
@@ -264,7 +299,7 @@ function renderPlayerPicker() {
     <label class="reveal-player-row">
       <input type="checkbox" value="${escapeHtml(r.id)}"${selectedIds.has(r.id) ? ' checked' : ''}>
       <span class="reveal-player-rank">${r.rank}</span>
-      <span class="reveal-player-name">${escapeHtml(r.name)}</span>
+      <span class="reveal-player-name">${escapeHtml(pickerName(r))}</span>
       <span class="reveal-player-score">${r.score.toFixed(1)}</span>
       ${changeBadgeHtml(r, showChange)}
     </label>

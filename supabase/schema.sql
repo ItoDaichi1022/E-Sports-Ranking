@@ -320,6 +320,36 @@ create table if not exists player_reports (
   )
 );
 
+-- 大会そのものへの通報。宛先はサイト全体の運営。
+--
+-- 大会は誰でも開ける。開いたきり進行しない大会、結果が明らかにおかしい大会、
+-- 規約に反する内容の大会 ── どれもその大会の運営に言っても始まらない
+-- （言う相手が当の本人であることが多い）ので、選手への通報とは別に受け口を作る。
+--
+-- 【自動では何も起きない】積み上がると運営の画面に並ぶだけで、大会を消すかどうかを
+-- 決めるのは人。自動で消すと、結託した数アカウントで正当な大会を潰せてしまう。
+create table if not exists tournament_reports (
+  id            uuid primary key default gen_random_uuid(),
+  tournament_id uuid not null references tournaments(id) on delete cascade,
+  reporter_id   uuid not null references players(id) on delete cascade,
+  -- 分類。選手への通報と同じ選択肢にそろえてある（js/app.js の REPORT_REASONS）。
+  -- 別の言葉を並べると、通報する側が「どちらの画面から出すか」で迷う。
+  reason        text not null,
+  -- 具体的な状況。任意だが、これが無い通報は運営が判断できないので画面では促す
+  body          text,
+  created_at    timestamptz not null default now(),
+  resolved_at   timestamptz,
+  resolved_by   uuid references players(id) on delete set null,
+  resolution    text,
+  constraint tournament_reports_reason_check check (
+    reason in ('harassment', 'cheating', 'impersonation', 'inappropriate', 'spam', 'other')
+  ),
+  constraint tournament_reports_body_length check (body is null or char_length(body) <= 500),
+  constraint tournament_reports_resolution_check check (
+    resolution is null or resolution in ('deleted', 'dismissed')
+  )
+);
+
 -- 運営が「公開する」を押した瞬間のランキングのスナップショット。
 -- 常時計算するスコアは保存しないという設計原則（doc/design.md 6章）を維持する。
 --
@@ -381,6 +411,13 @@ create index if not exists players_search_trgm on players using gin (search_text
 -- あとの別件を通報できなくならないようにするため（却下されたら、また通報できる）。
 create unique index if not exists player_reports_open_uniq
   on player_reports (target_id, reporter_id) where resolved_at is null;
+
+-- 大会への通報。画面が見るのはほぼ「未対応」だけなので、そこに絞る。
+-- 連投を1件に潰す考え方は player_reports と同じ（数えるのは人数であって件数ではない）。
+create index if not exists tournament_reports_open_idx
+  on tournament_reports (tournament_id) where resolved_at is null;
+create unique index if not exists tournament_reports_open_uniq
+  on tournament_reports (tournament_id, reporter_id) where resolved_at is null;
 create index if not exists tournaments_status_idx on tournaments (status);
 create index if not exists rankings_published_idx on published_rankings (published_at desc);
 create index if not exists announcements_order_idx on announcements (pinned desc, created_at desc);
@@ -804,6 +841,11 @@ grant update (resolved_at, resolved_by) on match_chat_reports to authenticated;
 grant select on player_reports to anon, authenticated;
 grant insert on player_reports to authenticated;
 
+-- 大会への通報。anon への select はゲストの読み込みを止めないため
+-- （ポリシーを満たさないので返るのは常に0件）。
+grant select on tournament_reports to anon, authenticated;
+grant insert on tournament_reports to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- 行レベルセキュリティ
 -- ---------------------------------------------------------------------------
@@ -822,6 +864,7 @@ alter table match_chat_reports  enable row level security;
 alter table match_room_codes    enable row level security;
 alter table tournament_organizers enable row level security;
 alter table player_reports      enable row level security;
+alter table tournament_reports  enable row level security;
 
 -- ---- players ----
 
@@ -1136,6 +1179,34 @@ create policy player_reports_insert on player_reports
 -- update / delete のポリシーは意図的に置いていない（GRANT も与えていない）。
 -- 対応済みにするのは admin_set_player_ban / admin_dismiss_player_reports からだけ。
 
+-- ---- tournament_reports ----
+
+-- 読めるのは運営と、自分が出した通報だけ。
+-- 大会の運営には見せない ── 誰が通報したかが分かると報復の材料になる。
+drop policy if exists tournament_reports_select on tournament_reports;
+create policy tournament_reports_select on tournament_reports
+  for select to anon, authenticated
+  using (is_admin() or reporter_id = current_player_id());
+
+-- 自分の名前でしか通報できない。停止中の人は通報できない
+-- （止められた腹いせに通報を撒く経路を残さない）。
+--
+-- 【その大会の運営は自分の大会を通報できない】通報は「この大会に問題がある」と
+-- 申し立てるもので、運営が自分の大会に出すのは筋が通らない。件数を自分で
+-- 積み上げられる余地も残さない。画面側でも歯車の中身を出し分けている。
+drop policy if exists tournament_reports_insert on tournament_reports;
+create policy tournament_reports_insert on tournament_reports
+  for insert to authenticated
+  with check (
+    reporter_id = current_player_id()
+    and not is_banned()
+    and not is_tournament_admin(tournament_id)
+  );
+
+-- update / delete のポリシーは意図的に置いていない。対応済みにするのは
+-- admin_dismiss_tournament_reports からだけ。大会そのものを消せば、外部キーの
+-- cascade で通報も一緒に消える。
+
 -- ---------------------------------------------------------------------------
 -- 運営専用の操作（RPC）
 --
@@ -1322,6 +1393,30 @@ grant execute on function admin_link_player_account(uuid, uuid) to authenticated
 grant execute on function admin_merge_players(uuid, uuid)     to authenticated;
 grant execute on function admin_set_player_ban(uuid, boolean) to authenticated;
 grant execute on function admin_dismiss_player_reports(uuid)  to authenticated;
+
+-- 大会への通報を「見た。問題なし」として畳む。
+-- 大会そのものを消す場合はこれを呼ばなくてよい（tournaments を消せば cascade で消える）。
+create or replace function admin_dismiss_tournament_reports(target_tournament_id uuid)
+  returns void
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+begin
+  if not is_admin() then
+    raise exception '運営権限が必要です。' using errcode = 'insufficient_privilege';
+  end if;
+
+  update tournament_reports
+     set resolved_at = now(),
+         resolved_by = current_player_id(),
+         resolution = 'dismissed'
+   where tournament_id = target_tournament_id and resolved_at is null;
+end;
+$$;
+
+revoke all on function admin_dismiss_tournament_reports(uuid) from anon, public;
+grant execute on function admin_dismiss_tournament_reports(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- チームでのエントリー（RPC）

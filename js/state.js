@@ -73,6 +73,10 @@ export const state = {
   // 通報された本人には自分宛ての通報は入らない（誰が通報したかを見せないため）。
   playerReports: [],  // { id, targetId, reporterId, reason, body, createdAt, resolvedAt, resolvedBy, resolution }
 
+  // 大会そのものへの通報。宛先はサイト全体の運営で、その大会の運営には見えない
+  // （見えると、通報された側が誰の仕業かを探せてしまう）。新しい順。
+  tournamentReports: [],  // { id, tournamentId, reporterId, reason, body, createdAt, resolvedAt, resolvedBy, resolution }
+
   // 大会ごとの運営。誰でも読める（大会ページに「運営: ○○」として出す）。
   // 大会を作った人はDB側のトリガで必ずここに入る。
   tournamentOrganizers: [],  // { tournamentId, playerId }
@@ -184,6 +188,45 @@ export function playerReportSummaries() {
     }))
     .sort((a, b) => b.reporterCount - a.reporterCount
       || String(b.reports[0].createdAt).localeCompare(String(a.reports[0].createdAt)));
+}
+
+// まだ運営が見ていない、大会への通報。大会を指定するとその大会の分だけ。
+export function openTournamentReports(tournamentId = null) {
+  return state.tournamentReports.filter((r) => !r.resolvedAt
+    && (tournamentId == null || r.tournamentId === tournamentId));
+}
+
+// 未対応の通報を、通報された大会ごとにまとめる（運営の画面用）。
+// 数え方は選手への通報と同じ ── 届いた件数ではなく、通報した人の数。
+export function tournamentReportSummaries() {
+  const byTournament = new Map();
+
+  openTournamentReports().forEach((r) => {
+    if (!byTournament.has(r.tournamentId)) {
+      byTournament.set(r.tournamentId, { tournamentId: r.tournamentId, reports: [], reporterIds: new Set() });
+    }
+    const entry = byTournament.get(r.tournamentId);
+    entry.reports.push(r);
+    entry.reporterIds.add(r.reporterId);
+  });
+
+  return [...byTournament.values()]
+    .map((entry) => ({
+      tournamentId: entry.tournamentId,
+      // 新しい順。運営が最初に読むのは直近の1件なので、先頭に置く
+      reports: [...entry.reports].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
+      reporterCount: entry.reporterIds.size,
+    }))
+    .sort((a, b) => b.reporterCount - a.reporterCount
+      || String(b.reports[0].createdAt).localeCompare(String(a.reports[0].createdAt)));
+}
+
+// 自分がこの大会を通報済みか（未対応のものがあるか）。
+export function hasOpenTournamentReportFrom(reporterId, tournamentId) {
+  if (!reporterId || !tournamentId) return false;
+  return state.tournamentReports.some(
+    (r) => !r.resolvedAt && r.reporterId === reporterId && r.tournamentId === tournamentId,
+  );
 }
 
 // 自分がこの選手を通報済みか（未対応のものがあるか）。

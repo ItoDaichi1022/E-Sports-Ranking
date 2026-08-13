@@ -240,6 +240,20 @@ function toPlayerReport(row) {
   };
 }
 
+function toTournamentReport(row) {
+  return {
+    id: row.id,
+    tournamentId: row.tournament_id,
+    reporterId: row.reporter_id,
+    reason: row.reason,
+    body: row.body ?? '',
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at,
+    resolvedBy: row.resolved_by,
+    resolution: row.resolution ?? null,
+  };
+}
+
 function toAnnouncement(row) {
   return {
     id: row.id,
@@ -321,6 +335,7 @@ export const ALL_PARTS = [
   'announcements',  // state.announcements
   'chatReports',    // state.chatReports
   'playerReports',  // state.playerReports
+  'tournamentReports', // state.tournamentReports
   'organizers',     // state.tournamentOrganizers
   'rounds',         // state.rounds
   'roomCodes',      // state.roomCodes
@@ -343,6 +358,7 @@ const QUERY_LABELS = {
   announcements: 'お知らせの読み込み',
   reports: '報告の読み込み',
   playerReports: '通報の読み込み',
+  tournamentReports: '大会への通報の読み込み',
   organizers: '大会運営の読み込み',
   rounds: '回戦の読み込み',
   roomCodes: 'ルームコードの読み込み',
@@ -394,21 +410,23 @@ export async function loadAll(parts = null) {
     queries.playerCount = supabase.from('players').select('id', { count: 'exact', head: true });
 
     const heldIds = state.players.map((p) => p.id);
-    queries.players = fullDataLoaded
-      // 運営の集計（ランキング）は全員が要るので、そのときだけ全行を取る
-      ? supabase.from('players').select(PLAYER_LIST_COLUMNS).order('display_name')
-      : (heldIds.length
-        ? supabase.from('players').select(PLAYER_LIST_COLUMNS).in('id', heldIds)
-        : noRows());
+    queries.players = heldIds.length
+      ? supabase.from('players').select(PLAYER_LIST_COLUMNS).in('id', heldIds)
+      : noRows();
+
+    // 【ランキングの集計でも全員は取らないこと】ensureFullData（運営の集計操作）は
+    // 全試合・全エントリーを読むが、選手の行までは要らない。集計に使うのは選手IDと
+    // スコアだけで、名前が要るのは最後に画面へ出す人だけ ── 発表は10〜50人なので、
+    // そのぶんを順位発表の画面が自分で取りに行く（js/reveal.js の fillPickerNames）。
+    // シード順の並び替え（js/app.js・js/entries.js）にいたっては名前を1つも使わない。
 
     // 【利用停止中の選手だけは常に全員取ること】運営のBAN一覧（js/app.js の
     // renderBanReview）は state.players から停止中の人を拾って並べる。手元に
     // 居る人しか拾えないと、解除すべき相手が一覧に出てこない ── 運営が「解除の
     // しようがない」状態になる。
     // 停止は例外的な操作なので件数は少なく、索引もある（players_banned_idx）。
-    queries.bannedPlayers = fullDataLoaded
-      ? noRows()   // 全行を取っているので二重に取らない
-      : supabase.from('players').select(PLAYER_LIST_COLUMNS).not('banned_at', 'is', null);
+    queries.bannedPlayers = supabase.from('players')
+      .select(PLAYER_LIST_COLUMNS).not('banned_at', 'is', null);
   }
 
   if (want.has('tournaments')) {
@@ -471,6 +489,12 @@ export async function loadAll(parts = null) {
     // 選手ページからの通報。RLSにより、運営には全件・一般の選手には自分が出した
     // 分だけ・ゲストには0件が返る（通報された本人にも自分宛ての分は返らない）
     queries.playerReports = supabase.from('player_reports').select('*').order('created_at', { ascending: false });
+  }
+
+  if (want.has('tournamentReports')) {
+    // 大会そのものへの通報。RLSにより、サイト全体の運営には全件・出した本人には
+    // 自分の分だけ・それ以外には0件が返る（その大会の運営にも見えない）
+    queries.tournamentReports = supabase.from('tournament_reports').select('*').order('created_at', { ascending: false });
   }
 
   if (want.has('organizers')) {
@@ -596,6 +620,9 @@ export async function loadAll(parts = null) {
   if (want.has('announcements')) state.announcements = r.announcements.data.map(toAnnouncement);
   if (want.has('chatReports')) state.chatReports = r.reports.data.map(toChatReport);
   if (want.has('playerReports')) state.playerReports = r.playerReports.data.map(toPlayerReport);
+  if (want.has('tournamentReports')) {
+    state.tournamentReports = r.tournamentReports.data.map(toTournamentReport);
+  }
   if (want.has('organizers')) {
     state.tournamentOrganizers = r.organizers.data.map((row) => ({
       tournamentId: row.tournament_id,
@@ -627,6 +654,10 @@ export async function loadAll(parts = null) {
   if (want.has('playerReports')) {
     // 選手ページからの通報。運営の画面に「誰が誰を」が出る
     state.playerReports.forEach((x) => { referenced.add(x.targetId); referenced.add(x.reporterId); });
+  }
+  if (want.has('tournamentReports')) {
+    // 大会への通報。運営の画面に通報者名が出る
+    state.tournamentReports.forEach((x) => referenced.add(x.reporterId));
   }
   if (want.has('ranking')) {
     // 公開済みランキング（順位発表・お知らせ）。中身は選手IDの並び
@@ -1128,6 +1159,36 @@ export async function reportPlayer(targetId, reporterId, reason, body) {
     throw new Error('この選手はすでに通報済みです。運営が確認するまでお待ちください。');
   }
   check(error, '通報の送信');
+}
+
+// 大会そのものへの通報。宛先はサイト全体の運営（その大会の運営には見えない）。
+//
+// 同じ大会への未対応の通報は1人1件までで、2回目はDB側の部分ユニーク索引に弾かれる
+// （schema.sql の tournament_reports_open_uniq）。画面でも歯車の中身を
+// 「通報済み」に変えて止めているが、別のタブから押された場合はここに来る。
+//
+// その大会の運営は通報できない（ポリシー側で弾く）。画面では歯車の中身が
+// そもそも「大会情報を編集／削除」になっているので、普通は届かない。
+export async function reportTournament(tournamentId, reporterId, reason, body) {
+  const { error } = await supabase.from('tournament_reports').insert({
+    tournament_id: tournamentId,
+    reporter_id: reporterId,
+    reason,
+    body: body?.trim() || null,
+  });
+  if (error?.code === '23505') {
+    throw new Error('この大会はすでに通報済みです。運営が確認するまでお待ちください。');
+  }
+  check(error, '通報の送信');
+}
+
+// 大会への通報を「見た。問題なし」として畳む（運営専用）。
+// 大会そのものを消す場合はこれを呼ばなくてよい（消せば通報も cascade で消える）。
+export async function dismissTournamentReports(tournamentId) {
+  const { error } = await supabase.rpc('admin_dismiss_tournament_reports', {
+    target_tournament_id: tournamentId,
+  });
+  check(error, '通報の取り下げ');
 }
 
 // 利用停止のオン・オフ。banned_at は列単位のGRANTから外してあるのでRPC経由。
