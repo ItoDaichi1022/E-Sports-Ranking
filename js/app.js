@@ -1091,10 +1091,14 @@ function renderParticipantCheckboxes() {
       renderSelectedList();
     });
 
-    label.appendChild(checkbox);
-    label.appendChild(document.createTextNode(
-      p.gameAccountId ? ` ${p.currentName} (${p.gameAccountId})` : ` ${p.currentName}`,
-    ));
+    // 名前は <span> に入れる。裸の文字のままだと flex の中で折り返しの扱いが
+    // 効かず、長い名前が島からはみ出して隣の行と境目が混ざる。
+    const name = document.createElement('span');
+    name.textContent = p.gameAccountId
+      ? `${p.currentName}（${p.gameAccountId}）`
+      : p.currentName;
+
+    label.append(checkbox, name);
     participantCheckboxesEl.appendChild(label);
   });
 }

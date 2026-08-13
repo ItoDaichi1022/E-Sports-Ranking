@@ -1176,6 +1176,13 @@ input[type="radio"] {
   height: 1.05rem;
   padding: 0;
   accent-color: var(--accent);
+  /* 【枠と面はここで消すこと】上の input 共通指定が 1px の枠と面の色を与えているが、
+     チェックボックスとラジオはブラウザが自前で描く部品で、枠は絵には出ないのに
+     箱の大きさには効く。印が箱より一回り小さく描かれ、押せる範囲だけが外へ広がる。 */
+  border: none;
+  background: none;
+  /* 名前が長い行で潰されないようにする（下の .checkbox-item は flex） */
+  flex-shrink: 0;
 }
 
 input[type="file"] {
@@ -1360,13 +1367,41 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   font-size: 0.82rem;
 }
 
+/* 名簿から人を選ぶ行（大会作成の参加者選び、チーム戦の相方選び）。
+
+   【1行を1つの島にすること】以前は枠も面も持たず、上下 0.3rem の余白だけで
+   並べていた。押せるのは行全体（<label>）なので、見た目には何も無い隙間まで
+   その行の領分になっている ── 候補が10人20人と並ぶと、押したつもりの行と
+   実際に入る行がずれる。枠と面を与えて、押せる範囲を目で分かるようにする。 */
 .checkbox-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface);
   font-size: 0.9rem;
   cursor: pointer;
+}
+
+.checkbox-item + .checkbox-item { margin-top: 0.35rem; }
+
+.checkbox-item:hover { border-color: var(--border-strong); }
+
+/* 選んだ行はその場で分かるようにする。選んだ結果は下の「選択中」にも出るが、
+   目を移さないと確かめられないのでは、押した手応えとして遅い。 */
+.checkbox-item:has(:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* 名前。長い名前を島の中で折り返す（はみ出させると、隣の行と境目が混ざる）。 */
+.checkbox-item > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 #selected-participant-list {

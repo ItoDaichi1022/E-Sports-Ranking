@@ -329,7 +329,12 @@ function partnerPicker(excludeIds) {
         syncChosen();
       });
 
-      label.append(radio, document.createTextNode(` ${playerLabel(p)}`));
+      // 名前は <span> に入れる（参加者選びと同じ理由。css/style.css の
+      // .checkbox-item > span を参照）。
+      const name = document.createElement('span');
+      name.textContent = playerLabel(p);
+
+      label.append(radio, name);
       list.appendChild(label);
     });
   };
