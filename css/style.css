@@ -1584,10 +1584,16 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   color: var(--text-faint);
 }
 
-/* 【.status-chip.status-draft はここにあった】公開前の大会に「準備中」を出すための
-   破線の印。状態は「募集中・進行中・終了」の3つにそろえ、公開前の大会にも
-   公開後の姿を出すようにしたので、この組み合わせはもう作られない
-   （js/tournamentState.js の STATUS_LABELS を参照）。 */
+/* 【.status-chip.status-draft はここにあった】公開前の大会に「準備中」を出すための印。
+   進行状況は「募集中・進行中・終了」の3つにそろえ、公開前は状態そのものを出さない
+   ことにしたので、この組み合わせはもう作られない（js/tournamentState.js を参照）。
+
+   代わりが下の .status-unpublished。あちらが言うのは進行状況ではなく
+   「まだ誰にも見えていない」ことで、出る場所も運営の一覧に限られる。 */
+.status-chip.status-unpublished {
+  color: var(--text-faint);
+  border-style: dashed;
+}
 
 /* 未対応の報告がある印（運営にだけ出る。中身は js/matchChat.js の reportChipHtml）。
    中身はチャットの話だが、出る場所は大会一覧（js/app.js）とエントリー状況
@@ -2191,6 +2197,20 @@ a.card:hover {
 .entry-deadline-note {
   font-size: 0.72rem;
   color: var(--text-faint);
+}
+
+/* 大会情報を編集しているあいだは、そのフォームだけを出す。
+   （切り替えは js/app.js の setTournamentEditing が .is-editing を付け外しする）
+
+   【要素ごとに hidden を立てないこと】以前はフォームを出すだけで、下に大会ページの
+   中身がそのまま残っていた ── 編集中の値と、保存前の古い表示が同じ画面に並ぶので、
+   どちらが本当なのか読めない。かといって要素ごとに隠すと、戻すときに
+   「元が非表示だったもの」（画像の無い大会のヘッダー、対戦表の無い大会のリンク）まで
+   出してしまう。ここで面ごと伏せれば、各要素の hidden はそのまま残る。
+
+   戻るリンクは残す。編集をやめる道が「キャンセル」だけだと、行き止まりに見える。 */
+#view-tournament-detail.is-editing > *:not(#tournament-edit-form):not(#tournament-back-link) {
+  display: none;
 }
 
 /* まだ公開していない大会の帯（運営だけが見る。js/entries.js の draftNotice）。

@@ -178,6 +178,17 @@ const tournamentManageBtn = $('tournament-manage-btn');
 const tournamentManageList = $('tournament-manage-list');
 const tournamentShareBtn = $('tournament-share-btn');
 const tournamentEditForm = $('tournament-edit-form');
+const tournamentDetailViewEl = $('view-tournament-detail');
+
+// 大会情報の編集を開く・閉じる。
+//
+// フォームの hidden と、面ごと伏せる印（.is-editing）は必ず一緒に動かすこと。
+// 片方だけ動かすと、編集フォームの下に保存前の古い表示が並ぶ ── どちらが本当の
+// 値なのか読めなくなる。伏せ方は css/style.css のその節を参照。
+function setTournamentEditing(on) {
+  tournamentEditForm.hidden = !on;
+  tournamentDetailViewEl.classList.toggle('is-editing', on);
+}
 const tournamentEditNameInput = $('tournament-edit-name-input');
 const tournamentEditDateInput = $('tournament-edit-date-input');
 const tournamentEditRulesInput = $('tournament-edit-rules-input');
@@ -313,7 +324,7 @@ function applyAuthUI() {
   // 歯車の中身はログインの状態で変わる（運営なら編集・削除、それ以外は通報）。
   // 大会詳細を開いたままログイン・ログアウトされることがあるので、ここでも見る。
   syncTournamentManageMenu(currentBracketTournamentId, canManageCurrent);
-  if (!canManageCurrent) tournamentEditForm.hidden = true;
+  if (!canManageCurrent) setTournamentEditing(false);
   // 運営でなくなったら投稿フォームも畳む
   if (!admin) closeAnnouncementForm();
 
@@ -1580,20 +1591,14 @@ function entrantCountLabel(t) {
 
 // 大会の進行状況。優勝者はここに含めない（下の championOf が別に受け持つ）。
 //
-// 【準備中は出さない】公開前の大会（status: 'draft'）にも、公開後の姿を出す ──
-// 対戦表が既に出来ているなら「進行中」、これから募集を始めるなら「募集中」。
-// 大会ページは公開前もそのままプレビューとして使うので、ここで「準備中」と
-// 出してしまうと、公開の前後で見え方が変わってプレビューの役に立たない。
+// 【公開前は空を返す】状態の言葉が付くのは公開してから（js/tournamentState.js の
+// STATUS_LABELS）。呼ぶ側は label が空ならタグごと・その一節ごと出さないこと。
 // 公開されていないことは、ページ先頭の帯（js/entries.js の draftNotice）が言う。
 function tournamentStatusInfo(t) {
-  // 対戦表があるかどうかは、そのまま「公開したら進行中か、募集中か」の分かれ目。
-  // 運営が参加者を直接選んだ大会は作成の時点で表が出来ているので前者になる。
-  const status = t.status === 'draft'
-    ? (state.bracketIds.has(t.id) ? 'running' : 'recruiting')
-    : t.status;
+  if (t.status === 'draft') return { label: '', tone: 'draft' };
 
   if (!state.bracketIds.has(t.id)) {
-    return { label: STATUS_LABELS[status] ?? '—', tone: status };
+    return { label: STATUS_LABELS[t.status] ?? '—', tone: t.status };
   }
 
   if (t.status === 'finished') return { label: '終了', tone: 'finished' };
@@ -1924,7 +1929,9 @@ function renderTournamentInfo(tournament) {
       <div><dt>三位決定戦</dt><dd>${tournament.thirdPlaceMatch ? '行う' : '行わない'}</dd></div>
       <div><dt>開催日時</dt><dd>${escapeHtml(tournamentWhenText(tournament.date) || '日付未設定')}</dd></div>
       ${deadlineText ? `<div><dt>エントリー締切</dt><dd>${escapeHtml(deadlineText)}</dd></div>` : ''}
-      <div><dt>進行状況</dt><dd>${escapeHtml(tournamentStatusLabel(tournament))}</dd></div>
+      ${tournamentStatusLabel(tournament)
+    ? `<div><dt>進行状況</dt><dd>${escapeHtml(tournamentStatusLabel(tournament))}</dd></div>`
+    : ''}
       ${organizerNames.length > 0
     ? `<div><dt>運営</dt><dd>${escapeHtml(organizerNames.join('、'))}</dd></div>`
     : ''}
@@ -1992,7 +1999,12 @@ async function renderEntrantsPage(tournamentId) {
 
   entrantsBackLink.textContent = '← 大会の詳細へ';
   entrantsTitleEl.textContent = `${tournament.name} の出場${isTeamTournament(tournament) ? 'チーム' : '選手'}`;
-  entrantsMetaEl.textContent = `${tournamentWhenText(tournament.date) || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
+  // 公開前は進行状況が空になる。区切りだけが残らないよう、空は落としてから繋ぐ。
+  entrantsMetaEl.textContent = [
+    tournamentWhenText(tournament.date) || '日付未設定',
+    `${entrantCountLabel(tournament)}参加`,
+    tournamentStatusLabel(tournament),
+  ].filter(Boolean).join(' ・ ');
 
   // 「誰が出ているか」はこのページで初めて必要になるので、ここで取りに行く
   // （大会一覧では人数しか持っていない。js/state.js の説明を参照）。
@@ -2117,7 +2129,7 @@ function renderTournamentDetailLoading() {
 // （一覧では人数しか持っていない。js/state.js の説明を参照）。
 async function renderTournamentDetail(tournamentId) {
   currentBracketTournamentId = tournamentId;
-  tournamentEditForm.hidden = true;
+  setTournamentEditing(false);
 
   // 歯車の中身を、この大会の運営かどうかで入れ替える。大会は誰でも開けるので、
   // 出し分けは「サイトの運営か」ではなく「この大会の運営か」で決まる。
@@ -2183,8 +2195,10 @@ async function renderTournamentDetail(tournamentId) {
     champion ? `優勝: ${champion}` : '',
   ].filter(Boolean).join(' ・ ');
 
+  // 公開前は状態の言葉が無い（label が空）ので、タグごと出さない。
+  // 空のタグを置くと、丸い印だけが意味もなく残る。
   const badge = tournamentBadge(tournament);
-  tournamentStatusChipEl.hidden = false;
+  tournamentStatusChipEl.hidden = !badge.label;
   tournamentStatusChipEl.className = `status-chip status-${badge.tone}`;
   tournamentStatusChipEl.textContent = badge.label;
 
@@ -2364,7 +2378,11 @@ async function renderBracketPage(tournamentId) {
   }
 
   bracketTitleEl.textContent = tournament.name;
-  bracketMetaEl.textContent = `${tournamentWhenText(tournament.date) || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
+  bracketMetaEl.textContent = [
+    tournamentWhenText(tournament.date) || '日付未設定',
+    `${entrantCountLabel(tournament)}参加`,
+    tournamentStatusLabel(tournament),
+  ].filter(Boolean).join(' ・ ');
 
   // 出場者の行とこの大会の試合結果を揃えてから描く。表の名前を引くのに出場者が、
   // 勝敗の保存（syncTournamentProgress の差分照合）に試合結果が要る。
@@ -3051,9 +3069,19 @@ seedByRankingBtn.addEventListener('click', seedBySelectedRanking);
 
 // 参加者の集め方の切り替え（エントリー募集 / 運営が直接選ぶ）。
 // ボタンの文言は変えない（index.html のその行の注記を参照）。
+//
+// 【状態を持たず、そのつどラジオを見ること】以前は変更のたびに直接 hidden を
+// 書き換えていた。そのため、ラジオが別の道から変わったとき（書きかけの復元、
+// 作成後のフォーム初期化）に選手を選ぶ欄だけが取り残され、「エントリーを募集する」
+// なのに選手検索とシード順が出たままになっていた。
+function syncEntryMode() {
+  const mode = tournamentForm.elements['entry-mode']?.value;
+  manualParticipantsEl.hidden = mode !== 'manual';
+}
+
 tournamentForm.addEventListener('change', (e) => {
   if (e.target.name !== 'entry-mode') return;
-  manualParticipantsEl.hidden = e.target.value !== 'manual';
+  syncEntryMode();
 });
 
 rankingRevealBtn.addEventListener('click', () => { navigate('reveal'); });
@@ -3082,8 +3110,9 @@ function syncEntryModeForMatchType() {
   manualRadio.disabled = isTeam;
   if (isTeam && manualRadio.checked) {
     modes.find((r) => r.value === 'recruit').checked = true;
-    manualParticipantsEl.hidden = true;
   }
+  // 閉じた結果ラジオが変わることがあるので、欄の出し入れは必ず通す
+  syncEntryMode();
 }
 tournamentMatchTypeInput.addEventListener('change', syncEntryModeForMatchType);
 
@@ -3091,6 +3120,10 @@ tournamentMatchTypeInput.addEventListener('change', syncEntryModeForMatchType);
 // 選んだ参加者（selectedParticipantIds）は入力欄ではないので控えの対象外。
 const TOURNAMENT_DRAFT_KEY = 'tournament-create';
 keepFormDraft(tournamentForm, TOURNAMENT_DRAFT_KEY);
+// 控えを戻すとラジオも戻る。欄の出し入れはラジオを見て決めているので、
+// 戻し終えたこの時点で一度そろえておく（でないと、前回「運営が直接選ぶ」で
+// 離れた人の画面が、募集の設定なのに選手検索を出したままになる）。
+syncEntryMode();
 
 tournamentForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -3206,6 +3239,9 @@ tournamentForm.addEventListener('submit', async (e) => {
   tournamentMatchTypeInput.value = '';
   tournamentMatchTypeNoteInput.value = '';
   tournamentRankingOptInInput.checked = true;
+  // 集め方も既定（エントリーを募集する）に戻す。戻さないと、次に大会を作る人の
+  // 画面が「運営が直接選ぶ」のまま開き、選手検索とシード順が出たままになる。
+  tournamentForm.elements['entry-mode'].value = 'recruit';
   syncMatchTypeNote();
   syncEntryModeForMatchType();
   tournamentCapacityInput.value = '';
@@ -3350,13 +3386,13 @@ tournamentEditBtn.addEventListener('click', () => {
   });
   // 保存済みの内容を入れ終えてから下書きを重ねる（書きかけがあればそちらが勝つ）
   keepFormDraft(tournamentEditForm, `tournament-edit-${tournament.id}`);
-  tournamentEditForm.hidden = !tournamentEditForm.hidden;
+  setTournamentEditing(tournamentEditForm.hidden);
 });
 
 tournamentEditCancelBtn.addEventListener('click', () => {
   // 「キャンセル」は書きかけを捨てる操作なので、控えも一緒に捨てる
   clearFormDraft(`tournament-edit-${currentBracketTournamentId}`);
-  tournamentEditForm.hidden = true;
+  setTournamentEditing(false);
 });
 
 tournamentEditForm.addEventListener('submit', async (e) => {
@@ -3404,7 +3440,7 @@ tournamentEditForm.addEventListener('submit', async (e) => {
   }, '大会情報の保存');
   if (ok) {
     clearFormDraft(`tournament-edit-${currentBracketTournamentId}`);
-    tournamentEditForm.hidden = true;
+    setTournamentEditing(false);
     // 運営を入れ替えたことを、自分の画面にも反映させる（自分を外した場合は
     // 編集ボタンごと消える）。
     await refreshFromDb();

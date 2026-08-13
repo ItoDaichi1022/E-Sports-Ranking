@@ -707,13 +707,12 @@ function setupPrompt(tournament) {
 // 公開前の大会の帯（運営だけが見る）。ページのいちばん上に出す。
 //
 // 「まだ誰にも見えていない」ことは、画面を見ただけでは分からない ── このページは
-// 公開後とまったく同じ見た目で、状態のタグにも公開後の姿（募集中・進行中）が出る
-// （js/tournamentState.js の STATUS_LABELS）。つまりここはプレビューで、
-// 唯一の違いがこの帯だから、いちばん上で言い切る必要がある。
+// 公開後とほぼ同じ見た目（プレビュー）だからで、違うのは状態のタグが付かないことと、
+// この帯があることだけ。だからここで言い切る必要がある。
 //
 // 【操作の真上ではなく先頭に置く理由】以前は「公開する」ボタンの真上に出していた。
 // 押す直前には読めるが、ページを開いて上から読む人には最後まで届かない ──
-// タグが「募集中」に見えるので、公開したつもりのまま閉じられてしまう。
+// 公開したつもりのまま閉じられてしまう。
 export function draftNotice(tournament) {
   const box = document.createElement('aside');
   box.className = 'draft-notice';
@@ -727,14 +726,14 @@ export function draftNotice(tournament) {
   const text = document.createElement('p');
   text.className = 'draft-notice-text';
   text.textContent = state.bracketIds.has(tournament.id)
-    ? 'これは公開後の見え方（プレビュー）です。上の状態は公開したときの表示で、'
-      + 'いま見えているのは運営だけ ── 選手とゲストには大会も対戦表も出ません。'
+    ? 'これは公開後の見え方（プレビュー）です。いま見えているのは運営だけで、'
+      + '選手とゲストには大会も対戦表も出ません。'
       + '内容と組み合わせを確かめてから、ページ下の「公開する」を押すと、'
-      + '大会が始まり、対戦表が誰にでも見えるようになります。'
-    : 'これは公開後の見え方（プレビュー）です。上の状態は公開したときの表示で、'
-      + 'いま見えているのは運営だけ ── 選手とゲストには大会一覧にも共有リンクにも出ません。'
+      + 'そこで大会が始まり、対戦表が誰にでも見えるようになります。'
+    : 'これは公開後の見え方（プレビュー）です。いま見えているのは運営だけで、'
+      + '選手とゲストには大会一覧にも共有リンクにも出ません。'
       + '内容を確かめてから、ページ下の「公開する」を押すと、'
-      + '大会一覧に並び、エントリーの受付が始まります。';
+      + 'そこで大会一覧に並び、エントリーの受付が始まります。';
 
   box.append(title, text);
   return box;
@@ -880,13 +879,14 @@ export function renderRecruitPage(containerEl) {
 
     const body = document.createElement('div');
     body.className = 'card-body';
-    // 【「準備中」の印はここにあった】公開前の大会（運営にしか見えない）に
-    // status-draft のタグを付けていたが、状態は「募集中・進行中・終了」の3つに
-    // そろえた（js/tournamentState.js の STATUS_LABELS）。公開していないことは、
-    // 開いた先のページ先頭の帯（draftNotice）が言う。
+    // 公開前の大会には「未公開」を付ける。これは進行状況（募集中・進行中・終了）
+    // ではなく、誰に見えているかの印 ── この一覧は運営に限り自分の未公開の大会も
+    // 混ぜて並べるので、印が無いと自分の目にも募集が始まったように見える。
+    // 開いた先ではページ先頭の帯（draftNotice）が同じことを詳しく言う。
     body.innerHTML = `
       <h2 class="card-title">${escapeHtml(t.name)}</h2>
       <p class="card-date">${escapeHtml(tournamentWhenText(t.date) || '開催日未定')}</p>
+      ${t.status === 'draft' ? '<span class="status-chip status-unpublished">未公開</span>' : ''}
       ${reportChipHtml(t.id)}
     `;
 
