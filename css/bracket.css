@@ -1304,20 +1304,10 @@ dialog.dialog-chat {
 
 /* ---- 運営への報告 ---- */
 
-/* 主導線ではないが、もめている最中に見つけられないと意味がないので、
-   目立たない灰色ではなく警告色の縁で置く。 */
-.btn-report {
-  margin-right: auto;
-  background: transparent;
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  box-shadow: none;
-}
-
-.btn-report:hover:not(:disabled) {
-  background: var(--danger);
-  color: #fff;
-}
+/* 札そのもの（.btn-report）は css/style.css にある。選手ページの「通報する」と
+   同じ見た目を使うため、常に読まれるほうへ移した。ここに残すのは、
+   ダイアログの操作列で左端へ寄せる指定だけ（この画面だけの都合）。 */
+.dialog-chat .dialog-actions .btn-report { margin-right: auto; }
 
 .chat-report-form {
   display: flex;

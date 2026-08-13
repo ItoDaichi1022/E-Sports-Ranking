@@ -34,6 +34,17 @@ create table if not exists players (
   sns_youtube     text,
   role            text not null default 'player',
   created_at      timestamptz not null default now(),
+  -- 利用停止（BAN）にした時刻と、停止した運営。null なら停止されていない。
+  --
+  -- 【この2列を update のGRANTに足してはいけない】players の UPDATE は列単位で
+  -- 絞ってある（下の「権限（列単位）」節）。足すと停止された本人が自分で解除できる。
+  -- 書き換えは admin_set_player_ban（security definer）からだけ行う。
+  --
+  -- 停止の理由は列に持たない。players の SELECT は誰にでも開いている（閉じると
+  -- 一覧も対戦表も読めなくなる）ので、ここに書いた運営のメモは全員に読まれる。
+  -- 理由にあたるものは player_reports に残る。
+  banned_at       timestamptz,
+  banned_by       uuid references players(id) on delete set null,
   -- owner はサイトの持ち主で1人だけ（ランキングの公開を握る）。
   -- admin はサイト全体の運営で、すべての大会を触れる。
   -- player は一般の選手だが、大会は誰でも作れる（作った大会の運営になる）。
@@ -255,6 +266,43 @@ create table if not exists match_chat_reports (
   constraint report_body_length check (char_length(body) <= 500)
 );
 
+-- 選手ページからの通報。対戦チャットの報告（上の match_chat_reports）とは別物で、
+-- あちらが「この対戦でもめている」を運営へ知らせるものなのに対し、こちらは
+-- 「この人が規約に反している」を知らせる。大会を誰でも開けるようにした結果、
+-- 対戦の当事者どうしという入口だけでは足りなくなったため足した。
+--
+-- resolved_at が null のものが「まだ運営が見ていない通報」で、画面が数えるのも
+-- 印を出すのもこれだけ。対応すると resolution に結末（'banned' か 'dismissed'）が入る。
+--
+-- 【自動でBANはしない】通報が player_ban_threshold() 人ぶん集まると、持ち主の画面に
+-- 「BAN対象」として並ぶ。止めるかどうかを決めるのは人で、DBは数えるだけ。
+-- 自動で消す作りにすると、結託した数アカウントで無実の選手を消せてしまう。
+--
+-- 【消せない】GRANT に delete を与えていない。通報した本人にも取り消させない ──
+-- 「通報しては取り下げる」を繰り返せると嫌がらせの道具になる。判断は運営が行い、
+-- 却下（dismissed）として記録に残す。
+create table if not exists player_reports (
+  id          uuid primary key default gen_random_uuid(),
+  target_id   uuid not null references players(id) on delete cascade,
+  reporter_id uuid not null references players(id) on delete cascade,
+  -- 分類。画面の選択肢と1対1で対応する（js/app.js の REPORT_REASONS）
+  reason      text not null,
+  -- 具体的な状況。任意だが、これが無い通報は運営が判断できないので画面では促す
+  body        text,
+  created_at  timestamptz not null default now(),
+  resolved_at timestamptz,
+  resolved_by uuid references players(id) on delete set null,
+  resolution  text,
+  constraint player_reports_not_self check (target_id <> reporter_id),
+  constraint player_reports_reason_check check (
+    reason in ('harassment', 'cheating', 'impersonation', 'inappropriate', 'spam', 'other')
+  ),
+  constraint player_reports_body_length check (body is null or char_length(body) <= 500),
+  constraint player_reports_resolution_check check (
+    resolution is null or resolution in ('banned', 'dismissed')
+  )
+);
+
 -- 運営が「公開する」を押した瞬間のランキングのスナップショット。
 -- 常時計算するスコアは保存しないという設計原則（doc/design.md 6章）を維持する。
 --
@@ -296,6 +344,15 @@ create index if not exists teams_tournament_idx   on tournament_teams (tournamen
 create index if not exists chat_room_idx          on match_chat_messages (tournament_id, match_id, created_at);
 -- 画面が見るのはほぼ「未対応の報告」だけなので、そこに絞る
 create index if not exists reports_open_idx       on match_chat_reports (tournament_id) where resolved_at is null;
+create index if not exists player_reports_open_idx on player_reports (target_id) where resolved_at is null;
+create index if not exists players_banned_idx     on players (id) where banned_at is not null;
+
+-- 【同じ人からの連投を1件に潰す】BANの判定は「何件届いたか」ではなく
+-- 「何人から届いたか」で行う。1人が10回押しても1件にしかならないようにしておかないと、
+-- 閾値の意味が無くなる。未対応のものだけを対象にしているのは、一度運営が見終えた
+-- あとの別件を通報できなくならないようにするため（却下されたら、また通報できる）。
+create unique index if not exists player_reports_open_uniq
+  on player_reports (target_id, reporter_id) where resolved_at is null;
 create index if not exists tournaments_status_idx on tournaments (status);
 create index if not exists rankings_published_idx on published_rankings (published_at desc);
 create index if not exists announcements_order_idx on announcements (pinned desc, created_at desc);
@@ -336,6 +393,34 @@ as $$
     select 1 from players
     where user_id = auth.uid() and role in ('admin', 'owner')
   );
+$$;
+
+-- いま操作している人が利用停止（BAN）中か。
+--
+-- 停止中にできなくなるのは「新しく関わること」だけ ── エントリー・大会作成・
+-- 対戦チャットへの書き込み・プロフィールの編集・通報。進行中の対戦のゲームカウント
+-- 入力（report_match_result）とエントリーの取り消しは通す。ここを止めると、
+-- 停止された人と当たっている相手が対戦表の中で立ち往生する（巻き添えを作らない）。
+create or replace function is_banned() returns boolean
+  language sql
+  security definer
+  stable
+  set search_path = public
+as $$
+  select exists (
+    select 1 from players
+    where user_id = auth.uid() and banned_at is not null
+  );
+$$;
+
+-- BAN対象として運営の画面に並べる人数のしきい値。
+-- 関数にしてあるのは、変えたくなったときに直す場所を1か所にするため
+-- （画面側は js/state.js の BAN_THRESHOLD が同じ数を持つ。変えるときは両方）。
+create or replace function player_ban_threshold() returns int
+  language sql
+  immutable
+as $$
+  select 3;
 $$;
 
 -- 呼び出し元の選手行のid（未登録ならnull）。ポリシーとクライアントの両方から使う。
@@ -684,6 +769,13 @@ grant select, insert, delete on match_chat_messages to authenticated;
 grant insert on match_chat_reports to authenticated;
 grant update (resolved_at, resolved_by) on match_chat_reports to authenticated;
 
+-- 選手ページからの通報。anon への select はゲストの読み込みを止めないため
+-- （ポリシーのどちらの条件も満たさないので、返るのは常に0件）。
+-- update / delete は誰にも与えない ── 対応済みにするのも却下するのも、
+-- 運営だけが通れるRPC（admin_set_player_ban / admin_dismiss_player_reports）から行う。
+grant select on player_reports to anon, authenticated;
+grant insert on player_reports to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- 行レベルセキュリティ
 -- ---------------------------------------------------------------------------
@@ -701,6 +793,7 @@ alter table match_chat_messages enable row level security;
 alter table match_chat_reports  enable row level security;
 alter table match_room_codes    enable row level security;
 alter table tournament_organizers enable row level security;
+alter table player_reports      enable row level security;
 
 -- ---- players ----
 
@@ -715,12 +808,16 @@ create policy players_insert on players
   for insert to authenticated
   with check (user_id = auth.uid() or is_admin());
 
--- 自分の行、または運営なら全行。更新できる「列」は上のGRANTで絞ってある
+-- 自分の行、または運営なら全行。更新できる「列」は上のGRANTで絞ってある。
+--
+-- 利用停止中は本人の編集だけを止める（名前・自己紹介・アイコンを差し替えて
+-- 回れなくするため）。運営は停止中の人のプロフィールも直せる ── 不適切な
+-- 自己紹介やアイコンを消すのは、停止したあとにこそ必要になる。
 drop policy if exists players_update on players;
 create policy players_update on players
   for update to authenticated
-  using (user_id = auth.uid() or is_admin())
-  with check (user_id = auth.uid() or is_admin());
+  using ((user_id = auth.uid() and not is_banned()) or is_admin())
+  with check ((user_id = auth.uid() and not is_banned()) or is_admin());
 
 drop policy if exists players_delete on players;
 create policy players_delete on players
@@ -749,10 +846,11 @@ create policy tournaments_select on tournaments
 
 -- 選手登録さえ済んでいれば誰でも大会を作れる。作った人はトリガで
 -- その大会の運営に入るので、作った直後から編集・削除できる。
+-- 利用停止中の人だけは作れない。
 drop policy if exists tournaments_insert on tournaments;
 create policy tournaments_insert on tournaments
   for insert to authenticated
-  with check (current_player_id() is not null);
+  with check (current_player_id() is not null and not is_banned());
 
 drop policy if exists tournaments_update on tournaments;
 create policy tournaments_update on tournaments
@@ -804,6 +902,9 @@ create policy entries_select on tournament_entries
 -- 自分の選手行で、募集中の大会にだけエントリーできる。
 -- チーム戦は申し込んだ人が相方の行も入れる必要があるので、このポリシーでは通らない。
 -- 代わりに enter_tournament_as_team（security definer）を通す。
+--
+-- 利用停止中はエントリーできない。取り消し（下の entries_delete）は止めていない ──
+-- 停止された人が募集中の大会から自分で抜けられなくなると、運営が1件ずつ外して回ることになる。
 drop policy if exists entries_insert on tournament_entries;
 create policy entries_insert on tournament_entries
   for insert to authenticated
@@ -811,6 +912,7 @@ create policy entries_insert on tournament_entries
     is_tournament_admin(tournament_id)
     or (
       player_id = current_player_id()
+      and not is_banned()
       and exists (
         select 1 from tournaments t
         where t.id = tournament_id and t.status = 'recruiting'
@@ -897,11 +999,13 @@ create policy chat_select on match_chat_messages
   using (can_use_match_chat(tournament_id, match_id));
 
 -- 自分の名前でしか書けない。確定した試合は運営だけが書ける（介入のため）。
+-- 利用停止中は書き込めない（読むのは止めない ── 運営とのやり取りの経緯は本人にも残す）。
 drop policy if exists chat_insert on match_chat_messages;
 create policy chat_insert on match_chat_messages
   for insert to authenticated
   with check (
     player_id = current_player_id()
+    and not is_banned()
     and can_use_match_chat(tournament_id, match_id)
     and (is_tournament_admin(tournament_id) or match_chat_is_open(tournament_id, match_id))
   );
@@ -980,6 +1084,29 @@ create policy reports_update on match_chat_reports
   for update to authenticated
   using (is_tournament_admin(tournament_id))
   with check (is_tournament_admin(tournament_id));
+
+-- ---- player_reports ----
+
+-- 読めるのは運営と、自分が出した通報だけ。
+-- 通報された本人には見せない ── 誰が通報したかが分かると報復の材料になる。
+drop policy if exists player_reports_select on player_reports;
+create policy player_reports_select on player_reports
+  for select to anon, authenticated
+  using (is_admin() or reporter_id = current_player_id());
+
+-- 自分の名前でしか通報できない。自分自身は通報できない（制約でも止めている）。
+-- 停止中の人は通報できない ── 止められた腹いせに通報を撒く経路を残さない。
+drop policy if exists player_reports_insert on player_reports;
+create policy player_reports_insert on player_reports
+  for insert to authenticated
+  with check (
+    reporter_id = current_player_id()
+    and target_id <> reporter_id
+    and not is_banned()
+  );
+
+-- update / delete のポリシーは意図的に置いていない（GRANT も与えていない）。
+-- 対応済みにするのは admin_set_player_ban / admin_dismiss_player_reports からだけ。
 
 -- ---------------------------------------------------------------------------
 -- 運営専用の操作（RPC）
@@ -1086,13 +1213,87 @@ begin
 end;
 $$;
 
+-- 利用停止（BAN）のオン・オフ。
+--
+-- banned_at は列単位のGRANTから外してあるので、変更はここを通すしかない。
+-- 停止しても解除しても、その人に届いていた未対応の通報はまとめて片付ける
+-- （画面の「BAN対象」から消える。結末は resolution に残る）。
+create or replace function admin_set_player_ban(target_player_id uuid, p_banned boolean)
+  returns void
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+declare
+  v_role text;
+  v_me   uuid;
+begin
+  if not is_admin() then
+    raise exception '運営権限が必要です。' using errcode = 'insufficient_privilege';
+  end if;
+
+  select role into v_role from players where id = target_player_id;
+  if not found then
+    raise exception '対象の選手が見つかりません。' using errcode = 'no_data_found';
+  end if;
+
+  -- 持ち主は誰にも止められない（止められると、解除できる人がいなくなる）
+  if v_role = 'owner' then
+    raise exception 'サイトの持ち主は利用停止にできません。' using errcode = 'insufficient_privilege';
+  end if;
+  -- 運営どうしで止め合えないようにする
+  if v_role = 'admin' and not is_owner() then
+    raise exception '運営を利用停止にできるのは、サイトの持ち主だけです。'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  v_me := current_player_id();
+
+  if p_banned then
+    update players set banned_at = now(), banned_by = v_me where id = target_player_id;
+  else
+    update players set banned_at = null, banned_by = null where id = target_player_id;
+  end if;
+
+  update player_reports
+     set resolved_at = now(),
+         resolved_by = v_me,
+         resolution = case when p_banned then 'banned' else 'dismissed' end
+   where target_id = target_player_id and resolved_at is null;
+end;
+$$;
+
+-- 通報を却下する（停止はしない）。見終えた印だけを付けて一覧から下ろす。
+create or replace function admin_dismiss_player_reports(target_player_id uuid)
+  returns void
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+begin
+  if not is_admin() then
+    raise exception '運営権限が必要です。' using errcode = 'insufficient_privilege';
+  end if;
+
+  update player_reports
+     set resolved_at = now(),
+         resolved_by = current_player_id(),
+         resolution = 'dismissed'
+   where target_id = target_player_id and resolved_at is null;
+end;
+$$;
+
 -- 認証済みユーザーだけがRPCを呼べるようにする
 revoke all on function admin_set_player_role(uuid, text)   from anon, public;
 revoke all on function admin_link_player_account(uuid, uuid) from anon, public;
 revoke all on function admin_merge_players(uuid, uuid)     from anon, public;
+revoke all on function admin_set_player_ban(uuid, boolean) from anon, public;
+revoke all on function admin_dismiss_player_reports(uuid)  from anon, public;
 grant execute on function admin_set_player_role(uuid, text)   to authenticated;
 grant execute on function admin_link_player_account(uuid, uuid) to authenticated;
 grant execute on function admin_merge_players(uuid, uuid)     to authenticated;
+grant execute on function admin_set_player_ban(uuid, boolean) to authenticated;
+grant execute on function admin_dismiss_player_reports(uuid)  to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- チームでのエントリー（RPC）
@@ -1126,6 +1327,11 @@ begin
   if v_me is null then
     raise exception '選手登録がまだのためエントリーできません。' using errcode = 'insufficient_privilege';
   end if;
+  -- この関数は security definer でRLSを通らないので、停止の判定を自分で行う
+  if is_banned() then
+    raise exception 'このアカウントは利用を停止されているため、エントリーできません。'
+      using errcode = 'insufficient_privilege';
+  end if;
 
   v_name := btrim(coalesce(p_team_name, ''));
   if v_name = '' then
@@ -1145,6 +1351,10 @@ begin
   end if;
   if (select count(*) from players where id = any(v_members)) <> 2 then
     raise exception '選択された選手が見つかりません。' using errcode = 'no_data_found';
+  end if;
+  if exists (select 1 from players where id = any(v_members) and banned_at is not null) then
+    raise exception '利用を停止されている選手とはチームを組めません。'
+      using errcode = 'insufficient_privilege';
   end if;
 
   -- 同じ大会への同時エントリーを直列化する
@@ -1414,8 +1624,15 @@ revoke all on function report_match_result(uuid, uuid, text, uuid) from anon, pu
 revoke all on function is_owner()                      from anon, public;
 revoke all on function is_tournament_admin(uuid)       from anon, public;
 revoke all on function is_tournament_visible(uuid)     from anon, public;
+revoke all on function is_banned()                     from anon, public;
+revoke all on function player_ban_threshold()          from anon, public;
 grant execute on function bracket_match(uuid, uuid)       to authenticated;
 grant execute on function is_owner()                      to authenticated;
+-- is_banned も anon に許可する。player_reports の select ポリシーは anon にも
+-- 適用され、同じ節で is_banned を呼ぶ経路がある（上と同じ理由）。
+-- 答えるのは「いまの人が停止中か」だけで、ログアウト状態なら常に偽。
+grant execute on function is_banned()                     to anon, authenticated;
+grant execute on function player_ban_threshold()          to anon, authenticated;
 -- is_match_participant / is_tournament_admin / is_tournament_visible だけは
 -- anon にも許可する。match_room_codes・match_chat_reports・大会まわりの select
 -- ポリシーは anon にも適用され、その中でこれらの関数を呼ぶため、実行権限が
@@ -1599,10 +1816,15 @@ begin
 exception when duplicate_object then null;
 end $$;
 
--- match_chat_messages と match_chat_reports は意図的に入れていない。
+-- match_chat_messages・match_chat_reports・player_reports は意図的に入れていない。
 --
 -- 既存の購読は「どれかのテーブルが変わったら全データを取り直す」作りなので、
 -- チャット1通ごとに全員が全件取得することになる。加えて、当事者にしか見せない
 -- データをブロードキャストに載せると、購読側のRLS適用の設定ミスがそのまま漏洩になる。
 -- チャットは画面を開いている間だけ、RLSを通る普通のSELECTで取りに行く
 -- （js/matchChat.js）。
+--
+-- player_reports も同じ理由で外してある。通報が届いた瞬間に運営の画面へ出す必要は
+-- 無く（見て判断するもので、待っているものではない）、載せれば通報の中身が
+-- ブロードキャストに乗る。運営の画面は読み込みのたびに取り直せば足りる。
+-- 停止したことは players が流れるので、その場で全員の画面に反映される。

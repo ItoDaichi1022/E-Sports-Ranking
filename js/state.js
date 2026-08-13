@@ -54,6 +54,11 @@ export const state = {
   // 自分が出したものだけが入る（ゲストは空）。新しい順。
   chatReports: [],    // { id, tournamentId, matchId, reporterId, body, createdAt, resolvedAt, resolvedBy }
 
+  // 選手ページからの通報。chatReports と同じくRLSで絞られ、運営には全件・
+  // 一般の選手には自分が出したものだけが入る（ゲストは空）。新しい順。
+  // 通報された本人には自分宛ての通報は入らない（誰が通報したかを見せないため）。
+  playerReports: [],  // { id, targetId, reporterId, reason, body, createdAt, resolvedAt, resolvedBy, resolution }
+
   // 大会ごとの運営。誰でも読める（大会ページに「運営: ○○」として出す）。
   // 大会を作った人はDB側のトリガで必ずここに入る。
   tournamentOrganizers: [],  // { tournamentId, playerId }
@@ -104,6 +109,72 @@ export function openChatReports(tournamentId = null, matchId = null) {
   return state.chatReports.filter((r) => !r.resolvedAt
     && (tournamentId == null || r.tournamentId === tournamentId)
     && (matchId == null || r.matchId === matchId));
+}
+
+// ---- 通報と利用停止（BAN）----
+//
+// 通報が何人ぶん集まったらBAN対象として運営の画面に並べるか。
+// 【DB側にも同じ数がある】supabase/schema.sql の player_ban_threshold()。
+// 変えるときは両方そろえること（片方だけ変えても画面とDBが食い違うだけで、
+// どちらが正しいという作りにはしていない ── DBは数えるだけで、止める判断はしない）。
+export const BAN_THRESHOLD = 3;
+
+// この選手は利用停止中か。
+export function isBannedPlayer(player) {
+  return Boolean(player?.bannedAt);
+}
+
+// 停止されていない選手だけ。一覧・検索・相方選び・運営の指名はこれを通す。
+//
+// state.players そのものを絞らないのは、対戦表と戦績が名前を引けなくなるため
+// （停止しても過去の記録は残す、というのがこの機能の前提）。見せる場所を選ぶのは
+// 呼ぶ側の仕事で、名前解決（getPlayerName）は全員を対象にし続ける。
+export function activePlayers() {
+  return state.players.filter((p) => !isBannedPlayer(p));
+}
+
+// まだ運営が見ていない通報。選手を指定するとその人宛てのものだけ。
+export function openPlayerReports(targetId = null) {
+  return state.playerReports.filter((r) => !r.resolvedAt
+    && (targetId == null || r.targetId === targetId));
+}
+
+// 未対応の通報を、通報された選手ごとにまとめる（運営の画面用）。
+//
+// 数えるのは「届いた件数」ではなく「通報した人の数」。DB側も同じ数え方で、
+// 同じ人からの連投は部分ユニーク索引で1件に潰してある（schema.sql の
+// player_reports_open_uniq）。多い順に並べて返す。
+export function playerReportSummaries() {
+  const byTarget = new Map();
+
+  openPlayerReports().forEach((r) => {
+    if (!byTarget.has(r.targetId)) {
+      byTarget.set(r.targetId, { targetId: r.targetId, reports: [], reporterIds: new Set() });
+    }
+    const entry = byTarget.get(r.targetId);
+    entry.reports.push(r);
+    entry.reporterIds.add(r.reporterId);
+  });
+
+  return [...byTarget.values()]
+    .map((entry) => ({
+      targetId: entry.targetId,
+      // 新しい順。運営が最初に読むのは直近の1件なので、先頭に置く
+      reports: [...entry.reports].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
+      reporterCount: entry.reporterIds.size,
+      isCandidate: entry.reporterIds.size >= BAN_THRESHOLD,
+    }))
+    .sort((a, b) => b.reporterCount - a.reporterCount
+      || String(b.reports[0].createdAt).localeCompare(String(a.reports[0].createdAt)));
+}
+
+// 自分がこの選手を通報済みか（未対応のものがあるか）。
+// 運営が却下すると消えるので、そのあとは改めて通報できる。
+export function hasOpenReportFrom(reporterId, targetId) {
+  if (!reporterId || !targetId) return false;
+  return state.playerReports.some(
+    (r) => !r.resolvedAt && r.reporterId === reporterId && r.targetId === targetId,
+  );
 }
 
 // 新しいレコードのID。DB側の主キーがuuidなので、クライアントで作るIDもuuidに揃える。

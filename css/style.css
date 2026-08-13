@@ -2782,6 +2782,170 @@ tr.own-row .player-identity a { color: var(--accent-bright); }
 tr.own-row:hover > td { background: rgba(147, 213, 0, 0.24) !important; }
 
 /* ---------------------------------------------------------------------------
+   通報と利用停止（BAN）
+
+   通報の入口は選手ページ、届いた通報の一覧は選手を探すページの上（運営だけ）。
+   どちらもダイアログや対戦表の外に出るので、bracket.css ではなくここに置く
+   （bracket.css は対戦表まわりの画面を開いたときにしか読まれない）。
+   --------------------------------------------------------------------------- */
+
+/* 主導線ではないが、もめている最中に見つけられないと意味がないので、
+   目立たない灰色ではなく警告色の縁で置く。
+   対戦チャットの「運営に報告」も同じ札を使う（css/bracket.css から移した）。 */
+.btn-report {
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  box-shadow: none;
+}
+
+.btn-report:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* 停止中であることの札。選手一覧（運営の画面）と、通報の一覧で使う。 */
+.ban-badge {
+  flex: none;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--r-pill);
+  color: var(--danger);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ban-badge.is-candidate {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* 選手ページとマイページに出る「利用停止中」の告知。
+   色だけに頼らず、縁と余白で「本文ではない」ことを形でも示す。 */
+.ban-notice {
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--danger);
+  border-left-width: 3px;
+  border-radius: var(--r-sm);
+  background: rgba(226, 68, 92, 0.08);
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.report-done {
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+
+/* ---- 届いている通報の一覧（運営専用）---- */
+
+.report-review {
+  margin-bottom: 1.6rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+.report-review-title {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+
+.report-card {
+  margin-top: 0.9rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+/* 閾値に届いた選手だけ縁を立てる。並びの上のほうに来るうえ、
+   ここだけ色が付くので、開いた瞬間にどれを読むべきかが分かる。 */
+.report-card.is-candidate {
+  border-color: var(--danger);
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.report-card-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.report-card-name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.report-count {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-details summary {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.report-list,
+.banned-list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.report-item {
+  padding: 0.6rem 0.7rem;
+  border-left: 2px solid var(--border-strong);
+  background: var(--surface-3);
+  border-radius: var(--r-sm);
+}
+
+.report-item-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.report-reason {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--warn);
+}
+
+/* 通報の本文は利用者が書いた文章。改行をそのまま見せる（textContent ではなく
+   エスケープして入れているので、ここで折り返しの指定が要る）。 */
+.report-item-body {
+  margin: 0.4rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.banned-block { margin-top: 1rem; }
+
+.banned-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ---------------------------------------------------------------------------
    ダイアログ
    --------------------------------------------------------------------------- */
 

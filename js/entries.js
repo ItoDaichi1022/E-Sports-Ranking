@@ -6,6 +6,7 @@
 
 import {
   state, isTeamTournament, entrantIdOfPlayer, getEntrantMemberIds, getPlayerName,
+  activePlayers, isBannedPlayer,
 } from './state.js';
 import { escapeHtml, cardThumb, skeletonCards } from './util.js';
 import { auth, isLoggedIn, canManageTournament } from './auth.js';
@@ -347,9 +348,10 @@ function teamEntryForm(tournament, onChanged, onCancel) {
   nameLabel.appendChild(nameInput);
 
   // 自分と、既にこの大会に出ている選手は選べない（DB側でも弾かれるが、
-  // 選べてしまうと送信して初めてエラーになり分かりにくい）
+  // 選べてしまうと送信して初めてエラーになり分かりにくい）。
+  // 利用停止中の選手も同じ理由で候補に出さない（enter_tournament_as_team が弾く）。
   const taken = new Set(tournament.participantIds);
-  const candidates = state.players.filter((p) => p.id !== auth.player.id && !taken.has(p.id));
+  const candidates = activePlayers().filter((p) => p.id !== auth.player.id && !taken.has(p.id));
 
   // 選んでいた相手が先に他のチームで埋まっていたら、選択を空に戻す
   if (openTeamForm.partnerId && !candidates.some((p) => p.id === openTeamForm.partnerId)) {
@@ -514,6 +516,16 @@ function entryControls(tournament, onChanged) {
     btn.textContent = '選手登録してエントリー';
     btn.addEventListener('click', () => { navigate('profile'); });
     return btn;
+  }
+
+  // 利用停止中はエントリーできない（DB側の entries_insert と
+  // enter_tournament_as_team も同じ判定を持つ）。押せないボタンを出すより、
+  // なぜ押せないのかをここで言い切る。
+  if (isBannedPlayer(auth.player)) {
+    const note = document.createElement('p');
+    note.className = 'entry-cta-reason';
+    note.textContent = 'このアカウントは利用を停止されているため、エントリーできません。';
+    return note;
   }
 
   return isTeamTournament(tournament)

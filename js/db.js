@@ -31,6 +31,10 @@ function toPlayer(row) {
     snsTwitch: row.sns_twitch ?? '',
     snsYoutube: row.sns_youtube ?? '',
     role: row.role ?? 'player',
+    // 利用停止（BAN）の印。null なら停止されていない。
+    // 列単位のGRANTから外してあるので、ここから書き戻すことはない（setPlayerBan を通す）。
+    bannedAt: row.banned_at ?? null,
+    bannedBy: row.banned_by ?? null,
   };
 }
 
@@ -202,6 +206,20 @@ function toChatReport(row) {
   };
 }
 
+function toPlayerReport(row) {
+  return {
+    id: row.id,
+    targetId: row.target_id,
+    reporterId: row.reporter_id,
+    reason: row.reason,
+    body: row.body ?? '',
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at,
+    resolvedBy: row.resolved_by,
+    resolution: row.resolution ?? null,
+  };
+}
+
 function toAnnouncement(row) {
   return {
     id: row.id,
@@ -282,6 +300,7 @@ export const ALL_PARTS = [
   'ranking',        // state.publishedRanking
   'announcements',  // state.announcements
   'chatReports',    // state.chatReports
+  'playerReports',  // state.playerReports
   'organizers',     // state.tournamentOrganizers
   'rounds',         // state.rounds
   'roomCodes',      // state.roomCodes
@@ -301,6 +320,7 @@ const QUERY_LABELS = {
   ranking: 'ランキングの読み込み',
   announcements: 'お知らせの読み込み',
   reports: '報告の読み込み',
+  playerReports: '通報の読み込み',
   organizers: '大会運営の読み込み',
   rounds: '回戦の読み込み',
   roomCodes: 'ルームコードの読み込み',
@@ -393,6 +413,12 @@ export async function loadAll(parts = null) {
   if (want.has('chatReports')) {
     // RLSにより、運営には全件・一般の選手には自分の分だけ・ゲストには0件が返る
     queries.reports = supabase.from('match_chat_reports').select('*').order('created_at', { ascending: false });
+  }
+
+  if (want.has('playerReports')) {
+    // 選手ページからの通報。RLSにより、運営には全件・一般の選手には自分が出した
+    // 分だけ・ゲストには0件が返る（通報された本人にも自分宛ての分は返らない）
+    queries.playerReports = supabase.from('player_reports').select('*').order('created_at', { ascending: false });
   }
 
   if (want.has('organizers')) {
@@ -511,6 +537,7 @@ export async function loadAll(parts = null) {
   }
   if (want.has('announcements')) state.announcements = r.announcements.data.map(toAnnouncement);
   if (want.has('chatReports')) state.chatReports = r.reports.data.map(toChatReport);
+  if (want.has('playerReports')) state.playerReports = r.playerReports.data.map(toPlayerReport);
   if (want.has('organizers')) {
     state.tournamentOrganizers = r.organizers.data.map((row) => ({
       tournamentId: row.tournament_id,
@@ -798,6 +825,46 @@ export async function linkPlayerAccount(playerId, userId) {
     target_user_id: userId,
   });
   check(error, 'アカウントの対応付け');
+}
+
+// ---------------------------------------------------------------------------
+// 通報と利用停止（BAN）
+// ---------------------------------------------------------------------------
+
+// 選手ページからの通報。
+//
+// 同じ相手への未対応の通報は1件までで、2回目はDB側の部分ユニーク索引に弾かれる
+// （schema.sql の player_reports_open_uniq）。画面でもボタンを「通報済み」に
+// 変えて止めているが、別のタブから押された場合はここに来る。
+export async function reportPlayer(targetId, reporterId, reason, body) {
+  const { error } = await supabase.from('player_reports').insert({
+    target_id: targetId,
+    reporter_id: reporterId,
+    reason,
+    body: body?.trim() || null,
+  });
+  if (error?.code === '23505') {
+    throw new Error('この選手はすでに通報済みです。運営が確認するまでお待ちください。');
+  }
+  check(error, '通報の送信');
+}
+
+// 利用停止のオン・オフ。banned_at は列単位のGRANTから外してあるのでRPC経由。
+// 停止しても解除しても、その人に届いていた未対応の通報はDB側でまとめて片付く。
+export async function setPlayerBan(playerId, banned) {
+  const { error } = await supabase.rpc('admin_set_player_ban', {
+    target_player_id: playerId,
+    p_banned: banned,
+  });
+  check(error, banned ? '利用停止' : '利用停止の解除');
+}
+
+// 通報を却下する（停止はしない）。見終えた印だけを付けて一覧から下ろす。
+export async function dismissPlayerReports(playerId) {
+  const { error } = await supabase.rpc('admin_dismiss_player_reports', {
+    target_player_id: playerId,
+  });
+  check(error, '通報の却下');
 }
 
 // 本人が先に新規登録してしまい二重になった行を、戦績のある古い行へ統合する。

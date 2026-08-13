@@ -11,7 +11,7 @@
 // 大会を編集できなくなり、サイト全体の運営に頼むしかなくなる（DB側は外すことを
 // 禁じていない ── 運営を入れ替える正当な操作と区別がつかないため、画面側で止める）。
 
-import { state } from './state.js';
+import { state, activePlayers } from './state.js';
 import { escapeHtml } from './util.js';
 
 // 検索結果に出す上限。多すぎると押す前に読み切れないので、絞り込みを促す。
@@ -88,7 +88,10 @@ export function mountOrganizerPicker(containerEl, { selectedIds = [], lockedId =
     const q = query.trim().toLowerCase();
     if (!q) return;
 
-    const hits = state.players
+    // 利用停止中の選手は候補に出さない（指名しても、その大会の操作は
+    // ポリシー側で止まる）。既に選ばれている札は消さない ── 停止する前から
+    // 運営に入っていた人を、編集のたびに黙って外してしまわないため。
+    const hits = activePlayers()
       .filter((p) => !selected.has(p.id))
       .filter((p) => p.currentName.toLowerCase().includes(q)
         || p.pastNames.slice(-2).some((n) => n.toLowerCase().includes(q)));

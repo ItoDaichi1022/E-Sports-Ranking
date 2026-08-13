@@ -15,7 +15,7 @@
 
 import {
   state, getEntrantName, getEntrantMemberIds, openChatReports,
-  findTournament, isRoundStarted, roundState, matchRoomCode,
+  findTournament, isRoundStarted, roundState, matchRoomCode, isBannedPlayer,
 } from './state.js';
 import { auth, canManageTournament } from './auth.js';
 import { confirmMatch, editMatch } from './bracket.js';
@@ -834,11 +834,18 @@ export function closeMatchChat() {
 
 // 確定済みの試合のチャットは読むだけにする（運営は介入できるので書ける）。
 // 入力で試合が確定した直後にも呼ぶので、state から引き直した姿で判断する。
+//
+// 利用停止中の人も読むだけになる。読めなくはしない ── 運営とのやり取りの経緯は
+// 本人にも残す（DB側も chat_select は絞らず、chat_insert だけを止めている）。
 function syncWriteState() {
   const match = currentMatch();
-  const canWrite = roomIsAdmin() || !match?.confirmed;
+  const banned = isBannedPlayer(auth.player);
+  const canWrite = !banned && (roomIsAdmin() || !match?.confirmed);
   formEl.hidden = !canWrite;
   closedNoteEl.hidden = canWrite;
+  closedNoteEl.textContent = banned
+    ? 'このアカウントは利用を停止されているため、書き込みはできません。'
+    : 'この対戦は結果が確定したため、書き込みはできません。';
 }
 
 // 対戦カードのチャットを開く。

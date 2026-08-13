@@ -6,6 +6,7 @@ import './intro.js';
 import {
   state, newId, getPlayerName, isTeamTournament, getEntrantName, getEntrantMemberIds,
   openChatReports, organizerIdsOf,
+  activePlayers, isBannedPlayer, playerReportSummaries, hasOpenReportFrom, BAN_THRESHOLD,
 } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
 import {
@@ -83,6 +84,17 @@ const $ = (id) => document.getElementById(id);
 
 const playerListEl = $('player-list');
 const playerSearchInput = $('player-search-input');
+
+// 選手の通報（ダイアログ）と、届いた通報の一覧（運営専用）
+const reportDialog = $('report-dialog');
+const reportTargetEl = $('report-target');
+const reportForm = $('report-form');
+const reportReasonInput = $('report-reason-input');
+const reportBodyInput = $('report-body-input');
+const reportFormErrorEl = $('report-form-error');
+const reportSubmitBtn = $('report-submit-btn');
+const reportCancelBtn = $('report-cancel-btn');
+const reportReviewEl = $('report-review');
 
 const participantSearchInput = $('participant-search-input');
 const participantCheckboxesEl = $('participant-checkboxes');
@@ -271,7 +283,8 @@ function applyAuthUI() {
   const owner = isOwner();
   const loggedIn = isLoggedIn();
   // 大会は誰でも開ける。必要なのは選手登録だけ（作った人がその大会の運営になる）。
-  const canCreateTournament = Boolean(auth.player);
+  // 利用停止中の人だけは作れない（DB側の tournaments_insert も同じ判定を持つ）。
+  const canCreateTournament = Boolean(auth.player) && !isBannedPlayer(auth.player);
   // いま開いている大会を管理できるか。詳細ページを開いたままログイン状態が
   // 変わることがあるので、ここでも見ておく（描き直しは routeFromLocation 側）。
   const canManageCurrent = canManageTournament(currentBracketTournamentId);
@@ -776,9 +789,169 @@ async function renderNewsPage(id) {
   newsActionsEl.append(editBtn, delBtn);
 }
 
+// ---- 通報と利用停止（BAN）----
+//
+// 通報の入口は選手ページの「通報する」だけ。届いた通報は運営の画面（選手ページの
+// 上）にまとまり、通報した人数が BAN_THRESHOLD に届くと「BAN対象」の札が付く。
+//
+// 【自動では止めない】札が付いても起きるのは表示だけで、止めるかどうかは運営が
+// 押して決める。自動で消す作りにすると、結託した数アカウントで無実の選手を
+// 消せてしまう（DB側も同じ考えで、数えるだけの作りにしてある）。
+
+// DBの player_reports.reason と1対1で対応する。増やすときは
+// supabase/schema.sql の player_reports_reason_check と index.html の選択肢も直すこと。
+const REPORT_REASONS = {
+  harassment: '誹謗中傷・ハラスメント',
+  cheating: '不正行為・八百長',
+  impersonation: 'なりすまし',
+  inappropriate: '不適切なプロフィール',
+  spam: '宣伝・勧誘・スパム',
+  other: 'その他',
+};
+
+const reasonLabel = (reason) => REPORT_REASONS[reason] ?? 'その他';
+
+// 通報ダイアログを開く。対象はいま見ている選手ページの人。
+let reportTargetId = null;
+
+function openReportDialog(player) {
+  reportTargetId = player.id;
+  reportTargetEl.textContent = `通報する相手: ${player.currentName}`;
+  reportReasonInput.value = 'harassment';
+  reportBodyInput.value = '';
+  reportFormErrorEl.textContent = '';
+  reportSubmitBtn.disabled = false;
+  reportDialog.showModal();
+}
+
+function closeReportDialog() {
+  reportTargetId = null;
+  reportDialog.close();
+}
+
+// 届いている通報の一覧（運営専用）。
+//
+// 通報された人ごとにまとめて、通報した人数の多い順に並べる。数えるのは件数ではなく
+// 人数 ── 1人が何度押しても1件にしかならない（DB側の部分ユニーク索引で潰してある）。
+function renderBanReview() {
+  // 一般の利用者には存在ごと見せない。RLSでも運営以外には0件しか返らないので、
+  // ここは「運営が自分の画面で見るためのもの」という位置づけを保つための出し分け。
+  if (!isAdmin()) {
+    reportReviewEl.hidden = true;
+    reportReviewEl.innerHTML = '';
+    return;
+  }
+
+  const summaries = playerReportSummaries();
+  const banned = state.players.filter(isBannedPlayer);
+
+  if (summaries.length === 0 && banned.length === 0) {
+    reportReviewEl.hidden = true;
+    reportReviewEl.innerHTML = '';
+    return;
+  }
+
+  const cards = summaries.map((s) => {
+    const player = state.players.find((p) => p.id === s.targetId);
+    const name = player ? player.currentName : '削除された選手';
+    const items = s.reports.map((r) => {
+      const reporter = state.players.find((p) => p.id === r.reporterId);
+      return `
+        <li class="report-item">
+          <span class="report-item-head">
+            <span class="report-reason">${escapeHtml(reasonLabel(r.reason))}</span>
+            <span class="meta-line">${escapeHtml(reporter ? reporter.currentName : '退会した選手')}・${escapeHtml(formatDateTime(r.createdAt))}</span>
+          </span>
+          ${r.body ? `<p class="report-item-body">${escapeHtml(r.body)}</p>` : ''}
+        </li>`;
+    }).join('');
+
+    return `
+      <article class="report-card${s.isCandidate ? ' is-candidate' : ''}">
+        <header class="report-card-head">
+          <a class="report-card-name" href="${pathFor('player', s.targetId)}">${escapeHtml(name)}</a>
+          <span class="report-count">通報 ${s.reporterCount}人</span>
+          ${s.isCandidate ? '<span class="ban-badge is-candidate">BAN対象</span>' : ''}
+        </header>
+        ${isBannedPlayer(player) ? '<p class="meta-line">この選手は既に利用停止中です。</p>' : ''}
+        <details class="report-details">
+          <summary>通報の内容（${s.reports.length}件）</summary>
+          <ul class="report-list">${items}</ul>
+        </details>
+        <div class="row-actions">
+          ${isBannedPlayer(player)
+            ? ''
+            : `<button type="button" class="btn-report ban-btn" data-id="${escapeHtml(s.targetId)}">この選手を利用停止にする</button>`}
+          <button type="button" class="btn-secondary dismiss-btn" data-id="${escapeHtml(s.targetId)}">通報を却下する</button>
+        </div>
+      </article>`;
+  }).join('');
+
+  // 停止中の選手は検索から消えるので、解除する相手を探せる場所をここに残す
+  const bannedList = banned.length === 0 ? '' : `
+    <details class="report-details banned-block">
+      <summary>利用停止中の選手（${banned.length}人）</summary>
+      <ul class="banned-list">
+        ${banned.map((p) => `
+          <li>
+            <a href="${pathFor('player', p.id)}">${escapeHtml(p.currentName)}</a>
+            <span class="meta-line">${escapeHtml(formatDateTime(p.bannedAt))}に停止</span>
+            <button type="button" class="btn-secondary unban-btn" data-id="${escapeHtml(p.id)}">停止を解除</button>
+          </li>`).join('')}
+      </ul>
+    </details>`;
+
+  reportReviewEl.hidden = false;
+  reportReviewEl.innerHTML = `
+    <h2 class="report-review-title">届いている通報</h2>
+    <p class="note">
+      通報が<strong>${BAN_THRESHOLD}人</strong>ぶん集まると「BAN対象」の札が付きます。
+      札が付いても自動では何も起きません ── 内容を読んで、止めるか却下するかを決めてください。
+      停止すると、その選手はエントリー・大会作成・チャット・プロフィールの編集ができなくなり、
+      選手の検索からも消えます（過去の対戦表と戦績はそのまま残ります）。
+    </p>
+    ${cards}
+    ${bannedList}`;
+
+  reportReviewEl.querySelectorAll('.ban-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setBan(btn, btn.dataset.id, true));
+  });
+  reportReviewEl.querySelectorAll('.unban-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setBan(btn, btn.dataset.id, false));
+  });
+  reportReviewEl.querySelectorAll('.dismiss-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const player = state.players.find((p) => p.id === btn.dataset.id);
+      if (!confirm(`「${player?.currentName ?? 'この選手'}」への通報をすべて却下します。よろしいですか？`)) return;
+      btn.disabled = true;
+      const ok = await persist(() => db.dismissPlayerReports(btn.dataset.id), '通報の却下');
+      if (ok) await refreshFromDb();
+      else btn.disabled = false;
+    });
+  });
+}
+
+// 利用停止のオン・オフ。選手ページと通報の一覧の両方から呼ぶ。
+async function setBan(btn, playerId, banned) {
+  const player = state.players.find((p) => p.id === playerId);
+  const name = player?.currentName ?? 'この選手';
+  const message = banned
+    ? `「${name}」を利用停止にします。\n\nエントリー・大会作成・チャット・プロフィールの編集ができなくなり、`
+      + '選手の検索からも消えます（過去の対戦表と戦績は残ります）。\n未対応の通報はまとめて対応済みになります。'
+      + '\n\nよろしいですか？'
+    : `「${name}」の利用停止を解除します。よろしいですか？`;
+  if (!confirm(message)) return;
+
+  btn.disabled = true;
+  const ok = await persist(() => db.setPlayerBan(playerId, banned), banned ? '利用停止' : '利用停止の解除');
+  if (ok) await refreshFromDb();
+  else btn.disabled = false;
+}
+
 // ---- 選手 ----
 
 function refreshPlayerUI() {
+  renderBanReview();
   renderPlayerTable(playerListEl, {
     ownPlayerId: auth.player?.id ?? null,
     isAdmin: isAdmin(),
@@ -819,12 +992,14 @@ function renderParticipantCheckboxes() {
     return;
   }
 
+  // 運営が参加者を直接選ぶ欄。利用停止中の選手は候補に出さない
+  const selectable = activePlayers();
   const query = participantSearchQuery.trim().toLowerCase();
   const visiblePlayers = query
-    ? state.players.filter((p) =>
+    ? selectable.filter((p) =>
         (p.gameAccountId ?? '').toLowerCase().includes(query)
         || p.currentName.toLowerCase().includes(query))
-    : state.players;
+    : selectable;
 
   if (visiblePlayers.length === 0) {
     participantCheckboxesEl.innerHTML = '<p class="empty-hint">検索条件に一致する選手がいません。</p>';
@@ -1044,6 +1219,19 @@ function renderProfilePage() {
 
   profileTitleEl.textContent = 'マイページ';
 
+  // 利用停止中は、まずそのことを本人に伝える。編集も保存もDB側で弾かれるので、
+  // 黙って失敗させると「保存できない不具合」に見える。
+  if (isBannedPlayer(auth.player)) {
+    profileFormMode = null;
+    setProfileEditing(false);
+    profileFormContainer.innerHTML = '';
+    profileNoteEl.textContent = 'このアカウントは現在、利用を停止されています。'
+      + 'エントリー・大会作成・対戦チャットへの書き込み・プロフィールの編集はできません。'
+      + '心当たりがない場合や、解除を求める場合は、フッターのお問い合わせから運営にご連絡ください。';
+    renderOwnProfileView();
+    return;
+  }
+
   // 普段は「他の人から見える姿」をそのまま出す。編集は鉛筆から。
   if (!profileEditing) {
     profileFormMode = null;
@@ -1103,6 +1291,9 @@ function renderOwnProfileView() {
 
   const bio = profileBioHtml(player);
   const chips = profileFooterHtml(player);
+  // 停止中は編集の入口を出さない。押してもDB側で弾かれるだけで、
+  // 「保存できない不具合」に見えてしまう（理由は上の renderProfilePage が出している）。
+  const banned = isBannedPlayer(player);
 
   // 選手ページとまったく同じ部品で組む（ここが「他の人からどう見えるか」の確認場所
   // なので、見た目が少しでも違うと確認にならない）。戦歴だけは通信が要るので、
@@ -1111,14 +1302,17 @@ function renderOwnProfileView() {
   profileViewEl.innerHTML = playerHeroHtml(player, {
     // ページの題は「マイページ」（h1）なので、自分の名前はその下の段
     nameTag: 'h2',
-    action: `<button type="button" class="profile-edit-link profile-edit-btn"
+    action: banned
+      ? ''
+      : `<button type="button" class="profile-edit-link profile-edit-btn"
               title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</button>`,
+    extra: banned ? '<p class="ban-notice">利用停止中のアカウントです。</p>' : '',
     foot: bio + '<div class="player-record"></div>',
   })
     + '<div class="player-history"></div>'
     + (chips || (bio ? '' : '<p class="empty-hint">まだプレイヤー名だけです。鉛筆アイコンからアイコン・使用キャラ・自己紹介などを追加できます。</p>'));
 
-  profileViewEl.querySelector('.profile-edit-btn').addEventListener('click', () => {
+  profileViewEl.querySelector('.profile-edit-btn')?.addEventListener('click', () => {
     setProfileEditing(true);
     renderProfilePage();
   });
@@ -2397,21 +2591,58 @@ async function renderPlayerDetail(playerId) {
 
   const stats = getPlayerStats(playerId, record);
   const isOwn = auth.player?.id === playerId;
+  const banned = isBannedPlayer(player);
+
+  // 運営の操作。プレイヤー名の変更と、利用停止の切り替え。
+  const adminActions = !isOwn && isAdmin()
+    ? `<p class="meta-line row-actions">
+         <button type="button" class="btn-secondary admin-rename-btn">プレイヤー名を変更</button>
+         ${banned
+           ? '<button type="button" class="btn-secondary admin-unban-btn">利用停止を解除</button>'
+           : '<button type="button" class="btn-report admin-ban-btn">利用停止にする</button>'}
+       </p>`
+    : '';
+
+  // 通報の入口。自分自身は通報できず、ログインして選手登録を済ませた人だけが押せる。
+  // 既に通報していれば押せない札に変える（DB側も同じ相手への未対応の通報を1件に絞る）。
+  let reportAction = '';
+  if (!isOwn && !banned && auth.player && !isAdmin()) {
+    reportAction = hasOpenReportFrom(auth.player.id, playerId)
+      ? '<p class="meta-line report-done">通報済みです。運営が確認します。</p>'
+      : '<p class="meta-line"><button type="button" class="btn-report player-report-btn">この選手を通報する</button></p>';
+  }
+
+  // 停止中であることは誰にでも出す（対戦表から辿り着いた人が、連絡がつかない理由を
+  // 探して回らずに済む）。自己紹介とSNSのリンクは伏せる ── 停止の理由がそこに
+  // 書かれていることが多く、残しておくと止めた意味が薄れる。
+  const bannedNotice = banned
+    ? '<p class="ban-notice">このアカウントは現在、利用を停止されています。過去の大会の記録はそのまま残しています。</p>'
+    : '';
 
   playerDetailEl.innerHTML = playerHeroHtml(player, {
     action: isOwn
       ? `<a href="${pathFor('profile')}" class="profile-edit-link" title="プロフィールを編集する" aria-label="プロフィールを編集する">${iconSvg('pencil')}</a>`
       : '',
-    extra: !isOwn && isAdmin()
-      ? '<p class="meta-line"><button type="button" class="btn-secondary admin-rename-btn">プレイヤー名を変更</button></p>'
-      : '',
+    extra: adminActions + reportAction,
     // 自己紹介と直近の戦績はヒーローの下段に入れる（同じ島）。
     // 全件の表だけは外に出す ── 開くと何十行にもなるので、島の中で伸ばすと
     // 名前とランクが画面の外へ流れていく。
-    foot: profileBioHtml(player) + recentResultsHtml(stats),
+    foot: bannedNotice + (banned ? '' : profileBioHtml(player)) + recentResultsHtml(stats),
   })
     + historyTableHtml(stats)
-    + profileFooterHtml(player);
+    + (banned ? '' : profileFooterHtml(player));
+
+  // 通報する。押すとダイアログが開く（送信は下の reportForm の submit）。
+  playerDetailEl.querySelector('.player-report-btn')?.addEventListener('click', () => {
+    openReportDialog(player);
+  });
+
+  playerDetailEl.querySelector('.admin-ban-btn')?.addEventListener('click', (e) => {
+    setBan(e.currentTarget, player.id, true);
+  });
+  playerDetailEl.querySelector('.admin-unban-btn')?.addEventListener('click', (e) => {
+    setBan(e.currentTarget, player.id, false);
+  });
 
   // プレイヤー名の変更。選手一覧の表からは外したので、運営はここから直す。
   // 代理登録された選手（本人のアカウントが無い人）を直せる唯一の経路でもある。
@@ -2551,6 +2782,44 @@ participantSearchInput.addEventListener('input', () => {
 playerSearchInput.addEventListener('input', () => {
   playerSearchQuery = playerSearchInput.value;
   refreshPlayerUI();
+});
+
+// 選手の通報。
+//
+// 状況の記入を必須にしているのは、理由の分類だけでは運営が判断できないため
+// （DBの列は任意にしてあるが、画面では書いてもらう）。押し間違いで通報が
+// 飛ばないようにする役目も兼ねている。
+reportCancelBtn.addEventListener('click', closeReportDialog);
+reportDialog.addEventListener('close', () => { reportTargetId = null; });
+
+reportForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!reportTargetId || !auth.player) return;
+
+  const body = reportBodyInput.value.trim();
+  if (!body) {
+    reportFormErrorEl.textContent = '何があったかを書いてください。運営はこの内容だけを見て判断します。';
+    reportBodyInput.focus();
+    return;
+  }
+
+  reportFormErrorEl.textContent = '';
+  reportSubmitBtn.disabled = true;
+
+  const targetId = reportTargetId;
+  const ok = await persist(
+    () => db.reportPlayer(targetId, auth.player.id, reportReasonInput.value, body),
+    '通報の送信',
+  );
+
+  if (!ok) {
+    reportSubmitBtn.disabled = false;
+    return;
+  }
+
+  closeReportDialog();
+  alert('通報を送信しました。運営が内容を確認します。');
+  await refreshFromDb();
 });
 
 shuffleBtn.addEventListener('click', shuffleSelected);

@@ -1,4 +1,4 @@
-import { state } from './state.js';
+import { state, isBannedPlayer } from './state.js';
 import { avatarHtml } from './util.js';
 import { characterRowArtHtml } from './characters.js';
 import { makeIconButton } from './icons.js';
@@ -84,11 +84,15 @@ export function renderPlayerTable(containerEl, options = {}) {
     return;
   }
 
-  const visiblePlayers = state.players.filter((p) =>
-    p.currentName.toLowerCase().includes(query)
-    // 選手ページに出す過去名（直近2件）と検索対象をそろえる。全履歴を対象にすると、
-    // 画面には出ていない古い名前で見つかってしまい、利用者から見て不可解になる。
-    || p.pastNames.slice(-2).some((n) => n.toLowerCase().includes(query)));
+  const visiblePlayers = state.players
+    // 利用停止中の選手は検索に出さない。運営には「停止中」の札を付けて残す ──
+    // 解除する相手を探せる場所がここしかないため。
+    // 過去の大会の対戦表と戦績には今までどおり名前が出る（記録は消さない）。
+    .filter((p) => isAdmin || !isBannedPlayer(p))
+    .filter((p) => p.currentName.toLowerCase().includes(query)
+      // 選手ページに出す過去名（直近2件）と検索対象をそろえる。全履歴を対象にすると、
+      // 画面には出ていない古い名前で見つかってしまい、利用者から見て不可解になる。
+      || p.pastNames.slice(-2).some((n) => n.toLowerCase().includes(query)));
 
   if (visiblePlayers.length === 0) {
     containerEl.innerHTML = '<p class="empty-hint">検索条件に一致する選手がいません。</p>';
@@ -124,6 +128,15 @@ export function renderPlayerTable(containerEl, options = {}) {
     link.href = pathFor('player', p.id);
     link.textContent = p.currentName;
     nameCell.appendChild(link);
+
+    // 運営の画面にだけ出る札（一般の利用者にはそもそも行が出ていない）
+    if (isBannedPlayer(p)) {
+      const badge = document.createElement('span');
+      badge.className = 'ban-badge';
+      badge.textContent = '停止中';
+      nameCell.appendChild(badge);
+    }
+
     nameTd.appendChild(nameCell);
 
     tr.append(nameTd);
