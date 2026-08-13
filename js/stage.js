@@ -272,7 +272,9 @@ export function renderStats(listEl) {
   const entered = held.reduce((sum, t) => sum + (t.participantCount || 0), 0);
 
   const stats = [
-    { label: 'Players', term: '登録選手', value: state.players.length, unit: '人' },
+    // 【state.players.length ではないこと】あちらは「これまでに引けた人数」で、
+    // ホームでは普通ゼロになる（js/state.js の注記）。総数はDB側で数えた値を使う。
+    { label: 'Players', term: '登録選手', value: state.playerCount, unit: '人' },
     { label: 'Tournaments', term: '開催した大会', value: held.length, unit: '大会' },
     { label: 'Entries', term: '延べ出場', value: entered, unit: '人' },
   ];

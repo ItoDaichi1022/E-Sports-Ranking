@@ -4,7 +4,21 @@
 export const state = {
   // { id, currentName, pastNames: [], gameAccountId, bio, mainCharacters: [],
   //   snsX, snsTwitch, snsYoutube, role, userId }
+  //
+  // 【全員は入っていない】ここに居るのは「これまでに引けた人」だけ。
+  // サイトを開いた時点では空で、大会を開けばその出場者が、検索すれば当たった人が
+  // 足されていく（js/db.js の ensurePlayers / searchPlayers）。
+  //
+  // 以前は起動時に全行を配っていたが、登録者が増えるほど、ホームしか見ない人まで
+  // 全員分を受け取ることになるのでやめた。名前を出す画面は、描く前にその選手が
+  // 手元にあることを確かめること ── といっても撒くのではなく、読み込む側
+  // （loadAll・ensureTournamentDetail）がまとめて揃えている。
+  //
+  // 人数だけが要る場所（ホームの「登録選手 N人」）は下の playerCount を見る。
   players: [],
+  // 登録選手の総数。行を運ばずDB側で数えた値（loadAll の playerCount）。
+  // state.players.length は「手元に引けた人数」でしかないので、こちらと混同しないこと。
+  playerCount: 0,
   // { id, name, date, format, matchType, matchTypeNote, entrantIds: [], entrantSeeds: [],
   //   participantIds: [], teams: [], entrantCount, participantCount, weight, rules,
   //   imageUrl, status, capacity }

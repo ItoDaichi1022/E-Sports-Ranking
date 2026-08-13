@@ -150,36 +150,58 @@ export function renderPlayerTable(containerEl, options = {}) {
 
       // 代理登録された行に、本人が自分で作ったアカウントを統合する（移行してきた選手の初回だけ）。
       //
-      // 【ここはまだ state.players を全部見ている】統合先の候補を選ぶ欄で、
-      // いまは起動時に全選手が手元にあるので成り立っている。loadAll から
-      // players を外したら（次の段階）、この候補は「これまでに見かけた人」だけに
-      // なってしまう ── そのときは、ここも検索して選ぶ形に変えること。
+      // 【候補は、欄に触れたときに初めて取る】候補になるのは「一度でもログインした
+      // 選手」全員で、登録者が増えれば全選手とほぼ同じ数になる。この欄のために
+      // 起動時から全員を配るわけにいかない。使うのは移行してきた選手の初回だけなので、
+      // 開いた人だけが1回取る形にしてある（db.loadMergeCandidates）。
       if (isAdmin && !p.userId) {
-        const candidates = state.players.filter((c) => c.userId && c.id !== p.id);
-        if (candidates.length > 0) {
-          const select = document.createElement('select');
-          select.append(new Option('本人のアカウントを統合...', ''));
-          candidates.forEach((c) => select.append(new Option(c.currentName, c.id)));
-          select.addEventListener('change', async () => {
-            const sourceId = select.value;
-            if (!sourceId) return;
-            const source = state.players.find((c) => c.id === sourceId);
-            if (!confirm(`「${source.currentName}」のアカウントを「${p.currentName}」に統合します。`
-              + `\n統合後、「${source.currentName}」の行は削除され、その人は「${p.currentName}」の戦績を引き継ぎます。よろしいですか？`)) {
-              select.value = '';
+        const select = document.createElement('select');
+        select.append(new Option('本人のアカウントを統合...', ''));
+
+        let loaded = false;
+        const fillCandidates = async () => {
+          if (loaded) return;
+          loaded = true;   // 二重に取りに行かない（focus は何度でも来る）
+          try {
+            const { players: candidates, hasMore } = await db.loadMergeCandidates();
+            const usable = candidates.filter((c) => c.id !== p.id);
+            if (usable.length === 0) {
+              select.options[0].textContent = '統合できるアカウントがありません';
               return;
             }
-            select.disabled = true;
-            try {
-              await onMerge(sourceId, p.id);
-            } catch (err) {
-              alert(err.message);
-              select.disabled = false;
-              select.value = '';
-            }
-          });
-          actionTd.appendChild(select);
-        }
+            usable.forEach((c) => select.append(new Option(c.currentName, c.id)));
+            // 溢れたことは伝える。黙って切ると、目当ての人が居ないのを
+            // 「そのアカウントは無い」と読まれる。
+            if (hasMore) select.append(new Option('（候補が多く、以降は表示していません）', ''));
+          } catch (err) {
+            loaded = false;   // 失敗したら次に触れたときやり直す
+            select.options[0].textContent = err.message;
+          }
+        };
+        // focus だけだと、キーボードで開いたときにしか来ない環境がある
+        select.addEventListener('focus', fillCandidates);
+        select.addEventListener('pointerdown', fillCandidates);
+
+        select.addEventListener('change', async () => {
+          const sourceId = select.value;
+          if (!sourceId) return;
+          const source = state.players.find((c) => c.id === sourceId);
+          if (!source) { select.value = ''; return; }
+          if (!confirm(`「${source.currentName}」のアカウントを「${p.currentName}」に統合します。`
+            + `\n統合後、「${source.currentName}」の行は削除され、その人は「${p.currentName}」の戦績を引き継ぎます。よろしいですか？`)) {
+            select.value = '';
+            return;
+          }
+          select.disabled = true;
+          try {
+            await onMerge(sourceId, p.id);
+          } catch (err) {
+            alert(err.message);
+            select.disabled = false;
+            select.value = '';
+          }
+        });
+        actionTd.appendChild(select);
       }
 
       if (isAdmin) {

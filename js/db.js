@@ -329,6 +329,8 @@ export const ALL_PARTS = [
 // 問い合わせが失敗したときに画面へ出す名前。
 const QUERY_LABELS = {
   players: '選手の読み込み',
+  playerCount: '登録選手数の読み込み',
+  bannedPlayers: '利用停止中の選手の読み込み',
   tournaments: '大会の読み込み',
   teams: 'チームの読み込み',
   entries: 'エントリーの読み込み',
@@ -376,8 +378,37 @@ export async function loadAll(parts = null) {
   const queries = {};
 
   if (want.has('players')) {
-    // 自己紹介とSNSはここでは取らない（PLAYER_LIST_COLUMNS の注記を参照）。
-    queries.players = supabase.from('players').select(PLAYER_LIST_COLUMNS).order('display_name');
+    // 【全選手の行はもう取らない】以前はここで players の全行を配っていた。
+    // ホームを開いただけの人にも全員分が降りてきて、登録者が増えるほど、
+    // 誰がどのページを見ても重くなり続ける作りだった。
+    //
+    // いま取るのは2つだけ。
+    //   1. 人数（行はゼロ。ホームの「登録選手 N人」に要る）
+    //   2. 既に手元に持っている人の、最新の中身
+    //
+    // 【2が要る理由】手元の行を取り直さないと、誰かが改名しても、その人を
+    // 一度でも見た人の画面には古い名前が残り続ける（以前は毎回作り直していたので
+    // 勝手に直っていた）。持っている人だけなので、増えても際限なく重くならない。
+    //
+    // 必要な選手を新しく取るのは ensurePlayers（下）。
+    queries.playerCount = supabase.from('players').select('id', { count: 'exact', head: true });
+
+    const heldIds = state.players.map((p) => p.id);
+    queries.players = fullDataLoaded
+      // 運営の集計（ランキング）は全員が要るので、そのときだけ全行を取る
+      ? supabase.from('players').select(PLAYER_LIST_COLUMNS).order('display_name')
+      : (heldIds.length
+        ? supabase.from('players').select(PLAYER_LIST_COLUMNS).in('id', heldIds)
+        : noRows());
+
+    // 【利用停止中の選手だけは常に全員取ること】運営のBAN一覧（js/app.js の
+    // renderBanReview）は state.players から停止中の人を拾って並べる。手元に
+    // 居る人しか拾えないと、解除すべき相手が一覧に出てこない ── 運営が「解除の
+    // しようがない」状態になる。
+    // 停止は例外的な操作なので件数は少なく、索引もある（players_banned_idx）。
+    queries.bannedPlayers = fullDataLoaded
+      ? noRows()   // 全行を取っているので二重に取らない
+      : supabase.from('players').select(PLAYER_LIST_COLUMNS).not('banned_at', 'is', null);
   }
 
   if (want.has('tournaments')) {
@@ -541,10 +572,13 @@ export async function loadAll(parts = null) {
     state.bracketIds = new Set(r.bracketIds.data.map((b) => b.tournament_id));
   }
 
-  // 取り直しで詳細を落とさない。loadAll は state.players を丸ごと作り直すので、
-  // ensurePlayerDetail が足した自己紹介・SNSは何もしなければ消える
-  // ── 選手ページを開いたまま更新が届くと、自己紹介だけ空になって見える。
-  if (want.has('players')) state.players = r.players.data.map(toPlayer).map(withPlayerDetail);
+  if (want.has('players')) {
+    state.playerCount = r.playerCount.count ?? 0;
+    // 作り直さず、手元の行に上書きする。作り直すと、画面が掴んでいる参照が
+    // 古いものになり、そちらを見ている表示だけが更新から取り残される。
+    rememberPlayers(r.players.data.map(toPlayer));
+    rememberPlayers(r.bannedPlayers.data.map(toPlayer));
+  }
   if (want.has('matches')) state.matches = r.matches.data.map(toMatch);
   if (want.has('ranking')) {
     const snapshot = r.ranking.data?.[0];
@@ -570,6 +604,37 @@ export async function loadAll(parts = null) {
   }
   if (want.has('rounds')) state.rounds = r.rounds.data.map(toRound);
   if (want.has('roomCodes')) state.roomCodes = r.roomCodes.data.map(toRoomCode);
+
+  // 【名前が要る選手を、読んだものから拾ってここで取ること】
+  //
+  // 全選手を配るのをやめた以上、名前を出す画面は「その名前の選手を手元に
+  // 持っている」ことを自分で確かめなければならない。それを描く側に撒くと、
+  // 必ずどこかで忘れる ── 忘れた場所には (不明) と出るが、どの大会・どの選手で
+  // 出るかはデータ次第なので、検査でも手元の確認でも捕まえきれない。
+  //
+  // だから、撒かずにここへ集める。ここは「何を読んだか」を知っている唯一の場所で、
+  // 読んだものが選手IDを指しているなら、その選手も一緒に要るに決まっている。
+  // 新しく選手IDを持つテーブルを足したときは、ここにも1行足すこと。
+  const referenced = new Set();
+  if (want.has('organizers')) {
+    // 大会ページの「運営: ○○」
+    state.tournamentOrganizers.forEach((o) => referenced.add(o.playerId));
+  }
+  if (want.has('chatReports')) {
+    // 対戦チャットからの報告。運営の画面に通報者名が出る
+    state.chatReports.forEach((x) => referenced.add(x.reporterId));
+  }
+  if (want.has('playerReports')) {
+    // 選手ページからの通報。運営の画面に「誰が誰を」が出る
+    state.playerReports.forEach((x) => { referenced.add(x.targetId); referenced.add(x.reporterId); });
+  }
+  if (want.has('ranking')) {
+    // 公開済みランキング（順位発表・お知らせ）。中身は選手IDの並び
+    (state.publishedRanking?.rankings ?? []).forEach((e) => referenced.add(e.id));
+  }
+  referenced.delete(null);
+  referenced.delete(undefined);
+  await ensurePlayers([...referenced]);
 }
 
 // 大会詳細の問い合わせを「始めただけ」の状態で覚えておく置き場。
@@ -653,6 +718,10 @@ export async function ensureTournamentDetail(tournamentId) {
   teams.data.forEach((t) => {
     if (t.placement === 1) state.teamChampions[tournamentId] = t.name;
   });
+
+  // 出場者の名前を揃える。この大会を出す画面（大会詳細・対戦表・出場選手一覧・
+  // 対戦チャット）は全部ここを通るので、名前が要る選手はここで出そろう。
+  await ensurePlayers(tournament.participantIds);
 }
 
 // 試合結果の問い合わせを「始めただけ」の状態で覚えておく置き場。
@@ -716,8 +785,9 @@ export async function ensureFullData() {
 
 // 一度取った詳細（自己紹介・SNS）の控え。playerId -> 詳細だけの部分オブジェクト。
 //
-// loadAll が state.players を作り直すたびに、ここから戻す（上の withPlayerDetail）。
-// 控えを持たずに state 側だけ書き換えると、背景の自動更新が来た瞬間に消える。
+// 新しく取ってきた行に、ここから詳細を戻す（下の withPlayerDetail）。
+// 一覧用の問い合わせは自己紹介とSNSを取らないので、控えを持たずに state 側だけ
+// 書き換えると、その選手を取り直した瞬間に自己紹介が空になる。
 const playerDetails = new Map();
 
 function withPlayerDetail(player) {
@@ -791,6 +861,57 @@ export async function loadPlayerEntries(playerId) {
   }));
 }
 
+// 1回の問い合わせに入れるIDの数。
+//
+// PostgRESTの in.(...) はURLのクエリに並ぶので、際限なく詰めるとURLが長くなりすぎて
+// 弾かれる（サーバーやCDNの上限に当たる。何件で切れるかは環境ごとに違う）。
+// uuidは36文字なので、200件でおよそ7.5KB ── 一般的な上限（8KB前後）の内側に収まる。
+const PLAYER_FETCH_CHUNK = 200;
+
+// 名前を出すのに要る選手を、手元に揃える。
+//
+// 【必要なぶんだけ取るための入口】起動時に全選手を配るのをやめた（loadAll の注記）
+// ので、名前を出す前にここを通す。既に持っている人は問い合わせない。
+export async function ensurePlayers(ids) {
+  const missing = [...new Set(ids)]
+    .filter((id) => id && !state.players.some((p) => p.id === id));
+  if (missing.length === 0) return;
+
+  const chunks = [];
+  for (let i = 0; i < missing.length; i += PLAYER_FETCH_CHUNK) {
+    chunks.push(missing.slice(i, i + PLAYER_FETCH_CHUNK));
+  }
+
+  const results = await Promise.all(chunks.map(
+    (chunk) => supabase.from('players').select(PLAYER_LIST_COLUMNS).in('id', chunk),
+  ));
+  for (const { error } of results) check(error, '選手の読み込み');
+
+  rememberPlayers(results.flatMap((res) => res.data.map(toPlayer)));
+}
+
+// アカウント統合の候補（本人が自分で作った選手行＝user_id を持つ行）。
+//
+// 運営が、代理登録した行に本人のアカウントを結び付けるときにだけ使う。
+// 移行してきた選手の初回だけの操作なので、開いた瞬間に取りに行くのではなく、
+// 欄に触れたときに初めて呼ぶ（js/players.js）。
+//
+// 【上限を置いてあること】user_id を持つ行は「一度でもログインした人」全員で、
+// 登録者が増えれば全選手とほぼ同じ数になる。この欄のためだけに全員を配らない。
+// 溢れたかどうかを返すので、呼ぶ側は「多すぎて出しきれない」と伝えられる。
+export async function loadMergeCandidates(limit = 200) {
+  const { data, error } = await supabase
+    .from('players')
+    .select(PLAYER_LIST_COLUMNS)
+    .not('user_id', 'is', null)
+    .order('display_name')
+    .limit(limit + 1);
+  check(error, '統合候補の読み込み');
+
+  const players = data.map(toPlayer);
+  return { players: rememberPlayers(players.slice(0, limit)), hasMore: players.length > limit };
+}
+
 // 選手の検索。打った文字に当たった人だけをDBから受け取る。
 //
 // 【全選手を手元に持たないための唯一の経路】画面の検索欄は4か所ある
@@ -834,6 +955,17 @@ export async function searchPlayers(query, { includeBanned = false, limit = 50 }
   const players = data.map(toPlayer);
   const hasMore = players.length > limit;
   return { players: rememberPlayers(players.slice(0, limit)), hasMore };
+}
+
+// 消えた選手を手元からも外す。
+//
+// 【外さないと古い名前が残り続ける】state.players はもう loadAll が作り直さない
+// （持っている行を上書きするだけ）。消された行はどこからも上書きされないので、
+// 何もしなければ、消したはずの選手が名前付きで出続ける。
+function forgetPlayer(playerId) {
+  playerDetails.delete(playerId);
+  const at = state.players.findIndex((p) => p.id === playerId);
+  if (at !== -1) state.players.splice(at, 1);
 }
 
 // 取ってきた選手を state.players に混ぜ、混ぜたあとの行を返す。
@@ -947,7 +1079,6 @@ export async function savePlayer(player) {
 }
 
 export async function deletePlayer(playerId) {
-  playerDetails.delete(playerId);
   const { error } = await supabase.from('players').delete().eq('id', playerId);
   // 試合結果から参照されている選手は外部キー(on delete restrict)で守られている。
   // 画面側でも事前に止めているが、他端末が同時に試合を入れた場合はここで弾かれる。
@@ -955,6 +1086,8 @@ export async function deletePlayer(playerId) {
     throw new Error('この選手は試合結果に記録されているため削除できません。');
   }
   check(error, '選手の削除');
+
+  forgetPlayer(playerId);
 }
 
 // 運営権限の付け外し。roleは直接UPDATEできないのでRPC経由。
@@ -1022,6 +1155,9 @@ export async function mergePlayers(sourcePlayerId, targetPlayerId) {
     target_player_id: targetPlayerId,
   });
   check(error, '選手の統合');
+
+  // 統合元の行はDB側で消える（admin_merge_players）。手元からも外す。
+  forgetPlayer(sourcePlayerId);
 }
 
 // ---------------------------------------------------------------------------

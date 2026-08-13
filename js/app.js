@@ -2659,23 +2659,23 @@ function profileFooterHtml(player) {
 // 戦績はこの選手のぶんだけ取りに行く（全選手の試合は手元に持っていない。
 // js/db.js の loadPlayerRecord を参照）。
 async function renderPlayerDetail(playerId) {
-  let player = state.players.find((p) => p.id === playerId);
-  if (!player) {
-    // 届く前に「無い」と言い切らない（renderTournamentDetailLoading と同じ理由）
-    playerDetailEl.innerHTML = db.hasLoadedOnce()
-      ? '<p class="empty-hint">選手が見つかりません。</p>'
-      : '<div class="skeleton-line skeleton-panel"></div>';
-    return;
-  }
+  // 【まず本人を取りに行くこと】この選手が手元にあるとは限らない。起動時に
+  // 全選手を配るのをやめたので（js/db.js の loadAll）、URLから直接ここへ
+  // 着地した場合、state.players はまだ空のこともある。
+  // 「居ない」と言い切れるのは、取りに行って見つからなかったときだけ。
+  playerDetailEl.innerHTML = '<div class="skeleton-line skeleton-panel"></div>';
 
   let record;
   try {
-    // 自己紹介とSNSは起動時には取っていない（js/db.js の PLAYER_LIST_COLUMNS）。
-    // 戦績と同時に投げる ── 直列にすると往復が1回増えて、その分だけ表示が遅れる。
+    // 3本まとめて投げる。直列にすると往復がそのぶん増え、表示が遅れる。
+    //   本人の行     … 名前・アイコン・キャラクター（一覧用の列）
+    //   自己紹介とSNS … 一覧の問い合わせには乗っていない（PLAYER_LIST_COLUMNS）
+    //   戦績         … この選手の試合と出場記録
     // 運営の「プレイヤー名を変更」も、ここで詳細が揃っていることに頼っている
     // （揃っていないまま保存すると自己紹介が消えるので、db.savePlayer が弾く）。
     [record] = await Promise.all([
       db.loadPlayerRecord(playerId),
+      db.ensurePlayers([playerId]),
       db.ensurePlayerDetail(playerId),
     ]);
   } catch (err) {
@@ -2684,11 +2684,11 @@ async function renderPlayerDetail(playerId) {
   }
   if (!isCurrentRoute('player', playerId)) return;
 
-  // 待っている間に背景の更新（loadAll）が来ていると、state.players は作り直されていて
-  // 上で掴んだ行はもう捨てられている ── その参照のまま描くと、自己紹介だけが
-  // 空のまま出る。掴み直す。消えていれば描かない。
-  player = state.players.find((p) => p.id === playerId);
-  if (!player) return;
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) {
+    playerDetailEl.innerHTML = '<p class="empty-hint">選手が見つかりません。</p>';
+    return;
+  }
 
   const stats = getPlayerStats(playerId, record);
   const isOwn = auth.player?.id === playerId;
