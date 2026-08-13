@@ -188,11 +188,23 @@ export function newId() {
   return crypto.randomUUID();
 }
 
+// 名前が引けなかったときに出す文字。
+//
+// 【IDをそのまま出さないこと】以前はここで id（uuid）を返していた。開発中は
+// 「誰が引けていないか」が分かって都合がよかったが、画面には
+// 「6f9c2a1e-…」という36文字がプレイヤー名として出る ── 見た人には意味が無く、
+// 崩れているようにしか見えない。実際に大会作成の運営欄で出た。
+export const UNKNOWN_PLAYER_NAME = '(不明)';
+
 // プレイヤーIDから表示用の現在名を取得する。BYE(null)は呼び出し側で扱う。
+//
+// 引けないのは、その選手がまだ手元に無いか、消されたか。どちらも呼ぶ側が
+// 描く前に手当てすべきこと（必要な選手を先に取っておく）で、ここでは
+// 画面を壊さないことだけを受け持つ。
 export function getPlayerName(id) {
   if (!id) return null;
   const player = state.players.find((p) => p.id === id);
-  return player ? player.currentName : id;
+  return player ? player.currentName : UNKNOWN_PLAYER_NAME;
 }
 
 // ---- 出場の単位（entrant）----

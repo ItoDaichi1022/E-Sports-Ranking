@@ -1,6 +1,6 @@
 import { bestAchievement } from './playerStats.js';
 import { isRankedTournament } from './rankingEligibility.js';
-import { getEntrantMemberIds } from './state.js';
+import { getEntrantMemberIds, UNKNOWN_PLAYER_NAME } from './state.js';
 
 // LumiRank軽量版：相手の強さで重み付けした反復スコアリングのみを残した最小実装。
 // doc/design.md の「8. ランキング方式」に準拠する。
@@ -316,7 +316,9 @@ export function computeRankings(state) {
       const tournamentsPlayed = tournamentsPlayedByPlayer.get(id)?.size ?? 0;
       return {
         id,
-        name: player ? player.currentName : id,
+        // 引けないときにIDを出さない（js/state.js の UNKNOWN_PLAYER_NAME を参照）。
+        // ランキングの集計は ensureFullData のあとに走るので、普通はここに来ない。
+        name: player ? player.currentName : UNKNOWN_PLAYER_NAME,
         score: scores.get(id) * scale,
         tournamentsPlayed,
         bestAchievement: bestAchievement(id, allTournamentsByPlayer.get(id) ?? new Set()),

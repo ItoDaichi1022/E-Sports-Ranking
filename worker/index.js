@@ -269,7 +269,7 @@ function escapeAttr(s) {
 // 取りに行く ── 40KBを2回配ったうえ、preload が LCP の役に立たなくなる。
 // 画面は普通に出るので気付けない。版数を上げるときは、こちらも一緒に上げること
 // （scripts/check-cache-version.mjs が両者を突き合わせて止める）。
-const HOME_LOGO = '/img/game-logo.webp?v=177';
+const HOME_LOGO = '/img/game-logo.webp?v=178';
 
 // index.html に既にある行は中身だけ差し替え、無い行はここで足す。
 //

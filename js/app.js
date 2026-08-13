@@ -7,6 +7,7 @@ import {
   state, newId, getPlayerName, isTeamTournament, getEntrantName, getEntrantMemberIds,
   openChatReports, organizerIdsOf,
   isBannedPlayer, playerReportSummaries, hasOpenReportFrom, BAN_THRESHOLD,
+  UNKNOWN_PLAYER_NAME,
 } from './state.js';
 import { renderPlayerTable, updatePlayer } from './players.js';
 import {
@@ -1031,7 +1032,12 @@ const runParticipantSearch = bindSearch(
 // 作成が終わったあとだけ reset で建て直す（前の大会の顔ぶれを持ち越さないため）。
 function ensureCreateOrganizerPicker({ reset = false } = {}) {
   if (!auth.player) return;
-  if (organizerPicker && !reset) return;
+  if (organizerPicker && !reset) {
+    // 建て直さずに、札の名前だけ描き直す。この画面は読み込みが終わるたびに
+    // ここを通るので、建てた時点で選手が届いていなくても、届いた時点で名前になる。
+    organizerPicker.refresh();
+    return;
+  }
   organizerPicker = mountOrganizerPicker(tournamentOrganizersEl, {
     selectedIds: [auth.player.id],
     lockedId: auth.player.id,
@@ -1125,7 +1131,8 @@ function renderSelectedList() {
 
     const nameLabel = document.createElement('span');
     nameLabel.className = 'seed-name';
-    nameLabel.textContent = player ? player.currentName : id;
+    // 引けないときにIDを出さない（js/state.js の UNKNOWN_PLAYER_NAME を参照）
+    nameLabel.textContent = player ? player.currentName : UNKNOWN_PLAYER_NAME;
 
     const upBtn = makeIconButton('arrowUp', 'シードを1つ上げる', { className: 'btn-secondary' });
     upBtn.disabled = index === 0;
@@ -2411,7 +2418,8 @@ function renderResultSection(tournament) {
 
     const memberLinks = memberIds.map((id) => {
       const player = state.players.find((p) => p.id === id);
-      const name = player ? player.currentName : id;
+      // 引けないときにIDを出さない（js/state.js の UNKNOWN_PLAYER_NAME を参照）
+      const name = player ? player.currentName : UNKNOWN_PLAYER_NAME;
       return `
         <div class="player-identity">
           ${avatarHtml(player ?? { currentName: name }, 'sm')}

@@ -11,7 +11,8 @@
 // 大会を編集できなくなり、サイト全体の運営に頼むしかなくなる（DB側は外すことを
 // 禁じていない ── 運営を入れ替える正当な操作と区別がつかないため、画面側で止める）。
 
-import { state } from './state.js';
+import { state, UNKNOWN_PLAYER_NAME } from './state.js';
+import { auth } from './auth.js';
 import { escapeHtml, createSearchRunner } from './util.js';
 import * as db from './db.js';
 
@@ -20,6 +21,19 @@ const MAX_RESULTS = 12;
 
 function playerLabel(player) {
   return player.currentName;
+}
+
+// 札に出す名前。
+//
+// 【自分は auth.player から引くこと】この欄が最初に建つのは、選手の読み込みが
+// 終わる前かもしれない。state.players だけを見ていると、自分の札が
+// 「あなた」と書かれたUUIDになって出る（実際に大会作成で出た）。
+// 自分の行はログインの時点で別に取れている（js/auth.js の refreshOwnPlayer）ので、
+// そちらを先に見れば、読み込みの前後によらず必ず名前が出る。
+function labelOf(id) {
+  if (auth.player?.id === id) return playerLabel(auth.player);
+  const player = state.players.find((p) => p.id === id);
+  return player ? playerLabel(player) : UNKNOWN_PLAYER_NAME;
 }
 
 // containerEl に欄を建てて、選ばれているIDを読み出せる操作卓を返す。
@@ -54,17 +68,17 @@ export function mountOrganizerPicker(containerEl, { selectedIds = [], lockedId =
       return;
     }
     [...selected].forEach((id) => {
-      const player = state.players.find((p) => p.id === id);
+      const label = labelOf(id);
       const chip = document.createElement('span');
       chip.className = 'organizer-chip';
-      chip.innerHTML = `<span>${escapeHtml(player ? playerLabel(player) : id)}</span>`;
+      chip.innerHTML = `<span>${escapeHtml(label)}</span>`;
 
       if (id !== lockedId) {
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'organizer-chip-remove';
         remove.textContent = '×';
-        remove.title = `${player ? playerLabel(player) : id} を運営から外す`;
+        remove.title = `${label} を運営から外す`;
         remove.addEventListener('click', () => {
           selected.delete(id);
           renderChosen();
@@ -160,5 +174,14 @@ export function mountOrganizerPicker(containerEl, { selectedIds = [], lockedId =
 
   return {
     selectedIds: () => [...selected],
+
+    // 札の名前だけ描き直す。
+    //
+    // 【建て直しではないこと】この欄は建て直すと、指名しかけた顔ぶれと
+    // 打ちかけの検索文字が消える（Realtimeの更新でも画面は描き直されるので、
+    // 呼ぶ側は建て直さない作りにしてある）。だが建てた時点ではまだ選手が
+    // 届いていないことがあり、そのままでは名前が出ないまま固まる。
+    // 名前だけを描き直せば、どちらも失わずに済む。
+    refresh() { renderChosen(); },
   };
 }
