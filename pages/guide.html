@@ -214,13 +214,16 @@
       <span class="guide-nav-item">大会</span>
       <span class="guide-nav-item">選手</span>
       <span class="guide-nav-item">対戦環境を整える</span>
+      <!-- 大会作成は選手登録を済ませた人にだけ出る（js/app.js）。
+           一覧に無いと「どこから作るのか」が分からないので、印を付けて並べる。 -->
+      <span class="guide-nav-item is-new">大会作成</span>
       <span class="guide-nav-sep"></span>
       <span class="guide-nav-item">エントリー状況</span>
       <span class="guide-nav-item">マイページ</span>
       <span class="guide-nav-item guide-nav-contact">お問い合わせ（X）</span>
     </div>
   </div>
-  <figcaption>左上の☰を押すと、この一覧が開きます（選手登録すると「大会作成」が増えます）</figcaption>
+  <figcaption>左上の☰を押すと、この一覧が開きます。「大会作成」は選手登録すると現れます</figcaption>
 </figure>
 
 <ul class="guide-pages">
@@ -243,6 +246,10 @@
   <li class="guide-page-card">
     <h3>対戦環境を整える</h3>
     <p>回線・コントローラーなど、大会当日までに整えておきたいものの案内です（広告を含みます）。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>大会作成</h3>
+    <p><strong>選手登録を済ませると現れます</strong>（それまではメニューにありません）。大会は誰でも開けます ── 作った人がその大会の運営になります。くわしくは<a href="/guide/" data-guide-target="guide-host">4. 大会を開きたい人へ</a>。</p>
   </li>
   <li class="guide-page-card">
     <h3>エントリー状況</h3>
