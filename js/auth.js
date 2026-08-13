@@ -87,6 +87,10 @@ async function refreshOwnPlayer() {
         snsX: data.sns_x ?? '',
         snsTwitch: data.sns_twitch ?? '',
         snsYoutube: data.sns_youtube ?? '',
+        // ここは自分の1行だけなので全列取っている（上の select('*')）。
+        // state.players の行は自己紹介とSNSを持っていない（js/db.js の
+        // PLAYER_LIST_COLUMNS）ため、保存の前に db.savePlayer がこの印を見る。
+        detailLoaded: true,
         role: data.role ?? 'player',
       }
     : null;

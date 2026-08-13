@@ -1927,21 +1927,12 @@ a.card:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* 大会一覧の優勝者。金は上位を示す色としてここと順位表だけに使う。 */
-.card-champion {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  max-width: 100%;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--gold);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* 【.card-champion はここにあった】大会一覧・エントリー状況のカードに出していた
+   「優勝 ○○」を外したので、規則も一緒に消した。理由は js/app.js の championOf の
+   注記にある ── 一覧で優勝者を出すには、一覧に並んだ全大会ぶんの優勝者名が要り、
+   そのために選手を全員手元に持つことになるため。優勝者は大会詳細・対戦表に出る。 */
 
-/* エントリー状況の「自分の成績」。優勝者の金と紛れないよう普通の文字色で出す */
+/* エントリー状況の「自分の成績」。金の優勝者表示と紛れないよう普通の文字色で出す */
 .card-my-result {
   font-size: 0.85rem;
   font-weight: 600;

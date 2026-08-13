@@ -15,6 +15,20 @@ import { downscaleImage } from './util.js';
 // 行 ⇄ stateオブジェクトの変換
 // ---------------------------------------------------------------------------
 
+// players から取る列を2段に分ける。
+//
+// 【全選手ぶんを常に運ぶものを最小にする】起動時の loadAll は全選手の行を取る。
+// 自己紹介（bio）は text で上限が無く（supabase/schema.sql）、1人が長文を書けば
+// ホームを開いた全員が毎回それを受け取ることになる。名前引き・行に敷く絵・
+// BAN判定に要る列だけを常に取り、残りは ensurePlayerDetail で足す。
+//
+// 【game_account_id はこちら側】プロフィールだけの値に見えるが、エントリーの
+// 表示名（js/entries.js の「名前（アカウントID）」）と選手検索でも使う。
+// 向こうへ移すと、エントリー一覧を出すたびに全員分の詳細が要ることになる。
+const PLAYER_LIST_COLUMNS =
+  'id, user_id, display_name, past_names, game_account_id, avatar_url, main_characters, role, banned_at, banned_by';
+const PLAYER_DETAIL_COLUMNS = 'id, bio, sns_x, sns_twitch, sns_youtube';
+
 function toPlayer(row) {
   return {
     id: row.id,
@@ -30,6 +44,12 @@ function toPlayer(row) {
     // 保存のたびに消してしまわないよう、読み書きだけは残している。
     snsTwitch: row.sns_twitch ?? '',
     snsYoutube: row.sns_youtube ?? '',
+    // 詳細列がこの行に入っていたか。
+    //
+    // 【空文字と「まだ取っていない」を取り違えないこと】上の4つは、詳細列を
+    // 選んでいない行では必ず空になる。その状態で savePlayer を呼ぶと、書かれていた
+    // 自己紹介が null で上書きされて消える（下の savePlayer が弾いている）。
+    detailLoaded: 'bio' in row,
     role: row.role ?? 'player',
     // 利用停止（BAN）の印。null なら停止されていない。
     // 列単位のGRANTから外してあるので、ここから書き戻すことはない（setPlayerBan を通す）。
@@ -356,7 +376,8 @@ export async function loadAll(parts = null) {
   const queries = {};
 
   if (want.has('players')) {
-    queries.players = supabase.from('players').select('*').order('display_name');
+    // 自己紹介とSNSはここでは取らない（PLAYER_LIST_COLUMNS の注記を参照）。
+    queries.players = supabase.from('players').select(PLAYER_LIST_COLUMNS).order('display_name');
   }
 
   if (want.has('tournaments')) {
@@ -520,7 +541,10 @@ export async function loadAll(parts = null) {
     state.bracketIds = new Set(r.bracketIds.data.map((b) => b.tournament_id));
   }
 
-  if (want.has('players')) state.players = r.players.data.map(toPlayer);
+  // 取り直しで詳細を落とさない。loadAll は state.players を丸ごと作り直すので、
+  // ensurePlayerDetail が足した自己紹介・SNSは何もしなければ消える
+  // ── 選手ページを開いたまま更新が届くと、自己紹介だけ空になって見える。
+  if (want.has('players')) state.players = r.players.data.map(toPlayer).map(withPlayerDetail);
   if (want.has('matches')) state.matches = r.matches.data.map(toMatch);
   if (want.has('ranking')) {
     const snapshot = r.ranking.data?.[0];
@@ -690,6 +714,45 @@ export async function ensureFullData() {
   }
 }
 
+// 一度取った詳細（自己紹介・SNS）の控え。playerId -> 詳細だけの部分オブジェクト。
+//
+// loadAll が state.players を作り直すたびに、ここから戻す（上の withPlayerDetail）。
+// 控えを持たずに state 側だけ書き換えると、背景の自動更新が来た瞬間に消える。
+const playerDetails = new Map();
+
+function withPlayerDetail(player) {
+  const detail = playerDetails.get(player.id);
+  return detail ? Object.assign(player, detail, { detailLoaded: true }) : player;
+}
+
+// その選手の自己紹介とSNSを読み込む。選手ページを開く入り口と、
+// プロフィールを保存し得る操作（運営のプレイヤー名変更）の前で呼ぶ。
+//
+// 【保存の前に必ず通すこと】これを呼ばずに savePlayer へ渡すと、手元に無い
+// 自己紹介が null で上書きされて消える。savePlayer がそれを弾くので黙って
+// 壊れることはないが、弾かれた側は保存できないままになる。
+export async function ensurePlayerDetail(playerId) {
+  if (!playerId || playerDetails.has(playerId)) return;
+
+  const { data, error } = await supabase
+    .from('players')
+    .select(PLAYER_DETAIL_COLUMNS)
+    .eq('id', playerId)
+    .maybeSingle();
+  check(error, 'プロフィールの読み込み');
+  if (!data) return;   // 消された選手。控えを作らないので、次に開けばもう一度見に行く
+
+  playerDetails.set(playerId, {
+    bio: data.bio ?? '',
+    snsX: data.sns_x ?? '',
+    snsTwitch: data.sns_twitch ?? '',
+    snsYoutube: data.sns_youtube ?? '',
+  });
+
+  const player = state.players.find((p) => p.id === playerId);
+  if (player) withPlayerDetail(player);
+}
+
 // お知らせの全件読み込み（一覧ページ・古いお知らせの詳細用）。普段は最新数件しか読まない。
 export async function ensureAllAnnouncements() {
   if (allAnnouncementsLoaded) return;
@@ -784,6 +847,15 @@ export async function createOwnPlayer(userId, profile) {
 // エラーではなく「0行更新」として成功で返るため、これが無いと何も保存されていないのに
 // 「保存しました」と表示され、原因の分からない不具合になる。
 export async function savePlayer(player) {
+  // 【自己紹介とSNSを手元に持たないまま保存しないこと】起動時に取る行には
+  // これらの列が入っていない（PLAYER_LIST_COLUMNS）。そのまま update すると、
+  // 画面に出ていなかった自己紹介が null で上書きされて消える ── 書いた本人が
+  // 選手ページを見るまで誰も気付かない。呼ぶ前に ensurePlayerDetail を通すこと。
+  if (!player.detailLoaded) {
+    throw new Error('プロフィールの読み込みが終わっていません。'
+      + '画面を開き直してから、もう一度お試しください。');
+  }
+
   const { data, error } = await supabase
     .from('players')
     .update(toPlayerUpdate(player))
@@ -797,9 +869,19 @@ export async function savePlayer(player) {
       + '（本人のアカウントでログインしているか確認してください）。',
     );
   }
+
+  // 控えも今の値にする。ここを忘れると、保存直後の loadAll が
+  // 古い控えを書き戻し、保存したはずの自己紹介が元に戻って見える。
+  playerDetails.set(player.id, {
+    bio: player.bio ?? '',
+    snsX: player.snsX ?? '',
+    snsTwitch: player.snsTwitch ?? '',
+    snsYoutube: player.snsYoutube ?? '',
+  });
 }
 
 export async function deletePlayer(playerId) {
+  playerDetails.delete(playerId);
   const { error } = await supabase.from('players').delete().eq('id', playerId);
   // 試合結果から参照されている選手は外部キー(on delete restrict)で守られている。
   // 画面側でも事前に止めているが、他端末が同時に試合を入れた場合はここで弾かれる。

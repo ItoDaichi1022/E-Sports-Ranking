@@ -100,8 +100,10 @@ function setRevealStatus(text, type) {
 // （.reveal-achievements-empty の1行）は実データ側にだけ残る道で、ここでは作らない。
 //
 // 大会画像は実在の大会を持てないので、サイトに同梱した画像を借りて充てている。
-const SAMPLE_ART_A = '/img/game-logo.webp';
-const SAMPLE_ART_B = '/img/icon.webp';
+// ?v= は index.html と同じ版数に合わせること（/img/* は _headers で1年 immutable。
+// 付け忘れると、絵を差し替えても古いものが配られ続ける）。
+const SAMPLE_ART_A = '/img/game-logo.webp?v=175';
+const SAMPLE_ART_B = '/img/icon.webp?v=175';
 
 const SAMPLE_PLAYERS = [
   { name: 'サンプル選手A', score: 100.0, previousRank: 2, achievements: [

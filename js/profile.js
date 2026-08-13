@@ -242,6 +242,11 @@ export function renderProfileForm(
   const bio = document.createElement('textarea');
   bio.name = 'bio';
   bio.rows = 4;
+  // 【上限を外さないこと】自己紹介はDB側では text（supabase/schema.sql）で長さの
+  // 制限が無い。チャットや通報（index.html）と同じ500文字にそろえてある。
+  // 他の自由入力と違い、ここは選手ページを開いた人に配られる ── 上限が無いと、
+  // 1人の長文が、その選手を見た全員の読み込みに乗り続ける。
+  bio.maxLength = 500;
   bio.placeholder = '選手ページに表示されます。例: ランキング動画のBGMは、アップテンポで盛り上がる曲が好きです。';
   bio.value = player?.bio ?? '';
   bioLabel.appendChild(bio);

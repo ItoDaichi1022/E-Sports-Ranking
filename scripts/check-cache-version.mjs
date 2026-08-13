@@ -81,6 +81,39 @@ for (const name of cssNames) {
   }
 }
 
+// JSの中で定数に書いた素材のURLも同じ版数にそろえる。
+//
+// 【ここを見ていなかったせいで2件取り残された】v=174 に上げたとき、js/seo.js の
+// FALLBACK_IMAGE は 173 のまま残り、js/reveal.js の SAMPLE_ART_A / B にいたっては
+// ?v= そのものが付いていなかった（v=175 で気付いて直した）。どちらも画面は普通に
+// 出るので、目で見つけることはできない。
+//
+// 拾うのは「大文字の定数に文字列で書いたパス」だけに絞ってある。JSファイル全体から
+// それらしい文字列を拾うと、注記の中に書かれた例（js/app.js の説明文にある
+// /pages/guide.html?v=69 など）まで拾ってしまい、直しようのない指摘が出続ける。
+//
+// 【注記を先に落とすこと】絞っただけでは足りない。注記の中に説明のつもりで
+//     const OLD = '/img/icon.png?v=69';
+// と書けば、それも定数の形をしているので拾ってしまう。書き方を人に守らせるより、
+// 機械が注記を読み飛ばすほうが確かなので、ここで落とす。
+//
+// 行の注記を落とすときに「: の直後の //」を残しているのは、'https://…' のような
+// 文字列を途中で切らないため（切ると、その行の残りが別の意味に化ける）。
+function withoutComments(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+}
+
+const jsNames = readdirSync(path.join(ROOT, 'js')).filter((n) => n.endsWith('.js'));
+for (const name of jsNames) {
+  const source = withoutComments(readFileSync(path.join(ROOT, 'js', name), 'utf8'));
+  const re = /const\s+[A-Z][A-Z0-9_]*\s*=\s*'(\/(?:js|css|img|pages|video)\/[^']*)'/g;
+  for (const [, ref] of source.matchAll(re)) {
+    collect(ref.match(/\?v=(\d+)$/)?.[1], `js/${name} の "${ref}"`);
+  }
+}
+
 if (versions.size > 1) {
   fail(`版数がそろっていません: ${[...versions].sort().join(', ')}`);
 } else if (versions.size === 1) {

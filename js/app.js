@@ -1430,33 +1430,42 @@ function entrantCountLabel(t) {
   return isTeamTournament(t) ? `${count}（${t.participantCount}人）` : count;
 }
 
-// 優勝者を名指しするのは、運営が結果を確定させた大会だけ。
-// 表が埋まっただけの段階では「結果待ち」に留める。
-//
-// 状態と優勝者は別々に返す。履歴一覧では別の要素として並べたいので、
-// 「優勝: ○○」という1本の文字列にまとめてしまうと分解できなくなる。
+// 大会の進行状況。優勝者はここに含めない（下の championOf が別に受け持つ）。
 function tournamentStatusInfo(t) {
   if (!state.bracketIds.has(t.id)) {
-    return { label: STATUS_LABELS[t.status] ?? '—', tone: t.status, champion: null };
+    return { label: STATUS_LABELS[t.status] ?? '—', tone: t.status };
   }
 
-  if (t.status === 'finished') {
-    // チーム戦ではチーム名が返る（優勝者は2人いるので選手名では出せない）
-    return { label: '終了', tone: 'finished', champion: championLabel(t.id) };
-  }
+  if (t.status === 'finished') return { label: '終了', tone: 'finished' };
 
   // 「結果待ち（表は埋まったが運営が確定していない）」は対戦表を見ないと分からない。
   // 一覧では対戦表を読み込まないので、その場合は「進行中」までの表示に留める。
   const bracket = state.brackets[t.id];
   return bracket && allMatchesDecided(bracket)
-    ? { label: '結果待ち', tone: 'pending', champion: null }
-    : { label: '進行中', tone: 'running', champion: null };
+    ? { label: '結果待ち', tone: 'pending' }
+    : { label: '進行中', tone: 'running' };
+}
+
+// 優勝者を名指しするのは、運営が結果を確定させた大会だけ。
+// 表が埋まっただけの段階では「結果待ち」に留める。
+// チーム戦ではチーム名が返る（優勝者は2人いるので選手名では出せない）。
+//
+// 【大会の一覧では呼ばないこと】個人戦の優勝者名は js/state.js の getPlayerName で
+// 引く ── つまり、その選手を手元に持っている必要がある。一覧は大会を何十件も並べる
+// 画面なので、ここで呼ぶと「一覧に出た全大会の優勝者」が要る＝結局こちらは
+// 全選手を抱えることになる。だから一覧のカードからは「優勝 ○○」を外した。
+//
+// 大会詳細・対戦表・出場選手一覧では呼んでよい。それらの画面は、もともと
+// その大会の出場者を取っていて、優勝者はその中の1人だから追加の取得が起きない。
+function championOf(t) {
+  if (!state.bracketIds.has(t.id) || t.status !== 'finished') return null;
+  return championLabel(t.id);
 }
 
 // 大会情報の「進行状況」欄用。1行に収めたいので優勝者も含めて文字列にする。
 function tournamentStatusLabel(t) {
-  const { label, champion } = tournamentStatusInfo(t);
-  return champion ? `優勝: ${champion}` : label;
+  const champion = championOf(t);
+  return champion ? `優勝: ${champion}` : tournamentStatusInfo(t).label;
 }
 
 // 大会名の隣に出すバッジ。「この大会はいま何を受け付けているか」を一言で示す。
@@ -1532,7 +1541,8 @@ function renderTournamentCards(containerEl, tournaments, emptyText, { myPlacemen
     card.className = 'card';
     card.href = pathFor('tournament', t.id);
 
-    const { label, tone, champion } = tournamentStatusInfo(t);
+    // 【優勝者はここに出さない】上の championOf の注記を参照。
+    const { label, tone } = tournamentStatusInfo(t);
     const placement = myPlacements
       ? placementLabelOf(t.id, myPlacements.get(t.id) ?? null)
       : null;
@@ -1544,7 +1554,6 @@ function renderTournamentCards(containerEl, tournaments, emptyText, { myPlacemen
       <p class="card-date">${escapeHtml(t.date || '日付未設定')} ・ ${escapeHtml(entrantCountLabel(t))}参加</p>
       <span class="status-chip status-${tone}">${escapeHtml(label)}</span>
       ${reportChipHtml(t.id)}
-      ${champion ? `<span class="card-champion">優勝 ${escapeHtml(champion)}</span>` : ''}
       ${placement ? `<span class="card-my-result">自分の成績: ${escapeHtml(placement)}</span>` : ''}
     `;
 
@@ -1976,7 +1985,7 @@ async function renderTournamentDetail(tournamentId) {
 
   // 状態はバッジが受け持つので、この行からは外す（同じことを2回言わない）。
   // 優勝者だけは状態ではなく結果なので、ここに残す。
-  const { champion } = tournamentStatusInfo(tournament);
+  const champion = championOf(tournament);
   tournamentMetaEl.textContent = [
     tournament.date || '日付未設定',
     `${entrantCountLabel(tournament)}参加`,
@@ -2571,7 +2580,7 @@ function profileFooterHtml(player) {
 // 戦績はこの選手のぶんだけ取りに行く（全選手の試合は手元に持っていない。
 // js/db.js の loadPlayerRecord を参照）。
 async function renderPlayerDetail(playerId) {
-  const player = state.players.find((p) => p.id === playerId);
+  let player = state.players.find((p) => p.id === playerId);
   if (!player) {
     // 届く前に「無い」と言い切らない（renderTournamentDetailLoading と同じ理由）
     playerDetailEl.innerHTML = db.hasLoadedOnce()
@@ -2582,12 +2591,25 @@ async function renderPlayerDetail(playerId) {
 
   let record;
   try {
-    record = await db.loadPlayerRecord(playerId);
+    // 自己紹介とSNSは起動時には取っていない（js/db.js の PLAYER_LIST_COLUMNS）。
+    // 戦績と同時に投げる ── 直列にすると往復が1回増えて、その分だけ表示が遅れる。
+    // 運営の「プレイヤー名を変更」も、ここで詳細が揃っていることに頼っている
+    // （揃っていないまま保存すると自己紹介が消えるので、db.savePlayer が弾く）。
+    [record] = await Promise.all([
+      db.loadPlayerRecord(playerId),
+      db.ensurePlayerDetail(playerId),
+    ]);
   } catch (err) {
     playerDetailEl.innerHTML = `<p class="empty-hint">${escapeHtml(err.message)}</p>`;
     return;
   }
   if (!isCurrentRoute('player', playerId)) return;
+
+  // 待っている間に背景の更新（loadAll）が来ていると、state.players は作り直されていて
+  // 上で掴んだ行はもう捨てられている ── その参照のまま描くと、自己紹介だけが
+  // 空のまま出る。掴み直す。消えていれば描かない。
+  player = state.players.find((p) => p.id === playerId);
+  if (!player) return;
 
   const stats = getPlayerStats(playerId, record);
   const isOwn = auth.player?.id === playerId;
