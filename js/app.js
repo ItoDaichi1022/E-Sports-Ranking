@@ -247,6 +247,9 @@ const loginBtn = $('login-btn');
 const logoutBtn = $('logout-btn');
 const navTournamentLink = $('nav-tournament-link');
 const tournamentsCreateLinkEl = $('tournaments-create-link');
+// 丸い＋（大会一覧の右下）。文字が無いボタンなので、絵は起動時に一度入れておく
+// （aria-label と title は index.html 側で付けてある）。
+tournamentsCreateLinkEl.innerHTML = iconSvg('plus');
 const mainNav = $('main-nav');
 const navToggle = $('nav-toggle');
 const navCloseBtn = $('nav-close');

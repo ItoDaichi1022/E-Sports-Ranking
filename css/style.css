@@ -650,6 +650,57 @@ button.scroll-top-btn:hover:not(:disabled) {
   to   { opacity: 1; transform: none; }
 }
 
+/* 大会作成への入口。大会一覧（#view-tournaments）の右下に貼り付く丸い＋。
+   あちら（上へ戻る）が画面の操作なのに対し、こちらはこのページの主な操作なので、
+   色を持たせ、角 ── 指がいちばん届く場所 ── を渡す。
+
+   【「上へ戻る」と重ならないこと】あちらも右下に固定で、同じ場所に出る。
+   角はこちらが取り、あちらを1つぶん上へ逃がす（下の body:has の節）。
+   z-index はどちらも 25 ── 重ならない以上、前後を争う必要がない。 */
+.fab-create {
+  position: fixed;
+  right: 1.25rem;
+  /* iPhoneのホームバーやAndroidのジェスチャーバーに重ならないよう持ち上げる
+     （「上へ戻る」と同じ式。ずらすと2つの高さが揃わなくなる） */
+  bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  box-shadow: var(--shadow), 0 0 22px -4px var(--glow);
+  text-decoration: none;
+}
+
+.fab-create svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.fab-create:hover {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+  color: var(--bg);
+}
+
+/* 動きを減らす設定の人には出現のアニメーションを出さない（下のまとめて止める節と同じ扱い） */
+@media (prefers-reduced-motion: no-preference) {
+  .fab-create { animation: scroll-top-in 0.18s ease-out; }
+}
+
+/* ＋が出ている画面では、「上へ戻る」を1つぶん上へ逃がす（丸3.4rem ＋ 間隔0.75rem）。
+   条件に :not([hidden]) を入れているのは、＋を出さない人（選手登録がまだ・利用停止中）
+   の画面で「上へ戻る」だけが浮くのを避けるため。
+   対戦表の「あなたの対戦」でも同じ手を使っている（css/bracket.css）。 */
+body:has(#view-tournaments:not([hidden]) .fab-create:not([hidden])) button.scroll-top-btn {
+  bottom: calc(1.25rem + 3.4rem + 0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
 .site-footer a { color: var(--text-faint); }
 .site-footer a:hover { color: var(--text); }
 
