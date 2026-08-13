@@ -14,9 +14,17 @@
 //   state.js も DOM も触らない。渡された大会1件だけを見て答える。
 //   worker/index.js（Cloudflare 上）からも同じ判断を使うため。
 
-// 進行状況の呼び名。DBの status（supabase/schema.sql）と1対1で対応する。
+// 進行状況の呼び名。
+//
+// 【draft（準備中）はここに無い】画面に出す状態は「募集中・進行中・終了」の3つだけ。
+// 公開前の大会は、その大会ページ自身が「公開したらどう見えるか」のプレビューなので、
+// タグにも公開後の姿（募集を始めるなら募集中、対戦表まで出来ているなら進行中）を出す。
+// まだ公開されていないことは、ページ先頭の帯（js/entries.js の draftNotice）が言う。
+//
+// 以前はここに draft: '準備中' があり、大会一覧のカードと詳細のタグに出していた。
+// 状態が4つあると、公開の前後で見え方が変わってしまい、プレビューとして役に立たない。
+// 読み替えは js/app.js の tournamentStatusInfo が持つ。
 export const STATUS_LABELS = {
-  draft: '準備中',
   recruiting: '募集中',
   running: '進行中',
   finished: '終了',
@@ -83,9 +91,12 @@ export function entryState(tournament, now = Date.now()) {
     };
   }
 
+  // 公開前。エントリーは受け付けないが、タグは公開後の姿を出す（上の STATUS_LABELS
+  // の説明を参照）。ここで返す label と tone が使われるのは、この大会が
+  // 「公開したら募集中になる」場合の見え方そのもの。
   if (status === 'draft') {
     return {
-      ...base, key: 'draft', label: '準備中', tone: 'draft',
+      ...base, key: 'draft', label: '募集中', tone: 'recruiting',
       canEnter: false, blockedReason: 'この大会はまだ公開されていません。',
     };
   }

@@ -42,7 +42,7 @@ const SITE_DESCRIPTION = 'コミュニティの大会運営と個人ランキン
 
 // プレビュー画像が無いときの絵。?v= は index.html と同じ版数に合わせる
 // （/img/* は1年 immutable なので、差し替えたら番号も上げること）。
-const FALLBACK_IMAGE = '/img/icon.png?v=186';
+const FALLBACK_IMAGE = '/img/icon.png?v=187';
 
 // ページの題（h1）と同じ言葉を使う。検索結果とページの中身で名前が違うと、
 // 開いた人に「別のページに来た」と思わせる。
@@ -160,14 +160,45 @@ function absolute(path, origin) {
 
 // ---- 文言の組み立て ----
 
-// 日付（'2026-08-20'）を読ませる形に。曜日まで出すのは、大会が「いつ」なのかを
-// 検索結果の1行で掴ませるため。壊れた値はそのまま返す（消してしまうより分かる）。
-function dateText(ymd) {
-  if (!ymd) return '';
-  const d = new Date(`${ymd}T00:00:00+09:00`);
-  if (Number.isNaN(d.getTime())) return String(ymd);
-  const week = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
-  return `${d.getMonth() + 1}月${d.getDate()}日(${week})`;
+// 【時刻は必ず日本時間で組み立てること】このファイルはブラウザと Worker の
+// 両方で動く。Worker（Cloudflare）はUTCで走るので、Date の getHours() や
+// getDay() をそのまま使うと、カードの文言だけ9時間ずれる ── 20:00開催の大会が
+// 「11:00」、日をまたぐ大会は日付ごと前日になる。しかもSNSはカードを
+// 共有された時点のまま抱えるので、間違ったまま残り続ける。
+// Intl（timeZone: 'Asia/Tokyo'）に組み立てさせて、実行環境に依存させない。
+const JST = 'Asia/Tokyo';
+
+// Intl の出力から部品を取り出す。en-US を使うのは、返る値が数字と曜日の略号で
+// そろっていて解析しやすいため（日本語ロケールだと「8月」のような単位が混ざる）。
+function jstParts(d) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: JST,
+    month: 'numeric', day: 'numeric', weekday: 'short',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(d);
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? '';
+  const WEEK = {
+    Sun: '日', Mon: '月', Tue: '火', Wed: '水', Thu: '木', Fri: '金', Sat: '土',
+  };
+  return {
+    month: get('month'),
+    day: get('day'),
+    week: WEEK[get('weekday')] ?? '',
+    // 24時制の 24:xx は 0時のこと（環境によってこう返る）
+    hour: get('hour') === '24' ? '00' : get('hour'),
+    minute: get('minute'),
+  };
+}
+
+// 開催日時（timestamptz）を読ませる形に。曜日と時刻まで出すのは、大会が
+// 「いつ」なのかを検索結果の1行で掴ませるため。
+// 壊れた値はそのまま返す（消してしまうより分かる）。
+function dateText(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  const { month, day, week, hour, minute } = jstParts(d);
+  return `${month}月${day}日(${week}) ${hour}:${minute}`;
 }
 
 // 締切（timestamptz）を絶対時刻で。「あと3日」のような相対表現にしないのは、
@@ -176,10 +207,8 @@ function deadlineText(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const week = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${d.getMonth() + 1}/${d.getDate()}(${week}) ${hh}:${mm}`;
+  const { month, day, week, hour, minute } = jstParts(d);
+  return `${month}/${day}(${week}) ${hour}:${minute}`;
 }
 
 // 【SEARCH_STATE_TEXT はここにあった】説明文に「募集中」「進行中」「終了」を
@@ -265,10 +294,14 @@ function siteGraph(origin) {
 // 大会。オンライン大会なので location は VirtualLocation にする
 // （Place を使うと「住所が無い」という扱いでエラーになる）。
 //
-// 【startDate に時刻が入らない】DBが持っている開催日（tournaments.date）は
-// 日付だけの列で、開始時刻をどこにも持っていない。schema.org は日付だけの
-// ISO 8601 も認めるので、いまはそれで出している。時刻まで出したくなったら、
-// 先に開始時刻の列を足すこと（推測で 00:00 を補うと、その時刻が検索結果に出る）。
+// 【startDate は時刻込みのISOをそのまま出す】開催日時（tournaments.date）は
+// timestamptz になった（supabase/migration-026.sql）。DBから来る値は
+// 時差を持ったISO 8601（2026-08-15T11:00:00+00:00）で、schema.org が
+// 求める形そのままなので、加工せずに渡す。
+//
+// 時刻が未設定だった頃の大会は、移行のときに日本時間の 0:00 になっている。
+// そこだけは「本当に0時開催」と読まれるが、運営が大会情報を編集して
+// 実際の時刻を入れれば直る（推測で書き換えると、当時の記録を捏造することになる）。
 function eventNode(t, { url, image, description, origin }) {
   return pruned({
     '@type': 'Event',

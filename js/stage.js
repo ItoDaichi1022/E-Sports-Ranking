@@ -24,7 +24,7 @@
 //   （JSを通さない）」がCSSだけで出している。ここへ戻さないこと。
 
 import { state } from './state.js';
-import { safeUrl } from './util.js';
+import { safeUrl, tournamentWhenText, tournamentDayKey } from './util.js';
 import { STATUS_LABELS } from './tournamentState.js';
 import { pathFor } from './router.js';
 
@@ -158,10 +158,9 @@ const FEATURED_MONTHS = 3;
 
 // 「直近Nか月」の始まりの日を 'YYYY-MM-DD' で返す。
 //
-// t.date は日付だけの文字列なので、こちらも同じ形に揃えて文字列のまま比べる。
-// Date に変換して比べると、時刻と時差の扱いを持ち込むことになる。
-// toISOString() を使わないのも同じ理由 ── あれはUTCに寄せるので、日本時間の
-// 朝に開くと1日前の日付になり、境目の大会が入ったり落ちたりする。
+// 比べる相手（大会の開催日時）も tournamentDayKey で同じ形に直してから比べる。
+// toISOString() を使わないのは、あれがUTCに寄せるため ── 日本時間の朝に開くと
+// 1日前の日付になり、境目の大会が入ったり落ちたりする。
 function monthsAgo(months) {
   const d = new Date();
   // 3月31日から3か月引くと「12月31日」になる。月末の繰り上がりは Date に任せる。
@@ -194,11 +193,12 @@ export function renderFeatured(blockEl, slotEl) {
     t.status !== 'draft'
     // 開催日が入っていない大会は「直近3か月かどうか」を判断できないので外す
     && t.date
-    && t.date >= since
+    && tournamentDayKey(t.date) >= since
   ));
 
   // 出場人数の多い順。同数なら新しいほうを採る。
   // filter が新しい配列を返しているので、ここでの sort は state を壊さない。
+  // 開催日時はISO文字列なので、同じ形どうしなら文字のまま比べて時系列になる。
   candidates.sort((a, b) => peopleIn(b) - peopleIn(a) || (a.date < b.date ? 1 : -1));
 
   const pick = candidates[0];
@@ -231,7 +231,7 @@ export function renderFeatured(blockEl, slotEl) {
 
   const meta = document.createElement('p');
   meta.className = 'featured-meta';
-  meta.textContent = `${pick.date}・${STATUS_LABELS[pick.status] ?? ''}`;
+  meta.textContent = `${tournamentWhenText(pick.date)}・${STATUS_LABELS[pick.status] ?? ''}`;
 
   const title = document.createElement('h3');
   title.className = 'featured-title';

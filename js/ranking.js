@@ -1,6 +1,7 @@
 import { bestAchievement } from './playerStats.js';
 import { isRankedTournament } from './rankingEligibility.js';
 import { getEntrantMemberIds, UNKNOWN_PLAYER_NAME } from './state.js';
+import { tournamentDayKey } from './util.js';
 
 // LumiRank軽量版：相手の強さで重み付けした反復スコアリングのみを残した最小実装。
 // doc/design.md の「8. ランキング方式」に準拠する。
@@ -66,14 +67,21 @@ export function computeRankingsForRange(state, { start = null, end = null } = {}
   };
 }
 
-// 大会の開催日（'YYYY-MM-DD'）が start〜end の範囲に入っている試合だけを残す。
+// 大会の開催日が start〜end（どちらも 'YYYY-MM-DD'）の範囲に入っている試合だけを残す。
 // 日付未設定の大会の試合は対象外とする（いつの試合か判定できないため）。
 // start・end はどちらも省略可（null）で、省略した側は無制限になる。
 // 両方省略なら全期間（フィルタなし）。
+//
+// 【ISO文字列のまま比べないこと】開催日時は timestamptz になった
+// （supabase/migration-026.sql）。ISOはUTCで来るので、日本時間の朝9時より前に
+// 始まる大会は前日の日付を持つ ── 集計期間の端にいる大会が、丸ごと外れたり
+// 紛れ込んだりする。地域時刻の日付（tournamentDayKey）に直してから比べる。
 export function filterMatchesByRange(state, { start = null, end = null } = {}) {
   if (!start && !end) return state.matches;
 
-  const dateByTournament = new Map(state.tournaments.map((t) => [t.id, t.date]));
+  const dateByTournament = new Map(
+    state.tournaments.map((t) => [t.id, tournamentDayKey(t.date)]),
+  );
   return state.matches.filter((m) => {
     const date = dateByTournament.get(m.tournamentId);
     if (!date) return false;

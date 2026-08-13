@@ -285,3 +285,61 @@ export function createSearchRunner({
     }, delay);
   };
 }
+
+// ---------------------------------------------------------------------------
+// 大会の開催日時
+// ---------------------------------------------------------------------------
+//
+// tournaments.date は timestamptz（supabase/migration-026.sql で date から変えた）。
+// 開始時刻まで持つようになったので、生の値をそのまま画面に出すことはできない
+// ── ISO文字列（2026-08-15T11:00:00+00:00）が並んでしまう。
+//
+// 【見る人の地域時刻で出す】締切（entryDeadlineText）と同じ扱いにそろえる。
+// 日本から見れば日本時間になり、同じ画面の中で締切と開催日時の基準が食い違わない。
+// サーバー側（worker/index.js → js/seo.js）だけは日本時間で固定する ── あちらは
+// UTCで動くので、見る人の時刻に合わせようがない。
+const WHEN_FORMAT = {
+  year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'short',
+  hour: '2-digit', minute: '2-digit',
+};
+
+// 「2026/8/15(金) 20:00」。未設定と壊れた値はどちらも空文字にして、
+// 呼ぶ側では「開催日未定」などの言葉に置き換えてもらう。
+export function tournamentWhenText(iso) {
+  if (!iso) return '';
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+  return at.toLocaleString('ja-JP', WHEN_FORMAT);
+}
+
+// 日付だけの 'YYYY-MM-DD'。期間で絞る場面（ランキングの集計期間・ホームの
+// 「直近3か月」）で使う。
+//
+// 【ISO文字列の頭を切り出さないこと】あれはUTCなので、日本時間の朝9時より前に
+// 開いた大会は前日の日付になる。日をまたぐ側にいる大会が、集計期間から
+// 抜け落ちたり紛れ込んだりする。必ず地域時刻に直してから組み立てる。
+export function tournamentDayKey(iso) {
+  if (!iso) return '';
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}
+
+// <input type="datetime-local"> に入れられる形（'YYYY-MM-DDTHH:MM'）。
+// あの部品は地域時刻の文字列しか受け付けないので、ISOをそのまま入れても空になる。
+export function toDateTimeLocalValue(iso) {
+  const day = tournamentDayKey(iso);
+  if (!day) return '';
+  const at = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${day}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
+
+// datetime-local の値（地域時刻）を、DBへ渡すISO文字列にする。
+// 空欄は null（開催日時未設定）。
+export function fromDateTimeLocalValue(value) {
+  if (!value) return null;
+  const at = new Date(value);
+  return Number.isNaN(at.getTime()) ? null : at.toISOString();
+}

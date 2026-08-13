@@ -72,7 +72,10 @@ create table if not exists players (
 create table if not exists tournaments (
   id         uuid primary key default gen_random_uuid(),
   name       text not null,
-  date       date,
+  -- 開催日時。開始時刻まで持つ（migration-026 で date から変えた）。列の名前は
+  -- 参照している場所が多いので date のままにしてある ── 画面に出す言葉のほうを
+  -- 「開催日時」にそろえた。時刻を持たなかった頃の大会は日本時間の0:00になっている。
+  date       timestamptz,
   format     text not null default 'single_elim',
   -- 対戦方法。'1v1' / 'relay' はランキング反映の対象、'2v2' / 'other' は対象外
   -- （条件は js/rankingEligibility.js）。null はこの列より前に作られた大会で、対象外扱い。

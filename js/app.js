@@ -13,7 +13,7 @@ import {
 import { renderPlayerTable, updatePlayer } from './players.js';
 import {
   escapeHtml, avatarHtml, safeUrl, cardThumb, setupImagePicker, skeletonCards,
-  createSearchRunner,
+  createSearchRunner, tournamentWhenText, toDateTimeLocalValue, fromDateTimeLocalValue,
 } from './util.js';
 import {
   createBracket, updateTournament, allMatchesDecided, finalStandings, finalPlacements,
@@ -31,6 +31,7 @@ import { keepFormDraft, clearFormDraft } from './formDraft.js';
 import { mountOrganizerPicker } from './organizerPicker.js';
 import {
   renderRecruitPage, renderTournamentActions, renderEntryCta, entryDeadlineText,
+  draftNotice,
 } from './entries.js';
 import { STATUS_LABELS, entrantUnit, entryState } from './tournamentState.js';
 import {
@@ -189,6 +190,7 @@ const tournamentEditMatchTypeNoteInput = $('tournament-edit-match-type-note-inpu
 const tournamentEditRankingOptInInput = $('tournament-edit-ranking-opt-in-input');
 const tournamentInfoEl = $('tournament-info');
 const tournamentActionsEl = $('tournament-actions');
+const tournamentDraftNoticeEl = $('tournament-draft-notice');
 const tournamentEntryCtaEl = $('tournament-entry-cta');
 const tournamentHeroEl = $('tournament-hero');
 const tournamentTitleEl = $('tournament-title');
@@ -1577,9 +1579,21 @@ function entrantCountLabel(t) {
 }
 
 // 大会の進行状況。優勝者はここに含めない（下の championOf が別に受け持つ）。
+//
+// 【準備中は出さない】公開前の大会（status: 'draft'）にも、公開後の姿を出す ──
+// 対戦表が既に出来ているなら「進行中」、これから募集を始めるなら「募集中」。
+// 大会ページは公開前もそのままプレビューとして使うので、ここで「準備中」と
+// 出してしまうと、公開の前後で見え方が変わってプレビューの役に立たない。
+// 公開されていないことは、ページ先頭の帯（js/entries.js の draftNotice）が言う。
 function tournamentStatusInfo(t) {
+  // 対戦表があるかどうかは、そのまま「公開したら進行中か、募集中か」の分かれ目。
+  // 運営が参加者を直接選んだ大会は作成の時点で表が出来ているので前者になる。
+  const status = t.status === 'draft'
+    ? (state.bracketIds.has(t.id) ? 'running' : 'recruiting')
+    : t.status;
+
   if (!state.bracketIds.has(t.id)) {
-    return { label: STATUS_LABELS[t.status] ?? '—', tone: t.status };
+    return { label: STATUS_LABELS[status] ?? '—', tone: status };
   }
 
   if (t.status === 'finished') return { label: '終了', tone: 'finished' };
@@ -1722,7 +1736,7 @@ function renderTournamentCards(containerEl, tournaments, emptyText, { myPlacemen
     body.className = 'card-body';
     body.innerHTML = `
       <${titleTag} class="card-title">${escapeHtml(t.name)}</${titleTag}>
-      <p class="card-date">${escapeHtml(t.date || '日付未設定')} ・ ${escapeHtml(entrantCountLabel(t))}参加</p>
+      <p class="card-date">${escapeHtml(tournamentWhenText(t.date) || '日付未設定')} ・ ${escapeHtml(entrantCountLabel(t))}参加</p>
       <span class="status-chip status-${tone}">${escapeHtml(label)}</span>
       ${reportChipHtml(t.id)}
       ${placement ? `<span class="card-my-result">自分の成績: ${escapeHtml(placement)}</span>` : ''}
@@ -1908,7 +1922,7 @@ function renderTournamentInfo(tournament) {
       <div><dt>対戦方法</dt><dd>${escapeHtml(matchTypeLabel(tournament))}</dd></div>
       <div><dt>形式</dt><dd>${escapeHtml(formatLabel)}</dd></div>
       <div><dt>三位決定戦</dt><dd>${tournament.thirdPlaceMatch ? '行う' : '行わない'}</dd></div>
-      <div><dt>開催日</dt><dd>${escapeHtml(tournament.date || '日付未設定')}</dd></div>
+      <div><dt>開催日時</dt><dd>${escapeHtml(tournamentWhenText(tournament.date) || '日付未設定')}</dd></div>
       ${deadlineText ? `<div><dt>エントリー締切</dt><dd>${escapeHtml(deadlineText)}</dd></div>` : ''}
       <div><dt>進行状況</dt><dd>${escapeHtml(tournamentStatusLabel(tournament))}</dd></div>
       ${organizerNames.length > 0
@@ -1978,7 +1992,7 @@ async function renderEntrantsPage(tournamentId) {
 
   entrantsBackLink.textContent = '← 大会の詳細へ';
   entrantsTitleEl.textContent = `${tournament.name} の出場${isTeamTournament(tournament) ? 'チーム' : '選手'}`;
-  entrantsMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
+  entrantsMetaEl.textContent = `${tournamentWhenText(tournament.date) || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
 
   // 「誰が出ているか」はこのページで初めて必要になるので、ここで取りに行く
   // （大会一覧では人数しか持っていない。js/state.js の説明を参照）。
@@ -2069,6 +2083,8 @@ function renderTournamentDetailLoading() {
   tournamentStatusChipEl.hidden = true;
   tournamentMetaEl.innerHTML = '<span class="skeleton-line skeleton-text is-short"></span>';
   tournamentActionsEl.innerHTML = '';
+  // 別の大会を開いたときに、前の大会の「まだ公開されていません」を残さない
+  tournamentDraftNoticeEl.innerHTML = '';
   // 行き先が決まっていないリンクは出さない（押せてしまう空のリンクを作らない）
   bracketLinkEl.hidden = true;
   entrantsLinkEl.hidden = true;
@@ -2136,6 +2152,7 @@ async function renderTournamentDetail(tournamentId) {
     tournamentStatusChipEl.hidden = true;
     tournamentInfoEl.innerHTML = '<p class="empty-hint">この大会は存在しないか、削除されています。</p>';
     tournamentActionsEl.innerHTML = '';
+    tournamentDraftNoticeEl.innerHTML = '';
     renderEntryCta(tournamentEntryCtaEl, null);
     bracketLinkEl.hidden = true;
     entrantsLinkEl.hidden = true;
@@ -2161,7 +2178,7 @@ async function renderTournamentDetail(tournamentId) {
   // 優勝者だけは状態ではなく結果なので、ここに残す。
   const champion = championOf(tournament);
   tournamentMetaEl.textContent = [
-    tournament.date || '日付未設定',
+    tournamentWhenText(tournament.date) || '日付未設定',
     `${entrantCountLabel(tournament)}参加`,
     champion ? `優勝: ${champion}` : '',
   ].filter(Boolean).join(' ・ ');
@@ -2199,6 +2216,13 @@ async function renderTournamentDetail(tournamentId) {
   }
 
   const onChanged = async () => { await refreshFromDb(); };
+
+  // 公開前の帯はページのいちばん上。ここに立てるのは運営だけ（DBが draft の行を
+  // 運営以外に返さない。supabase/migration-022.sql）だが、念のため画面でも見る。
+  tournamentDraftNoticeEl.innerHTML = '';
+  if (tournament.status === 'draft' && canManageTournament(tournament.id)) {
+    tournamentDraftNoticeEl.appendChild(draftNotice(tournament));
+  }
 
   // エントリーの導線はページの上（見出しのすぐ下）。運営の募集操作は下のまま。
   renderEntryCta(tournamentEntryCtaEl, tournament, onChanged);
@@ -2340,7 +2364,7 @@ async function renderBracketPage(tournamentId) {
   }
 
   bracketTitleEl.textContent = tournament.name;
-  bracketMetaEl.textContent = `${tournament.date || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
+  bracketMetaEl.textContent = `${tournamentWhenText(tournament.date) || '日付未設定'} ・ ${entrantCountLabel(tournament)}参加 ・ ${tournamentStatusLabel(tournament)}`;
 
   // 出場者の行とこの大会の試合結果を揃えてから描く。表の名前を引くのに出場者が、
   // 勝敗の保存（syncTournamentProgress の差分照合）に試合結果が要る。
@@ -2701,7 +2725,7 @@ function recentResultsHtml(stats, { titleTag = 'h2' } = {}) {
         <span class="result-place">${escapeHtml(entry.placement || '—')}</span>
         <span class="result-body">
           <span class="result-name">${escapeHtml(entry.tournament.name)}</span>
-          <span class="result-meta">${escapeHtml(entry.tournament.date || '日付未定')}${
+          <span class="result-meta">${escapeHtml(tournamentWhenText(entry.tournament.date) || '日付未定')}${
             entry.teamName ? `・${escapeHtml(entry.teamName)}` : ''}</span>
         </span>
       </a>`;
@@ -2735,7 +2759,7 @@ function historyTableHtml(stats) {
                   <a href="${pathFor('tournament', entry.tournament.id)}">${escapeHtml(entry.tournament.name)}</a>
                   ${entry.teamName ? `<div class="meta-line">${escapeHtml(entry.teamName)}</div>` : ''}
                 </td>
-                <td>${escapeHtml(entry.tournament.date || '—')}</td>
+                <td>${escapeHtml(tournamentWhenText(entry.tournament.date) || '—')}</td>
                 <td>${escapeHtml(entry.placement || '—')}</td>
               </tr>
             `).join('')}
@@ -3109,7 +3133,10 @@ tournamentForm.addEventListener('submit', async (e) => {
   const tournament = {
     id: newId(),
     name,
-    date: tournamentDateInput.value || null,
+    // datetime-local が返すのは地域時刻の文字列。DBは timestamptz なので、
+    // 時差を持ったISOに直してから渡す（そのまま渡すと、サーバー側の時間帯で
+    // 読まれて9時間ずれる）。
+    date: fromDateTimeLocalValue(tournamentDateInput.value),
     format: 'single_elim',
     matchType,
     matchTypeNote: matchType === 'other' ? tournamentMatchTypeNoteInput.value.trim() : '',
@@ -3299,7 +3326,9 @@ tournamentEditBtn.addEventListener('click', () => {
   if (!tournament) return;
   setManageMenuOpen(false);
   tournamentEditNameInput.value = tournament.name;
-  tournamentEditDateInput.value = tournament.date || '';
+  // datetime-local は地域時刻の 'YYYY-MM-DDTHH:MM' しか受け付けない。
+  // DBが持っているISO文字列をそのまま入れると、欄が空のままになる。
+  tournamentEditDateInput.value = toDateTimeLocalValue(tournament.date);
   tournamentEditMatchTypeInput.value = tournament.matchType || '';
   tournamentEditMatchTypeNoteInput.value = tournament.matchTypeNote || '';
   tournamentEditRankingOptInInput.checked = tournament.rankingOptIn !== false;
@@ -3347,7 +3376,7 @@ tournamentEditForm.addEventListener('submit', async (e) => {
   const capacityRaw = tournamentEditCapacityInput.value.trim();
   const result = updateTournament(currentBracketTournamentId, {
     name: tournamentEditNameInput.value,
-    date: tournamentEditDateInput.value,
+    date: fromDateTimeLocalValue(tournamentEditDateInput.value),
     matchType: tournamentEditMatchTypeInput.value,
     matchTypeNote: tournamentEditMatchTypeNoteInput.value,
     rankingOptIn: tournamentEditRankingOptInInput.checked,

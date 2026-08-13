@@ -1584,10 +1584,10 @@ input[type="file"]::file-selector-button:hover { border-color: var(--border-stro
   color: var(--text-faint);
 }
 
-.status-chip.status-draft {
-  color: var(--text-faint);
-  border-style: dashed;
-}
+/* 【.status-chip.status-draft はここにあった】公開前の大会に「準備中」を出すための
+   破線の印。状態は「募集中・進行中・終了」の3つにそろえ、公開前の大会にも
+   公開後の姿を出すようにしたので、この組み合わせはもう作られない
+   （js/tournamentState.js の STATUS_LABELS を参照）。 */
 
 /* 未対応の報告がある印（運営にだけ出る。中身は js/matchChat.js の reportChipHtml）。
    中身はチャットの話だが、出る場所は大会一覧（js/app.js）とエントリー状況
@@ -2194,9 +2194,11 @@ a.card:hover {
 }
 
 /* まだ公開していない大会の帯（運営だけが見る。js/entries.js の draftNotice）。
-   破線の枠にしているのは、準備中の印（.status-chip.status-draft）と同じ言い方で
-   「まだ形になっていない」を示すため。公開のボタンはこのすぐ下に並ぶので、
-   色で急かさず、状態を伝えることだけに徹する。 */
+   置き場所はページのいちばん上（#tournament-draft-notice）。このページは公開後と
+   同じ見た目＝プレビューなので、状態のタグまで「募集中」と出る ── 唯一の違いが
+   この帯だから、読み始める位置に無いと意味がない。
+   破線の枠にしているのは「まだ形になっていない」を示すため。公開のボタンは
+   ページの下にあるので、色で急かさず、状態を伝えることだけに徹する。 */
 .draft-notice {
   display: flex;
   flex-direction: column;
