@@ -39,6 +39,7 @@ import {
   accountLabel, signInWithProvider, signOut, reloadOwnPlayer,
 } from './auth.js';
 import { isConfigured } from './supabaseClient.js';
+import { inAppBrowserNotice } from './inAppBrowser.js';
 import { initStage, renderFeatured, renderStats, prefersReducedMotion } from './stage.js';
 import { iconSvg, makeIconButton, setButtonIcon } from './icons.js';
 import {
@@ -3647,6 +3648,29 @@ announcementForm.addEventListener('submit', async (e) => {
 //
 // ログイン手段はGoogleとDiscordのみ。どちらもアカウント側でメール確認や
 // パスワード再設定が済んでいるので、こちらで登録フォームを持つ必要がない。
+
+// アプリ内ブラウザ（XやDiscordの中で開くブラウザ）で来た人に、押す前に
+// 「普通のブラウザで開き直してほしい」と伝える。埋め込みブラウザでは
+// Googleが認可画面を出さず、通せても戻ってこられない ── 理由の詳しいところは
+// js/inAppBrowser.js の冒頭に書いてある。
+//
+// 【押したあとでは遅いこと】失敗しても例外は出ない。セッションがnullになるだけで、
+// 画面はエラーひとつ無い未ログインのまま ── だから、押す前に置く。
+//
+// 起動時に一度だけ差し込む。見分ける材料はUser-Agentだけで、開いている間に
+// 変わることはないため。ログインの入口は2か所（ダイアログとマイページ）あり、
+// 同じ要素は片方にしか置けないので、それぞれに1つずつ作る。
+for (const panel of [$('login-panel'), profileLoginPanel]) {
+  // 【ここで起動を止めないこと】差し込み先が見当たらなければ黙って諦める。
+  // これは「あれば助かる案内」であって、サイトの根幹ではない。ボタンの囲いの
+  // 作りが変わったときに throw すると、app.js の評価ごと失敗してサイト全体が
+  // 出なくなる ── 案内が消えるだけのほうがまし。
+  const anchor = panel?.querySelector('.oauth-buttons');
+  if (!anchor) continue;
+
+  const notice = inAppBrowserNotice();
+  if (notice) panel.insertBefore(notice, anchor);
+}
 
 function openLoginDialog() {
   loginErrorEl.textContent = '';

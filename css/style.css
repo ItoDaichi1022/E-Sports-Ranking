@@ -3159,6 +3159,52 @@ dialog h3 {
 
 .oauth-buttons button { width: 100%; }
 
+/* アプリ内ブラウザ（XやDiscordの中のブラウザ）で開いている人への案内。
+   js/inAppBrowser.js が、ログインボタンの手前に差し込む。
+
+   ログインの入口はダイアログとマイページの2か所にあり、どちらも幅が違うので
+   幅の指定は持たせず、置かれた場所いっぱいに広がるようにしてある。 */
+.inapp-notice {
+  margin-bottom: 1rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid rgba(245, 181, 68, 0.45);
+  border-radius: var(--r);
+  background: rgba(245, 181, 68, 0.09);
+}
+
+.inapp-notice-title {
+  margin: 0 0 0.35rem;
+  color: var(--warn);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.inapp-notice-body {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+/* 狭い画面に置かれることが前提なので、ボタンは横に流して折り返させる。
+   Androidでは2つ（Chromeで開く・URLをコピー）、iOSでは1つ並ぶ。 */
+.inapp-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.inapp-notice-actions > * { flex: 1 1 auto; }
+
+/* ボタンが働かなかった人のための手順。本文より一段弱く見せる。 */
+.inapp-notice-how {
+  margin: 0.7rem 0 0;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
 /* ---------------------------------------------------------------------------
    アイコン
    --------------------------------------------------------------------------- */
