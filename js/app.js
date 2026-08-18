@@ -1953,6 +1953,14 @@ function rankingEligibilityHtml(tournament) {
   `;
 }
 
+// 大会情報のタブ（'info' | 'rules'）と、それがどの大会のものか。
+//
+// 【覚えておく理由】募集中の大会は、他の人がエントリーするたびにRealtimeで
+// この節が描き直される。毎回 info に戻すと、ルールを読んでいる最中に他人の操作で
+// 表へ引き戻されることになる。大会が変われば info（既定）から始める。
+let tournamentInfoTab = 'info';
+let tournamentInfoTabFor = null;
+
 function renderTournamentInfo(tournament) {
   const formatLabel = FORMAT_LABELS[tournament.format] || tournament.format;
   const unit = entrantUnit(tournament);
@@ -1979,8 +1987,32 @@ function renderTournamentInfo(tournament) {
     ? entryDeadlineText(tournament)
     : '';
 
+  // 別の大会を開いたら、既定の「大会情報」から始める
+  if (tournamentInfoTabFor !== tournament.id) {
+    tournamentInfoTabFor = tournament.id;
+    tournamentInfoTab = 'info';
+  }
+  const rulesOpen = tournamentInfoTab === 'rules';
+
+  // 大会情報とルールをタブで分ける。ルールは大会によっては何十行にもなり、
+  // 続けて縦に積むと、その手前にある表（形式・日時・運営）を読みたい人まで
+  // 長文の上を通ることになる。どちらも「読む場所」だが、読みたい時が違う。
+  //
+  // 見出し（<h2>大会情報</h2>）はタブが兼ねるので置かない（同じことを2回言わない）。
   let html = `
-    <h2>大会情報</h2>
+    <div class="info-tabs" role="tablist">
+      <button type="button" id="tournament-info-tab-info" class="info-tab${rulesOpen ? '' : ' is-active'}"
+              role="tab" aria-selected="${rulesOpen ? 'false' : 'true'}" aria-controls="tournament-info-panel-info">
+        大会情報
+      </button>
+      <button type="button" id="tournament-info-tab-rules" class="info-tab${rulesOpen ? ' is-active' : ''}"
+              role="tab" aria-selected="${rulesOpen ? 'true' : 'false'}" aria-controls="tournament-info-panel-rules">
+        ルール
+      </button>
+    </div>
+
+    <div id="tournament-info-panel-info" class="info-panel" role="tabpanel"
+         aria-labelledby="tournament-info-tab-info"${rulesOpen ? ' hidden' : ''}>
     ${openReports.length > 0 ? `
       <div class="report-notice">
         <span class="report-notice-title">⚠ 未対応の報告が${openReports.length}件あります</span>
@@ -2006,7 +2038,8 @@ function renderTournamentInfo(tournament) {
     : ''}
     </dl>
   `;
-  // 配信元。試合を見に行く導線なので、ルールより先に、押せる形で出す。
+  // 配信元。試合を見に行く導線なので、押せる形で「大会情報」の側に置く
+  // （ルールのタブに入れると、見に来ただけの人が読む必要のない長文を通る）。
   // URLはDBから来るので、表示のたびに safeUrl を通してから href に入れる。
   const streamUrl = safeUrl(tournament.streamUrl);
   if (streamUrl) {
@@ -2019,14 +2052,34 @@ function renderTournamentInfo(tournament) {
     `;
   }
 
-  if (tournament.rules) {
-    html += `
-      <h3>ルール</h3>
-      <p class="tournament-rules">${escapeHtml(tournament.rules)}</p>
-    `;
-  }
+  // ルールの面。空でもタブは残し、そこで「無い」と言い切る ── タブごと消すと、
+  // 探した人は「どこかにあるはず」と大会情報の表を読み直すことになる。
+  html += `
+    </div>
+
+    <div id="tournament-info-panel-rules" class="info-panel" role="tabpanel"
+         aria-labelledby="tournament-info-tab-rules"${rulesOpen ? '' : ' hidden'}>
+      ${tournament.rules
+    ? `<p class="tournament-rules">${escapeHtml(tournament.rules)}</p>`
+    : '<p class="empty-hint">この大会のルールはまだ書かれていません。</p>'}
+    </div>
+  `;
 
   tournamentInfoEl.innerHTML = html;
+
+  // 切り替え。innerHTML で毎回作り直すので、そのたびに繋ぎ直す。
+  const infoTabBtn = tournamentInfoEl.querySelector('#tournament-info-tab-info');
+  const rulesTabBtn = tournamentInfoEl.querySelector('#tournament-info-tab-rules');
+  const setTab = (tab) => {
+    if (tournamentInfoTab === tab) return;
+    tournamentInfoTab = tab;
+    renderTournamentInfo(tournament);
+    // 作り直すと押したボタンごと消える。同じタブのボタンへ焦点を戻さないと、
+    // キーボードで操作している人は押したとたんページの先頭へ放り出される。
+    tournamentInfoEl.querySelector(`#tournament-info-tab-${tab}`)?.focus();
+  };
+  infoTabBtn.addEventListener('click', () => setTab('info'));
+  rulesTabBtn.addEventListener('click', () => setTab('rules'));
 }
 
 // 出場選手一覧のページ（/tournaments/{大会ID}/entrants/）。名前の五十音順に上から並べ、
@@ -2175,15 +2228,18 @@ function renderTournamentDetailLoading() {
   // 待っているあいだの仮置きは、JSが後から埋める枠のうち「一番上のもの」に置く。
   // ここを間違えると、待たせた時間ぶんそのまま画面が飛ぶ ── 以前は大会情報
   // （#tournament-info・ページの下のほう）に置いていたので、中身が届いた瞬間に
-  // エントリーの導線と対戦表・出場選手への入口がその上に割り込み、仮置きが
-  // 300px ほど下へ突き落とされていた（Lighthouse の CLS 0.19 はほぼこれ）。
+  // 対戦表・出場選手への入口がその上に割り込み、仮置きが 300px ほど下へ
+  // 突き落とされていた（Lighthouse の CLS 0.19 はほぼこれ）。
   //
   // 一番上に置けば、届いた中身はその場で入れ替わり、続きは「まだ何も無い」
   // 下の空きに足されるだけになる。動くものが無いので、ずれようがない。
   // 逆に、下の枠は読み込み中は空のままにしておくこと。
+  //
+  // 【2枚なのはエントリーの島を数えないから】島は画面の下端に貼り付くので
+  // 本文の高さには関わらない（renderEntryCta が is-docked を付ける）。
+  // 仮置きが要るのは、この枠のあとに続く対戦表・出場選手一覧への入口の2枚だけ。
   renderEntryCta(tournamentEntryCtaEl, null);
   tournamentEntryCtaEl.innerHTML = [
-    '<div class="skeleton-line skeleton-panel skeleton-panel-cta"></div>',
     '<div class="skeleton-line skeleton-panel skeleton-panel-link"></div>',
     '<div class="skeleton-line skeleton-panel skeleton-panel-link"></div>',
   ].join('');
@@ -2307,7 +2363,7 @@ async function renderTournamentDetail(tournamentId) {
     tournamentDraftNoticeEl.appendChild(draftNotice(tournament));
   }
 
-  // エントリーの導線はページの上（見出しのすぐ下）。運営の募集操作は下のまま。
+  // エントリーの導線は画面の下端に貼り付く島（js/entries.js）。運営の募集操作は本文の下。
   renderEntryCta(tournamentEntryCtaEl, tournament, onChanged);
   renderTournamentActions(tournamentActionsEl, tournament, onChanged);
 

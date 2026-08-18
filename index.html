@@ -35,13 +35,13 @@
 <meta property="og:locale" content="ja_JP">
 <meta property="og:title" content="IgniteArena｜どこでも熱く、遊べ。">
 <meta property="og:description" content="IgniteArenaは、大会の運営とランキングの集計をひとつにまとめた場所。大会を開く・エントリーする・対戦表を追う。ログインなしで全部のぞけます。">
-<meta property="og:image" content="/img/icon.png?v=193">
+<meta property="og:image" content="/img/icon.png?v=194">
 <meta name="twitter:card" content="summary_large_image">
 <!-- ブラウザのタブとスマートフォンのホーム画面のアイコン。
      img/README.md に置くべきファイルをまとめてある（差し替えるときはそこを参照）。
      タブはWebP。iOSのホーム画面（apple-touch-icon）だけはWebPを読まないのでPNGを残す。 -->
-<link rel="icon" href="/img/icon.webp?v=193" type="image/webp">
-<link rel="apple-touch-icon" href="/img/icon.png?v=193">
+<link rel="icon" href="/img/icon.webp?v=194" type="image/webp">
+<link rel="apple-touch-icon" href="/img/icon.png?v=194">
 <!-- 見出し・数字用フォント（同梱）。CSSより先に読ませてチラつきを抑える -->
 <link rel="preload" href="/fonts/oxanium.woff2" as="font" type="font/woff2" crossorigin>
 <!-- 大会の画像とデータの取りに行き先。CSSを読んでいるあいだに名前解決とTLSの
@@ -55,7 +55,7 @@
 <link rel="preconnect" href="https://zgqoeicdnneivzasneez.supabase.co" crossorigin>
 <!-- ?v= はキャッシュ更新用。デプロイするときは、このファイル内の ?v= の数字を
      すべて同じ値に上げる（`node scripts/check-cache-version.mjs` で確認できる）。 -->
-<link rel="stylesheet" href="/css/style.css?v=193">
+<link rel="stylesheet" href="/css/style.css?v=194">
 <!-- 【css/reveal.css はここで読まない】順位発表の画面（/reveal/・持ち主専用）だけで
      使う45KBで、しかもほとんどの人は一度も開かない。ここに <link> を置くと、
      ブラウザはそれを読み終えるまで最初の描画を始めないので、全員の表示が
@@ -453,7 +453,7 @@
                （縮小で中間色が大量に生まれるため、実測で非可逆の6倍）。
                差し替えるときは quality を上げ下げして実測すること。 -->
           <img class="hero-game-logo" id="hero-game-logo" fetchpriority="high"
-               src="/img/game-logo.webp?v=193" alt="" width="466" height="415">
+               src="/img/game-logo.webp?v=194" alt="" width="466" height="415">
         </div>
 
         <p class="hero-eyebrow">Tournament &amp; Ranking</p>
@@ -499,6 +499,10 @@
     <!-- 初めて来た人が数秒で「何のサイトか・自分は対象か」を掴むための短い紹介。
          詳しい説明は「はじめに」の担当なので、ここは短く止める。
 
+         【長さの上限はXのポスト1本ぶん（140字）】この段落は、下の3段（見る→出る→残る）
+         を読ませるための入口でしかない。ここが長いと、いちばん伝えたい3段に届く前に
+         読むのをやめられる。書き足したくなったら「はじめに」か3段の側に足すこと。
+
          【書きぶりは「出る人」の側から】サイトの機能を並べる書き方（大会運営と
          ランキングを備えています、など）は、読む人を運営側に立たせてしまう。
          ここに来るのはほとんどが出る側の人なので、主語は常に「あなた」にして、
@@ -515,22 +519,24 @@
         <h2>IgniteArenaとは</h2>
       </div>
       <p class="home-lead reveal">
-        IgniteArenaは、大会運営とランキング管理を一元化するプラットフォームです。
-        大会を開く運営には対戦表の作成から結果集計までを、出場する選手にはエントリーから
-        戦績の蓄積までを、それぞれシームレスに提供します。
-        本気で頂点を目指す大規模大会から、仲間と楽しむエンジョイ大会まで ── あらゆる大会が、
-        ここから生まれています。
+        IgniteArenaは、大会の運営もランキングの集計もひとつにまとめた場所。
+        出たい大会にその場で名乗れて、出るほどに戦績が積み上がります。
+        本気で頂点を目指す大規模大会から、仲間と楽しむエンジョイ大会まで、ここから生まれています。
       </p>
 
       <!-- 「見る → 出る → 残る」の3段。番号を大きく振って、
-           上から順に読めば参加までの流れが分かる形にする。 -->
+           上から順に読めば参加までの流れが分かる形にする。
+
+           本文は「何ができるか」＋「だから自分にどう良いか」の2文まで、50字程度。
+           3つとも同じ長さにそろえること ── 1つだけ長いと、並べたときに
+           そこだけ重く見えて、3段が同じ重みの流れに読めなくなる。 -->
       <ol class="home-steps">
         <li class="home-step reveal">
           <span class="home-step-num">01</span>
           <div class="home-step-body">
             <p class="home-step-label">Watch</p>
             <h3 class="home-step-title">ログインなしで、全部のぞける</h3>
-            <p>対戦表も、選手の戦績も、ランキングも、登録しないまま見られます。どんな相手が出ているのか、自分でも戦えそうかを、先に確かめてから決められます。</p>
+            <p>対戦表も戦績もランキングも、登録なしで見られます。どんな相手が出ているのか、先に確かめてから決められます。</p>
           </div>
         </li>
         <li class="home-step reveal">
@@ -538,7 +544,7 @@
           <div class="home-step-body">
             <p class="home-step-label">Enter</p>
             <h3 class="home-step-title">出たい大会に、その場で名乗る</h3>
-            <p>選手登録をすませておけば、募集中の大会にボタン1つで参加表明。予定が変わっても募集のあいだは取り消せるので、まず押しておいて構いません。</p>
+            <p>選手登録をすませておけば、募集中の大会にボタン1つで参加表明。気が変わっても募集のあいだは取り消せます。</p>
           </div>
         </li>
         <li class="home-step reveal">
@@ -546,7 +552,7 @@
           <div class="home-step-body">
             <p class="home-step-label">Record</p>
             <h3 class="home-step-title">勝った分だけ、順位が動く</h3>
-            <p>試合の結果は自動であなたの戦歴に残り、ランキングに反映されます。出るほどに自分の立ち位置がはっきりして、次に狙う相手が見えてきます。</p>
+            <p>試合の結果は自動であなたの戦歴に残り、ランキングに反映されます。出るほどに、次に狙う相手が見えてきます。</p>
           </div>
         </li>
       </ol>
@@ -610,13 +616,13 @@
   <!-- ガイドの本文には、対戦カード・チャット・報告の「見本」が埋め込んである
        （pages/guide.html の .guide-chat-mock など）。見本は本物と同じクラスで
        組んであるので、css/bracket.css も一緒に読まないと素の見た目になる。 -->
-  <section id="view-guide" class="view stage" hidden data-src="/pages/guide.html?v=193"
-           data-css="/css/guide.css?v=193 /css/bracket.css?v=193"></section>
+  <section id="view-guide" class="view stage" hidden data-src="/pages/guide.html?v=194"
+           data-css="/css/guide.css?v=194 /css/bracket.css?v=194"></section>
 
   <!-- 本番までの環境づくり（回線・コントローラ）。中身は pages/setup.html。
        エントリー済みの大会詳細から誘導する（js/entries.js の setupPrompt）。
        楽天アフィリエイトのリンクを含むので、広告である旨の明示がページ冒頭にある。 -->
-  <section id="view-setup" class="view stage" hidden data-src="/pages/setup.html?v=193" data-css="/css/guide.css?v=193"></section>
+  <section id="view-setup" class="view stage" hidden data-src="/pages/setup.html?v=194" data-css="/css/guide.css?v=194"></section>
 
   <!-- 大会の一覧。募集中・進行中・終了をタブで切り替える（#tournaments/{タブ名}）。
        「履歴」ページに進行中が混ざる分かりにくさを避けるため、状態ごとの
@@ -669,7 +675,7 @@
     <div id="entries-content"></div>
   </section>
 
-  <section id="view-profile" class="view" hidden data-css="/css/characters.css?v=193">
+  <section id="view-profile" class="view" hidden data-css="/css/characters.css?v=194">
     <div class="page-head">
       <p class="page-eyebrow">Profile</p>
       <h1 id="profile-title">マイページ</h1>
@@ -872,12 +878,13 @@
     </p>
   </section>
 
-  <!-- 大会詳細。上から 画像 → 大会名 → ブラケットへの入口 → 大会情報 → エントリー。
+  <!-- 大会詳細。上から 画像 → 大会名 → ブラケットへの入口 → 大会情報／ルール。
        ブラケットは別ページに分けてあり、ここからは入口だけを出す。
-       エントリーは内容を確認してから押すものなので最後に置く。 -->
+       エントリーの島だけは本文の流れから外し、画面の下端に貼り付ける
+       （どこまで読んでも押せるように。#tournament-entry-cta）。 -->
   <!-- 参加メンバー一覧の1枠は対戦カードそのままなので、対戦表のCSSが要る
        （data-css / js/app.js の loadViewCss）。対戦表を開いても読み直さない。 -->
-  <section id="view-tournament-detail" class="view" hidden data-css="/css/bracket.css?v=193">
+  <section id="view-tournament-detail" class="view" hidden data-css="/css/bracket.css?v=194">
     <a class="back-link" id="tournament-back-link" href="/tournaments/">← 大会一覧へ</a>
 
     <!-- 公開前の帯（運営だけが見る。中身は js/entries.js の draftNotice）。
@@ -1013,10 +1020,10 @@
       <button type="button" id="tournament-edit-cancel-btn" class="btn-secondary">キャンセル</button>
     </form>
     <!-- エントリーの導線。募集中の大会でだけJSが中身を入れる（js/entries.js の
-         renderEntryCta）。ページの上に置いてあるのは、募集中の大会を開いた人が
-         最初に知りたいのが「自分は出られるのか、いつまでか」だから ──
-         ルールを読んでから決めたい人は下まで読めるが、決めている人まで
-         下まで歩かせる理由はない。
+         renderEntryCta）。中身が入ると is-docked が付いて画面の下端に貼り付く ──
+         ルールや出場者を読みに下へ行っても、決め所が画面の外へ出ないようにするため。
+         枠そのものをここに置いてあるのは、読み込み中の仮置き（対戦表・出場選手一覧へ
+         の入口2枚ぶん）をこの位置＝本文の流れに出すため。
          【エントリーの入口はここ1つだけ】下の #tournament-actions には運営の操作
          （公開する・締め切る）しか置かない。2か所に出すと、片方を押したあとに
          もう片方が残って「まだ押していない」ように見える。 -->
@@ -1052,7 +1059,7 @@
   </section>
 
   <!-- ブラケット（対戦表）。大会詳細から分けて、対戦表だけに集中できるようにする。 -->
-  <section id="view-bracket" class="view" hidden data-css="/css/bracket.css?v=193">
+  <section id="view-bracket" class="view" hidden data-css="/css/bracket.css?v=194">
     <a class="back-link" id="bracket-back-link" href="/tournaments/">← 大会へ</a>
     <h1 id="bracket-title"></h1>
     <p id="bracket-meta" class="meta-line"></p>
@@ -1070,7 +1077,7 @@
        （「あの人は出ているか」を探すためのページなので、シード順にはしていない）。
        1枠ずつの見た目は対戦表の対戦カードと同じにしてある（js/bracketView.js の
        buildEntrantRow）── ここで見た枠が、そのまま対戦表の中で見つかるように。 -->
-  <section id="view-entrants" class="view" hidden data-css="/css/bracket.css?v=193">
+  <section id="view-entrants" class="view" hidden data-css="/css/bracket.css?v=194">
     <a class="back-link" id="entrants-back-link" href="/tournaments/">← 大会の詳細へ</a>
     <h1 id="entrants-title"></h1>
     <p id="entrants-meta" class="meta-line"></p>
@@ -1078,7 +1085,7 @@
     <div id="entrants-container"></div>
   </section>
 
-  <section id="view-player-detail" class="view" hidden data-css="/css/characters.css?v=193">
+  <section id="view-player-detail" class="view" hidden data-css="/css/characters.css?v=194">
     <button type="button" id="player-back-btn" class="back-link as-button">← 戻る</button>
     <div id="player-detail"></div>
   </section>
@@ -1089,7 +1096,7 @@
        以前はここにランキングの表と公開の操作も置いていたが、順位はお知らせで
        発表する形にしたので、サイトに常設するのは「選手を探せること」だけにした。
        集計と発表そのものは順位発表の画面（#reveal・持ち主専用）に集約してある。 -->
-  <section id="view-players" class="view" hidden data-css="/css/characters.css?v=193">
+  <section id="view-players" class="view" hidden data-css="/css/characters.css?v=194">
     <div class="page-head">
       <p class="page-eyebrow">Players</p>
       <h1>選手</h1>
@@ -1122,7 +1129,7 @@
        中身は js/reveal.js、見た目は css/reveal.css。 -->
   <!-- data-css: この画面を初めて開いたときにだけ読むCSS（js/app.js の loadViewCss）。
        ?v= は他と同じ版数にそろえること（scripts/check-cache-version.mjs が確認する）。 -->
-  <section id="view-reveal" class="view" hidden data-css="/css/reveal.css?v=193">
+  <section id="view-reveal" class="view" hidden data-css="/css/reveal.css?v=194">
     <div id="reveal-setup">
       <div class="page-head">
         <p class="page-eyebrow">Reveal</p>
@@ -1224,7 +1231,7 @@
              2本目に data-src を持たせていないのは、2本が同時に15MBを取りに行くのを
              避けるため ── 1本目が流せる状態になってから js/reveal.js が src を渡す。
              そのときには実体がブラウザのキャッシュにあるので、取り直しは起きない。 -->
-        <video id="reveal-bg" class="reveal-bg" data-src="/video/0204.mov?v=193"
+        <video id="reveal-bg" class="reveal-bg" data-src="/video/0204.mov?v=194"
                muted playsinline preload="none" aria-hidden="true"></video>
         <video id="reveal-bg-b" class="reveal-bg"
                muted playsinline preload="auto" aria-hidden="true"></video>
@@ -1243,9 +1250,9 @@
 
   <!-- 規約類。中身は pages/terms.html と pages/privacy.html
        （どちらもフッターから開く。初回に開いたとき読み込む） -->
-  <section id="view-terms" class="view legal stage" hidden data-src="/pages/terms.html?v=193" data-css="/css/legal.css?v=193"></section>
+  <section id="view-terms" class="view legal stage" hidden data-src="/pages/terms.html?v=194" data-css="/css/legal.css?v=194"></section>
 
-  <section id="view-privacy" class="view legal stage" hidden data-src="/pages/privacy.html?v=193" data-css="/css/legal.css?v=193"></section>
+  <section id="view-privacy" class="view legal stage" hidden data-src="/pages/privacy.html?v=194" data-css="/css/legal.css?v=194"></section>
 
 </main>
 
@@ -1276,7 +1283,7 @@
      実行されるため、この行は必ず下の app.js より先に走る。
      js/supabaseClient.js は window.supabase がある前提で書いてあるので、
      この順番が崩れると起動時に例外で止まる ── 動かすときは必ずそこを確かめること。 -->
-<script defer src="/js/vendor/supabase.js?v=193"></script>
+<script defer src="/js/vendor/supabase.js?v=194"></script>
 
 <!-- キャッシュ更新用の版数を1か所にまとめる。
      app.js の src だけに ?v= を付けても、app.js が import する各モジュールのURLは
@@ -1288,37 +1295,37 @@
 <script type="importmap">
 {
   "imports": {
-    "/js/auth.js":           "/js/auth.js?v=193",
-    "/js/bracket.js":        "/js/bracket.js?v=193",
-    "/js/bracketView.js":    "/js/bracketView.js?v=193",
-    "/js/bracketZoom.js":    "/js/bracketZoom.js?v=193",
-    "/js/characterData.js":  "/js/characterData.js?v=193",
-    "/js/characterFocus.js": "/js/characterFocus.js?v=193",
-    "/js/characterPicker.js": "/js/characterPicker.js?v=193",
-    "/js/characters.js":     "/js/characters.js?v=193",
-    "/js/db.js":             "/js/db.js?v=193",
-    "/js/entries.js":        "/js/entries.js?v=193",
-    "/js/formDraft.js":      "/js/formDraft.js?v=193",
-    "/js/icons.js":          "/js/icons.js?v=193",
-    "/js/imageUrl.js":       "/js/imageUrl.js?v=193",
-    "/js/inAppBrowser.js":   "/js/inAppBrowser.js?v=193",
-    "/js/intro.js":          "/js/intro.js?v=193",
-    "/js/matchChat.js":      "/js/matchChat.js?v=193",
-    "/js/organizerPicker.js": "/js/organizerPicker.js?v=193",
-    "/js/playerStats.js":    "/js/playerStats.js?v=193",
-    "/js/players.js":        "/js/players.js?v=193",
-    "/js/profile.js":        "/js/profile.js?v=193",
-    "/js/ranking.js":        "/js/ranking.js?v=193",
-    "/js/rankingEligibility.js": "/js/rankingEligibility.js?v=193",
-    "/js/reveal.js":         "/js/reveal.js?v=193",
-    "/js/router.js":         "/js/router.js?v=193",
-    "/js/seo.js":            "/js/seo.js?v=193",
-    "/js/stage.js":          "/js/stage.js?v=193",
-    "/js/state.js":          "/js/state.js?v=193",
-    "/js/supabaseClient.js": "/js/supabaseClient.js?v=193",
-    "/js/tournamentState.js": "/js/tournamentState.js?v=193",
-    "/js/tournamentTier.js": "/js/tournamentTier.js?v=193",
-    "/js/util.js":           "/js/util.js?v=193"
+    "/js/auth.js":           "/js/auth.js?v=194",
+    "/js/bracket.js":        "/js/bracket.js?v=194",
+    "/js/bracketView.js":    "/js/bracketView.js?v=194",
+    "/js/bracketZoom.js":    "/js/bracketZoom.js?v=194",
+    "/js/characterData.js":  "/js/characterData.js?v=194",
+    "/js/characterFocus.js": "/js/characterFocus.js?v=194",
+    "/js/characterPicker.js": "/js/characterPicker.js?v=194",
+    "/js/characters.js":     "/js/characters.js?v=194",
+    "/js/db.js":             "/js/db.js?v=194",
+    "/js/entries.js":        "/js/entries.js?v=194",
+    "/js/formDraft.js":      "/js/formDraft.js?v=194",
+    "/js/icons.js":          "/js/icons.js?v=194",
+    "/js/imageUrl.js":       "/js/imageUrl.js?v=194",
+    "/js/inAppBrowser.js":   "/js/inAppBrowser.js?v=194",
+    "/js/intro.js":          "/js/intro.js?v=194",
+    "/js/matchChat.js":      "/js/matchChat.js?v=194",
+    "/js/organizerPicker.js": "/js/organizerPicker.js?v=194",
+    "/js/playerStats.js":    "/js/playerStats.js?v=194",
+    "/js/players.js":        "/js/players.js?v=194",
+    "/js/profile.js":        "/js/profile.js?v=194",
+    "/js/ranking.js":        "/js/ranking.js?v=194",
+    "/js/rankingEligibility.js": "/js/rankingEligibility.js?v=194",
+    "/js/reveal.js":         "/js/reveal.js?v=194",
+    "/js/router.js":         "/js/router.js?v=194",
+    "/js/seo.js":            "/js/seo.js?v=194",
+    "/js/stage.js":          "/js/stage.js?v=194",
+    "/js/state.js":          "/js/state.js?v=194",
+    "/js/supabaseClient.js": "/js/supabaseClient.js?v=194",
+    "/js/tournamentState.js": "/js/tournamentState.js?v=194",
+    "/js/tournamentTier.js": "/js/tournamentTier.js?v=194",
+    "/js/util.js":           "/js/util.js?v=194"
   }
 }
 </script>
@@ -1371,34 +1378,34 @@
      取ってくる画面では「絵は早く、中身は遅く」という交換になる。承知のうえで入れてある。
      効きが悪ければ、この属性を27本から消すだけで元に戻せる
      （scripts/check-cache-version.mjs の「先読みの優先度」の検査も一緒に外すこと）。 -->
-<link rel="modulepreload" href="/js/auth.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/bracket.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/characterData.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/characterFocus.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/characterPicker.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/characters.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/db.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/entries.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/formDraft.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/icons.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/imageUrl.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/inAppBrowser.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/intro.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/matchChat.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/organizerPicker.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/playerStats.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/players.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/profile.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/ranking.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/rankingEligibility.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/router.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/seo.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/stage.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/state.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/supabaseClient.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/tournamentState.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/tournamentTier.js?v=193" fetchpriority="low">
-<link rel="modulepreload" href="/js/util.js?v=193" fetchpriority="low">
+<link rel="modulepreload" href="/js/auth.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/bracket.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/characterData.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/characterFocus.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/characterPicker.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/characters.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/db.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/entries.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/formDraft.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/icons.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/imageUrl.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/inAppBrowser.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/intro.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/matchChat.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/organizerPicker.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/playerStats.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/players.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/profile.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/ranking.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/rankingEligibility.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/router.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/seo.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/stage.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/state.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/supabaseClient.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/tournamentState.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/tournamentTier.js?v=194" fetchpriority="low">
+<link rel="modulepreload" href="/js/util.js?v=194" fetchpriority="low">
 <!-- 【fetchpriority="low" を消さないこと（v170で追加）】
      app.js は上に並べた27本の静的importが全部そろうまで1行も実行できない。その27本は
      v169で「低」に落としてある。だからこの1本だけを「高」で先に届けても、残りの26本を
@@ -1414,6 +1421,6 @@
      【css/style.css は同じ手では下げられない】残る最大の先客はCSSだが、あちらは
      レンダリングを止める <link> なので優先度が「最高」で、画像より上にいる。
      下げると画面が白いまま待たされる。あちらは分割するしかない。 -->
-<script type="module" src="/js/app.js?v=193" fetchpriority="low"></script>
+<script type="module" src="/js/app.js?v=194" fetchpriority="low"></script>
 </body>
 </html>

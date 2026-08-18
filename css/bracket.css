@@ -1438,15 +1438,62 @@ dialog.dialog-chat {
    線を重ねると「線の下に線」になって、かえって塊が読み取りにくくなる。 */
 .tournament-info { margin-top: 0.5rem; }
 
-.tournament-info h2 {
-  margin: 0 0 1rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-faint);
+/* 大会情報とルールの切り替え（中身は js/app.js の renderTournamentInfo）。
+
+   ルールは大会によっては何十行にもなる。続けて縦に積むと、形式や日時を見たいだけの
+   人まで長文の上を通ることになる ── どちらも「読む場所」だが、読みたい時が違う。
+
+   見た目は大会一覧のタブ（.page-tab）と揃える。あちらはリンク、こちらはボタンだが、
+   同じサイトの中でタブが2種類の顔を持つ理由はない。 */
+.info-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 1.4rem;
+  border-bottom: 1px solid var(--border-soft);
 }
 
+/* タブは押す場所なので、指の幅と高さを渡す。面は塗らず、下の線と文字色だけで
+   現在地を示す（ボタンの既定の枠・影は消す）。 */
+.info-tab {
+  min-height: 2.75rem;
+  padding: 0.5rem 1.2rem;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.info-tab:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text);
+}
+
+.info-tab.is-active {
+  border-bottom-color: var(--accent-2);
+  color: var(--text);
+}
+
+/* 狭い画面では指で押す的にするため、幅を等分して大きくする（.page-tab と同じ） */
+@media (max-width: 640px) {
+  .info-tabs { gap: 0; }
+
+  .info-tab {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.4rem;
+    font-size: 0.88rem;
+  }
+}
+
+/* 見出し（h2「大会情報」）はもう置いていない ── タブが同じことを言うので、
+   節の題としては重複する。小見出し（配信元）だけがこの中に残る。 */
 .tournament-info h3 {
   margin: 1.5rem 0 0.5rem;
   font-size: 0.78rem;

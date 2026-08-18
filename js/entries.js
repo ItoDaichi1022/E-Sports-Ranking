@@ -774,19 +774,54 @@ export function renderTournamentActions(containerEl, tournament, onChanged) {
 // エントリーの理由文につける印。押せないボタンから aria-describedby で指す。
 const BLOCKED_REASON_ID = 'entry-blocked-reason';
 
-// エントリーの導線（大会詳細の上部）。
+// 貼り付いた島の高さを見張る係。
 //
-// 【なぜページの上に置くか】以前はルールや参加者を確認したあとに押せるよう、
-// ページの一番下に置いていた。読む順としては正しいが、募集中の大会を開いた人が
-// 最初に知りたいのは「自分は出られるのか、いつまでか」で、それが画面外にあると
-// 一度スクロールしないと分からない。確認したい人は下まで読めるが、
-// 決めている人まで下まで歩かせる理由はない。
+// 島は画面の下端に浮いているので、そのぶんページの末尾に余白を作らないと、
+// 一番下の中身（運営の操作）が島の下に隠れて読めない。高さは決め打ちにできない
+// ── チーム戦はボタンを押すとフォームがこの中に開いて、背が倍ほどに変わる。
+// 実寸を測って --entry-cta-h に入れ、余白と「上へ戻る」の位置をCSS側で合わせる。
+let entryCtaSizeObserver = null;
+
+function trackEntryCtaHeight(box) {
+  entryCtaSizeObserver?.disconnect();
+  entryCtaSizeObserver = null;
+
+  // 島が無いときは変数ごと消す。残すと、他のページに移ってからも
+  // その大会の島のぶんだけ末尾が空く。
+  if (!box) {
+    document.documentElement.style.removeProperty('--entry-cta-h');
+    return;
+  }
+
+  const sync = () => {
+    const h = Math.ceil(box.getBoundingClientRect().height);
+    document.documentElement.style.setProperty('--entry-cta-h', `${h}px`);
+  };
+  sync();
+
+  // 古いブラウザには ResizeObserver が無い。そのときは最初の実寸だけで済ませる
+  // （フォームを開くと余白が足りなくなるが、島そのものは動かないので読める）。
+  if (typeof ResizeObserver !== 'function') return;
+  entryCtaSizeObserver = new ResizeObserver(sync);
+  entryCtaSizeObserver.observe(box);
+}
+
+// エントリーの導線（大会詳細・画面の下端に貼り付く島）。
+//
+// 【なぜ画面の下端に貼り付けるか】以前は本文の流れの中（大会名のすぐ下）に
+// 置いていた。開いた瞬間は目に入るが、ルールや出場者を読みに下へ行くと画面の外へ
+// 出てしまい、読んで「出よう」と決めたその瞬間に押す場所が無くなる。
+// 貼り付けておけば、どこまで読んでも決め所が消えない。
 //
 // 【押せる入口はこの1つだけ】下の renderTournamentActions にエントリーは置かない。
 // 2か所に出すと、片方を押した後にもう片方が残って「まだ押していない」ように見える。
 export function renderEntryCta(containerEl, tournament, onChanged) {
   containerEl.innerHTML = '';
   containerEl.hidden = true;
+  // 貼り付けるのは島が入ったときだけ。読み込み中この枠は仮置きの器を兼ねていて、
+  // そちらは本文の流れに残さないと、届いた中身の場所が空いたままになる。
+  containerEl.classList.remove('is-docked');
+  trackEntryCtaHeight(null);
   if (!tournament) return;
 
   const st = entryState(tournament);
@@ -840,6 +875,8 @@ export function renderEntryCta(containerEl, tournament, onChanged) {
 
   containerEl.appendChild(box);
   containerEl.hidden = false;
+  containerEl.classList.add('is-docked');
+  trackEntryCtaHeight(box);
 }
 
 // 募集ページ。運営には準備中の大会も見せる。
