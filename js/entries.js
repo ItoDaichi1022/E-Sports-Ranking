@@ -45,6 +45,9 @@ export function entryDeadlineText(tournament) {
 
 // 残り時間。刻みは、その場面で人が気にする単位までにする ── 3日先の大会に
 // 「あと2日3時間41分」まで出しても読めないし、毎分書き換わって落ち着かない。
+//
+// countdown は「あと○○」の言い方かどうか。頭に「締切まで」を付けてよいのはこの形だけで、
+// 「まもなく締切」「締切時刻を過ぎています」はそれだけで文になっている。
 function remainingLabel(at) {
   const ms = at.getTime() - Date.now();
   // 言い方はバッジ（js/tournamentState.js の entryState）とそろえる。
@@ -53,13 +56,15 @@ function remainingLabel(at) {
 
   const minutes = Math.floor(ms / 60000);
   if (minutes < 1) return { text: 'まもなく締切', soon: true };
-  if (minutes < 60) return { text: `あと${minutes}分`, soon: true };
+  if (minutes < 60) return { text: `あと${minutes}分`, soon: true, countdown: true };
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return { text: `あと${hours}時間${minutes % 60}分`, soon: hours < 3 };
+  if (hours < 24) {
+    return { text: `あと${hours}時間${minutes % 60}分`, soon: hours < 3, countdown: true };
+  }
 
   const days = Math.floor(hours / 24);
-  return { text: `あと${days}日${hours % 24}時間` };
+  return { text: `あと${days}日${hours % 24}時間`, countdown: true };
 }
 
 // 書き換えの間隔。残り1時間を切ったら分単位で動くので短く、それより先は
@@ -73,10 +78,14 @@ function repaintDelay(at) {
 // withNote は、締切を過ぎたときに「それでもエントリーはできる」と添えるかどうか。
 // エントリーボタンの隣（大会詳細）では必要だが、一覧のカードには押す先が無いので出さない。
 //
+// remainingOnly は、日時を出さず残り時間だけにするかどうか。画面の下端に貼り付く島
+// （renderEntryCta）で使う ── あそこは「いま押すかどうか」を決める場所で、要るのは
+// 間に合うかどうかだけ。何日の何時までかは大会情報のタブに表として出ている。
+//
 // 【タイマーの後始末】画面が描き直されるとこの要素はDOMから外れて捨てられる。
 // どこかに控えておくと、消えた要素を掴んだままタイマーが回り続けるので、
 // 「繋がっていなければ終わり」で自分から畳む。
-export function entryDeadlineElement(tournament, { withNote = false } = {}) {
+export function entryDeadlineElement(tournament, { withNote = false, remainingOnly = false } = {}) {
   const at = entryDeadlineAt(tournament);
   if (!at) return null;
 
@@ -93,7 +102,11 @@ export function entryDeadlineElement(tournament, { withNote = false } = {}) {
 
   const paint = () => {
     const left = remainingLabel(at);
-    chip.textContent = `エントリー締切 ${at.toLocaleString('ja-JP', DEADLINE_FORMAT)}（${left.text}）`;
+    // 残り時間だけのときも「あと2日3時間」では何の残りか分からないので、
+    // 「あと○○」の形にだけ頭を付ける（「まもなく締切」はそれ自体で足りている）。
+    chip.textContent = remainingOnly
+      ? (left.countdown ? `締切まで${left.text}` : left.text)
+      : `エントリー締切 ${at.toLocaleString('ja-JP', DEADLINE_FORMAT)}（${left.text}）`;
     chip.classList.toggle('is-passed', Boolean(left.passed));
     chip.classList.toggle('is-soon', Boolean(left.soon));
     if (withNote) note.hidden = !left.passed;
@@ -843,18 +856,23 @@ export function renderEntryCta(containerEl, tournament, onChanged) {
   // 変わるだけなので、それだけでは「済んでいるから取り消せる」のか「間違って
   // 押しかけている」のかが読み取れない。
   // チーム戦は .team-entry-status が同じことを（チーム名つきで）言うので重ねない。
+  //
+  // 【一言で止める】島は画面の下端に貼り付いていて、本文の上に重なる。ここに
+  // 2文3文と書くと、その厚みぶん大会のページが読めなくなる。取り消せることは
+  // ボタン自身（「エントリーを取り消す」）が示すので、括弧の中だけで足りる。
   if (entered && !isTeamTournament(tournament)) {
     const done = document.createElement('p');
     done.className = 'entry-cta-entered';
-    done.textContent = 'この大会にエントリー済みです。募集中のあいだはいつでも取り消せます。';
+    done.textContent = 'エントリー済み（募集中は取り消せます）';
     box.appendChild(done);
   }
 
   box.appendChild(entryControls(tournament, onChanged));
 
   // 締切はボタンのすぐ隣。押すかどうかを決めるのはこの場所で、
-  // 大会情報の表まで下りないと期限が分からないのでは間に合わない。
-  const deadline = entryDeadlineElement(tournament, { withNote: true });
+  // 大会情報のタブまで開かないと期限が分からないのでは間に合わない。
+  // ここに出すのは残り時間だけ（日時は大会情報の表の担当）。
+  const deadline = entryDeadlineElement(tournament, { withNote: true, remainingOnly: true });
   if (deadline) box.appendChild(deadline);
 
   // 押せない理由は必ず文字で出す。灰色になっているだけでは、
@@ -867,9 +885,13 @@ export function renderEntryCta(containerEl, tournament, onChanged) {
     box.appendChild(reason);
   } else if (st.remaining !== null && st.remaining > 0) {
     // 残り枠は「押せるうち」だけ添える。埋まってからは上の理由が受け持つ。
+    //
+    // 定員は書かない。ここで要るのは「まだ入れるか」だけで、何人中かは
+    // 大会情報のタブ（エントリー欄に「20 / 32人」と出る）の担当。
+    // 「残り12 / 32人」と縮めると、12が残りなのか埋まった数なのかが読めなくなる。
     const left = document.createElement('p');
     left.className = 'entry-cta-slots';
-    left.textContent = `残り${st.remaining}${entrantUnit(tournament)}（定員${tournament.capacity}${entrantUnit(tournament)}）`;
+    left.textContent = `残り${st.remaining}${entrantUnit(tournament)}`;
     box.appendChild(left);
   }
 
