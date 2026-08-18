@@ -178,20 +178,26 @@
 
 /* ---- 目次と章立て ---- */
 
+/* 目次。題のすぐ下、このページの一番上に置く ── ここを開く人はたいてい
+   用のある章を持って来ているので、最初に渡すのは説明ではなく行き先。
+   ページの主な操作がこれになったぶん、指で押せる大きさまで上げてある。 */
 .guide-toc {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin: 1.25rem 0 2rem;
+  margin: 0.25rem 0 2.5rem;
 }
 
 .guide-toc a {
-  padding: 0.4rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.5rem 1rem;
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
   background: var(--surface-2);
   color: var(--text-dim);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 600;
   text-decoration: none;
 }

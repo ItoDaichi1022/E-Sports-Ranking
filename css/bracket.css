@@ -1492,6 +1492,11 @@ dialog.dialog-chat {
   }
 }
 
+/* ランキング反映の印は、表の下・配信元のすぐ上に立つ（js/app.js の renderTournamentInfo）。
+   .ranking-mark 自身は下向きの余白しか持っていない ── 使い方ガイドでは節の先頭に
+   置く部品だから。ここでは前に表が来るので、上の余白はこちら側で足す。 */
+.tournament-info .ranking-mark { margin: 1.5rem 0 0.9rem; }
+
 /* 見出し（h2「大会情報」）はもう置いていない ── タブが同じことを言うので、
    節の題としては重複する。小見出し（配信元）だけがこの中に残る。 */
 .tournament-info h3 {

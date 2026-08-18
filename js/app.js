@@ -2021,7 +2021,12 @@ function renderTournamentInfo(tournament) {
         </span>
       </div>
     ` : ''}
-    ${rankingEligibilityHtml(tournament)}
+
+    <!-- 対戦表と出場選手一覧への入口を置く場所。中身（#bracket-link・#entrants-link）は
+         index.html にあるものを、下で要素ごとここへ移してくる ── この節は innerHTML で
+         丸ごと作り直すので、入口をここに直接書くと毎回作り直すことになる。 -->
+    <div id="tournament-info-links"></div>
+
     <dl class="tournament-info-grid">
       <div><dt>${countHeading}</dt><dd>${escapeHtml(countLabel)}</dd></div>
       <div><dt>規模</dt><dd>${tournamentTier(tournament.entrantCount)}</dd></div>
@@ -2038,6 +2043,16 @@ function renderTournamentInfo(tournament) {
     : ''}
     </dl>
   `;
+
+  // ランキングに乗るかどうかの印。表の下、配信元のすぐ上に置く。
+  //
+  // 【なぜ表より下か】この印が答えるのは「この大会に出ると順位が動くのか」で、
+  // 大会そのものがどんな大会か（日時・形式・人数）を掴んだあとに効いてくる話。
+  // 表より先に出すと、まだ何の大会かも分からないうちに条件の説明を読まされる。
+  // 配信元と隣り合わせなのは都合がよい ── 条件の1つが「配信元がYouTubeであること」で、
+  // 満たしていない理由を読んだ人が、そのまま下の欄で確かめられる。
+  html += rankingEligibilityHtml(tournament);
+
   // 配信元。試合を見に行く導線なので、押せる形で「大会情報」の側に置く
   // （ルールのタブに入れると、見に来ただけの人が読む必要のない長文を通る）。
   // URLはDBから来るので、表示のたびに safeUrl を通してから href に入れる。
@@ -2066,6 +2081,16 @@ function renderTournamentInfo(tournament) {
   `;
 
   tournamentInfoEl.innerHTML = html;
+
+  // 対戦表・出場選手一覧への入口を、この節の中（表の上）へ移す。
+  //
+  // 【なぜ移すのか】要素そのものは index.html にある ── ここは innerHTML で毎回
+  // 作り直すので、中に直接書くと押せる入口を毎回作り直すことになる。器だけを
+  // 用意しておいて、実物を動かす形にしてある。
+  // 上の innerHTML でいったんDOMから外れているが、hidden やリンク先は
+  // renderTournamentDetail が要素に直接入れているので、戻せばそのまま出る。
+  tournamentInfoEl.querySelector('#tournament-info-links')
+    .append(bracketLinkEl, entrantsLinkEl);
 
   // 切り替え。innerHTML で毎回作り直すので、そのたびに繋ぎ直す。
   const infoTabBtn = tournamentInfoEl.querySelector('#tournament-info-tab-info');
@@ -2235,11 +2260,13 @@ function renderTournamentDetailLoading() {
   // 下の空きに足されるだけになる。動くものが無いので、ずれようがない。
   // 逆に、下の枠は読み込み中は空のままにしておくこと。
   //
-  // 【2枚なのはエントリーの島を数えないから】島は画面の下端に貼り付くので
-  // 本文の高さには関わらない（renderEntryCta が is-docked を付ける）。
-  // 仮置きが要るのは、この枠のあとに続く対戦表・出場選手一覧への入口の2枚だけ。
+  // 【エントリーの島は数えない】島は画面の下端に貼り付くので本文の高さには
+  // 関わらない（renderEntryCta が is-docked を付ける）。仮置きが要るのは、
+  // 届いたあとにこの位置から始まる3つ ── 大会情報／ルールのタブと、
+  // その中に入る対戦表・出場選手一覧への入口の2枚。
   renderEntryCta(tournamentEntryCtaEl, null);
   tournamentEntryCtaEl.innerHTML = [
+    '<div class="skeleton-line skeleton-panel skeleton-panel-tabs"></div>',
     '<div class="skeleton-line skeleton-panel skeleton-panel-link"></div>',
     '<div class="skeleton-line skeleton-panel skeleton-panel-link"></div>',
   ].join('');
