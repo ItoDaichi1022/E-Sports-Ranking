@@ -42,7 +42,7 @@ const SITE_DESCRIPTION = 'コミュニティの大会運営と個人ランキン
 
 // プレビュー画像が無いときの絵。?v= は index.html と同じ版数に合わせる
 // （/img/* は1年 immutable なので、差し替えたら番号も上げること）。
-const FALLBACK_IMAGE = '/img/icon.png?v=197';
+const FALLBACK_IMAGE = '/img/icon.png?v=198';
 
 // ページの題（h1）と同じ言葉を使う。検索結果とページの中身で名前が違うと、
 // 開いた人に「別のページに来た」と思わせる。
@@ -59,6 +59,7 @@ const STATIC_TITLES = {
   entries: 'エントリー状況',
   profile: 'マイページ',
   reveal: '順位発表',
+  reports: '届いている通報',
   terms: '利用規約',
   privacy: 'プライバシーポリシー',
 };
@@ -75,15 +76,16 @@ const STATIC_DESCRIPTIONS = {
   entries: '自分がエントリー・出場した大会のまとめ。募集中・進行中・終了した大会を一覧で確認できます。',
   profile: 'プロフィールの確認と編集。プレイヤー名・アイコン・使用キャラクター・自己紹介を設定できます。',
   reveal: 'ランキングの順位発表（運営専用）。',
+  reports: '選手・大会に届いている通報の確認（運営専用）。',
   terms: `${SITE_NAME}の利用規約。`,
   privacy: `${SITE_NAME}のプライバシーポリシー。取得する情報と、その使い道を記載しています。`,
 };
 
 // 検索結果に出したくないページ。
 //   * 自分にしか意味がないもの（マイページ・エントリー状況）
-//   * 操作の途中（大会作成）や運営専用（順位発表）
+//   * 操作の途中（大会作成）や運営専用（順位発表・届いている通報）
 // 中身が薄いページを拾わせると、サイト全体の評価にも響く。
-const NOINDEX_PAGES = new Set(['create', 'entries', 'profile', 'reveal']);
+const NOINDEX_PAGES = new Set(['create', 'entries', 'profile', 'reveal', 'reports']);
 
 // ---- 出し入れの道具 ----
 

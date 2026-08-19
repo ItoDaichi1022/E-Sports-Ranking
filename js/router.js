@@ -54,6 +54,9 @@ export const ROUTES = [
   ['entries', '/entries/'],
   ['profile', '/profile/'],
   ['reveal', '/reveal/'],
+  // 届いている通報（運営専用）。以前は選手ページの中に混ぜていたが、
+  // あそこは「選手を探す」場所で、通報の裁きはその用事ではない。
+  ['reports', '/reports/'],
   ['terms', '/terms/'],
   ['privacy', '/privacy/'],
 ];
@@ -88,6 +91,8 @@ export const VIEW_ID_OF = {
   // 順位発表（運営専用）。ランキングの表とは見せ方も操作もまるで違うので、
   // 同じページのモードにせず別のページにしてある（js/reveal.js）。
   reveal: 'view-reveal',
+  // 届いている通報（運営専用）。選手・大会どちらへの通報もここに集める。
+  reports: 'view-reports',
   profile: 'view-profile',
   // 規約類（静的ページ。フッターから開く。描画関数は持たない）
   terms: 'view-terms',

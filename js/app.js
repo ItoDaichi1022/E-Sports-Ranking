@@ -247,6 +247,7 @@ const accountAvatarEl = $('account-avatar');
 const loginBtn = $('login-btn');
 const logoutBtn = $('logout-btn');
 const navTournamentLink = $('nav-tournament-link');
+const navReportsLink = $('nav-reports-link');
 const tournamentsCreateLinkEl = $('tournaments-create-link');
 // 丸い＋（大会一覧の右下）。文字が無いボタンなので、絵は起動時に一度入れておく
 // （aria-label と title は index.html 側で付けてある）。
@@ -327,6 +328,10 @@ function applyAuthUI() {
   // 片方だけ出ると「メニューには無いのに一覧にはある」という食い違いになる。
   tournamentsCreateLinkEl.hidden = !canCreateTournament;
   announcementNewBtn.hidden = !admin;
+  // 届いている通報のページ。運営だけが開ける（DBのRLSも運営以外には0件しか返さない）。
+  // メニューから消すのは、行き先そのものを見せないため ── 押しても追い返される
+  // リンクが並んでいると、押した人には壊れているようにしか見えない。
+  navReportsLink.hidden = !admin;
   // ランキングの集計と順位発表は持ち主だけ。大会を開ける人が増えても、
   // 全大会を横断して順位を決める操作は1人に閉じておく。
   rankingRevealBtn.hidden = !owner;
@@ -551,6 +556,12 @@ function routeFromLocation() {
     history.replaceState(null, '', pathFor('home'));
     target = 'home';
   }
+  // 通報のページは運営だけ。URLを直に叩かれても中身は出ない（そもそもDBが
+  // 運営以外には通報を返さないので空になるが、ページごと見せない）。
+  if (target === 'reports' && !isAdmin()) {
+    history.replaceState(null, '', pathFor('home'));
+    target = 'home';
+  }
 
   // 「別の画面へ移ったのか、同じ画面を描き直しているだけなのか」。
   // この関数は Realtime の更新のたびにも呼ばれるので、この区別は要になる。
@@ -622,6 +633,7 @@ function routeFromLocation() {
     else if (target === 'entrants') draw(renderEntrantsPage(param));
     else if (target === 'player') draw(renderPlayerDetail(param));
     else if (target === 'players') refreshPlayerUI();
+    else if (target === 'reports') renderBanReview();
     else if (target === 'reveal') draw(loadReveal().then((m) => m.renderRevealPage()));
     else if (target === 'profile') renderProfilePage();
 
@@ -875,15 +887,18 @@ function closeReportDialog() {
   reportDialog.close();
 }
 
-// 届いている通報の一覧（運営専用）。
+// 届いている通報の一覧（/reports/・運営専用）。
 //
 // 通報された人ごとにまとめて、通報した人数の多い順に並べる。数えるのは件数ではなく
 // 人数 ── 1人が何度押しても1件にしかならない（DB側の部分ユニーク索引で潰してある）。
+//
+// 【1ページ取ってある】以前はこの節を選手ページ（#view-players）の中に置いていたが、
+// あそこは訪れた人が名前で選手を探す場所で、通報を裁くのはその用事ではない。
+// 役目が違うので分けた（index.html の #view-reports）。
 function renderBanReview() {
-  // 一般の利用者には存在ごと見せない。RLSでも運営以外には0件しか返らないので、
-  // ここは「運営が自分の画面で見るためのもの」という位置づけを保つための出し分け。
+  // ページごと運営にしか出していない（navigate と applyAuthUI）が、ここでも見る ──
+  // 開いたままログアウトされることがあり、そのとき中身が残っていては困る。
   if (!isAdmin()) {
-    reportReviewEl.hidden = true;
     reportReviewEl.innerHTML = '';
     return;
   }
@@ -892,9 +907,10 @@ function renderBanReview() {
   const banned = state.players.filter(isBannedPlayer);
   const tournamentSummaries = tournamentReportSummaries();
 
+  // 何も無いときは、そう言い切る。1ページ取っている以上、空で返すと
+  // 「読み込みに失敗したのか、本当に0件なのか」が分からない。
   if (summaries.length === 0 && banned.length === 0 && tournamentSummaries.length === 0) {
-    reportReviewEl.hidden = true;
-    reportReviewEl.innerHTML = '';
+    reportReviewEl.innerHTML = '<p class="empty-hint">届いている通報はありません。</p>';
     return;
   }
 
@@ -982,7 +998,7 @@ function renderBanReview() {
   }).join('');
 
   const tournamentBlock = tournamentSummaries.length === 0 ? '' : `
-    <h3 class="report-review-title">大会への通報</h3>
+    <h2 class="report-review-title">大会への通報</h2>
     <p class="note">
       大会そのものへの通報です。消すかどうかは内容を読んで決めてください
       ── 消すのはその大会のページの歯車から行います（通報も一緒に消えます）。
@@ -990,16 +1006,21 @@ function renderBanReview() {
     </p>
     ${tournamentCards}`;
 
-  reportReviewEl.hidden = false;
-  reportReviewEl.innerHTML = `
-    <h2 class="report-review-title">届いている通報</h2>
+  // 選手への通報。届いていないときは節ごと出さない ── 説明だけが残ると、
+  // 何も無いのに「読んで決めてください」と言われることになる。
+  const playerBlock = summaries.length === 0 ? '' : `
+    <h2 class="report-review-title">選手への通報</h2>
     <p class="note">
       通報が<strong>${BAN_THRESHOLD}人</strong>ぶん集まると「BAN対象」の札が付きます。
       札が付いても自動では何も起きません ── 内容を読んで、止めるか却下するかを決めてください。
       停止すると、その選手はエントリー・大会作成・チャット・プロフィールの編集ができなくなり、
       選手の検索からも消えます（過去の対戦表と戦績はそのまま残ります）。
     </p>
-    ${cards}
+    ${cards}`;
+
+  // 題（「届いている通報」）はページの h1 が持っているので、ここには置かない。
+  reportReviewEl.innerHTML = `
+    ${playerBlock}
     ${bannedList}
     ${tournamentBlock}`;
 
@@ -1051,8 +1072,9 @@ async function setBan(btn, playerId, banned) {
 
 // ---- 選手 ----
 
+// 選手ページの描き直し。届いている通報はここでは描かない ── /reports/ に
+// 移したので、あちらのページを開いたときに renderBanReview が走る。
 function refreshPlayerUI() {
-  renderBanReview();
   renderPlayerTable(playerListEl, {
     ownPlayerId: auth.player?.id ?? null,
     isAdmin: isAdmin(),

@@ -3056,12 +3056,12 @@ tr.own-row:hover > td { background: rgba(147, 213, 0, 0.24) !important; }
 
 /* ---- 届いている通報の一覧（運営専用）---- */
 
+/* 届いている通報（/reports/・運営専用）。
+   ページ1枚を取っているので、以前のように本文から浮かせる囲いは持たない
+   ── 面の中に面が入ると、どこからどこまでが1件なのかが読み取りにくくなる。
+   1件ずつの囲いは .report-card が受け持つ。 */
 .report-review {
   margin-bottom: 1.6rem;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--surface);
 }
 
 .report-review-title {
