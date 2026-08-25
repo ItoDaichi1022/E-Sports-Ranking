@@ -933,25 +933,53 @@
   color: var(--text);
 }
 
-/* ---- 配信スコアボードへの入口（運営だけ・js/bracketView.js の scoreboardLink）----
-   カードの下端に足す1行。押すより「右クリックしてURLを写す」ほうが多い相手なので、
-   ボタンではなくリンクのまま置いてある。見た目だけ隣のボタンにそろえる。 */
-.scoreboard-link {
-  display: block;
-  width: 100%;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.72rem;
-  font-weight: 500;
-  text-align: center;
-  text-decoration: none;
+/* ---- 配信スコアボードへの入口（運営だけ・js/matchChat.js の scoreboardRow）----
+
+   置き場所はゲームカウント欄の下端。対戦カードの中に置いていた頃は、狭い枠に
+   4つ目の行が増えて表全体が窮屈になっていた ── 配信卓の人はどのみちこの欄を
+   開くので、開いた先に置くほうが動線としても近い。
+
+   【ボタンではなくリンクのまま置いてある】行き先はOBSのブラウザソースへ貼るURLで、
+   押して開くことより「右クリックしてURLを写す」ことのほうが多い。window.open で
+   開くボタンにすると、その一番よく使う操作ができなくなる。 */
+.chat-scoreboard-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
   border-top: 1px solid var(--border-soft);
-  background: transparent;
+}
+
+.chat-scoreboard-note {
+  margin: 0;
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
   color: var(--text-faint);
 }
 
-.scoreboard-link:hover {
+.scoreboard-link {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill);
   background: var(--surface-3);
   color: var(--text);
+}
+
+.scoreboard-link:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+  color: var(--accent-bright);
 }
 
 /* ---- あなたの対戦（画面下端に貼り付ける入口） ----

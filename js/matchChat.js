@@ -20,6 +20,7 @@ import {
 import { auth, canManageTournament } from './auth.js';
 import { confirmMatch, editMatch } from './bracket.js';
 import { escapeHtml } from './util.js';
+import { pathFor } from './router.js';
 import { iconSvg, setButtonIcon, makeIconButton } from './icons.js';
 import * as db from './db.js';
 
@@ -646,11 +647,61 @@ function editConfirmedRow() {
   return row;
 }
 
+// 配信用スコアボードへの入口（運営だけ）。
+//
+// 【置き場所をここにした理由】以前は対戦表の対戦カードの下端に1行足していたが、
+// あの枠には配信台のトグル・チャット・鉛筆が既に並んでいて、4つ目を足すと
+// 表全体が窮屈になった。配信卓に立つ人はどのみちこの「ゲームカウント」欄を
+// 開くので、開いた先に置くほうが動線としても近い。
+//
+// 【ボタンではなくリンク】行き先はOBSのブラウザソースに貼るURLで、押して開く
+// ことより「右クリックしてURLを写す」ことのほうが多い。window.open で開く
+// ボタンにすると、その一番よく使う操作ができなくなる。
+// target="_blank" なので router.js のリンク横取りも素通りする（この対戦の
+// ダイアログを閉じずに別のタブで開く）。
+function scoreboardRow(tournament, match) {
+  const row = document.createElement('div');
+  row.className = 'chat-scoreboard-row';
+
+  const note = document.createElement('p');
+  note.className = 'chat-scoreboard-note';
+  note.textContent = 'この対戦のスコアボード。URLをOBSのブラウザソースに貼ると、'
+    + '映像の下部にスコアバナーが出ます（幅1920×高さ360が目安）。';
+
+  const link = document.createElement('a');
+  link.className = 'scoreboard-link';
+  link.href = pathFor('scoreboard', tournament.id, { match: match.id });
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.textContent = '配信スコアボードを開く';
+  link.title = 'OBSのブラウザソース用のURL（右クリックでURLを写せます）';
+
+  row.append(note, link);
+  return row;
+}
+
 // 当事者には自分の対戦の入力欄、運営には不戦勝も選べる確定欄を出す
 // （スペクテーターや無関係の選手には何も出さない）。
+//
+// 中身の組み立ては renderResultBody に任せ、ここは「そのあとに必ず足すもの」
+// だけを持つ ── 向こうは状態ごとに何度も return するので、末尾に置きたいものを
+// あちらに書くと、確定済み・開始待ち…と枝の数だけ同じ行を書くことになる。
 function renderResultPanel() {
   resultEl.innerHTML = '';
+  renderResultBody();
 
+  // 配信卓への入口は、欄の中身がどの形でも同じ場所（下端）に出す。
+  // 確定前は「ゲームカウントを動かす画面」、確定後は「リザルトを映す画面」として
+  // 同じURLを使うので、出し分けはしない。
+  if (resultEl.hidden || !roomIsAdmin()) return;
+  const match = currentMatch();
+  const tournament = findTournament(room?.tournamentId);
+  if (!match || !tournament || match.isBye) return;
+  if (!match.player1Id || !match.player2Id) return;
+  resultEl.appendChild(scoreboardRow(tournament, match));
+}
+
+function renderResultBody() {
   const match = currentMatch();
   const tournament = findTournament(room?.tournamentId);
   if (!match || !tournament) {
