@@ -714,6 +714,42 @@
   transform: translateX(-50%) translateY(0);
 }
 
+/* ---------------------------------------------------------------------------
+   操作している人だけのモード（body.sb-operator-mode）
+
+   マウスが動く・キーが押される、のどちらかで「ここにいるのはOBSではなく
+   人だ」と分かった瞬間に一度だけ付く（js/scoreboard.js の enterOperatorMode）。
+   以後は外れない ── OBSのブラウザソースはふつうどちらの入力も送らないので、
+   ここに来るのは人が直接この画面を開いて操作しているときだけ。
+
+   ボードを消し、操作パネルだけをページの中央に据える。名前とカウントは
+   パネルの中にも出ているので、ボードが無くても何を操作しているかは分かる。 */
+
+body.sb-operator-mode .sb-viewport {
+  display: none;
+}
+
+body.sb-operator-mode {
+  /* ボードが消えると transparent のままでは素の白い背景が出てしまう
+     （<html> 側に地の色を持たせていないため）。ここは人が見る画面なので、
+     OBS用の透過をやめて、サイトの地の色に戻す。 */
+  background: var(--bg, #050505);
+}
+
+body.sb-operator-mode #scoreboard-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.sb-operator-mode .sb-controls {
+  position: static;
+  transform: none;
+  opacity: 1;
+  visibility: visible;
+}
+
 .sb-ctrl-group {
   display: flex;
   align-items: center;

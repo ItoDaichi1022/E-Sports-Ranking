@@ -14,8 +14,12 @@
 // 作りなので、そもそも「1-0 の状態」が保存される場面が無い（js/matchChat.js）。
 // そこで配信中は、この画面の上で人が動かす。
 //
-//   * 操作パネルはマウスが動いたときだけ出る。OBSのブラウザソースにはマウスが
-//     届かないので、これがそのまま「映像には絶対に出ない」ことになる
+//   * 人がここにいると分かるのは、マウスが動くかキーを押したときだけ
+//     （OBSのブラウザソースには基本どちらも届かない）。その瞬間に一度だけ
+//     「操作している人のモード」に切り替わり、ボードは消えて操作パネルだけが残る
+//     ── ボードと操作パネルが同時に出ている状態を作らない。OBS側はどちらの
+//     入力も受け取らないので、この切り替えが起きることはなく、ボードだけが
+//     ずっと映り続ける
 //   * 配信卓の人は、同じURLを自分のブラウザでも開いて、そちらから操作する
 //   * 2つのブラウザ（操作用とOBS）は Supabase Realtime のブロードキャストで
 //     つなぐ。テーブルは増やさない ── 配信中の一時的な数字で、残す意味が無い
@@ -512,19 +516,28 @@ function swapSides() {
 let redrawEntrants = () => {};
 
 // ---------------------------------------------------------------------------
-// 操作パネルの出し入れ
+// 「操作している人」への切り替え
 //
-// マウスが動いたときだけ出す。OBSのブラウザソースにはマウスイベントが届かない
-// （「対話」を開かないかぎり）ので、これがそのまま「映像には出ない」になる。
+// マウスが動くかキーを押した時点で、この画面を開いているのはOBSではなく
+// 人だと分かる（OBSのブラウザソースは「対話」を開かないかぎりどちらも送らない）。
+// そこで一度だけ、ボードを隠して操作パネルだけを残す ── 両方が同時に
+// 出ている状態を作らない。名前と数字はパネルの中にも出ているので、
+// ボードが無くても何を操作しているかは分かる。
+//
+// 【一度切り替えたら戻さない】マウスが止まるたびにボードへ戻すと、
+// 操作の合間にちらつく。人が使っているとすでに分かっている以上、
+// 戻す理由が無い。
 // ---------------------------------------------------------------------------
 
-let hideTimer = null;
+let operatorMode = false;
 
-function wakeControls() {
-  if (!ui) return;
+function enterOperatorMode() {
+  if (!ui || operatorMode) return;
+  operatorMode = true;
+  document.body.classList.add('sb-operator-mode');
   ui.controls.root.classList.add('is-shown');
-  clearTimeout(hideTimer);
-  hideTimer = setTimeout(() => ui?.controls.root.classList.remove('is-shown'), 2600);
+  // 役目を終えたので外す。以後は onKeyDown からだけ呼ばれる形になる
+  window.removeEventListener('mousemove', enterOperatorMode);
 }
 
 const KEYS = {
@@ -543,8 +556,8 @@ function onKeyDown(e) {
   const fn = KEYS[e.key.toLowerCase()];
   if (!fn) return;
   e.preventDefault();
+  enterOperatorMode();
   fn();
-  wakeControls();
 }
 
 // ---------------------------------------------------------------------------
@@ -644,11 +657,11 @@ export async function renderScoreboardPage(tournamentId) {
     connect(tournamentId, match.id);
 
     window.addEventListener('resize', applyScale);
-    window.addEventListener('mousemove', wakeControls);
+    window.addEventListener('mousemove', enterOperatorMode);
     window.addEventListener('keydown', onKeyDown);
     teardown = [
       () => window.removeEventListener('resize', applyScale),
-      () => window.removeEventListener('mousemove', wakeControls),
+      () => window.removeEventListener('mousemove', enterOperatorMode),
       () => window.removeEventListener('keydown', onKeyDown),
     ];
   }
@@ -695,9 +708,8 @@ export async function renderScoreboardPage(tournamentId) {
 // 別のページへ移るとき、js/app.js から呼ぶ。
 // body のクラスを外し忘れると、移った先でヘッダーもナビも消えたままになる。
 export function closeScoreboard() {
-  document.body.classList.remove('scoreboard-only');
-  clearTimeout(hideTimer);
-  hideTimer = null;
+  document.body.classList.remove('scoreboard-only', 'sb-operator-mode');
+  operatorMode = false;
   teardown.forEach((fn) => fn());
   teardown = [];
   disconnect();
