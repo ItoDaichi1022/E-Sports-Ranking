@@ -38,7 +38,7 @@ import { pathFor } from './router.js';
 
 // 設計上の寸法（css/scoreboard.css と同じ値）。px で組んで最後に拡大縮小する
 const DESIGN_W = 1300;
-const DESIGN_H = 152;
+const DESIGN_H = 150;
 // 画面のふちに残す余白の割合。ここを詰めすぎると、OBS側で少し縮めたときに
 // ブレードの先端が切れる
 const FIT_W = 0.965;
@@ -200,7 +200,7 @@ function buildCore() {
   const boltT = el('span', 'sb-core-bolt sb-core-bolt-t');
   const boltB = el('span', 'sb-core-bolt sb-core-bolt-b');
 
-  // 銘板は1行（大会名 ｜ 回戦名）。2段に積むと 152px の高さに収まらない
+  // 銘板は1行（大会名 ｜ 回戦名）。2段に積むと 150px の高さに収まらない
   const tab = el('div', 'sb-core-tab');
   const event = el('span', 'sb-event');
   const round = el('span', 'sb-round');
