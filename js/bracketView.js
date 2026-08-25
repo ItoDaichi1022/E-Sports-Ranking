@@ -311,6 +311,24 @@ function streamToggle(tournamentId, roundIndex, match, onRefresh) {
   return btn;
 }
 
+// 配信用スコアボードへの入口（運営だけ・両方の枠が埋まっている対戦だけ）。
+//
+// 【ボタンではなくリンクにしてある】この行き先はOBSのブラウザソースに貼るURLで、
+// 押して開くことより「右クリックしてURLを写す」ことのほうが多い。window.open で
+// 開くボタンにすると、その一番よく使う操作ができなくなる。
+// target="_blank" を付けてあるので、router.js のリンク横取りも素通りする
+// （対戦表を閉じずに別のタブで開く）。
+function scoreboardLink(tournamentId, matchId) {
+  const a = document.createElement('a');
+  a.className = 'scoreboard-link';
+  a.href = pathFor('scoreboard', tournamentId, { match: matchId });
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = '配信スコアボード';
+  a.title = 'この対戦のスコアボードを開く（OBSのブラウザソース用のURL）';
+  return a;
+}
+
 // 「いま行われている回戦」かどうか。開始済みで、まだ確定していない対戦が残っている
 // 回戦を指す。配信台の色分けに使う（終わった回戦とこれからの回戦は落ち着いた色にする）。
 function isRoundInProgress(tournamentId, roundIndex, round) {
@@ -500,6 +518,10 @@ function renderMatchBox(
 
   box.appendChild(r1.row);
   box.appendChild(r2.row);
+
+  // 配信卓への入口。確定前・確定後どちらにも出す ── 試合中はゲームカウントを
+  // 動かす画面として、終わったあとはリザルトを映す画面として、同じURLを使う。
+  if (!readOnly && p1 && p2) box.appendChild(scoreboardLink(tournamentId, match.id));
 
   if (match.confirmed) {
     if (match.isWalkover) {

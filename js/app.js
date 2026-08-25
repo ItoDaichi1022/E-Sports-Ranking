@@ -73,6 +73,14 @@ async function loadReveal() {
   return revealMod;
 }
 
+// 配信用スコアボード。開くのは配信卓に立つ人だけなので、順位発表と同じく
+// 開いたときに初めて取りに行く。
+let scoreboardMod = null;
+async function loadScoreboard() {
+  scoreboardMod ??= await import('/js/scoreboard.js');
+  return scoreboardMod;
+}
+
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
 let selectedParticipantIds = [];
 let currentBracketTournamentId = null;
@@ -588,6 +596,12 @@ function routeFromLocation() {
     // ここで取りに行かせない ── そうしないと、どのページへ移っても48KBを読むことになる。
     if (target !== 'reveal') revealMod?.closeRevealStage();
 
+    // スコアボードも同じ理由で畳む。body の .scoreboard-only が残ったままだと、
+    // 移った先でヘッダーもナビも背景も消えたままの、真っ黒な画面になる。
+    // まだ一度も開いていなければ（scoreboardMod が null）畳むものも無いので、
+    // ここで取りに行かせない。
+    if (target !== 'scoreboard') scoreboardMod?.closeScoreboard();
+
     // 比べるのはページ名ではなく要素のID。2つのページ名が同じ画面を指すことがあり
     // （かつて #players と #ranking がそうだった）、名前で比べると、後から回ってきた
     // 別名のほうが「対象ではない」と判断して、出したばかりの画面を隠してしまう。
@@ -631,6 +645,7 @@ function routeFromLocation() {
     else if (target === 'tournament') draw(renderTournamentDetail(param));
     else if (target === 'bracket') draw(renderBracketPage(param));
     else if (target === 'entrants') draw(renderEntrantsPage(param));
+    else if (target === 'scoreboard') draw(loadScoreboard().then((m) => m.renderScoreboardPage(param)));
     else if (target === 'player') draw(renderPlayerDetail(param));
     else if (target === 'players') refreshPlayerUI();
     else if (target === 'reports') renderBanReview();

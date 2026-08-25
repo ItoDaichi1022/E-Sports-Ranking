@@ -269,7 +269,7 @@ function escapeAttr(s) {
 // 取りに行く ── 40KBを2回配ったうえ、preload が LCP の役に立たなくなる。
 // 画面は普通に出るので気付けない。版数を上げるときは、こちらも一緒に上げること
 // （scripts/check-cache-version.mjs が両者を突き合わせて止める）。
-const HOME_LOGO = '/img/game-logo.webp?v=198';
+const HOME_LOGO = '/img/game-logo.webp?v=199';
 
 // index.html に既にある行は中身だけ差し替え、無い行はここで足す。
 //
@@ -342,6 +342,16 @@ function rewriteMeta(response, meta) {
     //
     // 入れるのは絵と名前だけで、あとはこれまでどおりJSが描く。ここで画面を
     // 組み立て始めると、同じ見た目を2か所で作ることになる。
+    // 配信用スコアボードのURLは、OBSのブラウザソースが直に開く。ここで
+    // <body> にクラスを入れておかないと、JSが動き出すまでのあいだサイトの
+    // 見た目（導入の演出・ヘッダー・黒い背景）が描かれ、それがそのまま中継の
+    // 画に一瞬乗る。消す指示は css/style.css にあり、あれは <head> で読むので
+    // 最初の描画に間に合う。
+    .on('body', {
+      element(el) {
+        if (meta.viewId === 'view-scoreboard') el.setAttribute('class', 'scoreboard-only');
+      },
+    })
     .on('#view-home', {
       element(el) {
         if (meta.viewId !== 'view-home') el.setAttribute('hidden', '');

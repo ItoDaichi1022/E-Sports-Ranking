@@ -4653,3 +4653,41 @@ body.nav-open header::after { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .intro-playing .intro { display: none !important; }
 }
+
+/* ---------------------------------------------------------------------------
+   配信用スコアボードのときだけ、サイトの装いを全部やめる
+   （/tournaments/{大会ID}/scoreboard/・js/scoreboard.js）
+
+   あの画面はページではなく映像素材で、OBSのブラウザソースにURLを貼って使う。
+   ヘッダーもナビもフッターも背景も出してはならない ── 背景が透けていなければ、
+   中継の画に黒い長方形が貼り付く。
+
+   【スコアボード本体のCSSは css/scoreboard.css にある。ここに置いてあるのは
+     この数行だけ】あちらは画面を開いてから読み込まれる（data-css）ので、
+     届くまでのあいだヘッダーと導入の演出が見えてしまう。それは配信の画に
+     一瞬サイトが映るということなので、消す指示のほうは最初から読まれる
+     このファイルに置く。ここを scoreboard.css へ移さないこと。
+
+   クラスを付けるのは2か所。
+     * worker/index.js … 返すHTMLの <body> に最初から入れておく（直リンクで開く
+       OBS側は必ずこの経路を通るので、JSを待つ時間そのものが無くなる）
+     * js/app.js       … サイトの中を移動したときの付け外し
+   --------------------------------------------------------------------------- */
+
+body.scoreboard-only {
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  background-image: none;
+}
+
+/* body 直下から <main> 以外を一掃する（導入の演出・ヘッダー・フッター・
+   ダイアログ・「上へ戻る」まで、まとめて消える）。 */
+body.scoreboard-only > *:not(main) { display: none !important; }
+body.scoreboard-only main { max-width: none; padding: 0; margin: 0; }
+/* 画面全体に敷いてある光の地模様。これを消さないと、薄い緑の膜が映像に乗る */
+body.scoreboard-only::before { display: none; }
+
+/* この画面だけは読み物ではないので、器の最低高さと余白も持たせない */
+#view-scoreboard { min-height: 0; padding: 0; margin: 0; }

@@ -495,6 +495,9 @@ const VIEW_CSS_EXPECTED = {
   'view-privacy': ['legal.css'],
   // 順位発表の全画面演出（持ち主専用）
   'view-reveal': ['reveal.css'],
+  // 配信用スコアボード（配信卓専用）。板の重なりで組んだ大きな絵で、
+  // 開く人が限られるので <head> では読まない
+  'view-scoreboard': ['scoreboard.css'],
 };
 const actualViewCss = new Map(
   [...html.matchAll(/<section id="(view-[\w-]+)"([^>]*)>/g)]

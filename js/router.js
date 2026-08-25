@@ -49,6 +49,10 @@ export const ROUTES = [
   // URLでも大会の一部だと分かる形にしておく。
   ['bracket', '/tournaments/:id/bracket/'],
   ['entrants', '/tournaments/:id/entrants/'],
+  // 配信用スコアボード。OBSのブラウザソースにURLを直接貼って使う画面で、
+  // ヘッダーもナビも背景も出さず、スコアボードの絵だけを描く。
+  // どの対戦を出すかは ?match={対戦ID}（対戦表のカードから開くと付いてくる）。
+  ['scoreboard', '/tournaments/:id/scoreboard/'],
   ['players', '/players/'],
   ['player', '/players/:id/'],
   ['entries', '/entries/'],
@@ -84,6 +88,9 @@ export const VIEW_ID_OF = {
   bracket: 'view-bracket',
   // 出場選手一覧。詳細・対戦表と同じく大会ごとのページ
   entrants: 'view-entrants',
+  // 配信用スコアボード（js/scoreboard.js）。他のページと違い、この画面が出ている
+  // あいだは body に .scoreboard-only が付いて、サイトの装い一式が消える。
+  scoreboard: 'view-scoreboard',
   player: 'view-player-detail',
   // 選手を探すページ。ランキングの表を置いていた頃の #ranking から来た人も、
   // pathFromLegacyHash が読み替えてここへ着く。
