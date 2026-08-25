@@ -39,6 +39,10 @@ const DESIGN_H = 372;
 // ブレードの先端が切れる
 const FIT_W = 0.965;
 const FIT_H = 0.9;
+// 画面の下に残す余白。css/scoreboard.css の .sb-viewport { padding-bottom } と
+// 同じ値にしてあること ── ここだけ変えると、見た目の余白と拡大率の計算が
+// 食い違い、ボードの下端が余白の外まではみ出す（＝画面の下辺で切れる）。
+const BOTTOM_GAP_RATIO = 0.032;
 
 // 回戦名の見せ方。ブラケットが持っているのは F / SF / QF / R3 という短い記号で、
 // これは対戦表の中で場所を取らないための表記。中継の画に出す札は読ませる字にする。
@@ -375,9 +379,12 @@ function paint({ bumpLeft = false, bumpRight = false } = {}) {
 
 function applyScale() {
   if (!ui) return;
+  // ボードは下辺に寄せてあるので、高さの側は「画面の高さそのもの」ではなく
+  // 「下の余白を引いた、実際に置ける高さ」を基準にする。
+  const usableHeight = window.innerHeight * (1 - BOTTOM_GAP_RATIO);
   const scale = Math.min(
     (window.innerWidth * FIT_W) / DESIGN_W,
-    (window.innerHeight * FIT_H) / DESIGN_H,
+    (usableHeight * FIT_H) / DESIGN_H,
   );
   ui.board.board.style.setProperty('--sb-scale', String(scale));
 }

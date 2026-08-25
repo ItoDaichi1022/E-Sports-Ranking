@@ -42,13 +42,24 @@
    transform: scale() で縮める（倍率は js/scoreboard.js が --sb-scale に入れる）。
    px で組んで最後に拡大縮小するほうが、部品どうしの噛み合わせが崩れない
    ── 板の重なりを % で組むと、幅が変わるたびに継ぎ目がずれる。
+
+   【画面の中央ではなく、下辺に置く】
+   これは実況画面の下部に載せる公式スコアバナーで、画面いっぱいに出す絵ではない。
+   OBSのブラウザソースをキャンバス全体（1920×1080など）に敷いて、その中の
+   下寄りにこのバナーだけが浮くようにする ── そうしておけば、配信側は
+   ソースの位置・大きさをバナーの形に合わせて切り出す手間がいらない。
+   下の余白（BOTTOM_GAP_RATIO）は js/scoreboard.js の拡大率計算と対にしてある。
    --------------------------------------------------------------------------- */
 
 .sb-viewport {
   position: fixed;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* js/scoreboard.js の BOTTOM_GAP_RATIO と同じ値。ここだけ変えると、
+     余白はCSS上そう見えても、拡大率の計算がその余白を知らないままになる。 */
+  padding-bottom: 3.2vh;
   overflow: hidden;
 }
 
@@ -668,11 +679,14 @@
    ことがそのまま「映像には絶対に出ない」ことになる。
    --------------------------------------------------------------------------- */
 
+/* 【下ではなく上に置いてある】操作用ブラウザで開いたときの見え方の話で、
+   OBS側の映像には映らない（マウスが動いたときだけ出るこの仕組みそのものは
+   変わらない）。ボードが画面の下辺に寄ったので、下に置くと重なってしまう。 */
 .sb-controls {
   position: fixed;
   left: 50%;
-  bottom: 22px;
-  transform: translateX(-50%) translateY(14px);
+  top: 18px;
+  transform: translateX(-50%) translateY(-14px);
   z-index: 10;
   display: flex;
   flex-wrap: wrap;
