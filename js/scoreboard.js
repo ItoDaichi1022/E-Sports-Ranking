@@ -37,8 +37,8 @@ import { escapeHtml, safeUrl, initialOf } from './util.js';
 import { pathFor } from './router.js';
 
 // 設計上の寸法（css/scoreboard.css と同じ値）。px で組んで最後に拡大縮小する
-const DESIGN_W = 1480;
-const DESIGN_H = 180;
+const DESIGN_W = 1300;
+const DESIGN_H = 156;
 // 画面のふちに残す余白の割合。ここを詰めすぎると、OBS側で少し縮めたときに
 // ブレードの先端が切れる
 const FIT_W = 0.965;
@@ -200,13 +200,16 @@ function buildCore() {
   const boltT = el('span', 'sb-core-bolt sb-core-bolt-t');
   const boltB = el('span', 'sb-core-bolt sb-core-bolt-b');
 
-  // 銘板は1行（大会名 ｜ 回戦名）。2段に積むと 180px の高さに収まらない
+  // 銘板は1行（大会名 ｜ 回戦名）。2段に積むと 156px の高さに収まらない
   const tab = el('div', 'sb-core-tab');
   const event = el('span', 'sb-event');
   const round = el('span', 'sb-round');
   tab.append(event, el('span', 'sb-tab-sep'), round);
 
-  root.append(halo, back, ring, lip, well, face, gloss, boltT, boltB, tab);
+  // 【tab は back より先に入れること】銘板はエンブレムの上に載るが、重なりでは
+  // 奥。下端がエンブレムの背後へ潜る形にしたいので、あとから来る back に
+  // 覆われる位置に置く ── 末尾へ動かすと、札がエンブレムの天面に貼り付いて見える。
+  root.append(halo, tab, back, ring, lip, well, face, gloss, boltT, boltB);
   return { root, event, face, round };
 }
 
@@ -327,14 +330,14 @@ function fillSide(sideUi, tournamentId, entrantId, seed) {
     : escapeHtml(initialOf(name));
 }
 
-// 長い名前を枠に収める。設計上は30pxで、入らないぶんだけ段階的に落とす
+// 長い名前を枠に収める。設計上は26pxで、入らないぶんだけ段階的に落とす
 // （落としきっても入らなければ、CSS側の text-overflow で「…」になる）。
 //
 // 【左右まとめて決めること】片方ずつ詰めると、名前の長さが違うだけで左右の
 // 字の大きさが変わる ── 中継の画では「片方だけ小さい」がそのまま格の違いに
 // 見えてしまう。両方が収まる大きさを1つ選んで、同じ値を入れる。
 function fitNames(leftEl, rightEl) {
-  for (let size = 30; size >= 18; size -= 2) {
+  for (let size = 26; size >= 16; size -= 2) {
     leftEl.style.fontSize = `${size}px`;
     rightEl.style.fontSize = `${size}px`;
     if (leftEl.scrollWidth <= leftEl.clientWidth
@@ -351,7 +354,7 @@ function fillCore(coreUi, tournament) {
   coreUi.face.innerHTML = url
     ? `<img src="${escapeHtml(url)}" alt="">`
     // ロゴが登録されていない大会は、頭文字1文字を印として置く。
-    // エンブレムの面は 126px しかなく、大会名をそのまま組むと行が割れて読めない
+    // エンブレムの面は 106px しかなく、大会名をそのまま組むと行が割れて読めない
     // ── 名前は銘板のほうが最後まで出しているので、ここは絵の代わりで足りる。
     : `<span class="sb-core-word">${escapeHtml(initialOf(name))}</span>`;
 }
