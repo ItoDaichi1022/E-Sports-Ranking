@@ -38,7 +38,7 @@ import { pathFor } from './router.js';
 
 // 設計上の寸法（css/scoreboard.css と同じ値）。px で組んで最後に拡大縮小する
 const DESIGN_W = 1300;
-const DESIGN_H = 156;
+const DESIGN_H = 152;
 // 画面のふちに残す余白の割合。ここを詰めすぎると、OBS側で少し縮めたときに
 // ブレードの先端が切れる
 const FIT_W = 0.965;
@@ -200,16 +200,16 @@ function buildCore() {
   const boltT = el('span', 'sb-core-bolt sb-core-bolt-t');
   const boltB = el('span', 'sb-core-bolt sb-core-bolt-b');
 
-  // 銘板は1行（大会名 ｜ 回戦名）。2段に積むと 156px の高さに収まらない
+  // 銘板は1行（大会名 ｜ 回戦名）。2段に積むと 152px の高さに収まらない
   const tab = el('div', 'sb-core-tab');
   const event = el('span', 'sb-event');
   const round = el('span', 'sb-round');
   tab.append(event, el('span', 'sb-tab-sep'), round);
 
-  // 【tab は back より先に入れること】銘板はエンブレムの上に載るが、重なりでは
-  // 奥。下端がエンブレムの背後へ潜る形にしたいので、あとから来る back に
-  // 覆われる位置に置く ── 末尾へ動かすと、札がエンブレムの天面に貼り付いて見える。
-  root.append(halo, tab, back, ring, lip, well, face, gloss, boltT, boltB);
+  // 【tab は最後に入れること】銘板はエンブレムの下の角に 8px ぶん被せてある。
+  // 前に出ていないと、その重なりぶんが六角形の裏へ回って、ただ下に並べただけの
+  // 見た目になる（重ね方は css/scoreboard.css の .sb-core-tab に書いてある）。
+  root.append(halo, back, ring, lip, well, face, gloss, boltT, boltB, tab);
   return { root, event, face, round };
 }
 

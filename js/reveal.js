@@ -107,8 +107,8 @@ function setRevealStatus(text, type) {
 // 大会画像は実在の大会を持てないので、サイトに同梱した画像を借りて充てている。
 // ?v= は index.html と同じ版数に合わせること（/img/* は _headers で1年 immutable。
 // 付け忘れると、絵を差し替えても古いものが配られ続ける）。
-const SAMPLE_ART_A = '/img/game-logo.webp?v=205';
-const SAMPLE_ART_B = '/img/icon.webp?v=205';
+const SAMPLE_ART_A = '/img/game-logo.webp?v=206';
+const SAMPLE_ART_B = '/img/icon.webp?v=206';
 
 const SAMPLE_PLAYERS = [
   { name: 'サンプル選手A', score: 100.0, previousRank: 2, achievements: [
