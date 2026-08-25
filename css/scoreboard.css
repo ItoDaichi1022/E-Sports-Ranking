@@ -38,7 +38,7 @@
 /* ---------------------------------------------------------------------------
    置き場所と拡大率
 
-   設計上の寸法は 1840 × 372 px に固定してあり、画面の大きさに合わせて
+   設計上の寸法は 1480 × 180 px に固定してあり、画面の大きさに合わせて
    transform: scale() で縮める（倍率は js/scoreboard.js が --sb-scale に入れる）。
    px で組んで最後に拡大縮小するほうが、部品どうしの噛み合わせが崩れない
    ── 板の重なりを % で組むと、幅が変わるたびに継ぎ目がずれる。
@@ -65,8 +65,8 @@
 
 .sb-board {
   position: relative;
-  width: 1840px;
-  height: 372px;
+  width: 1480px;
+  height: 180px;
   flex: none;
   transform: scale(var(--sb-scale, 1));
   transform-origin: center center;
@@ -113,19 +113,19 @@
    外へ向かって細くなり、先端は薄い刃で終わる。
 
    【中央側は、エンブレムの下へ潜り込ませてある】
-   板の内側の端（790px の位置）は、中央エンブレムのいちばん太いところより 40px
+   板の内側の端（700px の位置）は、中央エンブレムのいちばん太いところより 60px
    奥にある。突き合わせで終わらせると、エンブレムは中央がふくらんだ多角形なので、
    上下の角のところだけ黒い隙間が開く ── 別々の部品が並んでいるように見えてしまう。
    潜り込ませておけば、どの高さでも継ぎ目が出ない。
    そのぶん、内側の端に付ける飾り（チームカラーの帯・ボルト・細線）は right: 0 では
-   なく、エンブレムの輪郭より外（right: 44px 以上）に置くこと。
+   なく、エンブレムの輪郭より外（right: 74px 以上）に置くこと。
    --------------------------------------------------------------------------- */
 
 .sb-side {
   position: absolute;
-  top: 74px;
-  width: 790px;
-  height: 168px;
+  top: 28px;
+  width: 700px;
+  height: 104px;
 }
 
 .sb-side-l { left: 20px; }
@@ -148,7 +148,7 @@
    主板より一回り大きく、先端はさらに鋭い。上下に 12px はみ出させて、
    主板のふちに沿った黒い縁取りとして見せる。 */
 .sb-plate-back {
-  inset: -12px 0 -12px -26px;
+  inset: -8px 0 -8px -18px;
   background:
     linear-gradient(180deg, #23272c 0%, #0c0e11 34%, var(--sb-ink) 100%);
   clip-path: polygon(100% 0%, 13% 0%, 0% 46%, 0% 54%, 13% 100%, 100% 100%);
@@ -199,10 +199,10 @@
    選手名が乗る面。周りより暗く沈め、上辺に影・下辺に光を置いて彫り込んで見せる
    （板とは逆の向き＝凹んでいる、という合図）。両端は斜めに切る。 */
 .sb-plate-inner {
-  top: 26px;
-  bottom: 26px;
+  top: 16px;
+  bottom: 16px;
   left: 118px;
-  right: 200px;
+  right: 226px;
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.16) 40%, rgba(0, 0, 0, 0) 100%),
     linear-gradient(180deg, var(--sb-inner), #14171c);
@@ -215,10 +215,10 @@
    上辺へ光・下辺へ影を置いて、削り出した台が持ち上がっているように見せる。
    ここを平らなままにすると、いちばん大事な数字が「板に印刷された字」になる。 */
 .sb-plate-scorepad {
-  top: 9px;
-  bottom: 9px;
-  right: 62px;
-  width: 150px;
+  top: 6px;
+  bottom: 6px;
+  right: 92px;
+  width: 122px;
   background:
     linear-gradient(180deg,
       rgba(255, 255, 255, 0.13) 0%,
@@ -234,13 +234,13 @@
 
 /* ---- 6枚目：チームカラーの帯 ----
    スコアの外側に立つ、斜めに傾いた細いスラブ。ここが左右を見分ける唯一の強い色。
-   right: 44px なのは、板の内側の端がエンブレムの下へ潜っているため
+   right: 74px なのは、板の内側の端がエンブレムの下へ潜っているため
    （0 にすると、この帯ごとエンブレムの陰に隠れる）。 */
 .sb-plate-accent {
   top: 0;
   bottom: 0;
-  right: 44px;
-  width: 18px;
+  right: 74px;
+  width: 14px;
   background: linear-gradient(180deg, var(--sb-team-hi) 0%, var(--sb-team) 42%, var(--sb-team-lo) 100%);
   /* 上へ向かって内側へ倒れる平行四辺形。まっすぐな柱にしない */
   clip-path: polygon(34% 0%, 100% 0%, 66% 100%, 0% 100%);
@@ -250,9 +250,9 @@
 /* 下辺に沿って外へ流れる細い光。先端に近づくほど消える */
 .sb-plate-edgeline {
   left: 10%;
-  right: 46px;
-  bottom: 3px;
-  height: 3px;
+  right: 76px;
+  bottom: 2px;
+  height: 2px;
   background: linear-gradient(90deg,
     rgba(0, 0, 0, 0) 0%,
     var(--sb-team-soft) 46%,
@@ -263,8 +263,8 @@
 /* 上辺に沿った白の細線。板の継ぎ目に見える */
 .sb-plate-hairline {
   left: 13%;
-  right: 70px;
-  top: 9px;
+  right: 100px;
+  top: 6px;
   height: 1px;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, var(--sb-hair) 32%, var(--sb-hair) 100%);
 }
@@ -275,30 +275,30 @@
 .sb-plate-slits {
   top: 50%;
   /* 刃のほう（外側）に置くこと。内側へ寄せると選手アイコンの下に入って見えなくなる */
-  left: 46px;
-  width: 46px;
-  height: 24px;
+  left: 34px;
+  width: 34px;
+  height: 16px;
   transform: translateY(-50%) skewX(-22deg);
   background:
     linear-gradient(90deg,
-      rgba(0, 0, 0, 0.85) 0 6px, rgba(0, 0, 0, 0) 6px 16px,
-      rgba(0, 0, 0, 0.85) 16px 22px, rgba(0, 0, 0, 0) 22px 32px,
-      rgba(0, 0, 0, 0.85) 32px 38px, rgba(0, 0, 0, 0) 38px 46px);
+      rgba(0, 0, 0, 0.85) 0 4px, rgba(0, 0, 0, 0) 4px 12px,
+      rgba(0, 0, 0, 0.85) 12px 16px, rgba(0, 0, 0, 0) 16px 24px,
+      rgba(0, 0, 0, 0.85) 24px 28px, rgba(0, 0, 0, 0) 28px 34px);
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.07);
   opacity: 0.9;
 }
 
 /* 板を留めているボルト。中央寄りの角に2つだけ */
 .sb-plate-bolt {
-  width: 9px;
-  height: 9px;
-  right: 78px;
+  width: 7px;
+  height: 7px;
+  right: 108px;
   border-radius: 50%;
   background: radial-gradient(circle at 32% 28%, #6d757e 0%, #2b3036 52%, #0c0e11 100%);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 1px rgba(0, 0, 0, 0.9);
 }
-.sb-plate-bolt-t { top: 12px; }
-.sb-plate-bolt-b { bottom: 12px; }
+.sb-plate-bolt-t { top: 8px; }
+.sb-plate-bolt-b { bottom: 8px; }
 
 /* ---------------------------------------------------------------------------
    左右の中身（文字とアイコン）
@@ -312,22 +312,22 @@
   inset: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 /* 外側は先端の刃のぶん、内側はエンブレムに潜っているぶんだけ、中身を寄せる。
-   内側の 66px は「エンブレムの輪郭より外」を守る値で、これを削るとスコアの
+   内側の 94px は「エンブレムの輪郭より外」を守る値で、これを削るとスコアの
    数字がエンブレムの陰に入る。 */
-.sb-side-l .sb-side-body { flex-direction: row-reverse; padding: 0 66px 0 106px; }
-.sb-side-r .sb-side-body { flex-direction: row;         padding: 0 106px 0 66px; }
+.sb-side-l .sb-side-body { flex-direction: row-reverse; padding: 0 94px 0 104px; }
+.sb-side-r .sb-side-body { flex-direction: row;         padding: 0 104px 0 94px; }
 
 /* ---- スコア ----
-   この画面でいちばん強い要素。白・800・120px。数字は tabular-nums で、
+   この画面でいちばん強い要素。白・800・78px。数字は tabular-nums で、
    0→1→2 と変わっても左右の重心が動かない。 */
 .sb-score {
   flex: none;
-  width: 132px;
-  font-size: 120px;
+  width: 110px;
+  font-size: 78px;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: #ffffff;
@@ -335,9 +335,9 @@
   /* 板の面から浮かせる。上の細い光と下の濃い影で、削り出しの数字に見せる */
   text-shadow:
     0 1px 0 rgba(255, 255, 255, 0.35),
-    0 3px 0 rgba(0, 0, 0, 0.55),
-    0 10px 26px rgba(0, 0, 0, 0.8),
-    0 0 34px var(--sb-team-glow);
+    0 2px 0 rgba(0, 0, 0, 0.55),
+    0 7px 18px rgba(0, 0, 0, 0.8),
+    0 0 24px var(--sb-team-glow);
 }
 
 /* ---- 名前 ---- */
@@ -347,7 +347,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 9px;
+  gap: 6px;
   padding: 0 4px;
 }
 .sb-side-l .sb-id { align-items: flex-start; text-align: left; }
@@ -356,14 +356,14 @@
 .sb-name {
   margin: 0;
   max-width: 100%;
-  font-size: 42px;
+  font-size: 30px;
   font-weight: 700;
   letter-spacing: 0.015em;
   color: #f7f9fb;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7), 0 6px 18px rgba(0, 0, 0, 0.75);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7), 0 5px 14px rgba(0, 0, 0, 0.75);
 }
 
 /* シード番号・チームのメンバー名。名前より一段落とす */
@@ -372,10 +372,10 @@
   max-width: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 17px;
+  gap: 8px;
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   color: rgba(214, 221, 229, 0.62);
   white-space: nowrap;
   overflow: hidden;
@@ -385,8 +385,8 @@
 
 .sb-seed {
   flex: none;
-  padding: 3px 9px 4px;
-  font-size: 14px;
+  padding: 2px 7px 3px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
   color: #0a0c0f;
@@ -399,8 +399,8 @@
 .sb-avatar {
   position: relative;
   flex: none;
-  width: 128px;
-  height: 128px;
+  width: 88px;
+  height: 88px;
 }
 
 .sb-avatar > * {
@@ -416,25 +416,25 @@
   background: conic-gradient(from 210deg,
     #737b85 0deg, #2a2f36 62deg, #9aa4ae 128deg, #14171b 200deg,
     #5c646d 268deg, #1d2126 322deg, #737b85 360deg);
-  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.75)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.75)) drop-shadow(0 7px 14px rgba(0, 0, 0, 0.6));
 }
 
 /* チームカラーの細い環。環と面のあいだに1枚だけ挟む */
 .sb-avatar-tint {
-  inset: 5px;
+  inset: 4px;
   background: linear-gradient(150deg, var(--sb-team-hi), var(--sb-team) 45%, var(--sb-team-lo));
 }
 
 .sb-avatar-face {
-  inset: 8px;
+  inset: 6px;
   overflow: hidden;
   background: linear-gradient(180deg, #1a1e23, #06070a);
   display: grid;
   place-items: center;
-  font-size: 52px;
+  font-size: 34px;
   font-weight: 700;
   color: rgba(226, 232, 238, 0.75);
-  box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.85);
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.85);
 }
 
 .sb-avatar-face img {
@@ -446,7 +446,7 @@
 
 /* 面の上に落とす影とハイライト。アイコンが環の中に沈んで見える */
 .sb-avatar-gloss {
-  inset: 8px;
+  inset: 6px;
   background: linear-gradient(168deg,
     rgba(255, 255, 255, 0.22) 0%,
     rgba(255, 255, 255, 0.04) 22%,
@@ -466,8 +466,8 @@
   position: absolute;
   top: 0;
   left: 50%;
-  width: 360px;
-  height: 372px;
+  width: 300px;
+  height: 180px;
   transform: translateX(-50%);
   /* 左右のブレードはこの下へ潜り込んでいる。ここが板の重なりのいちばん上 */
   z-index: 3;
@@ -485,28 +485,28 @@
     50% 100%, 14% 90%, 0% 62%, 0% 40%, 14% 12%);
 }
 
-/* いちばん奥。黒い縁取りとして 14px だけはみ出す。
-   上下の中心（8 + 150 = 158px）は、左右のブレードの中心（74 + 84 = 158px）と
+/* いちばん奥。黒い縁取りとして 7px だけはみ出す。
+   上下の中心（0 + 80 = 80px）は、左右のブレードの中心（28 + 52 = 80px）と
    そろえてある ── ここがずれると、真ん中だけが浮いて見える。 */
 .sb-core-back {
-  top: 8px;
-  left: 30px;
-  width: 300px;
-  height: 300px;
+  top: 0;
+  left: 70px;
+  width: 160px;
+  height: 160px;
   background: linear-gradient(180deg, #2b3037 0%, #0a0c0f 46%, #000 100%);
   filter:
-    drop-shadow(0 4px 0 rgba(0, 0, 0, 0.9))
-    drop-shadow(0 20px 40px rgba(0, 0, 0, 0.75));
+    drop-shadow(0 2px 0 rgba(0, 0, 0, 0.9))
+    drop-shadow(0 10px 22px rgba(0, 0, 0, 0.75));
 }
 
 /* 金属のベゼル。
    光の当たる向きを1周ぶん回して、削り出しの縁に見せる。明暗の振れ幅は大きめに
    取ること ── 中間のグレーだけで回すと、ただの灰色の多角形になる。 */
 .sb-core-ring {
-  top: 22px;
-  left: 44px;
-  width: 272px;
-  height: 272px;
+  top: 7px;
+  left: 77px;
+  width: 146px;
+  height: 146px;
   background: conic-gradient(from 198deg,
     #99a2ad 0deg, #1b2026 42deg, #cdd6e0 108deg, #5b636d 150deg,
     #0b0e12 192deg, #7f8892 244deg, #14181d 296deg, #b3bcc6 340deg, #99a2ad 360deg);
@@ -516,10 +516,10 @@
 /* ベゼルと内側の面のあいだの明るい細線。ここが1本あるだけで、
    ベゼルが「面に描かれた輪」ではなく「上に載った部品」に見える。 */
 .sb-core-lip {
-  top: 33px;
-  left: 55px;
-  width: 250px;
-  height: 250px;
+  top: 13px;
+  left: 83px;
+  width: 134px;
+  height: 134px;
   background: linear-gradient(180deg,
     rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 34%,
     rgba(0, 0, 0, 0.5) 78%, rgba(0, 0, 0, 0.7) 100%);
@@ -527,10 +527,10 @@
 
 /* ベゼルの内側に落とす影。ロゴの面が奥に沈む */
 .sb-core-well {
-  top: 36px;
-  left: 58px;
-  width: 244px;
-  height: 244px;
+  top: 14px;
+  left: 84px;
+  width: 132px;
+  height: 132px;
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.25) 26%, rgba(0, 0, 0, 0) 60%),
     linear-gradient(180deg, #0b0d10, #030405);
@@ -538,14 +538,14 @@
 
 /* ロゴが乗る面。大会バナーは横長なので contain で全体を収める（切らない） */
 .sb-core-face {
-  top: 42px;
-  left: 64px;
-  width: 232px;
-  height: 232px;
+  top: 17px;
+  left: 87px;
+  width: 126px;
+  height: 126px;
   overflow: hidden;
   display: grid;
   place-items: center;
-  padding: 38px 34px;
+  padding: 21px 18px;
   background:
     radial-gradient(120% 90% at 50% 8%, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 62%),
     repeating-linear-gradient(114deg,
@@ -556,27 +556,30 @@
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.7));
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.7));
 }
 
-/* ロゴが登録されていない大会。エンブレムの中に大会名を組む */
+/* ロゴが登録されていない大会に出す、大会名の頭文字1文字。
+   180px の高さではエンブレムの面が 126px しか無く、大会名をそのまま組むと
+   4〜5行に割れて読めない。名前そのものは下の銘板が最後まで出しているので、
+   ここは「印」として頭文字だけを大きく置く。 */
 .sb-core-word {
-  font-size: 30px;
+  font-size: 56px;
   font-weight: 800;
-  line-height: 1.16;
+  line-height: 1;
   letter-spacing: 0.02em;
   text-align: center;
   color: #eef2f6;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.8), 0 8px 20px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.8), 0 6px 14px rgba(0, 0, 0, 0.8);
   overflow: hidden;
 }
 
 /* ベゼルの上を横切るガラスの反射 */
 .sb-core-gloss {
-  top: 36px;
-  left: 58px;
-  width: 244px;
-  height: 244px;
+  top: 14px;
+  left: 84px;
+  width: 132px;
+  height: 132px;
   background: linear-gradient(158deg,
     rgba(255, 255, 255, 0.24) 0%,
     rgba(255, 255, 255, 0.05) 24%,
@@ -587,85 +590,93 @@
 
 /* エンブレムの背後のわずかな明かり。板を浮かせるためだけの光で、色は付けない */
 .sb-core-halo {
-  top: 44px;
-  left: 30px;
-  width: 300px;
-  height: 240px;
+  top: 24px;
+  left: 70px;
+  width: 160px;
+  height: 126px;
   border-radius: 50%;
   background: radial-gradient(closest-side, rgba(150, 170, 195, 0.16), rgba(0, 0, 0, 0) 72%);
-  filter: blur(14px);
+  filter: blur(9px);
 }
 
 /* ベゼルを留めるボルト。上下2点 */
 .sb-core-bolt {
-  width: 12px;
-  height: 12px;
+  width: 7px;
+  height: 7px;
   left: 50%;
-  margin-left: -6px;
+  margin-left: -3.5px;
   border-radius: 50%;
   background: radial-gradient(circle at 34% 30%, #838b95 0%, #31373e 50%, #0a0c0f 100%);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 1px rgba(0, 0, 0, 0.9);
 }
-.sb-core-bolt-t { top: 24px; }
-.sb-core-bolt-b { top: 280px; }
+.sb-core-bolt-t { top: 8px; }
+.sb-core-bolt-b { top: 145px; }
 
 /* ---- 銘板（エンブレムの下から差し込まれた台形）----
-   中央の造形の「足」にあたる部分。2行を持つ。
-     上 … 大会名（小さく、うんと字間を空けて銘板の字に）
-     下 … 回戦名（決勝・準決勝・3位決定戦…）
+   中央の造形の「足」にあたる部分。大会名と回戦名を1行に並べる。
 
-   【大会名をエンブレムの上に載せなかった理由】
-   最初は上に細い帯として置いていたが、エンブレムは上へ向かって尖る多角形なので、
-   帯のちょうど真ん中 ── いちばん読ませたいところ ── がエンブレムに隠れる。
-   下の札に2行として組めば、どちらも最後まで読める。 */
+   【2段ではなく1行にしてある】
+   全体を 180px に収めるので、エンブレム（160px）の下に残るのは 30px 前後しかない。
+   そこへ2段を押し込むと、どちらの字も潰れて中継の画で読めなくなる。
+   横は空いている（左右のブレードは 132px で終わり、この帯より上にある）ので、
+   幅のほうへ伸ばす ── 札は中身に合わせて広がり、ブレードの下を横切る形になる。 */
 .sb-core-tab {
-  top: 300px;
+  top: 150px;
   left: 50%;
-  width: 320px;
+  width: max-content;
+  max-width: 640px;
   transform: translateX(-50%);
-  padding: 9px 0 12px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 5px 32px 6px;
   background: linear-gradient(180deg, #30363d 0%, #14171b 42%, #05070a 100%);
-  clip-path: polygon(7% 0%, 93% 0%, 84% 100%, 16% 100%);
+  clip-path: polygon(4% 0%, 96% 0%, 92% 100%, 8% 100%);
   filter:
     drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.18))
-    drop-shadow(0 8px 18px rgba(0, 0, 0, 0.8));
+    drop-shadow(0 5px 12px rgba(0, 0, 0, 0.8));
 }
 
-/* 大会名。ロゴが登録されている大会だけ出す（js/scoreboard.js の fillCore）
-   ── ロゴが無い大会では、エンブレムの中身が大会名そのものになるため。 */
+/* 大会名。ロゴがあってもなくても必ず出す ── ロゴ側は絵で、こちらが名前。
+   ロゴが無い大会ではエンブレムが頭文字1文字になるので、なおさらここが要る。 */
 .sb-event {
-  display: block;
-  margin-bottom: 5px;
-  padding: 0 34px;
-  font-size: 14px;
+  max-width: 380px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.28em;
-  text-indent: 0.28em;   /* 字間のぶん右へ寄るのを戻す */
-  color: rgba(214, 223, 232, 0.6);
+  letter-spacing: 0.26em;
+  text-indent: 0.26em;   /* 字間のぶん右へ寄るのを戻す */
+  color: rgba(214, 223, 232, 0.62);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sb-event[hidden] { display: none; }
+
+/* 大会名と回戦名のあいだの仕切り。細い縦棒1本だけ */
+.sb-tab-sep {
+  flex: none;
+  width: 1px;
+  height: 13px;
+  background: rgba(255, 255, 255, 0.22);
+}
 
 .sb-round {
-  display: block;
-  font-size: 23px;
+  flex: none;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: 0.26em;
-  text-indent: 0.26em;
+  letter-spacing: 0.22em;
+  text-indent: 0.22em;
   color: #f2f5f8;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
 }
 
 /* 札の裾を横切る細線 */
 .sb-core-tab::after {
   content: '';
   position: absolute;
-  left: 24%;
-  right: 24%;
-  bottom: 6px;
+  left: 18%;
+  right: 18%;
+  bottom: 4px;
   height: 1px;
   background: linear-gradient(90deg,
     rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0) 100%);

@@ -37,8 +37,8 @@ import { escapeHtml, safeUrl, initialOf } from './util.js';
 import { pathFor } from './router.js';
 
 // 設計上の寸法（css/scoreboard.css と同じ値）。px で組んで最後に拡大縮小する
-const DESIGN_W = 1840;
-const DESIGN_H = 372;
+const DESIGN_W = 1480;
+const DESIGN_H = 180;
 // 画面のふちに残す余白の割合。ここを詰めすぎると、OBS側で少し縮めたときに
 // ブレードの先端が切れる
 const FIT_W = 0.965;
@@ -200,11 +200,11 @@ function buildCore() {
   const boltT = el('span', 'sb-core-bolt sb-core-bolt-t');
   const boltB = el('span', 'sb-core-bolt sb-core-bolt-b');
 
-  // 銘板は2行（上＝大会名・下＝回戦名）
+  // 銘板は1行（大会名 ｜ 回戦名）。2段に積むと 180px の高さに収まらない
   const tab = el('div', 'sb-core-tab');
   const event = el('span', 'sb-event');
   const round = el('span', 'sb-round');
-  tab.append(event, round);
+  tab.append(event, el('span', 'sb-tab-sep'), round);
 
   root.append(halo, back, ring, lip, well, face, gloss, boltT, boltB, tab);
   return { root, event, face, round };
@@ -327,14 +327,14 @@ function fillSide(sideUi, tournamentId, entrantId, seed) {
     : escapeHtml(initialOf(name));
 }
 
-// 長い名前を枠に収める。設計上は42pxで、入らないぶんだけ段階的に落とす
+// 長い名前を枠に収める。設計上は30pxで、入らないぶんだけ段階的に落とす
 // （落としきっても入らなければ、CSS側の text-overflow で「…」になる）。
 //
 // 【左右まとめて決めること】片方ずつ詰めると、名前の長さが違うだけで左右の
 // 字の大きさが変わる ── 中継の画では「片方だけ小さい」がそのまま格の違いに
 // 見えてしまう。両方が収まる大きさを1つ選んで、同じ値を入れる。
 function fitNames(leftEl, rightEl) {
-  for (let size = 42; size >= 24; size -= 2) {
+  for (let size = 30; size >= 18; size -= 2) {
     leftEl.style.fontSize = `${size}px`;
     rightEl.style.fontSize = `${size}px`;
     if (leftEl.scrollWidth <= leftEl.clientWidth
@@ -343,18 +343,17 @@ function fitNames(leftEl, rightEl) {
 }
 
 function fillCore(coreUi, tournament) {
+  const name = tournament?.name ?? '';
+  // 大会名は銘板が常に出す。エンブレムのほうは「絵」の担当。
+  coreUi.event.textContent = name;
+
   const url = safeUrl(tournament?.imageUrl);
-  if (url) {
-    coreUi.face.innerHTML = `<img src="${escapeHtml(url)}" alt="">`;
-    // ロゴがあるときだけ、銘板の1行目に大会名を出す
-    coreUi.event.textContent = tournament?.name ?? '';
-    coreUi.event.hidden = false;
-  } else {
-    // ロゴが登録されていない大会。エンブレムの中身を大会名そのものにして、
-    // 銘板の1行目は消す（同じ名前を2か所に出さない）
-    coreUi.face.innerHTML = `<span class="sb-core-word">${escapeHtml(tournament?.name ?? '')}</span>`;
-    coreUi.event.hidden = true;
-  }
+  coreUi.face.innerHTML = url
+    ? `<img src="${escapeHtml(url)}" alt="">`
+    // ロゴが登録されていない大会は、頭文字1文字を印として置く。
+    // エンブレムの面は 126px しかなく、大会名をそのまま組むと行が割れて読めない
+    // ── 名前は銘板のほうが最後まで出しているので、ここは絵の代わりで足りる。
+    : `<span class="sb-core-word">${escapeHtml(initialOf(name))}</span>`;
 }
 
 // スコアの描き替え。数字が増えたときだけ一度だけ跳ねさせる
@@ -389,6 +388,11 @@ function applyScale() {
   const scale = Math.min(
     (window.innerWidth * FIT_W) / DESIGN_W,
     (usableHeight * FIT_H) / DESIGN_H,
+    // 【1倍より上へは伸ばさない】ここを開けておくと、1920×1080 のブラウザソース
+    // では横幅に合わせて 1.25 倍まで拡大され、設計上 180px のバナーが 225px で
+    // 出る ── 「180pxに収まる」ではなくなる。狭い画面では縮むが、広い画面では
+    // 設計どおりの大きさで止めて、余ったぶんは左右の余白にする。
+    1,
   );
   ui.board.board.style.setProperty('--sb-scale', String(scale));
 }
