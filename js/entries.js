@@ -617,6 +617,22 @@ function adminControls(tournament, onChanged) {
       }
     });
     wrap.appendChild(openBtn);
+
+    // 「公開する」の隣に、入れた条件へ戻る道を置く。プレビューは公開前に内容を
+    // 確かめる場なので、違っていたときの行き先が同じ場所に無いと、直し方を
+    // 探しに歯車を開けて回ることになる。
+    //
+    // 開くのは大会情報の編集フォーム（ページ上部）。大会はもう作られているので、
+    // 作成フォームには戻せない ── 戻すと同じ大会がもう1つできてしまう。
+    // フォームを持っているのは js/app.js なので、報せるだけにして向こうで開く。
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn-secondary';
+    editBtn.textContent = '修正する';
+    editBtn.addEventListener('click', () => {
+      document.dispatchEvent(new CustomEvent('request-tournament-edit'));
+    });
+    wrap.appendChild(editBtn);
   }
 
   if (tournament.status === 'recruiting') {

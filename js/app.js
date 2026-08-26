@@ -3577,7 +3577,13 @@ document.addEventListener('keydown', (e) => {
 // 大会を離れたら閉じておく（削除したときは行き先が大会一覧になる）
 window.addEventListener(ROUTE_CHANGE_EVENT, () => setManageMenuOpen(false));
 
-tournamentEditBtn.addEventListener('click', () => {
+// 編集フォームを開く（歯車の「大会情報を編集」と、公開前プレビューの「修正する」）。
+//
+// toggle は歯車のためのもの。同じ場所を続けて押したら閉じる、という開け閉めが
+// 歯車には要る。プレビューの「修正する」はページの下端にあって、フォームは
+// ページの上にある ── 押した先が閉じる動きだと、画面上は何も起きていないように
+// 見えるので、あちらからは必ず開く（scrollIntoView で開いた先まで連れて行く）。
+function openTournamentEditForm({ toggle = false } = {}) {
   const tournament = state.tournaments.find((t) => t.id === currentBracketTournamentId);
   if (!tournament) return;
   setManageMenuOpen(false);
@@ -3606,8 +3612,17 @@ tournamentEditBtn.addEventListener('click', () => {
   });
   // 保存済みの内容を入れ終えてから下書きを重ねる（書きかけがあればそちらが勝つ）
   keepFormDraft(tournamentEditForm, `tournament-edit-${tournament.id}`);
-  setTournamentEditing(tournamentEditForm.hidden);
-});
+  setTournamentEditing(toggle ? tournamentEditForm.hidden : true);
+  // 歯車はフォームのすぐ上にあるので動かさない。遠くから開いたときだけ連れて行く。
+  if (!toggle) tournamentEditForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+tournamentEditBtn.addEventListener('click', () => openTournamentEditForm({ toggle: true }));
+
+// 公開前のプレビューに出る「修正する」（js/entries.js の adminControls）。
+// 大会はもう作られているので、行き先は作成フォームではなくこの編集フォーム
+// ── 同じ条件をそのまま入れ直せる欄がここに揃っている。
+document.addEventListener('request-tournament-edit', () => openTournamentEditForm());
 
 tournamentEditCancelBtn.addEventListener('click', () => {
   // 「キャンセル」は書きかけを捨てる操作なので、控えも一緒に捨てる
