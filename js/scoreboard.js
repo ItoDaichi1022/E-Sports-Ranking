@@ -38,7 +38,7 @@ import { pathFor } from './router.js';
 
 // 設計上の寸法（css/scoreboard.css と同じ値）。px で組んで最後に拡大縮小する
 const DESIGN_W = 1300;
-const DESIGN_H = 150;
+const DESIGN_H = 132;
 // 画面のふちに残す余白の割合。ここを詰めすぎると、OBS側で少し縮めたときに
 // ブレードの先端が切れる
 const FIT_W = 0.965;
@@ -153,17 +153,19 @@ function el(tag, className, text) {
 
 // 左右どちらかのブレード一式。板（装飾）と中身（文字）を別の層に分けてある
 // ── 右側は板の層だけを scaleX(-1) で反転させるため（css/scoreboard.css）。
+//
+// 【板は2枚しか無い】面（sb-plate-main）と、チームカラーの帯（sb-plate-accent）。
+// 以前はここに背面板・光沢・彫り込み・スコア台・細線・スリット・ボルトまで
+// 積んでいたが、中継の画では 1/3 以下に縮んで出るので、その大半は潰れた
+// ノイズにしかならない。読ませたいのは名前とスコアの2つだけ。
 function buildSide(side) {
   const root = el('div', `sb-side sb-side-${side}`);
 
   const plates = el('div', 'sb-plates');
   plates.setAttribute('aria-hidden', 'true');
-  for (const name of [
-    'sb-plate-back', 'sb-plate-main', 'sb-plate-sheen', 'sb-plate-inner',
-    'sb-plate-scorepad', 'sb-plate-accent', 'sb-plate-edgeline',
-    'sb-plate-hairline', 'sb-plate-slits',
-    'sb-plate-bolt sb-plate-bolt-t', 'sb-plate-bolt sb-plate-bolt-b',
-  ]) plates.appendChild(el('span', `sb-plate ${name}`));
+  for (const name of ['sb-plate-main', 'sb-plate-accent']) {
+    plates.appendChild(el('span', `sb-plate ${name}`));
+  }
 
   const body = el('div', 'sb-side-body');
 
@@ -174,12 +176,12 @@ function buildSide(side) {
   const sub = el('p', 'sb-sub');
   id.append(name, sub);
 
+  // アイコンは六角形のまま。枠はチームカラーの単色1枚だけで、
+  // 金属の環・内側の細線・ガラスの反射は持たない。
   const avatar = el('div', 'sb-avatar');
   const ring = el('span', 'sb-avatar-ring sb-hex');
-  const tint = el('span', 'sb-avatar-tint sb-hex');
   const face = el('span', 'sb-avatar-face sb-hex');
-  const gloss = el('span', 'sb-avatar-gloss sb-hex');
-  avatar.append(ring, tint, face, gloss);
+  avatar.append(ring, face);
 
   body.append(score, id, avatar);
   root.append(plates, body);
@@ -187,29 +189,25 @@ function buildSide(side) {
   return { root, score, name, sub, face };
 }
 
+// 中央のエンブレム。大会ロゴを収めた多角形と、その下の銘板。
+// 面（face）とその下の枠（back）の2枚だけで、ベゼル・落とし込み・反射・
+// ボルトは持たない ── ロゴそのものが絵なので、周りを作り込むほど絵が負ける。
 function buildCore() {
   const root = el('div', 'sb-core');
 
-  const halo = el('span', 'sb-core-halo');
   const back = el('span', 'sb-core-back sb-emblem-shape');
-  const ring = el('span', 'sb-core-ring sb-emblem-shape');
-  const lip = el('span', 'sb-core-lip sb-emblem-shape');
-  const well = el('span', 'sb-core-well sb-emblem-shape');
   const face = el('div', 'sb-core-face sb-emblem-shape');
-  const gloss = el('span', 'sb-core-gloss sb-emblem-shape');
-  const boltT = el('span', 'sb-core-bolt sb-core-bolt-t');
-  const boltB = el('span', 'sb-core-bolt sb-core-bolt-b');
 
-  // 銘板は1行（大会名 ｜ 回戦名）。2段に積むと 150px の高さに収まらない
+  // 銘板は1行（大会名 ｜ 回戦名）。2段に積むと 132px の高さに収まらない
   const tab = el('div', 'sb-core-tab');
   const event = el('span', 'sb-event');
   const round = el('span', 'sb-round');
   tab.append(event, el('span', 'sb-tab-sep'), round);
 
   // 【tab は最後に入れること】銘板はエンブレムの下の角に 8px ぶん被せてある。
-  // 前に出ていないと、その重なりぶんが六角形の裏へ回って、ただ下に並べただけの
+  // 前に出ていないと、その重なりぶんが多角形の裏へ回って、ただ下に並べただけの
   // 見た目になる（重ね方は css/scoreboard.css の .sb-core-tab に書いてある）。
-  root.append(halo, back, ring, lip, well, face, gloss, boltT, boltB, tab);
+  root.append(back, face, tab);
   return { root, event, face, round };
 }
 
