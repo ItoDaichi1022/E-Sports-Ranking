@@ -8,12 +8,20 @@
        0. アカウントの作り方  1. このサイトの各ページ  2. 大会へのエントリー
        3. ランキングの仕組み  4. 大会を開きたい人へ  5. 困ったとき・通報
 
+     【動く図（.guide-demo）】1章の図は、押す前と押した後を続けて見せる。
+     段を進めるのは js/guideDemo.js、段ごとの見た目は css/guide.css の
+     「動く図」の節。図に付ける属性（data-demo-in / -out / -act / -tap）の意味は
+     js/guideDemo.js の冒頭にまとめてある。動きを止めている人（
+     prefers-reduced-motion）には最後の段の形で置き、ボタンで1段ずつ見られる。
+
      【使えるCSSは3枚だけ】この画面が読むのは style.css / guide.css / bracket.css
      （index.html の view-guide の data-css）。characters.css と reveal.css は
      読んでいないので、.char-chip や .reveal-* をここに書いても無地で出る。
      scripts/check-cache-version.mjs がこれを見張っている。
-     position: fixed の部品（.own-match-bar など）も図に持ち込まないこと ──
-     画面に貼り付いてしまう。
+     position: fixed の部品（.own-match-bar・#tournament-entry-cta.is-docked）は
+     そのまま持ち込まないこと ── 画面に貼り付いてしまう。中身
+     （.own-match-panel 以下）は実物のまま使い、帯の見た目だけを図用の器
+     （.guide-ownbar-mock）で作る。
 
      【画面と食い違わせないこと】ここは操作の手順書なので、ボタンの文言や
      メニューの並びを変えたら、このファイルも一緒に直す。読んだ人が画面に
@@ -196,67 +204,77 @@
 <!-- ================= 1. 各ページの説明 ================= -->
 <h2 class="guide-chapter reveal" id="guide-pages"><span class="guide-chapter-num">1</span>このサイトの各ページ</h2>
 <p class="guide-chapter-lead">
-  画面の移動は、左上の<strong>メニュー（☰）</strong>からです。
+  画面の移動は、左上の<strong>メニュー（☰）</strong>から。ページは<strong>使う人ごとに4つ</strong>に
+  分かれています。上から順に「登録する → 出る → 開く」なので、
+  <strong>自分に当てはまるところまで読めば足ります</strong>。
 </p>
 
-<figure class="guide-figure guide-figure-wide">
-  <div class="guide-nav-mock">
-    <div class="guide-nav-bar">
-      <span class="guide-nav-toggle" aria-hidden="true"><span></span><span></span><span></span></span>
-      <span class="guide-nav-title">IgniteArena</span>
-    </div>
-    <div class="guide-nav-menu">
-      <span class="guide-nav-item">ホーム</span>
-      <span class="guide-nav-item is-active">はじめに</span>
-      <span class="guide-nav-item">お知らせ</span>
-      <span class="guide-nav-sep"></span>
-      <span class="guide-nav-item">大会</span>
-      <span class="guide-nav-item">選手</span>
-      <span class="guide-nav-item">対戦環境を整える</span>
-      <!-- 大会作成は選手登録を済ませた人にだけ出る（js/app.js）。
-           一覧に無いと「どこから作るのか」が分からないので、印を付けて並べる。 -->
-      <span class="guide-nav-item is-new">大会作成</span>
-      <span class="guide-nav-sep"></span>
-      <span class="guide-nav-item">エントリー状況</span>
-      <span class="guide-nav-item">マイページ</span>
-      <span class="guide-nav-item guide-nav-contact">お問い合わせ（X）</span>
+<!-- ---- A. はじめての人が使うページ ----
+
+     図（.guide-demo）は押す前と押した後を続けて見せる。段の進み方は
+     js/guideDemo.js、段ごとの見た目は css/guide.css の「動く図」の節。
+     属性の意味は js/guideDemo.js の冒頭にまとめてある。 -->
+<div class="guide-group reveal">
+  <span class="guide-group-mark" aria-hidden="true">A</span>
+  <h3>はじめての人が使うページ</h3>
+</div>
+<p class="guide-group-lead">
+  見るだけならログインは要りません。ここに並ぶのは、<strong>着いた場所</strong>と、
+  <strong>移動の仕方</strong>と、<strong>自分のことを決める画面</strong>です。
+</p>
+
+<figure class="guide-figure guide-figure-wide guide-demo reveal" data-steps="3">
+  <div class="guide-demo-stage">
+    <div class="guide-nav-mock">
+      <div class="guide-nav-bar">
+        <span class="guide-nav-toggle guide-inert" data-demo-tap="1" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="guide-nav-title">IgniteArena</span>
+      </div>
+      <div class="guide-nav-menu">
+        <span class="guide-nav-item" data-demo-in="1" style="--i:0"
+              data-demo-act="2" data-demo-actclass="is-active">ホーム</span>
+        <span class="guide-nav-item" data-demo-in="1" style="--i:1">はじめに</span>
+        <span class="guide-nav-item" data-demo-in="1" style="--i:2">お知らせ</span>
+        <span class="guide-nav-sep" data-demo-in="1" style="--i:3"></span>
+        <span class="guide-nav-item" data-demo-in="1" style="--i:4">大会</span>
+        <span class="guide-nav-item" data-demo-in="1" style="--i:5">選手</span>
+        <span class="guide-nav-item" data-demo-in="1" style="--i:6">対戦環境を整える</span>
+        <!-- 大会作成は選手登録を済ませた人にだけ出る（js/app.js）。
+             一覧に無いと「どこから作るのか」が分からないので、3段目で印を付ける。 -->
+        <span class="guide-nav-item" data-demo-in="1" style="--i:7"
+              data-demo-act="3" data-demo-actclass="is-new">大会作成</span>
+        <span class="guide-nav-sep" data-demo-in="1" style="--i:8"></span>
+        <span class="guide-nav-item" data-demo-in="1" style="--i:9">エントリー状況</span>
+        <span class="guide-nav-item" data-demo-in="1" style="--i:10">マイページ</span>
+        <span class="guide-nav-item guide-nav-contact" data-demo-in="1" style="--i:11">お問い合わせ（X）</span>
+      </div>
     </div>
   </div>
-  <figcaption>左上の☰を押すと、この一覧が開きます。「大会作成」は選手登録すると現れます</figcaption>
+  <ol class="guide-demo-steps">
+    <li>左上の<strong>☰</strong>を押すと、行き先の一覧が開きます。どのページを見ていても同じ場所にあります。</li>
+    <li>並びは<strong>サイトを知る／競技を見る／自分のこと</strong>の3つに区切ってあり、<strong>いま開いているページ</strong>には印が付きます。</li>
+    <li><strong>「大会作成」は選手登録を済ませると現れます</strong>（それまでは一覧にありません）。</li>
+  </ol>
+  <button type="button" class="guide-demo-replay">もう一度</button>
+  <figcaption>メニューは全ページ共通です</figcaption>
 </figure>
 
 <ul class="guide-pages">
   <li class="guide-page-card">
     <h3>ホーム</h3>
-    <p>サイトの紹介と、<strong>注目の大会</strong>、これまでの積み上げ（登録選手・開催した大会・延べ出場）、運営からの<strong>最新のお知らせ</strong>。まずここを見れば、いま何が動いているか分かります。</p>
+    <p>サイトの紹介と、運営からの<strong>最新のお知らせ</strong>、<strong>注目の大会</strong>、これまでの積み上げ（登録選手・開催した大会・延べ出場）。まずここを見れば、いま何が動いているか分かります。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>はじめに</h3>
+    <p>いま読んでいるこのページです。使い方に迷ったら、メニューからいつでも戻れます。</p>
   </li>
   <li class="guide-page-card">
     <h3>お知らせ</h3>
     <p>運営からのお知らせの一覧です。新しい順に並びます。</p>
   </li>
   <li class="guide-page-card">
-    <h3>大会</h3>
-    <p>大会の一覧です。<strong>募集中・進行中・終了</strong>のタブで切り替えます。<strong>参加は募集中タブから</strong>。大会を開くと、<strong>大会情報</strong>と<strong>ルール</strong>のタブ、<strong>対戦表</strong>・<strong>出場選手一覧</strong>への入口があります。</p>
-  </li>
-  <li class="guide-page-card">
-    <h3>選手</h3>
-    <p><strong>名前を入れて探す</strong>ページです。一覧は出ません ── 検索した名前に当たった選手だけが並びます。<strong>ゲームアカウントIDや以前の名前でも</strong>見つかります。選手を開くと順位・戦歴・使用キャラクターが見られます。</p>
-  </li>
-  <li class="guide-page-card">
-    <h3>対戦環境を整える</h3>
-    <p>回線・コントローラーなど、大会当日までに整えておきたいものの案内です（広告を含みます）。</p>
-  </li>
-  <li class="guide-page-card">
-    <h3>大会作成</h3>
-    <p><strong>選手登録を済ませると現れます</strong>（それまではメニューにありません）。<strong>「大会」ページの右下にある丸い「＋」</strong>からも入れます。大会は誰でも開けます ── 作った人がその大会の運営になります。くわしくは<a href="/guide/" data-guide-target="guide-host">4. 大会を開きたい人へ</a>。</p>
-  </li>
-  <li class="guide-page-card">
-    <h3>エントリー状況</h3>
-    <p>自分がエントリー・出場した大会が<strong>エントリー中／出場中／過去に出場</strong>に分かれて並びます。<strong>自分の大会へはここから</strong>が早道です。</p>
-  </li>
-  <li class="guide-page-card">
     <h3>マイページ</h3>
-    <p>ログイン・選手登録と、<strong>自分のプロフィール</strong>。鉛筆アイコンから編集します。</p>
+    <p>ログイン・選手登録と、<strong>自分のプロフィール</strong>。鉛筆アイコンから編集します。作り方は<a href="/guide/" data-guide-target="guide-account">0. アカウントの作り方</a>。</p>
   </li>
   <li class="guide-page-card">
     <h3>お問い合わせ（X）</h3>
@@ -264,6 +282,216 @@
   </li>
 </ul>
 
+<!-- ---- B. 大会に出る人が使うページ ---- -->
+<div class="guide-group reveal">
+  <span class="guide-group-mark" aria-hidden="true">B</span>
+  <h3>大会に出る人が使うページ</h3>
+</div>
+<p class="guide-group-lead">
+  探す → 名乗る → 戦う。<strong>出るあいだに触るのはこれだけ</strong>で、
+  運営の操作（締切・回戦の開始）は出てきません。
+</p>
+
+<figure class="guide-figure guide-figure-wide guide-demo reveal" data-steps="4">
+  <div class="guide-demo-stage">
+    <!-- 1段目：大会ページ -->
+    <div class="guide-demo-screen" data-demo-in="1" data-demo-out="2">
+      <p class="guide-demo-url">/tournaments/{大会ID}/</p>
+      <h4>IgniteArena Cup #7</h4>
+      <p class="tournament-status-line">
+        <span class="status-chip status-recruiting guide-inert">募集中</span>
+        <span class="meta-line">9/6(土) 20:00 ・ 1v1</span>
+      </p>
+      <div class="info-tabs">
+        <span class="info-tab is-active guide-inert">大会情報</span>
+        <span class="info-tab guide-inert">ルール</span>
+      </div>
+      <span class="link-card guide-inert">
+        <span class="link-card-main">
+          <span class="link-card-title">トーナメントを見る</span>
+          <span class="link-card-note">締め切ると作られます</span>
+        </span>
+        <span class="link-card-arrow" aria-hidden="true">→</span>
+      </span>
+      <span class="link-card guide-inert">
+        <span class="link-card-main">
+          <span class="link-card-title">出場選手一覧を見る</span>
+          <span class="link-card-note">24人</span>
+        </span>
+        <span class="link-card-arrow" aria-hidden="true">→</span>
+      </span>
+      <dl class="tournament-info-grid">
+        <div><dt>エントリー</dt><dd>24 / 32人</dd></div>
+        <div><dt>形式</dt><dd>ダブルエリミネーション</dd></div>
+      </dl>
+    </div>
+
+    <!-- 2〜3段目：エントリーの島（押す前と押した後を同じ場所で入れ替える） -->
+    <div class="guide-demo-screen" data-demo-in="2" data-demo-out="4">
+      <p class="guide-demo-url">/tournaments/{大会ID}/</p>
+      <div class="guide-demo-swap">
+        <div class="entry-cta" data-demo-in="2" data-demo-out="3">
+          <span class="as-link btn-entry guide-inert" data-demo-tap="2">ログインしてエントリー</span>
+          <p class="entry-cta-slots">残り8人</p>
+        </div>
+        <div class="entry-cta" data-demo-in="3">
+          <p class="entry-cta-entered">エントリー済み（募集中は取り消せます）</p>
+          <span class="as-link btn-secondary guide-inert">エントリーを取り消す</span>
+        </div>
+      </div>
+      <p class="note">この島は画面の下端に貼り付いて、ページのどこを読んでいても出ています。</p>
+    </div>
+
+    <!-- 4段目：対戦表 -->
+    <div class="guide-demo-screen" data-demo-in="4">
+      <p class="guide-demo-url">/tournaments/{大会ID}/bracket/</p>
+      <div class="match-box">
+        <div class="match-player">
+          <span class="seed-badge">2</span>
+          <div class="player-name">NOVA</div>
+          <span class="player-score"></span>
+        </div>
+        <div class="match-player">
+          <span class="seed-badge">9</span>
+          <div class="player-name">あなた</div>
+          <span class="player-score"></span>
+        </div>
+      </div>
+      <!-- 実物の帯は position: fixed なので、図では .guide-ownbar-mock で包む
+           （中身は実物のまま。css/guide.css の注記を参照）。 -->
+      <div class="guide-ownbar-mock">
+        <div class="own-match-panel">
+          <span class="own-match-label">あなたの対戦</span>
+          <span class="own-match-round">1回戦</span>
+          <span class="own-match-vs">vs NOVA</span>
+          <span class="own-match-status is-live">試合開始</span>
+          <span class="as-link own-match-open guide-inert" data-demo-tap="4">対戦を開く</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <ol class="guide-demo-steps">
+    <li>大会ページで中身を確かめます。<strong>対戦表</strong>と<strong>出場選手一覧</strong>への入口も、日時や形式の表もここに。</li>
+    <li>下端の島から<strong>エントリー</strong>。残り枠と締切までの残り時間が、ボタンのすぐ隣に出ます。</li>
+    <li>押すと<strong>エントリー済み</strong>に変わります。<strong>募集のあいだは取り消せます</strong>。</li>
+    <li>対戦表では、<strong>「あなたの対戦」の帯</strong>から自分の対戦を開きます ── 表の中から自分を探す必要はありません。</li>
+  </ol>
+  <button type="button" class="guide-demo-replay">もう一度</button>
+  <figcaption>エントリーの入口は、この島ひとつだけです</figcaption>
+</figure>
+
+<ul class="guide-pages">
+  <li class="guide-page-card">
+    <h3>大会</h3>
+    <p>大会の一覧です。<strong>募集中・進行中・終了</strong>のタブで切り替えます。<strong>参加は募集中タブから</strong>。手順は<a href="/guide/" data-guide-target="guide-entry">2. 大会エントリー方法</a>。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>エントリー状況</h3>
+    <p>自分がエントリー・出場した大会が<strong>エントリー中／出場中／過去に出場</strong>に分かれて並びます。<strong>自分の大会へはここから</strong>が早道です。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>対戦表</h3>
+    <p>大会ページの<strong>「トーナメントを見る」</strong>から開きます。締め切った時点の戦績で<strong>シード</strong>が決まります。自分の対戦は下端の帯から開きます。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>出場選手一覧</h3>
+    <p>その大会に出る顔ぶれ。<strong>名前の五十音順</strong>です。1枠ずつの見た目は対戦表の対戦カードと同じなので、ここで見た枠がそのまま表の中で見つかります。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>選手</h3>
+    <p><strong>名前を入れて探す</strong>ページです。一覧は出ません ── 検索した名前に当たった選手だけが並びます。<strong>ゲームアカウントIDや以前の名前でも</strong>見つかります。選手を開くと順位・戦歴・使用キャラクターが見られます。</p>
+  </li>
+</ul>
+
+<!-- ---- C. 大会を開く人が使うページ ---- -->
+<div class="guide-group reveal">
+  <span class="guide-group-mark" aria-hidden="true">C</span>
+  <h3>大会を開く人が使うページ</h3>
+</div>
+<p class="guide-group-lead">
+  <strong>大会は誰でも開けます。</strong>作った人がその大会の運営になり、
+  進行に要る操作が<strong>その大会にだけ</strong>開きます。出るだけの人には出てきません。
+</p>
+
+<figure class="guide-figure guide-figure-wide guide-demo reveal" data-steps="3">
+  <div class="guide-demo-stage">
+    <!-- 1〜2段目：大会ページの下にある運営の操作 -->
+    <div class="guide-demo-screen" data-demo-in="1" data-demo-out="3">
+      <p class="guide-demo-url">/tournaments/{大会ID}/</p>
+      <h4>秋のオープン 2026</h4>
+      <p class="tournament-status-line">
+        <span class="guide-demo-swap">
+          <span class="status-chip status-unpublished guide-inert" data-demo-in="1" data-demo-out="2">公開前</span>
+          <span class="status-chip status-recruiting guide-inert" data-demo-in="2">募集中</span>
+        </span>
+        <span class="meta-line">10/4(土) 20:00 ・ 1v1</span>
+      </p>
+      <div class="guide-demo-swap">
+        <span class="as-link guide-inert" data-demo-in="1" data-demo-out="2" data-demo-tap="1">公開する</span>
+        <span class="as-link guide-inert" data-demo-in="2" data-demo-tap="2">締め切ってブラケット生成</span>
+      </div>
+      <p class="note">運営の操作は、大会ページのいちばん下にまとまっています。</p>
+    </div>
+
+    <!-- 3段目：対戦表の、回戦ごとの操作 -->
+    <div class="guide-demo-screen" data-demo-in="3">
+      <p class="guide-demo-url">/tournaments/{大会ID}/bracket/</p>
+      <div class="round-header">R1</div>
+      <div class="guide-round-mock">
+        <span class="round-status started guide-inert">進行中</span>
+        <span class="guide-round-note">配信台 1試合</span>
+        <span class="as-link guide-inert guide-mini-btn" data-demo-tap="3">R1 を開始</span>
+      </div>
+      <p class="note">押すまで、選手はゲームカウントを入れられません。</p>
+    </div>
+  </div>
+  <ol class="guide-demo-steps">
+    <li>作っただけでは<strong>誰にも見えません</strong>。「公開する」を押して、はじめて募集が始まります。</li>
+    <li>集まったら<strong>「締め切ってブラケット生成」</strong>。その時点の戦績でシードが決まり、対戦表ができます。</li>
+    <li>対戦表の<strong>回戦ごとに「開始」</strong>。押すと、その回戦の選手が結果を入れられるようになります。</li>
+  </ol>
+  <button type="button" class="guide-demo-replay">もう一度</button>
+  <figcaption>くわしくは<a href="/guide/" data-guide-target="guide-host">4. 大会を開きたい人へ</a></figcaption>
+</figure>
+
+<ul class="guide-pages">
+  <li class="guide-page-card">
+    <h3>大会作成</h3>
+    <p><strong>選手登録を済ませると現れます</strong>（それまではメニューにありません）。<strong>「大会」ページの右下にある丸い「＋」</strong>からも入れます。日程・対戦方法・定員・締切を決めて公開します。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>配信用スコアボード</h3>
+    <p>対戦カードから開く、<strong>配信に乗せるための1枚</strong>（運営だけ）。そのURLを<strong>OBSのブラウザソース</strong>に貼ると、背景が透けたスコアボードだけが映像に乗ります。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>届いている通報</h3>
+    <p>選手・大会への通報が集まる場所（運営だけ）。<strong>自動では何も止めません</strong> ── 読んで判断するのは人です。</p>
+  </li>
+</ul>
+
+<!-- ---- D. そのほかのページ ---- -->
+<div class="guide-group reveal">
+  <span class="guide-group-mark" aria-hidden="true">D</span>
+  <h3>そのほかのページ</h3>
+</div>
+<p class="guide-group-lead">
+  普段の流れには出てきませんが、それぞれ役割を持っています。
+</p>
+
+<ul class="guide-pages">
+  <li class="guide-page-card">
+    <h3>対戦環境を整える</h3>
+    <p>回線・コントローラーなど、大会当日までに整えておきたいものの案内です（広告を含みます）。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>順位発表</h3>
+    <p>ランキングはサイトに表を置いていません。集計したものを、この画面から発表として出します（サイトの持ち主だけ）。仕組みは<a href="/guide/" data-guide-target="guide-ranking">3. ランキングの仕組み</a>。</p>
+  </li>
+  <li class="guide-page-card">
+    <h3>利用規約・プライバシーポリシー</h3>
+    <p>ページのいちばん下（フッター）から開けます。</p>
+  </li>
+</ul>
 <!-- ================= 2. 大会エントリー方法 ================= -->
 <h2 class="guide-chapter reveal" id="guide-entry"><span class="guide-chapter-num">2</span>大会エントリー方法</h2>
 <p class="guide-chapter-lead">

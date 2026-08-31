@@ -513,6 +513,349 @@
 .guide-figure .ranking-mark { width: 100%; }
 
 /* ---------------------------------------------------------------------------
+   1章：使う人ごとのグループ分けと、動く図
+
+   【なぜグループに分けたか】ページを名前の順に並べても、読む人は自分に関係の
+   ある行がどれかを自分で選り分けることになる。触る画面は立場でほとんど決まる
+   （出るだけの人は大会作成を一度も開かない）ので、立場で束ねて、上から
+   「登録する → 出る → 開く」の順に置く。番号は束ごとに振り直す。
+
+   【動く図（.guide-demo）】押す前と押した後を続けて見せる。段が進むと何が
+   変わるかはここに書き、いま何段目かを教えるのは js/guideDemo.js の役目。
+   図の中身は実物のクラス（.card / .match-box / .entry-cta …）で組んであるので、
+   このファイルで足すのは「図の中に置いたときの大きさ」と「段ごとの出し入れ」だけ。
+
+   【動きを止めている人には最後の段で置く】js 側が自動で進めず、下のボタンが
+   「1段ずつ見る」に変わる。ここでは移り変わりの時間を 0 にして、切り替えが
+   一瞬で済むようにしておく。
+   --------------------------------------------------------------------------- */
+
+.guide-group {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  margin: 2.5rem 0 0.9rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* 束の番号。章番号（塗りつぶしの四角）・段番号（枠線の四角）と同じページに並ぶので、
+   こちらは面を持たない字だけにして、形で見分けられるようにする。
+
+   【輪郭だけにしないこと】-webkit-text-stroke で中を抜くと、I・II・III のように
+   縦棒だけの字は細い線の集まりになって、番号ではなく罫線か描画の乱れに見える
+   （実際そう見えた）。字は塗って、面を持たないことで区別する。 */
+.guide-group-mark {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--accent-bright);
+}
+
+.guide-group h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.guide-group-lead {
+  margin: 0 0 1.1rem;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.85;
+}
+
+.guide-group-lead strong { color: var(--text); }
+
+/* ---- 動く図 ---- */
+
+.guide-demo { align-items: stretch; gap: 1rem; }
+
+/* 段ごとに中身を入れ替える場所。
+
+   【重ねるのは js/guideDemo.js が用意できたときだけ】重ねてよいのは
+   「1つだけ出す」を誰かが引き受けている場合に限る。JSが届かないまま重ねると、
+   全部の段が同じ場所に折り重なって読めなくなる ── そこで、重ねる・隠すの
+   仕掛けは .is-playable（JSが付ける）の下にだけ置き、それが無いときは
+   ただの縦並びとして最後まで読める形に落とす。 */
+.guide-demo-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.guide-demo.is-playable .guide-demo-stage {
+  display: grid;
+  justify-items: center;
+  /* 升目の高さはいちばん背の高い段に合わせて決まる。短い段を上に寄せると
+     下だけが大きく空いて、図が途中で終わっているように見えるので、縦にも中央へ。 */
+  align-items: center;
+  gap: 0;
+}
+
+/* 重ねると、出ている段が変わっても図の高さが変わらない
+   （読んでいる途中で下の文が跳ね上がらない）。 */
+.guide-demo.is-playable .guide-demo-stage > * { grid-area: 1 / 1; }
+
+/* 図の中の1画面。実物の部品を縦に積むだけの器 */
+.guide-demo-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: min(100%, 330px);
+  text-align: left;
+}
+
+/* 同じ場所で見た目だけが入れ替わるもの（押す前のボタン／押した後の知らせ、
+   公開前のバッジ／募集中のバッジ）。重ねて置くので、切り替わっても図が動かない。
+   .guide-demo-stage と同じ理由で、重ねるのは .is-playable のときだけ。 */
+.guide-demo-swap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.guide-demo.is-playable .guide-demo-swap { display: grid; gap: 0; }
+.guide-demo.is-playable .guide-demo-swap > * { grid-area: 1 / 1; }
+
+/* 「あなたの対戦」の帯の図。実物（.own-match-bar）は position: fixed なので
+   そのままでは図に持ち込めない（画面に貼り付いてしまう）。中身の
+   .own-match-panel から下は実物のまま使い、帯の見た目だけをここで作る。 */
+.guide-ownbar-mock {
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.guide-ownbar-mock .own-match-panel { padding: 0.5rem 0.6rem; gap: 0.25rem 0.5rem; }
+.guide-ownbar-mock .own-match-vs { font-size: 0.85rem; }
+.guide-ownbar-mock .own-match-label { font-size: 0.66rem; }
+.guide-ownbar-mock .own-match-open { padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+
+/* その画面のURL。ページごとに本物のパスがあることも、ここで伝わる */
+.guide-demo-url {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  color: var(--text-faint);
+}
+
+.guide-demo-screen h4 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.guide-demo-screen .meta-line { margin: 0; font-size: 0.75rem; }
+.guide-demo-screen .note { margin: 0; font-size: 0.75rem; }
+
+/* 図の中のタブ・入口は span なので、button や a と同じ箱の形をここで与える
+   （.guide-chat-mock .chat-tab と同じ理由） */
+.guide-demo .info-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: default;
+}
+
+.guide-demo .info-tabs { margin: 0; }
+
+.guide-demo .link-card {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  cursor: default;
+}
+
+.guide-demo .link-card-title { font-size: 0.85rem; }
+.guide-demo .link-card-note { font-size: 0.72rem; }
+
+.guide-demo .tournament-info-grid > div { padding: 0.45rem 0.6rem; }
+.guide-demo .tournament-info-grid dt { font-size: 0.68rem; }
+.guide-demo .tournament-info-grid dd { font-size: 0.78rem; }
+
+.guide-demo .entry-cta { margin: 0; }
+
+/* 実物のエントリーボタンはゆっくり発光し続ける（.btn-entry の entry-glow）。
+   本物では「ここが決め所」の合図だが、図の中では止めておく ── 説明を読んでいる
+   あいだじゅう光り続けるものが横にあると、そちらに目を持っていかれる。 */
+.guide-demo .btn-entry {
+  min-height: 0;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  animation: none;
+}
+
+.guide-demo .btn-entry::after { content: none; }
+
+/* 一覧のカードは実物のまま置くと画像枠（160px）で図が埋まる。
+   ここで見せたいのは題と状態なので、枠だけ低くする。 */
+.guide-demo .card-thumb { height: 74px; font-size: 1.5rem; }
+.guide-demo .card-body { padding: 0.7rem 0.8rem 0.8rem; }
+.guide-demo .card-title { font-size: 0.9rem; }
+.guide-demo .card-date { font-size: 0.75rem; }
+
+.guide-demo .match-box { width: 100%; }
+
+.guide-demo .stat-row { border: 0; }
+.guide-demo .stat-item { padding: 0 0.7rem; }
+.guide-demo .stat-item:first-child { padding-left: 0; }
+.guide-demo .stat-num { font-size: 1.6rem; }
+.guide-demo .stat-label { margin-bottom: 0.35rem; }
+
+/* ---- 段ごとの出し入れ ---- */
+
+/* 出ていない段のものは、場所を取ったまま透明にする（消すと図が跳ねる）。
+   --i を付けた要素は、その順に少しずつ遅れて現れる。
+   隠すのは .is-playable のときだけ ── そうしないと、JSが届かなかったときに
+   図が空の箱になる。 */
+.guide-demo.is-playable [data-demo-in] {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  transition-delay: calc(var(--i, 0) * 45ms);
+}
+
+.guide-demo.is-playable [data-demo-in].is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+/* 【重ねてあるものは、溶かさずに切り替えること】同じ升目に置いたもの同士を
+   フェードで入れ替えると、消えかけと出かけが 0.4 秒ぶん重なって、対戦表と
+   大会ページが二重写しになる（実際そう見えた）。重なる相手がいるのは
+   .guide-demo-stage と .guide-demo-swap の直下だけなので、そこだけ即座に
+   切り替える。重なる相手がいないもの（メニューの項目が順に出るなど）は
+   上の規則のままフェードする。 */
+.guide-demo.is-playable .guide-demo-stage > [data-demo-in],
+.guide-demo.is-playable .guide-demo-swap > [data-demo-in] {
+  transition: none;
+  transform: none;
+}
+
+/* 段を進めるボタンも、進める相手がいるときだけ出す */
+.guide-demo:not(.is-playable) .guide-demo-replay { display: none; }
+
+/* 「ここを押す」の合図。押せる部品そのものに輪を出す ── 矢印を別に置くと、
+   図が縮んだときに指す先とずれる。 */
+.guide-demo .is-tapped { position: relative; }
+
+.guide-demo .is-tapped::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 2px solid var(--accent);
+  border-radius: var(--r-sm);
+  animation: guide-demo-tap 1.2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes guide-demo-tap {
+  0%   { transform: scale(0.9); opacity: 0; }
+  35%  { opacity: 1; }
+  100% { transform: scale(1.12); opacity: 0; }
+}
+
+/* ---- 段の説明 ---- */
+
+.guide-demo-steps {
+  list-style: none;
+  counter-reset: guide-demo-step;
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.guide-demo-steps li {
+  position: relative;
+  padding: 0.5rem 0.7rem 0.5rem 2.3rem;
+  border-radius: var(--r-sm);
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  line-height: 1.75;
+  counter-increment: guide-demo-step;
+  transition: color 0.3s ease, background 0.3s ease;
+}
+
+.guide-demo-steps li::before {
+  content: counter(guide-demo-step);
+  position: absolute;
+  left: 0.65rem;
+  top: 0.62rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-faint);
+  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* いま図に出ている段。読む人が図と文を行き来せずに済むよう、
+   両方が同時に光る（図は中身が変わり、こちらは面が付く）。 */
+.guide-demo-steps li.is-current {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.guide-demo-steps li.is-current::before {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: var(--accent-fg);
+}
+
+.guide-demo-steps li.is-done { color: var(--text-dim); }
+.guide-demo-steps li strong { color: inherit; font-weight: 700; }
+
+.guide-demo-replay {
+  align-self: center;
+  min-height: 0;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  box-shadow: none;
+}
+
+.guide-demo-replay:hover {
+  border-color: var(--accent);
+  background: transparent;
+  color: var(--accent-bright);
+}
+
+/* 動きを止めている人には、切り替えも光の輪も出さない。
+   図は最後の段の形で置かれ、ボタンで1段ずつ見られる（js/guideDemo.js）。 */
+@media (prefers-reduced-motion: reduce) {
+  .guide-demo.is-playable [data-demo-in] { transition: none; }
+  .guide-demo .is-tapped::after { animation: none; opacity: 1; }
+}
+
+/* ---------------------------------------------------------------------------
    狭い画面の調整（ガイドのぶん）
 
    css/style.css の「狭い画面の調整」から移してきた。上書きは上書きされる側と

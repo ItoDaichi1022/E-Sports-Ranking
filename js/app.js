@@ -81,6 +81,14 @@ async function loadScoreboard() {
   return scoreboardMod;
 }
 
+// 「はじめに」の動く図。本文（pages/guide.html）と同じで、そのページを開いた
+// 人だけが要るものなので、ここでも同じ扱いにする。
+let guideDemoMod = null;
+async function loadGuideDemo() {
+  guideDemoMod ??= await import('/js/guideDemo.js');
+  return guideDemoMod;
+}
+
 // 大会作成画面でのシード順（index 0 = シード1位）。ブラケット生成前の一時的な状態。
 let selectedParticipantIds = [];
 let currentBracketTournamentId = null;
@@ -516,6 +524,17 @@ function loadStaticPage(viewId) {
       // 中身が入ったいま初めて演出を仕掛けられる（routeFromLocation が呼んだ時点では
       // この器はまだ空で、仕掛ける相手がいなかった）。
       initStage(el);
+
+      // 動く図（.guide-demo）があるページだけ、そのための小さなモジュールを足す。
+      // 本文が届いてからでないと、仕掛ける相手がいない ── initStage と同じ理由。
+      // 図が無いページ（利用規約・プライバシーポリシー）では取りに行かない。
+      if (el.querySelector('.guide-demo')) {
+        loadGuideDemo()
+          .then(({ initGuideDemos }) => initGuideDemos(el))
+          // 図が動かなくても本文は読める。読めなくなるほうが困るので、
+          // ここで転んでもページ全体は巻き込まない。
+          .catch((err) => console.error('動く図を用意できませんでした', err));
+      }
     })
     .catch((err) => {
       // 読めなかったときは、白紙のまま放置せず理由を出して読み直せるようにする
