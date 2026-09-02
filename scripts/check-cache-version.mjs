@@ -774,8 +774,15 @@ if (!existsSync(catalogPath)) {
 // img/character/（単数）は見ない。あそこはPNGの配布素材を置く場所で、.gitignore と
 // .assetsignore の両方で外してあるためGitにも配信にも載らない。普段は手元に無いので
 // 気付きにくいが、キャラクターを足すときだけ置くことになり、そのとき必ず引っかかる。
+//
+// img/logo-src/ も見ない。サイトのロゴの元絵（透過PNG）で、ここから game-logo.webp と
+// icon.webp / icon.png を書き出している。Gitには入れる（大きさが332KBなうえ、
+// これを失うと別の寸法で書き出し直せなくなる）が、.assetsignore で配信からは外す。
 
-const SKIP_DIRS = new Set([path.join(ROOT, 'img', 'character')]);
+const SKIP_DIRS = new Set([
+  path.join(ROOT, 'img', 'character'),
+  path.join(ROOT, 'img', 'logo-src'),
+]);
 const ALLOWED_NON_WEBP = new Set(['img/icon.png']);
 const IMAGE_EXT = /\.(png|jpe?g|gif|bmp|tiff?|avif)$/i;
 

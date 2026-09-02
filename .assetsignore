@@ -25,6 +25,11 @@ node_modules
 # あちらを外すと、選ぶ画面もプロフィールの絵も全部出なくなる。
 img/character
 
+# サイトのロゴの元絵（透過PNG）。ここから img/game-logo.webp と icon.webp / icon.png を
+# 書き出しており、配信で読まれるのは書き出したほうだけ。元絵は別の寸法で作り直すために
+# Gitには残すが、上げても誰も読まないぶん丸ごと無駄になるので配信からは外す。
+img/logo-src
+
 # 共有リンク（/t/{大会ID}）を返す Worker の原本。これは「配信するファイル」ではなく
 # 「Cloudflare 上で動くコード」で、wrangler が main として別に読んで束ねる。
 # 除外しないと同じ中身が /worker/index.js としても配信されてしまう（実害は無いが、

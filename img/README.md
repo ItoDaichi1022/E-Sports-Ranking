@@ -11,6 +11,7 @@
 | `character_back.webp` | 順位発表（`#reveal`）の使用キャラクターの列に敷く地 | 横長 WebP（不透過） | 100KB以下 |
 | `characters/` | キャラクターの切り抜き（**自動生成**。下記参照） | WebP（透過） | 1枚90KB以下 |
 | `character/` | 上の元になる配布素材（**普段は置かない**。下記参照） | PNG | — |
+| `logo-src/` | 上3つのロゴ・アイコンの元絵（**配信しない**。下記参照） | PNG（透過） | — |
 
 **ここに置く画像はWebPにする。**唯一の例外が `icon.png` で、iOSのホーム画面に
 追加したときのアイコン（`apple-touch-icon`）だけはWebPを読んでくれないため、
@@ -24,7 +25,7 @@
 
 1. 同じ名前で上書きする（参照している場所を変えなくて済む）
 2. **`game-logo.webp` を差し替えたときは、`index.html` の `<img id="hero-game-logo">` の
-   `width` / `height` を新しい画像の実寸に書き換える**（現在は 700×623）。
+   `width` / `height` を新しい画像の実寸に書き換える**（現在は 466×429）。
    ここが実寸と合っていないと、画像を読み終えるまでのあいだ確保される場所の
    高さがずれる。とくに書き忘れて高さが 0 になると、ホームのロゴが
    スクロール演出（clip-path）で開かないまま出てこない。
@@ -51,26 +52,43 @@
 - **透過の余白を切り落とす。** 配布素材は上下左右に大きな透明の余白が入っている
   ことが多い。余白ごと表示すると、ロゴが小さく見えるうえに、その上下に
   説明のつかない空きができる。
-- **幅700px程度に縮小する。** 画面に出るのは最大230pxで、高精細画面（3倍）でも
-  690pxあれば足りる。元の解像度のまま置いても、きれいには見えない。
+- **幅466px程度に縮小する。** 画面に出るのは最大230pxなので、高精細画面（2倍）に
+  ちょうど合う。元の解像度のまま置いても、きれいには見えない。
+  3倍ぶんの700pxも試したが、`check-cache-version.mjs` の 40KB の基準を
+  どう書き出しても超えた（quality 80 で 60KB）。
 - **WebPで書き出す。** グラデーションの多いロゴはPNGだとほとんど縮まない
   （実測: 700px幅で PNG 400KB に対し WebP 52KB）。
+- **40KBに収まる quality を実測で探す。** 太い黒の輪郭が全面に走るロゴは
+  写真より高いビットレートを要る。実測（466px幅）で quality 90 は 46.9KB あり、
+  それだけで基準を超えた。いまは quality 80 で 37.0KB。
 
 アイコンは**正方形**にすること。横長のまま入れるとタブの中で縮んで潰れる。
 256×256 あれば、スマホのホーム画面（180〜192px）にもタブ（16〜32px）にも足りる。
-こちらは透過させず、背景まで含めた1枚の絵にしておくと小さくしても形が保たれる
-（透過が全面不透明なら、アルファ面はただの無駄なので落とす）。
+こちらは透過させず、背景まで含めた1枚の絵にしておくと小さくしても形が保たれる。
+元絵が透過なら、サイトの地の色 `#050505`（`css/style.css` の `--bg`、
+`index.html` の `theme-color` と同じ）を敷いて潰す ── iOSはホーム画面の
+アイコンの透過を黒で埋めるので、ここで色を決めておかないと端末任せになる。
 
 差し替えるときは、元絵1枚から2つ書き出す:
 
 ```bash
 npm install --no-save sharp
-node -e "const s=require('sharp');s('元絵.png').resize(256,256).removeAlpha().webp({quality:90,effort:6}).toFile('img/icon.webp');s('元絵.png').resize(256,256).removeAlpha().png({palette:true,quality:100,effort:10}).toFile('img/icon.png')"
+node -e "const s=require('sharp');const a=()=>s('img/logo-src/元絵.png').resize(256,256,{fit:'contain',background:'#050505'}).flatten({background:'#050505'});a().webp({quality:90,effort:6}).toFile('img/icon.webp');a().png({palette:true,quality:100,effort:10}).toFile('img/icon.png')"
 ```
 
-ドット絵なので可逆WebPも試したが82KBで、`quality:90` の25KBと256pxでは
-見分けが付かなかった。タブは16〜32px、iOSのホーム画面でも180pxなのでこれで足りる。
-PNGはパレット化しないと4倍近く膨らむ（139KB → 36KB）。
+タブは16〜32px、iOSのホーム画面でも180pxなので、256pxで `quality:90` あれば足りる。
+PNGはパレット化しないと4倍近く膨らむ。
+
+## ロゴの元絵（`logo-src/`）
+
+`game-logo.webp` と `icon.webp` / `icon.png` は、すべて `img/logo-src/` の
+透過PNGから書き出している。**配信はしない**（`.assetsignore` で外してある）が、
+**Gitには入れる** ── 合わせて332KBしかないうえ、これを失うと別の寸法で
+書き出し直せなくなるため。`img/character/`（2.3GBで手元にも置かない）とは
+そこが違う。
+
+`scripts/check-cache-version.mjs` の「img/ はWebPにそろっているか」の検査も、
+このフォルダだけは見ない（元絵はPNGのまま置くのが正しいため）。
 
 ## キャラクターの画像（`character/` と `characters/`）
 
