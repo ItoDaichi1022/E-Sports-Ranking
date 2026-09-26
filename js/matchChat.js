@@ -661,31 +661,35 @@ function editConfirmedRow() {
 // ダイアログを閉じずに別のタブで開く）。
 //
 // 【2本あるのは、スコアボードが2ページに分かれているため】
-//   操作画面   ゲームカウントを動かす画面。ふだん開くのはこちら
+//   操作画面   出す対戦を選び、ゲームカウントを動かす画面。ふだん開くのはこちら
 //   表示専用   OBSのブラウザソースに貼るURL。ボードの絵しか描かない
 // 操作画面のほうにも貼るURLは出ているので、どちらから入っても行き着ける。
 // それでも表示専用を1本出しておくのは、右クリックで写せるようにするため
 // ── 開いてから中のURL欄を写すより、そのほうが手数が少ない。
-function scoreboardRow(tournament, match) {
+//
+// 【どちらのURLにも対戦IDを付けない】スコアボードのURLは大会ごとに1本で固定され、
+// 出す対戦は操作画面の一覧で選ぶ（js/scoreboard.js）。ここで ?match= を付けて
+// しまうと、対戦ごとに別のURLがあるように見えて、OBSの貼り替えが要ると誤解される。
+function scoreboardRow(tournament) {
   const row = document.createElement('div');
   row.className = 'chat-scoreboard-row';
 
   const note = document.createElement('p');
   note.className = 'chat-scoreboard-note';
-  note.textContent = 'この対戦の配信スコアボード。操作画面でゲームカウントを動かし、'
-    + 'OBSのブラウザソースには表示専用のURLを貼ります（幅1920×高さ360が目安）。';
+  note.textContent = 'この大会の配信スコアボード。操作画面で出す対戦を選んでゲームカウントを動かし、'
+    + 'OBSのブラウザソースには表示専用のURLを貼ります（大会ごとに1本で、対戦が変わっても貼り替え不要）。';
 
   const control = document.createElement('a');
   control.className = 'scoreboard-link';
-  control.href = pathFor('scoreboardControl', tournament.id, { match: match.id });
+  control.href = pathFor('scoreboardControl', tournament.id);
   control.target = '_blank';
   control.rel = 'noopener';
   control.textContent = '操作画面を開く';
-  control.title = '配信卓用。ゲームカウントを動かす画面（OBSに貼るURLもここに出ます）';
+  control.title = '配信卓用。出す対戦を選び、ゲームカウントを動かす画面（OBSに貼るURLもここに出ます）';
 
   const view = document.createElement('a');
   view.className = 'scoreboard-link is-sub';
-  view.href = pathFor('scoreboard', tournament.id, { match: match.id });
+  view.href = pathFor('scoreboard', tournament.id);
   view.target = '_blank';
   view.rel = 'noopener';
   view.textContent = 'OBS用のURL（表示専用）';
@@ -713,7 +717,7 @@ function renderResultPanel() {
   const tournament = findTournament(room?.tournamentId);
   if (!match || !tournament || match.isBye) return;
   if (!match.player1Id || !match.player2Id) return;
-  resultEl.appendChild(scoreboardRow(tournament, match));
+  resultEl.appendChild(scoreboardRow(tournament));
 }
 
 function renderResultBody() {

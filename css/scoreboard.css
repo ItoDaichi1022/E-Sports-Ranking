@@ -712,6 +712,134 @@ a.sb-ctrl-mini {
   color: #82868d;
 }
 
+/* ---- 配信台に出す対戦の一覧 ----
+   押したカードがそのまま表示専用の画面（OBS）に出る。いま出しているカードは
+   サイトの差し色（黄緑）で縁取り、ひと目で「どれが映っているか」が分かるようにする。 */
+
+.sb-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px;
+  border: 1px solid #2b2f35;
+  border-radius: 14px;
+  background: #0a0b0d;
+}
+.sb-pick-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.sb-pick-label {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  color: #c3f53c;
+}
+.sb-pick-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #9aa0a8;
+  cursor: pointer;
+}
+.sb-pick-toggle input { margin: 0; min-height: 0; accent-color: #c3f53c; }
+
+/* 出している対戦の結果が入ったときの「次を選んでください」 */
+.sb-pick-note {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: #f4d37a;
+  background: rgba(244, 211, 122, 0.08);
+  border: 1px solid rgba(244, 211, 122, 0.35);
+  border-radius: 8px;
+}
+
+.sb-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* 回戦が多い大会でも、下のURL欄が画面の外へ押し出されないように */
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.sb-pick-round { display: flex; flex-direction: column; gap: 6px; }
+.sb-pick-round-name {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #82868d;
+}
+.sb-pick-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.sb-pick-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 9px 11px;
+  text-align: left;
+  font: inherit;
+  color: #d6dae0;
+  background: #131619;
+  border: 1px solid #2b2f35;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.sb-pick-card:hover { background: #1b1f24; border-color: #4c545d; }
+.sb-pick-card.is-done { opacity: 0.6; }
+.sb-pick-card.is-current {
+  opacity: 1;
+  border-color: #c3f53c;
+  box-shadow: inset 0 0 0 1px #c3f53c;
+  background: #161b10;
+}
+
+.sb-pick-names {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #eef1f4;
+}
+.sb-pick-name {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-pick-name:last-child { text-align: right; }
+.sb-pick-vs { flex: none; font-size: 0.68rem; color: #82868d; }
+
+.sb-pick-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.sb-pick-tags:empty { display: none; }
+.sb-pick-tag {
+  padding: 1px 6px;
+  font-size: 0.66rem;
+  line-height: 1.5;
+  color: #9aa0a8;
+  border: 1px solid #363c43;
+  border-radius: 999px;
+}
+.sb-pick-tag.is-onair { color: #0a0b0d; background: #c3f53c; border-color: #c3f53c; font-weight: 700; }
+.sb-pick-tag.is-stream { color: #ff8d92; border-color: rgba(255, 141, 146, 0.5); }
+.sb-pick-tag.is-done { color: #7fb0ff; border-color: rgba(127, 176, 255, 0.45); }
+
+.sb-pick-empty { margin: 0; font-size: 0.78rem; color: #82868d; }
+
 /* 幅の狭い端末（配信卓がノートPCのことも、手元のスマートフォンのこともある）。
    区切りの縦線は、行が折り返すと意味を持たないので消す。 */
 @media (max-width: 680px) {
