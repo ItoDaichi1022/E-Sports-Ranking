@@ -1,8 +1,27 @@
-// 配信用スコアボード（/tournaments/{大会ID}/scoreboard/?match={対戦ID}）
+// 配信用スコアボード。URLは2つあり、どちらもこのモジュールが受け持つ。
+//
+//   表示専用  /tournaments/{大会ID}/scoreboard/?match={対戦ID}
+//             OBSのブラウザソースに貼るURL。スコアボードの絵だけを描く
+//   操作画面  /tournaments/{大会ID}/scoreboard/control/?match={対戦ID}
+//             配信卓の人がゲームカウントを動かす画面
+//
+// 【なぜ2つに分けたか】
+// もとは1つのURLで、マウスが動いたかキーが押されたかで見た目を切り替えていた
+// ── OBSのブラウザソースにはどちらも届かないので、「人が触ったら操作パネル」は
+// 理屈としては通っていた。破れていたのは、読み込みに失敗したときの案内だけが
+// その切り替えの外にあったこと。大会が取れなければ「大会が見つかりません」と
+// いう文字がボードと入れ替わって出るので、それがそのまま中継の画に乗る。
+//
+// 表示専用を別のURLにして、あの画面には案内を描く道そのものを持たせない
+// （下の fail() が、モードによって正反対に振る舞う）。うまく組めなかったときは
+// 何も描かず、既に出ているボードはそのまま残す ── 中継の画にとっては、
+// 数字が数秒古いことより、絵が文字に化けることのほうがずっと困る。
+//
+// 【表示専用が元のURLを引き継いでいる】OBSに貼られているURLはこの形なので、
+// 操作画面と入れ替えると、配信中の設定が操作パネルを映し始めてしまう。
 //
 // 【これは「ページ」ではなく「素材」】
-// OBSのブラウザソースにこのURLを貼ると、映像の上にスコアボードだけが乗る。
-// だからこの画面には、ヘッダーもナビもフッターも背景も無い ── 背景が透けて
+// 表示専用の側には、ヘッダーもナビもフッターも背景も無い ── 背景が透けて
 // いなければ、中継の画に黒い長方形が貼り付くことになる。打ち消しは
 // css/style.css の body.scoreboard-only が担い（scoreboard.css ではない ──
 // あちらは開いてから読まれるので、届くまでヘッダーが見えてしまう）、
@@ -12,15 +31,9 @@
 // DBが持っているのは確定した最終スコア（matches.score の "3-1"）だけで、
 // 試合の途中経過はどこにも無い ── ゲームカウントは入力した瞬間に確定する
 // 作りなので、そもそも「1-0 の状態」が保存される場面が無い（js/matchChat.js）。
-// そこで配信中は、この画面の上で人が動かす。
+// そこで配信中は、操作画面の上で人が動かす。
 //
-//   * 人がここにいると分かるのは、マウスが動くかキーを押したときだけ
-//     （OBSのブラウザソースには基本どちらも届かない）。その瞬間に一度だけ
-//     「操作している人のモード」に切り替わり、ボードは消えて操作パネルだけが残る
-//     ── ボードと操作パネルが同時に出ている状態を作らない。OBS側はどちらの
-//     入力も受け取らないので、この切り替えが起きることはなく、ボードだけが
-//     ずっと映り続ける
-//   * 配信卓の人は、同じURLを自分のブラウザでも開いて、そちらから操作する
+//   * 配信卓の人は操作画面を自分のブラウザで開き、OBSには表示専用のURLを貼る
 //   * 2つのブラウザ（操作用とOBS）は Supabase Realtime のブロードキャストで
 //     つなぐ。テーブルは増やさない ── 配信中の一時的な数字で、残す意味が無い
 //
@@ -47,6 +60,15 @@ const FIT_H = 0.9;
 // 同じ値にしてあること ── ここだけ変えると、見た目の余白と拡大率の計算が
 // 食い違い、ボードの下端が余白の外まではみ出す（＝画面の下辺で切れる）。
 const BOTTOM_GAP_RATIO = 0.032;
+
+// 表示専用（OBS用）と操作画面。器（#scoreboard-root）は同じものを使い、
+// 中身の作りと「失敗したときにどう振る舞うか」がこの値で変わる。
+const MODE_VIEW = 'view';
+const MODE_CONTROL = 'control';
+
+// いまどちらのページを組んでいるか。closeScoreboard では戻さない
+// ── 戻す相手がおらず、次に描くときは必ず render が入れ直すため。
+let mode = MODE_VIEW;
 
 // 回戦名の見せ方。ブラケットが持っているのは F / SF / QF / R3 という短い記号で、
 // これは対戦表の中で場所を取らないための表記。中継の画に出す札は読ませる字にする。
@@ -226,7 +248,7 @@ function buildBoard() {
 }
 
 // ---------------------------------------------------------------------------
-// 操作パネル
+// 操作パネル（操作画面だけが持つ）
 // ---------------------------------------------------------------------------
 
 function buildControls(onDelta, onReset, onSwap) {
@@ -261,14 +283,36 @@ function buildControls(onDelta, onReset, onSwap) {
   const text = el('div', 'sb-ctrl-text');
   text.append(
     el('span', 'sb-ctrl-hint', 'Q/A＝左の＋−　P/L＝右の＋−　S＝左右入れ替え　R＝0-0'),
-    el('span', 'sb-ctrl-hint', 'OBSのブラウザソースは 幅1920×高さ360 が目安。この操作欄は映像に出ません'),
   );
 
-  const urlBox = el('div', 'sb-ctrl-url');
+  bar.append(
+    left.root,
+    el('span', 'sb-ctrl-sep'),
+    right.root,
+    el('span', 'sb-ctrl-sep'),
+    swap, reset,
+    el('span', 'sb-ctrl-sep'),
+    text,
+  );
+
+  return { root: bar, left, right };
+}
+
+// OBSに貼るURLを渡す欄。操作画面の役目のうち、カウントを動かすことと並んで
+// 大きいのがこれ ── 配信卓の人がまず要るのは「どのURLを貼るか」で、
+// 操作画面のURL（いま開いているURL）をそのまま貼られると操作パネルが映る。
+function buildObsUrl() {
+  const box = el('div', 'sb-obs');
+
+  const label = el('p', 'sb-obs-label', 'OBSのブラウザソースに貼るURL（表示専用）');
+
+  const row = el('div', 'sb-obs-row');
   const url = document.createElement('input');
   url.type = 'text';
   url.readOnly = true;
-  url.setAttribute('aria-label', 'このスコアボードのURL');
+  url.className = 'sb-obs-input';
+  url.setAttribute('aria-label', 'OBSのブラウザソースに貼るURL');
+
   const copy = el('button', 'sb-ctrl-mini', 'URLをコピー');
   copy.type = 'button';
   copy.addEventListener('click', async () => {
@@ -282,21 +326,46 @@ function buildControls(onDelta, onReset, onSwap) {
     }
     setTimeout(() => { copy.textContent = 'URLをコピー'; }, 1800);
   });
-  urlBox.append(url, copy);
 
-  bar.append(
-    left.root,
-    el('span', 'sb-ctrl-sep'),
-    right.root,
-    el('span', 'sb-ctrl-sep'),
-    swap, reset,
-    el('span', 'sb-ctrl-sep'),
-    text,
-    el('span', 'sb-ctrl-sep'),
-    urlBox,
-  );
+  // 別のタブで開いて確かめられるようにしておく。貼る前に「本当にボードだけが
+  // 出るURLか」を見られたほうが安心して使える。
+  const open = el('a', 'sb-ctrl-mini', '別のタブで開く');
+  open.target = '_blank';
+  open.rel = 'noopener';
 
-  return { root: bar, left, right, url };
+  row.append(url, copy, open);
+
+  const note = el('p', 'sb-obs-note',
+    '幅1920×高さ360が目安。この操作画面のURLではなく、上のURLを貼ってください。');
+
+  box.append(label, row, note);
+  return { root: box, url, open };
+}
+
+// 操作画面の見出し。いま何を操作しているのかを、ボードを見なくても分かる字で置く。
+//
+// 【戻る導線をここに持つ】この画面でも body に .scoreboard-only が付くので、
+// ヘッダーもナビも消えている（css/style.css）。一本も置かないと、配信卓の人は
+// ブラウザの戻るボタンしか手が無くなる ── 対戦表から別のタブで開いていれば、
+// そこには戻り先の履歴も無い。
+function buildHead(tournamentId) {
+  const head = el('div', 'sb-panel-head');
+
+  const back = el('a', 'sb-panel-back', '← 対戦表へ');
+  back.href = pathFor('bracket', tournamentId);
+
+  const title = el('h1', 'sb-panel-title', '配信スコアボード｜操作画面');
+  const meta = el('p', 'sb-panel-meta');
+  head.append(back, title, meta);
+  return { root: head, meta };
+}
+
+// ボードを枠に収めた見本。操作画面には映像が無いので、ここが「いまOBSに
+// 出ている絵」を確かめられる唯一の場所になる。
+function buildPreview(viewport) {
+  const box = el('div', 'sb-preview');
+  box.append(el('p', 'sb-preview-label', 'OBSに映っている絵'), viewport);
+  return box;
 }
 
 // ---------------------------------------------------------------------------
@@ -373,6 +442,8 @@ function paint({ bumpLeft = false, bumpRight = false } = {}) {
   const [a, b] = live.swapped ? [live.b, live.a] : [live.a, live.b];
   paintScore(ui.board.left.score, a, bumpLeft);
   paintScore(ui.board.right.score, b, bumpRight);
+  // 操作パネルは操作画面にしか無い（表示専用のページは ui.controls を持たない）
+  if (!ui.controls) return;
   ui.controls.left.num.textContent = String(a);
   ui.controls.right.num.textContent = String(b);
 }
@@ -381,12 +452,12 @@ function paint({ bumpLeft = false, bumpRight = false } = {}) {
 // 拡大率
 // ---------------------------------------------------------------------------
 
-function applyScale() {
-  if (!ui) return;
+// OBSに出す側。画面いっぱいを使い、下辺に寄せて置く。
+function streamScale() {
   // ボードは下辺に寄せてあるので、高さの側は「画面の高さそのもの」ではなく
   // 「下の余白を引いた、実際に置ける高さ」を基準にする。
   const usableHeight = window.innerHeight * (1 - BOTTOM_GAP_RATIO);
-  const scale = Math.min(
+  return Math.min(
     (window.innerWidth * FIT_W) / DESIGN_W,
     (usableHeight * FIT_H) / DESIGN_H,
     // 【1倍より上へは伸ばさない】ここを開けておくと、1920×1080 のブラウザソース
@@ -395,11 +466,24 @@ function applyScale() {
     // 設計どおりの大きさで止めて、余ったぶんは左右の余白にする。
     1,
   );
-  ui.board.board.style.setProperty('--sb-scale', String(scale));
+}
+
+// 操作画面の見本。こちらは画面ではなく、見本の枠の幅に収める。
+function previewScale() {
+  const width = ui.board.viewport.clientWidth || window.innerWidth;
+  return Math.min((width * FIT_W) / DESIGN_W, 1);
+}
+
+function applyScale() {
+  if (!ui) return;
+  // --sb-scale は .sb-viewport に入れる。.sb-board はこれを継いで scale() に使い、
+  // 操作画面のほうは同じ値から見本の枠の高さも決める（css/scoreboard.css）。
+  const scale = mode === MODE_CONTROL ? previewScale() : streamScale();
+  ui.board.viewport.style.setProperty('--sb-scale', String(scale));
 }
 
 // ---------------------------------------------------------------------------
-// 2つのブラウザをつなぐ（操作用とOBS）
+// 2つのブラウザをつなぐ（操作画面とOBS）
 //
 // テーブルは作らない。配信中しか意味を持たない数字なので、Realtime の
 // ブロードキャスト（DBを経由しない一時的な通知）だけで足りる。
@@ -520,31 +604,8 @@ function swapSides() {
 
 let redrawEntrants = () => {};
 
-// ---------------------------------------------------------------------------
-// 「操作している人」への切り替え
-//
-// マウスが動くかキーを押した時点で、この画面を開いているのはOBSではなく
-// 人だと分かる（OBSのブラウザソースは「対話」を開かないかぎりどちらも送らない）。
-// そこで一度だけ、ボードを隠して操作パネルだけを残す ── 両方が同時に
-// 出ている状態を作らない。名前と数字はパネルの中にも出ているので、
-// ボードが無くても何を操作しているかは分かる。
-//
-// 【一度切り替えたら戻さない】マウスが止まるたびにボードへ戻すと、
-// 操作の合間にちらつく。人が使っているとすでに分かっている以上、
-// 戻す理由が無い。
-// ---------------------------------------------------------------------------
-
-let operatorMode = false;
-
-function enterOperatorMode() {
-  if (!ui || operatorMode) return;
-  operatorMode = true;
-  document.body.classList.add('sb-operator-mode');
-  ui.controls.root.classList.add('is-shown');
-  // 役目を終えたので外す。以後は onKeyDown からだけ呼ばれる形になる
-  window.removeEventListener('mousemove', enterOperatorMode);
-}
-
+// キーで動かす。操作画面にしか付けない ── 表示専用のページは、何が届いても
+// 数字が動かないほうが安全（OBSのブラウザソースは「対話」を開くとキーを送れる）。
 const KEYS = {
   q: () => bump('left', +1),
   a: () => bump('left', -1),
@@ -561,8 +622,69 @@ function onKeyDown(e) {
   const fn = KEYS[e.key.toLowerCase()];
   if (!fn) return;
   e.preventDefault();
-  enterOperatorMode();
   fn();
+}
+
+// ---------------------------------------------------------------------------
+// 組めなかったとき
+//
+// ここがこの2ページを分けた理由そのもの。
+//   操作画面 … 人が読む画面なので、理由と次の一手を文字で出す
+//   表示専用 … 文字は出さない。出ているボードはそのまま残し、少し待って組み直す
+// ---------------------------------------------------------------------------
+
+// 表示専用が組み直すまでの待ち。続けて失敗するほど間隔を空ける
+// （消えた大会のURLがOBSに残っていても、5秒ごとに問い合わせ続けないため）。
+const RETRY_STEP_MS = 5000;
+const RETRY_MAX_MS = 30000;
+
+let retryTimer = null;
+let retryCount = 0;
+
+function clearRetry() {
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = null;
+  retryCount = 0;
+}
+
+// 【自分ではDBを読み直さない】データの取り直しは js/app.js が受け持っていて、
+// Realtime が切れているあいだも1分ごとに全件を取り直している（保険の照合）。
+// ここから loadAll を呼ぶと、あちらの読み込み中フラグと取り合うことになる。
+// このタイマーがやるのは「届いているかもう一度見て、組めるなら組む」だけ。
+function scheduleRetry(tournamentId) {
+  if (retryTimer) return;
+  retryCount += 1;
+  const wait = Math.min(RETRY_STEP_MS * retryCount, RETRY_MAX_MS);
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    // 別のページへ移っていたら、もう組み直す先が無い。
+    //
+    // 【器が出ているかどうかでは見分けられない】操作画面とは同じ <section> を
+    // 共有しているので、あちらを開いていても器は出たままになる。URLで見ること
+    // ── そうしないと、待ちの残ったまま操作画面へ移った人の画面を、
+    // このタイマーが表示専用に組み替えてしまう。
+    if (!root()) return;
+    if (location.pathname !== pathFor('scoreboard', tournamentId)) return;
+    renderScoreboardPage(tournamentId);
+  }, wait);
+}
+
+function showNotice(html) {
+  const host = root();
+  if (!host) return;
+  closeScoreboard();
+  document.body.classList.add('scoreboard-only', 'sb-control-mode');
+  host.innerHTML = `<div class="sb-notice">${html}</div>`;
+}
+
+function fail(tournamentId, html) {
+  if (mode === MODE_CONTROL) {
+    showNotice(html);
+    return;
+  }
+  // 表示専用。中継の画に文字を出さない ── 描いてあるボードには触らず、
+  // 何も描けていなければ透明なまま置いておく。
+  scheduleRetry(tournamentId);
 }
 
 // ---------------------------------------------------------------------------
@@ -573,25 +695,40 @@ function root() {
   return document.getElementById('scoreboard-root');
 }
 
-function showNotice(html) {
-  closeScoreboard();
-  const host = root();
-  if (!host) return;
-  document.body.classList.add('scoreboard-only');
-  host.innerHTML = `<div class="sb-notice">${html}</div>`;
+// OBSのブラウザソースに貼るURL。操作画面だけが使う。
+function obsUrlFor(tournamentId, matchId) {
+  return new URL(pathFor('scoreboard', tournamentId, { match: matchId }), location.origin).href;
 }
 
-export async function renderScoreboardPage(tournamentId) {
+// OBS用（表示専用）。/tournaments/{大会ID}/scoreboard/
+export function renderScoreboardPage(tournamentId) {
+  return render(tournamentId, MODE_VIEW);
+}
+
+// 配信卓の操作画面。/tournaments/{大会ID}/scoreboard/control/
+export function renderScoreboardControlPage(tournamentId) {
+  return render(tournamentId, MODE_CONTROL);
+}
+
+async function render(tournamentId, wantMode) {
   const host = root();
   if (!host) return;
 
+  // 2つのページは器を共有している。サイトの中で行き来したときは作りが違うので、
+  // 組み立て直す前に前のページぶんを畳む。
+  if (mode !== wantMode) {
+    closeScoreboard();
+    mode = wantMode;
+  }
+
   document.body.classList.add('scoreboard-only');
+  if (mode === MODE_CONTROL) document.body.classList.add('sb-control-mode');
 
   const tournament = findTournament(tournamentId);
   if (!tournament) {
     // 届く前に「無い」と言い切らない（他のページと同じ扱い）
     if (!db.hasLoadedOnce()) return;
-    showNotice('<h2>大会が見つかりません</h2>'
+    fail(tournamentId, '<h2>大会が見つかりません</h2>'
       + '<p>この大会は存在しないか、削除されています。</p>'
       + `<p><a href="${pathFor('tournaments')}">大会一覧へ</a></p>`);
     return;
@@ -606,13 +743,13 @@ export async function renderScoreboardPage(tournamentId) {
       await db.loadBracket(tournamentId);
     }
   } catch (err) {
-    showNotice(`<h2>読み込めませんでした</h2><p>${escapeHtml(err.message)}</p>`);
+    fail(tournamentId, `<h2>読み込めませんでした</h2><p>${escapeHtml(err.message)}</p>`);
     return;
   }
 
   const bracket = state.brackets[tournamentId];
   if (!bracket) {
-    showNotice('<h2>対戦表がまだありません</h2>'
+    fail(tournamentId, '<h2>対戦表がまだありません</h2>'
       + '<p>スコアボードは対戦カードから作ります。募集を締め切って対戦表を組むと使えるようになります。</p>'
       + `<p><a href="${pathFor('tournament', tournamentId)}">大会の詳細へ</a></p>`);
     return;
@@ -621,11 +758,14 @@ export async function renderScoreboardPage(tournamentId) {
   const wanted = new URLSearchParams(location.search).get('match');
   const found = (wanted ? findMatch(bracket, wanted) : null) ?? defaultMatch(tournamentId, bracket);
   if (!found) {
-    showNotice('<h2>出せる対戦がありません</h2>'
+    fail(tournamentId, '<h2>出せる対戦がありません</h2>'
       + '<p>この大会の対戦表に、表示できる対戦カードが見つかりませんでした。</p>'
       + `<p><a href="${pathFor('bracket', tournamentId)}">対戦表へ</a></p>`);
     return;
   }
+
+  // ここまで来られたので、組み直しの待ちは畳む
+  clearRetry();
 
   const { match, round } = found;
 
@@ -637,6 +777,7 @@ export async function renderScoreboardPage(tournamentId) {
   if (!sameMatch) {
     closeScoreboard();
     document.body.classList.add('scoreboard-only');
+    if (mode === MODE_CONTROL) document.body.classList.add('sb-control-mode');
 
     const saved = loadSaved(tournamentId, match.id);
     const fromDb = confirmedCount(match);
@@ -652,23 +793,31 @@ export async function renderScoreboardPage(tournamentId) {
     };
 
     const board = buildBoard();
-    const controls = buildControls(bump, resetCount, swapSides);
-    controls.url.value = location.href;
-
     host.innerHTML = '';
-    host.append(board.viewport, controls.root);
-    ui = { board, controls };
+
+    if (mode === MODE_CONTROL) {
+      const head = buildHead(tournamentId);
+      const controls = buildControls(bump, resetCount, swapSides);
+      const obs = buildObsUrl();
+      obs.url.value = obsUrlFor(tournamentId, match.id);
+      obs.open.href = obs.url.value;
+
+      const panel = el('div', 'sb-panel');
+      panel.append(head.root, buildPreview(board.viewport), controls.root, obs.root);
+      host.appendChild(panel);
+      ui = { board, controls, head };
+
+      window.addEventListener('keydown', onKeyDown);
+      teardown.push(() => window.removeEventListener('keydown', onKeyDown));
+    } else {
+      host.appendChild(board.viewport);
+      ui = { board, controls: null, head: null };
+    }
 
     connect(tournamentId, match.id);
 
     window.addEventListener('resize', applyScale);
-    window.addEventListener('mousemove', enterOperatorMode);
-    window.addEventListener('keydown', onKeyDown);
-    teardown = [
-      () => window.removeEventListener('resize', applyScale),
-      () => window.removeEventListener('mousemove', enterOperatorMode),
-      () => window.removeEventListener('keydown', onKeyDown),
-    ];
+    teardown.push(() => window.removeEventListener('resize', applyScale));
   }
 
   // 出場枠のIDと、対戦表に出しているシード番号
@@ -683,14 +832,22 @@ export async function renderScoreboardPage(tournamentId) {
       : [match.player1Id, match.player2Id];
     fillSide(ui.board.left, tournamentId, p1, seedOf(p1));
     fillSide(ui.board.right, tournamentId, p2, seedOf(p2));
-    ui.controls.left.nameEl.textContent = getEntrantName(tournamentId, p1) ?? 'TBD';
-    ui.controls.right.nameEl.textContent = getEntrantName(tournamentId, p2) ?? 'TBD';
+    if (ui.controls) {
+      ui.controls.left.nameEl.textContent = getEntrantName(tournamentId, p1) ?? 'TBD';
+      ui.controls.right.nameEl.textContent = getEntrantName(tournamentId, p2) ?? 'TBD';
+    }
     fitNames(ui.board.left.name, ui.board.right.name);
   };
 
   redrawEntrants();
   fillCore(ui.board.core, tournament);
   ui.board.core.round.textContent = roundLabelOf(match, round);
+
+  // 操作画面の見出し。ボードの見本とは別に、字でも何を操作しているかを出す
+  if (ui.head) {
+    ui.head.meta.textContent = [tournament.name, roundLabelOf(match, round)]
+      .filter(Boolean).join('　｜　');
+  }
 
   // まだ誰も触っていないうちは、確定済みの最終スコアに追従する
   // （試合が終わったあとのリザルト表示に、そのまま使えるようにするため）
@@ -701,11 +858,12 @@ export async function renderScoreboardPage(tournamentId) {
 
   paint();
   applyScale();
-  // 文字の大きさは、画面に入って幅が確定してからでないと測れない。
+  // 文字の大きさと見本の枠の幅は、画面に入ってからでないと測れない。
   // 組み立てた直後のこの1回だけは、枠の幅がまだ 0 のまま測れていることがある
   // （上の redrawEntrants の中でも呼んでいるが、そちらは器を足す前に走りうる）。
   requestAnimationFrame(() => {
     if (!ui) return;
+    applyScale();
     fitNames(ui.board.left.name, ui.board.right.name);
   });
 }
@@ -713,8 +871,8 @@ export async function renderScoreboardPage(tournamentId) {
 // 別のページへ移るとき、js/app.js から呼ぶ。
 // body のクラスを外し忘れると、移った先でヘッダーもナビも消えたままになる。
 export function closeScoreboard() {
-  document.body.classList.remove('scoreboard-only', 'sb-operator-mode');
-  operatorMode = false;
+  document.body.classList.remove('scoreboard-only', 'sb-control-mode');
+  clearRetry();
   teardown.forEach((fn) => fn());
   teardown = [];
   disconnect();

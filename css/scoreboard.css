@@ -1,13 +1,20 @@
 /* ============================================================================
-   配信用スコアボード（/tournaments/{大会ID}/scoreboard/）
+   配信用スコアボード
 
    この画面だけで使うCSS。開くのは配信卓に立つ人だけなので、<head> では読まず
    <section data-css> から遅れて読む（js/app.js の loadViewCss）。
 
+   【2つのURLぶんが入っている】
+     /tournaments/{大会ID}/scoreboard/          表示専用。OBSのブラウザソースに貼る
+     /tournaments/{大会ID}/scoreboard/control/  配信卓の操作画面
+   このファイルの大半（ボードの絵）は両方が使い、操作画面だけの作りは
+   body.sb-control-mode の節にまとめてある。分けた理由は js/scoreboard.js の
+   冒頭に書いてある。
+
    【この画面が他と違うところ】
-   サイトの一部として見る画面ではない。OBSのブラウザソースにURLを貼って、
-   その1枚を映像に重ねるための「素材」で、ヘッダーもナビもフッターも背景も無い
-   ── 背景を透過させないと、映像の上に黒い長方形が乗ってしまう。
+   表示専用のほうは、サイトの一部として見る画面ではない。OBSのブラウザソースに
+   URLを貼って、その1枚を映像に重ねるための「素材」で、ヘッダーもナビもフッターも
+   背景も無い ── 背景を透過させないと、映像の上に黒い長方形が乗ってしまう。
    その打ち消しは body.scoreboard-only（css/style.css）が担う。
 
    【絵づくりの方針 ── 削って読ませる】
@@ -42,7 +49,10 @@
    置き場所と拡大率
 
    設計上の寸法は 1300 × 132 px に固定してあり、画面の大きさに合わせて
-   transform: scale() で縮める（倍率は js/scoreboard.js が --sb-scale に入れる）。
+   transform: scale() で縮める。倍率は js/scoreboard.js が --sb-scale に入れる
+   ── 入れる先は .sb-board ではなく .sb-viewport のほう。.sb-board は継いだ値を
+   scale() に使い、操作画面の見本の枠は同じ値から自分の高さを決める
+   （縮めるのは transform なので、レイアウト上の高さは 132px から動かない）。
    px で組んで最後に拡大縮小するほうが、部品どうしの噛み合わせが崩れない
    ── 板の重なりを % で組むと、幅が変わるたびに継ぎ目がずれる。
 
@@ -61,6 +71,8 @@
    下の余白（BOTTOM_GAP_RATIO）は js/scoreboard.js の拡大率計算と対にしてある。
    --------------------------------------------------------------------------- */
 
+/* 【操作画面では作りが変わる】あちらでは画面いっぱいの固定枠ではなく、
+   流れの中に置く「見本の箱」になる（body.sb-control-mode の節で上書きする）。 */
 .sb-viewport {
   position: fixed;
   inset: 0;
@@ -454,82 +466,127 @@
 }
 
 /* ---------------------------------------------------------------------------
-   操作パネル
+   操作画面（/tournaments/{大会ID}/scoreboard/control/）
 
-   配信卓の人が、同じURLを自分のブラウザでも開いてここからカウントを動かす。
-   OBSのブラウザソースにはマウスが届かないので、「マウスが動いたときだけ出す」
-   ことがそのまま「映像には絶対に出ない」ことになる。
+   配信卓の人が開く画面。ここで動かしたカウントが Realtime のブロードキャストで
+   OBS側（表示専用のURL）へ届く。
+
+   【以前はこれを同じ1ページの中で出し隠ししていた】マウスが動いたら操作パネルを
+   出す、という作りだったので、パネルは position:fixed で浮かせ、既定では
+   opacity:0 で消してあった。ページを分けたいま、その仕掛けは要らない
+   ── ここへ来るのは人だけなので、上から下へ素直に積む。
+
+   並べる順は「見出し → OBSに映っている絵 → カウントの操作 → 貼るURL」。
+   配信卓に着いた人が最初に要るのは絵の確認とURLで、カウントを動かすのは
+   試合が始まってからになる。
    --------------------------------------------------------------------------- */
 
-/* 【下ではなく上に置いてある】操作用ブラウザで開いたときの見え方の話で、
-   OBS側の映像には映らない（マウスが動いたときだけ出るこの仕組みそのものは
-   変わらない）。ボードが画面の下辺に寄ったので、下に置くと重なってしまう。 */
-.sb-controls {
-  position: fixed;
-  left: 50%;
-  top: 18px;
-  transform: translateX(-50%) translateY(-14px);
-  z-index: 10;
+body.sb-control-mode #scoreboard-root {
+  min-height: 100vh;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  max-width: min(96vw, 1560px);
-  gap: 10px 18px;
-  padding: 12px 18px;
-  border: 1px solid #2b2f35;
-  border-radius: 14px;
-  background: rgba(10, 11, 13, 0.94);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+  padding: 28px 16px 48px;
+  box-sizing: border-box;
+}
+
+.sb-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 1360px;
+  /* ボードの中だけが Oxanium。ここは読む文字なので、サイト共通の書体に寄せる */
   font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
                "Noto Sans JP", sans-serif;
   font-size: 0.85rem;
   color: #d6dae0;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
 }
 
-.sb-controls.is-shown {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(0);
+/* 【style.css の button を打ち消していること】サイト共通のボタンは min-height と
+   影を持っている。ここで消しておかないと、38px の四角のつもりが縦に伸びて、
+   操作欄が2倍の高さになる（実際そうなった）。 */
+.sb-panel button {
+  min-height: 0;
+  box-shadow: none;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
-/* ---------------------------------------------------------------------------
-   操作している人だけのモード（body.sb-operator-mode）
-
-   マウスが動く・キーが押される、のどちらかで「ここにいるのはOBSではなく
-   人だ」と分かった瞬間に一度だけ付く（js/scoreboard.js の enterOperatorMode）。
-   以後は外れない ── OBSのブラウザソースはふつうどちらの入力も送らないので、
-   ここに来るのは人が直接この画面を開いて操作しているときだけ。
-
-   ボードを消し、操作パネルだけをページの中央に据える。名前とカウントは
-   パネルの中にも出ているので、ボードが無くても何を操作しているかは分かる。 */
-
-body.sb-operator-mode .sb-viewport {
-  display: none;
-}
-
-body.sb-operator-mode {
-  /* ボードが消えると transparent のままでは素の白い背景が出てしまう
-     （<html> 側に地の色を持たせていないため）。ここは人が見る画面なので、
-     OBS用の透過をやめて、サイトの地の色に戻す。 */
-  background: var(--bg, #050505);
-}
-
-body.sb-operator-mode #scoreboard-root {
-  min-height: 100vh;
+.sb-panel-head {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* ヘッダーもナビも消えている画面なので、戻り先はここにしか無い */
+.sb-panel-back {
+  align-self: flex-start;
+  margin-bottom: 2px;
+  font-size: 0.78rem;
+  text-decoration: none;
+  color: #9aa0a8;
+}
+.sb-panel-back:hover { color: #c3f53c; }
+.sb-panel-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #eef1f4;
+}
+.sb-panel-meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #9aa0a8;
+}
+
+/* ---- OBSに映っている絵の見本 ----
+   操作画面には映像が無いので、ここが「いま中継に出ている絵」を確かめられる
+   唯一の場所になる。地を暗くしてあるのは、実際に乗るのが暗い映像の上だから。 */
+
+.sb-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sb-preview-label {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: #82868d;
+}
+
+/* 表示専用のときの .sb-viewport は画面いっぱいの固定枠（上の節）。
+   操作画面では、ただの箱として流れの中に置く。 */
+body.sb-control-mode .sb-viewport {
+  position: static;
+  inset: auto;
+  align-items: center;
+  width: 100%;
+  /* 【高さをここで決めている理由】ボードは 1300×132 の器を transform で縮める
+     だけなので、レイアウト上の高さは 132px から変わらない。縮めた絵に枠を
+     合わせるには、同じ倍率（--sb-scale。js/scoreboard.js が .sb-viewport に
+     入れる）から高さを組み立てるしかない。足している 32px は上下の余白。 */
+  height: calc(132px * var(--sb-scale, 1) + 32px);
+  padding-bottom: 0;
+  border: 1px solid #22262c;
+  border-radius: 12px;
+  background: #0a0b0d;
+  overflow: hidden;
+}
+
+/* ---- カウントの操作 ---- */
+
+.sb-controls {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-}
-
-body.sb-operator-mode .sb-controls {
-  position: static;
-  transform: none;
-  opacity: 1;
-  visibility: visible;
+  gap: 10px 18px;
+  padding: 14px 18px;
+  border: 1px solid #2b2f35;
+  border-radius: 14px;
+  background: #0a0b0d;
 }
 
 .sb-ctrl-group {
@@ -550,16 +607,6 @@ body.sb-operator-mode .sb-controls {
 }
 .sb-ctrl-group.is-left  .sb-ctrl-label { color: #7fb0ff; text-align: right; }
 .sb-ctrl-group.is-right .sb-ctrl-label { color: #ff8d92; }
-
-/* 【style.css の button を打ち消していること】サイト共通のボタンは min-height と
-   影を持っている。ここで消しておかないと、38px の四角のつもりが縦に伸びて、
-   操作欄が2倍の高さになる（実際そうなった）。 */
-.sb-controls button {
-  min-height: 0;
-  box-shadow: none;
-  white-space: nowrap;
-  box-sizing: border-box;
-}
 
 .sb-ctrl-btn {
   width: 36px;
@@ -601,23 +648,6 @@ body.sb-operator-mode .sb-controls {
   white-space: nowrap;
 }
 
-.sb-ctrl-url {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.sb-ctrl-url input {
-  width: 24ch;
-  min-height: 0;
-  margin: 0;
-  padding: 7px 8px;
-  font-size: 0.72rem;
-  color: #c8ccd2;
-  background-color: #131619;
-  border: 1px solid #2b2f35;
-  border-radius: 7px;
-  box-shadow: none;
-}
 .sb-ctrl-mini {
   padding: 8px 11px;
   font-size: 0.72rem;
@@ -629,9 +659,72 @@ body.sb-operator-mode .sb-controls {
   cursor: pointer;
 }
 .sb-ctrl-mini:hover { background: #262c33; }
+/* 「別のタブで開く」だけはリンク（貼る前に本物を見られるようにしてある）。
+   ボタンと同じ見た目にそろえるので、下線と行の高さだけ打ち消す。 */
+a.sb-ctrl-mini {
+  display: inline-block;
+  text-decoration: none;
+}
 
-/* 対戦が選ばれていない・見つからないときの案内。ここだけは映像用ではないので
-   （そもそも出す絵が無い）、普通の文字として真ん中に置く。 */
+/* ---- OBSに貼るURL ----
+   操作画面の役目のうち、カウントを動かすことと並んで大きいのがこれ。
+   配信卓の人がまず要るのは「どのURLを貼るか」で、いま開いているURL
+   （操作画面のURL）を貼られると、操作パネルがそのまま中継の画に出る。 */
+
+.sb-obs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px;
+  border: 1px solid #2b2f35;
+  border-radius: 14px;
+  background: #0a0b0d;
+}
+.sb-obs-label {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  color: #c3f53c;
+}
+.sb-obs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sb-obs-input {
+  flex: 1 1 24ch;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 9px 10px;
+  font-size: 0.78rem;
+  color: #c8ccd2;
+  background-color: #131619;
+  border: 1px solid #2b2f35;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.sb-obs-note {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: #82868d;
+}
+
+/* 幅の狭い端末（配信卓がノートPCのことも、手元のスマートフォンのこともある）。
+   区切りの縦線は、行が折り返すと意味を持たないので消す。 */
+@media (max-width: 680px) {
+  .sb-ctrl-sep { display: none; }
+  .sb-ctrl-hint { white-space: normal; }
+  .sb-ctrl-label { min-width: 6ch; }
+}
+
+/* 読み込めなかったときの案内。
+   【これが出るのは操作画面だけ】表示専用のページ（OBSに貼るURL）には、この字を
+   描く道そのものが無い ── 中継の画に文字が出るくらいなら、古いボードが
+   残っているほうがましなので、あちらは何も描かずに黙って組み直しを待つ
+   （js/scoreboard.js の fail）。 */
 .sb-notice {
   position: fixed;
   inset: 0;
@@ -669,5 +762,4 @@ body.sb-operator-mode .sb-controls {
 
 @media (prefers-reduced-motion: reduce) {
   .sb-score.is-bumped { animation: none; }
-  .sb-controls { transition: none; }
 }

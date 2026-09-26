@@ -659,24 +659,39 @@ function editConfirmedRow() {
 // ボタンにすると、その一番よく使う操作ができなくなる。
 // target="_blank" なので router.js のリンク横取りも素通りする（この対戦の
 // ダイアログを閉じずに別のタブで開く）。
+//
+// 【2本あるのは、スコアボードが2ページに分かれているため】
+//   操作画面   ゲームカウントを動かす画面。ふだん開くのはこちら
+//   表示専用   OBSのブラウザソースに貼るURL。ボードの絵しか描かない
+// 操作画面のほうにも貼るURLは出ているので、どちらから入っても行き着ける。
+// それでも表示専用を1本出しておくのは、右クリックで写せるようにするため
+// ── 開いてから中のURL欄を写すより、そのほうが手数が少ない。
 function scoreboardRow(tournament, match) {
   const row = document.createElement('div');
   row.className = 'chat-scoreboard-row';
 
   const note = document.createElement('p');
   note.className = 'chat-scoreboard-note';
-  note.textContent = 'この対戦のスコアボード。URLをOBSのブラウザソースに貼ると、'
-    + '映像の下部にスコアバナーが出ます（幅1920×高さ360が目安）。';
+  note.textContent = 'この対戦の配信スコアボード。操作画面でゲームカウントを動かし、'
+    + 'OBSのブラウザソースには表示専用のURLを貼ります（幅1920×高さ360が目安）。';
 
-  const link = document.createElement('a');
-  link.className = 'scoreboard-link';
-  link.href = pathFor('scoreboard', tournament.id, { match: match.id });
-  link.target = '_blank';
-  link.rel = 'noopener';
-  link.textContent = '配信スコアボードを開く';
-  link.title = 'OBSのブラウザソース用のURL（右クリックでURLを写せます）';
+  const control = document.createElement('a');
+  control.className = 'scoreboard-link';
+  control.href = pathFor('scoreboardControl', tournament.id, { match: match.id });
+  control.target = '_blank';
+  control.rel = 'noopener';
+  control.textContent = '操作画面を開く';
+  control.title = '配信卓用。ゲームカウントを動かす画面（OBSに貼るURLもここに出ます）';
 
-  row.append(note, link);
+  const view = document.createElement('a');
+  view.className = 'scoreboard-link is-sub';
+  view.href = pathFor('scoreboard', tournament.id, { match: match.id });
+  view.target = '_blank';
+  view.rel = 'noopener';
+  view.textContent = 'OBS用のURL（表示専用）';
+  view.title = 'OBSのブラウザソースに貼るURL（右クリックでURLを写せます）';
+
+  row.append(note, control, view);
   return row;
 }
 

@@ -49,10 +49,27 @@ export const ROUTES = [
   // URLでも大会の一部だと分かる形にしておく。
   ['bracket', '/tournaments/:id/bracket/'],
   ['entrants', '/tournaments/:id/entrants/'],
-  // 配信用スコアボード。OBSのブラウザソースにURLを直接貼って使う画面で、
-  // ヘッダーもナビも背景も出さず、スコアボードの絵だけを描く。
-  // どの対戦を出すかは ?match={対戦ID}（対戦表のカードから開くと付いてくる）。
+  // 配信用スコアボードは2つのURLに分かれている。
+  //
+  //   scoreboard        … OBSのブラウザソースに貼る、表示専用の画面。ヘッダーもナビも
+  //                       背景も出さず、スコアボードの絵だけを描く。文字の案内
+  //                       （「大会が見つかりません」など）は何があっても出さない
+  //   scoreboardControl … 配信卓の人がカウントを動かす操作画面。人が読む画面なので、
+  //                       読み込めなかったときは普通に理由を出す
+  //
+  // 【なぜ分けたか】以前は1つのURLで、マウスが動いたかどうかで見た目を切り替えて
+  // いた。OBSにはマウスが届かないので理屈は通っていたが、読み込みに失敗したときの
+  // 案内だけはその切り替えの外にあり、中継の画に「大会が見つかりません」という
+  // 文字がそのまま出てしまう。表示専用の側を別のURLにして、あの画面には案内を
+  // 描く道そのものを持たせない。
+  //
+  // どの対戦を出すかは、どちらも ?match={対戦ID}（対戦表のカードから開くと付いてくる）。
+  //
+  // 【表示専用のほうが元のURLを引き継いでいる】OBSのブラウザソースに貼られている
+  // URLはこの形なので、入れ替えると配信中の設定が操作画面を映し始める
+  // ── 操作パネルが中継の画に出るのが、いちばん困る壊れ方になる。
   ['scoreboard', '/tournaments/:id/scoreboard/'],
+  ['scoreboardControl', '/tournaments/:id/scoreboard/control/'],
   ['players', '/players/'],
   ['player', '/players/:id/'],
   ['entries', '/entries/'],
@@ -90,7 +107,12 @@ export const VIEW_ID_OF = {
   entrants: 'view-entrants',
   // 配信用スコアボード（js/scoreboard.js）。他のページと違い、この画面が出ている
   // あいだは body に .scoreboard-only が付いて、サイトの装い一式が消える。
+  //
+  // 表示専用（OBS用）と操作画面は別のURLだが、器は1つを共有する
+  // ── どちらも #scoreboard-root の中だけを組み立てるので、器を2つ持つ理由が無い。
+  // 描き分けは js/scoreboard.js が body のクラス（.sb-control-mode）で行う。
   scoreboard: 'view-scoreboard',
+  scoreboardControl: 'view-scoreboard',
   player: 'view-player-detail',
   // 選手を探すページ。ランキングの表を置いていた頃の #ranking から来た人も、
   // pathFromLegacyHash が読み替えてここへ着く。

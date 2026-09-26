@@ -941,7 +941,11 @@
 
    【ボタンではなくリンクのまま置いてある】行き先はOBSのブラウザソースへ貼るURLで、
    押して開くことより「右クリックしてURLを写す」ことのほうが多い。window.open で
-   開くボタンにすると、その一番よく使う操作ができなくなる。 */
+   開くボタンにすると、その一番よく使う操作ができなくなる。
+
+   【リンクは2本ある】スコアボードが操作画面と表示専用（OBS用）の2ページに
+   分かれているため。ふだん押すのは操作画面のほうなので、表示専用は
+   .is-sub で一段控えた見た目にして、押すべきほうを迷わせない。 */
 .chat-scoreboard-row {
   display: flex;
   align-items: center;
@@ -979,6 +983,23 @@
 .scoreboard-link:hover {
   border-color: var(--accent);
   background: var(--surface-2);
+  color: var(--accent-bright);
+}
+
+/* 表示専用（OBSに貼るURL）のほう。押して開く用ではなく、右クリックで写す用なので
+   面を張らず、字も一段小さくする。 */
+.scoreboard-link.is-sub {
+  min-height: 2.2rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: transparent;
+  border-color: var(--border-soft);
+  color: var(--text-faint);
+}
+
+.scoreboard-link.is-sub:hover {
+  border-color: var(--accent);
   color: var(--accent-bright);
 }
 

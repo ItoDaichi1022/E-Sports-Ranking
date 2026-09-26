@@ -112,6 +112,9 @@ async function appShell(request, env, url, route) {
   const data = await pageData(env, route);
   const meta = buildPageMeta(route.page, { param: route.param, ...data }, url.origin);
   meta.viewId = VIEW_ID_OF[route.page] ?? VIEW_ID_OF.home;
+  // 配信用スコアボードは表示専用と操作画面で器（viewId）を共有しているので、
+  // <body> に入れるクラスを決めるにはページ名のほうが要る。
+  meta.page = route.page;
   // 見出しに入れる名前。JSが動く前に読める文字がここしか無いので、
   // 大会名・お知らせの題があるページでは先に入れておく。
   meta.heading = data.tournament?.name ?? data.announcement?.title ?? null;
@@ -269,7 +272,7 @@ function escapeAttr(s) {
 // 取りに行く ── 40KBを2回配ったうえ、preload が LCP の役に立たなくなる。
 // 画面は普通に出るので気付けない。版数を上げるときは、こちらも一緒に上げること
 // （scripts/check-cache-version.mjs が両者を突き合わせて止める）。
-const HOME_LOGO = '/img/game-logo.webp?v=210';
+const HOME_LOGO = '/img/game-logo.webp?v=211';
 
 // index.html に既にある行は中身だけ差し替え、無い行はここで足す。
 //
@@ -347,9 +350,16 @@ function rewriteMeta(response, meta) {
     // 見た目（導入の演出・ヘッダー・黒い背景）が描かれ、それがそのまま中継の
     // 画に一瞬乗る。消す指示は css/style.css にあり、あれは <head> で読むので
     // 最初の描画に間に合う。
+    //
+    // 操作画面（scoreboardControl）には .sb-control-mode も足す。あちらは人が見る
+    // 画面で、透過をやめて地の色に戻す必要があるため ── 付けずに返すと、
+    // 開いた直後だけ真っ白な面が出る（透過した body の下が素の白だから）。
     .on('body', {
       element(el) {
-        if (meta.viewId === 'view-scoreboard') el.setAttribute('class', 'scoreboard-only');
+        if (meta.viewId !== 'view-scoreboard') return;
+        el.setAttribute('class', meta.page === 'scoreboardControl'
+          ? 'scoreboard-only sb-control-mode'
+          : 'scoreboard-only');
       },
     })
     .on('#view-home', {

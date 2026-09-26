@@ -4691,3 +4691,16 @@ body.scoreboard-only::before { display: none; }
 
 /* この画面だけは読み物ではないので、器の最低高さと余白も持たせない */
 #view-scoreboard { min-height: 0; padding: 0; margin: 0; }
+
+/* 操作画面（/tournaments/{大会ID}/scoreboard/control/）だけの打ち消し。
+   あちらは映像素材ではなく、配信卓の人が見て触る画面なので、透過をやめて
+   サイトの地の色に戻し、縦に伸びたときはスクロールできるようにする。
+
+   【この2行もこちらに置く理由は上と同じ】操作画面の作り一式は
+   css/scoreboard.css にあるが、あれは開いてから読まれるので、届くまでのあいだ
+   透過した body の下 ── 素の白い面 ── が見えてしまう。クラスは worker/index.js が
+   返すHTMLの時点で入れてあるので、この2行だけ先に効かせれば白い面は出ない。 */
+body.scoreboard-only.sb-control-mode {
+  overflow: auto;
+  background: var(--bg, #050505);
+}

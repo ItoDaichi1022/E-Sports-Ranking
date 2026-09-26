@@ -619,7 +619,11 @@ function routeFromLocation() {
     // 移った先でヘッダーもナビも背景も消えたままの、真っ黒な画面になる。
     // まだ一度も開いていなければ（scoreboardMod が null）畳むものも無いので、
     // ここで取りに行かせない。
-    if (target !== 'scoreboard') scoreboardMod?.closeScoreboard();
+    // スコアボードは表示専用（OBS用）と操作画面の2ページある。どちらも
+    // 同じモジュールが受け持つので、両方から外れたときだけ畳む。
+    if (target !== 'scoreboard' && target !== 'scoreboardControl') {
+      scoreboardMod?.closeScoreboard();
+    }
 
     // 比べるのはページ名ではなく要素のID。2つのページ名が同じ画面を指すことがあり
     // （かつて #players と #ranking がそうだった）、名前で比べると、後から回ってきた
@@ -665,6 +669,7 @@ function routeFromLocation() {
     else if (target === 'bracket') draw(renderBracketPage(param));
     else if (target === 'entrants') draw(renderEntrantsPage(param));
     else if (target === 'scoreboard') draw(loadScoreboard().then((m) => m.renderScoreboardPage(param)));
+    else if (target === 'scoreboardControl') draw(loadScoreboard().then((m) => m.renderScoreboardControlPage(param)));
     else if (target === 'player') draw(renderPlayerDetail(param));
     else if (target === 'players') refreshPlayerUI();
     else if (target === 'reports') renderBanReview();
@@ -4097,11 +4102,16 @@ async function start() {
   // トップだから（supabaseClient.js の redirectUrl）。下の3ページには着地しない。
   {
     const { page, param } = currentRoute();
-    if (param && (page === 'tournament' || page === 'entrants' || page === 'bracket')) {
+    // 配信用スコアボードもここに入れてある。あの画面は対戦表と同じ材料
+    // （エントリー＋試合結果）で組み立てるうえ、OBSのブラウザソースが
+    // 直に開くURLなので、絵が出るまでの待ち時間がそのまま「中継に何も出ない時間」
+    // になる ── 往復を1回減らす効き目がいちばん大きい。
+    const needsDetail = ['tournament', 'entrants', 'bracket', 'scoreboard', 'scoreboardControl'];
+    if (param && needsDetail.includes(page)) {
       db.prefetchTournamentDetail(param);
-      // 試合結果を使うのは対戦表だけ。大会詳細でも取りに行くと、開かない人にも
-      // 配ることになる（開いた分だけ読む、という方針がここで崩れる）。
-      if (page === 'bracket') db.prefetchTournamentMatches(param);
+      // 試合結果を使うのは対戦表とスコアボードだけ。大会詳細でも取りに行くと、
+      // 開かない人にも配ることになる（開いた分だけ読む、という方針がここで崩れる）。
+      if (page !== 'tournament' && page !== 'entrants') db.prefetchTournamentMatches(param);
     }
   }
 
