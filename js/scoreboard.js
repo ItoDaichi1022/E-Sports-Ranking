@@ -40,9 +40,11 @@
 //     つなぐ。チャンネルは大会に1本で、流すのは「いま出している対戦ID＋カウント」
 //     の組。テーブルは増やさない ── 配信中の一時的な値で、残す意味が無い
 //
-// 【まだ誰も選んでいないあいだは自動】
-// 操作画面で一度も対戦を選んでいなければ、両方の画面が同じ規則（defaultMatch）で
-// 同じ対戦を出す。選んだ時点から、選んだものが正になる。
+// 【選ばれていないあいだは空のボード】
+// 操作画面で対戦を選ぶまで（と、「選択を解除」を押したあと）は、名前もアイコンも
+// 回戦名も出さず、カウントは 0-0 のボードを出す。大会ロゴと大会名だけは残る。
+// 勝手に対戦を選んで出すことはしない ── 配信の前後や休憩中に、まだ始まっていない
+// 対戦の名前が中継の画に乗ってしまうため。何を映すかを決めるのは配信卓の人。
 //
 // 【まだ触っていないあいだはDBに従う】
 // 選んだ直後は、確定済みの対戦ならその最終スコアを出す（試合後のリザルト表示に
@@ -96,8 +98,9 @@ function roundLabelOf(match, round) {
 // 数字をモジュール側で覚えておかないと、観戦者が1人チャットを送るたびに
 // ゲームカウントが 0-0 に戻る、という壊れ方をする。
 //
-// rev は「いつ決めた値か」の通し番号。0 は「まだ誰も選んでいない（自動）」で、
-// そのあいだは matchId を描くたびに defaultMatch で選び直す。
+// rev は「いつ決めた値か」の通し番号。0 は「この画面ではまだ何も決まっていない」。
+// matchId が null なら未選択（空のボード）── rev が 0 でも、そうでなくても
+// （「選択を解除」も1つの決定として rev を進めて送る）。
 // ---------------------------------------------------------------------------
 let live = null;   // { tournamentId, matchId, a, b, swapped, touched, rev }
 let ui = null;     // 組み立て済みのDOM（作り直しを避けるために持つ）
@@ -130,7 +133,9 @@ function writeJson(key, value) {
 
 function loadSelection(tournamentId) {
   const v = readJson(selectionKey(tournamentId));
-  if (typeof v?.matchId !== 'string' || typeof v?.rev !== 'number') return null;
+  if (typeof v?.rev !== 'number') return null;
+  // matchId が null の控えは「解除した」という記録（未選択）
+  if (v.matchId !== null && typeof v.matchId !== 'string') return null;
   return { matchId: v.matchId, rev: v.rev };
 }
 
@@ -181,25 +186,6 @@ function isStreamed(tournamentId, roundIndex, matchId) {
   return (state.rounds.find(
     (r) => r.tournamentId === tournamentId && r.roundIndex === roundIndex,
   )?.streamedMatchIds ?? []).includes(matchId);
-}
-
-// まだ操作画面で誰も選んでいないときの既定。
-//   1. いま配信台に指定されていて、まだ確定していない対戦
-//   2. まだ確定していない対戦のうち、いちばん早い回戦のもの
-//   3. どれも終わっていれば決勝
-// 表示専用と操作画面が同じ材料から同じ答えを出すので、何も選ばなくても
-// 2つの画面は同じ対戦を出している。
-function defaultMatch(tournamentId, bracket) {
-  const all = eachMatch(bracket).filter(({ match }) => !match.isBye);
-
-  const streamed = all.find(({ match, roundIndex }) => !match.confirmed
-    && isStreamed(tournamentId, roundIndex, match.id));
-  if (streamed) return streamed;
-
-  const pending = all.find(({ match }) => !match.confirmed && match.player1Id && match.player2Id);
-  if (pending) return pending;
-
-  return all[all.length - 1] ?? null;
 }
 
 // 確定済みの対戦の最終スコア。"3-1" の左が player1 側（対戦表の上の行）。
@@ -273,13 +259,14 @@ function buildCore() {
   const tab = el('div', 'sb-core-tab');
   const event = el('span', 'sb-event');
   const round = el('span', 'sb-round');
-  tab.append(event, el('span', 'sb-tab-sep'), round);
+  const sep = el('span', 'sb-tab-sep');
+  tab.append(event, sep, round);
 
   // 【tab は最後に入れること】銘板はエンブレムの下の角に 8px ぶん被せてある。
   // 前に出ていないと、その重なりぶんが多角形の裏へ回って、ただ下に並べただけの
   // 見た目になる（重ね方は css/scoreboard.css の .sb-core-tab に書いてある）。
   root.append(back, face, tab);
-  return { root, event, face, round };
+  return { root, event, face, round, sep };
 }
 
 function buildBoard() {
@@ -355,11 +342,13 @@ function buildControls(onDelta, onReset, onSwap) {
 // TBD のままのカードが残る。数十枚のボタンなので作り直しても軽い。
 // 押したときの処理は枠に1つだけ付けておき（data-match で見分ける）、
 // 作り直しのたびに付け直さないで済むようにする。
-function buildPicker(onPick, onToggleDone) {
+function buildPicker(onPick, onToggleDone, onClear) {
   const box = el('div', 'sb-pick');
 
   const head = el('div', 'sb-pick-head');
   const label = el('p', 'sb-pick-label', '配信台に出す対戦');
+
+  const tools = el('div', 'sb-pick-tools');
 
   const toggle = el('label', 'sb-pick-toggle');
   const check = document.createElement('input');
@@ -368,7 +357,14 @@ function buildPicker(onPick, onToggleDone) {
   check.addEventListener('change', () => onToggleDone(check.checked));
   toggle.append(check, document.createTextNode('終わった対戦も表示'));
 
-  head.append(label, toggle);
+  // 試合と試合のあいだ・休憩中に、名前の無い 0-0 のボードへ戻すためのボタン
+  const clear = el('button', 'sb-ctrl-mini', '選択を解除');
+  clear.type = 'button';
+  clear.title = '名前を出さず、0-0 の空のボードにします';
+  clear.addEventListener('click', onClear);
+
+  tools.append(toggle, clear);
+  head.append(label, tools);
 
   const note = el('p', 'sb-pick-note');
   note.hidden = true;
@@ -380,7 +376,7 @@ function buildPicker(onPick, onToggleDone) {
   });
 
   box.append(head, note, list);
-  return { root: box, list, note };
+  return { root: box, list, note, clear };
 }
 
 function tag(text, modifier) {
@@ -404,7 +400,7 @@ function pickCard(tournamentId, match, roundIndex) {
   );
 
   const tags = el('span', 'sb-pick-tags');
-  if (current) tags.appendChild(tag(live.rev > 0 ? '配信中' : '配信中（自動）', 'onair'));
+  if (current) tags.appendChild(tag('配信中', 'onair'));
   if (isStreamed(tournamentId, roundIndex, match.id)) tags.appendChild(tag('配信台', 'stream'));
   if (match.isThirdPlace) tags.appendChild(tag('3位決定戦'));
   if (match.confirmed) tags.appendChild(tag(`確定 ${match.score ?? ''}`.trim(), 'done'));
@@ -439,7 +435,11 @@ function fillPicker(pickUi, tournamentId, bracket, currentMatch) {
   // 出している対戦の結果が入ったら、次を選ぶよう促す。映像のほうは確定した
   // 最終スコアのまま残る（リザルトとして見せられる）ので、自動では切り替えない
   // ── 配信の切り替えどきを決めるのは配信卓の人。
-  if (!currentMatch) {
+  pickUi.clear.disabled = !live?.matchId;
+  if (!live?.matchId) {
+    pickUi.note.hidden = false;
+    pickUi.note.textContent = '対戦が選ばれていません。OBSには名前の無い 0-0 のボードが出ています。下から出す対戦を選んでください。';
+  } else if (!currentMatch) {
     pickUi.note.hidden = false;
     pickUi.note.textContent = '出していた対戦が対戦表から無くなりました（組み直された可能性があります）。下から選び直してください。';
   } else if (currentMatch.confirmed) {
@@ -550,6 +550,22 @@ function fillSide(sideUi, tournamentId, entrantId, seed) {
     : escapeHtml(initialOf(name));
 }
 
+// 未選択のときの片側。名前・シード・メンバー・アイコンを空にする
+// （六角形の枠と板はそのまま残るので、ボードの形は崩れない）。
+function clearSide(sideUi) {
+  sideUi.name.textContent = '';
+  sideUi.sub.innerHTML = '';
+  sideUi.face.innerHTML = '';
+}
+
+// 銘板の回戦名。空のときは区切り線も消す ── 残すと「大会名 ｜」と
+// 何かが欠けたように見える。
+function setRoundLabel(text) {
+  if (!ui) return;
+  ui.board.core.round.textContent = text;
+  ui.board.core.sep.hidden = !text;
+}
+
 // 長い名前を枠に収める。設計上は26pxで、入らないぶんだけ段階的に落とす
 // （落としきっても入らなければ、CSS側の text-overflow で「…」になる）。
 //
@@ -624,6 +640,24 @@ function refresh() {
     fillPicker(ui.picker, live.tournamentId, bracket, found?.match ?? null);
   }
 
+  fillCore(ui.board.core, tournament);
+
+  // 未選択。名前・アイコン・回戦名を空にして、カウントは 0-0 にする
+  if (!live.matchId) {
+    clearSide(ui.board.left);
+    clearSide(ui.board.right);
+    setRoundLabel('');
+    if (ui.controls) {
+      ui.controls.left.nameEl.textContent = '—';
+      ui.controls.right.nameEl.textContent = '—';
+    }
+    if (ui.head) {
+      ui.head.meta.textContent = [tournament.name, '対戦未選択'].filter(Boolean).join('　｜　');
+    }
+    paint();
+    return;
+  }
+
   // 選ばれた対戦がまだ手元に無い（向こうの画面のほうが先にデータを持っている、
   // 対戦表が組み直された、など）。表示専用は描いてあるボードをそのまま残す
   // ── 名前を空にするより、1つ前の対戦が数秒残るほうが中継の画としてはまし。
@@ -642,8 +676,7 @@ function refresh() {
     : [match.player1Id, match.player2Id];
   fillSide(ui.board.left, live.tournamentId, p1, seedOf(tournament, p1));
   fillSide(ui.board.right, live.tournamentId, p2, seedOf(tournament, p2));
-  fillCore(ui.board.core, tournament);
-  ui.board.core.round.textContent = roundLabelOf(match, round);
+  setRoundLabel(roundLabelOf(match, round));
 
   if (ui.controls) {
     ui.controls.left.nameEl.textContent = p1 ? getEntrantName(live.tournamentId, p1) : 'TBD';
@@ -758,7 +791,9 @@ function broadcast() {
 }
 
 function receive(payload) {
-  if (!live || !payload || typeof payload.matchId !== 'string') return;
+  if (!live || !payload) return;
+  // matchId が null ＝「選択を解除」。それ以外で文字列でないものは読まない
+  if (payload.matchId !== null && typeof payload.matchId !== 'string') return;
   // rev は送るたびに増える通し番号。行き違いで古い値が後から届いても、
   // 新しいほうを巻き戻さない（±を連打したときに起きる）。
   if (typeof payload.rev !== 'number' || payload.rev <= live.rev) return;
@@ -853,12 +888,25 @@ function selectMatch(matchId) {
   const bracket = state.brackets[live.tournamentId];
   const found = bracket ? findMatch(bracket, matchId) : null;
   if (!found) return;
-  // 同じ対戦を押し直しただけ。自動で選ばれている対戦を押したときだけは、
-  // 「これに決めた」として送る（そこから先は自動で動かなくなる）
-  if (live.matchId === matchId && live.rev > 0) return;
+  // 同じ対戦を押し直しただけ
+  if (live.matchId === matchId) return;
 
   live.matchId = matchId;
   Object.assign(live, countFor(live.tournamentId, found.match));
+  refresh();
+  commit();
+}
+
+// 「選択を解除」。名前の無い 0-0 のボードに戻す。
+// それまで出していた対戦のカウントは対戦ごとの控えに残っているので、
+// 一覧で選び直せば数字も戻る。
+function clearSelection() {
+  if (!live?.matchId) return;
+  live.matchId = null;
+  live.a = 0;
+  live.b = 0;
+  live.swapped = false;
+  live.touched = false;
   refresh();
   commit();
 }
@@ -974,13 +1022,16 @@ export function renderScoreboardControlPage(tournamentId) {
   return render(tournamentId, MODE_CONTROL);
 }
 
-// 大会を開いた直後の状態。控えがあればその対戦とカウントから、無ければ自動
-// （rev 0）で始める。自動のときの対戦は render が毎回選び直す。
+// 大会を開いた直後の状態。控えがあればその対戦とカウントから、無ければ
+// 未選択（空のボード）で始める。
 function initialLive(tournamentId, bracket) {
   const selection = loadSelection(tournamentId);
-  const found = selection ? findMatch(bracket, selection.matchId) : null;
+  const found = selection?.matchId ? findMatch(bracket, selection.matchId) : null;
   if (!found) {
-    return { tournamentId, matchId: null, a: 0, b: 0, swapped: false, touched: false, rev: 0 };
+    // 「解除した」という控えなら、その rev を持っておく（古い選択の控えを
+    // 持った画面が後から開いても、そちらに巻き戻されないように）
+    const rev = selection && selection.matchId === null ? selection.rev : 0;
+    return { tournamentId, matchId: null, a: 0, b: 0, swapped: false, touched: false, rev };
   }
   return {
     tournamentId,
@@ -1051,7 +1102,7 @@ async function render(tournamentId, wantMode) {
     if (mode === MODE_CONTROL) {
       const head = buildHead(tournamentId);
       const controls = buildControls(bump, resetCount, swapSides);
-      const picker = buildPicker(selectMatch, toggleDone);
+      const picker = buildPicker(selectMatch, toggleDone, clearSelection);
       const obs = buildObsUrl();
       obs.url.value = obsUrlFor(tournamentId);
       obs.open.href = obs.url.value;
@@ -1072,23 +1123,6 @@ async function render(tournamentId, wantMode) {
 
     window.addEventListener('resize', applyScale);
     teardown.push(() => window.removeEventListener('resize', applyScale));
-  }
-
-  // まだ誰も選んでいなければ、そのときのデータで出す対戦を選び直す
-  // （回戦が進めば、自動で次の対戦へ移っていく）
-  if (live.rev === 0) {
-    const auto = defaultMatch(tournamentId, bracket);
-    if (auto && auto.match.id !== live.matchId) {
-      live.matchId = auto.match.id;
-      Object.assign(live, countFor(tournamentId, auto.match));
-    }
-  }
-
-  if (!live.matchId) {
-    fail(tournamentId, '<h2>出せる対戦がありません</h2>'
-      + '<p>この大会の対戦表に、表示できる対戦カードが見つかりませんでした。</p>'
-      + `<p><a href="${pathFor('bracket', tournamentId)}">対戦表へ</a></p>`);
-    return;
   }
 
   // ここまで来られたので、組み直しの待ちは畳む

@@ -738,6 +738,18 @@ a.sb-ctrl-mini {
   letter-spacing: 0.03em;
   color: #c3f53c;
 }
+.sb-pick-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+/* 「選択を解除」は、何も選んでいないときは押せない */
+.sb-ctrl-mini:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sb-ctrl-mini:disabled:hover { background: #1b1f24; }
 .sb-pick-toggle {
   display: inline-flex;
   align-items: center;
